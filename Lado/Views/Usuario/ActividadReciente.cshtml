@@ -1,0 +1,461 @@
+﻿@model Lado.Models.ApplicationUser
+@{
+    ViewData["Title"] = "Actividad Reciente";
+}
+
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2><i class="fas fa-history text-primary"></i> Actividad Reciente</h2>
+                <p class="text-muted">Revisa tu historial de actividad y transacciones</p>
+            </div>
+            <div>
+                <button class="btn btn-outline-primary me-2" onclick="filtrarActividad()">
+                    <i class="fas fa-filter"></i> Filtrar
+                </button>
+                <button class="btn btn-outline-secondary" onclick="exportarActividad()">
+                    <i class="fas fa-download"></i> Exportar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Filtros laterales -->
+    <div class="col-lg-3 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h6 class="mb-0">Filtros</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label small">Tipo de Actividad</label>
+                    <select class="form-select form-select-sm" id="filtroTipo">
+                        <option value="todas">Todas</option>
+                        @if (Model.TipoUsuario == (int)Lado.Models.TipoUsuario.Creador)
+                        {
+                            <option value="suscripcion">Nuevas Suscripciones</option>
+                            <option value="pago">Pagos Recibidos</option>
+                            <option value="retiro">Retiros</option>
+                            <option value="contenido">Nuevo Contenido</option>
+                        }
+                        else
+                        {
+                            <option value="suscripcion">Suscripciones</option>
+                            <option value="pago">Pagos Realizados</option>
+                            <option value="like">Likes</option>
+                            <option value="comentario">Comentarios</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small">Período</label>
+                    <select class="form-select form-select-sm" id="filtroPeriodo">
+                        <option value="hoy">Hoy</option>
+                        <option value="semana" selected>Esta Semana</option>
+                        <option value="mes">Este Mes</option>
+                        <option value="todo">Todo el Tiempo</option>
+                    </select>
+                </div>
+
+                <button class="btn btn-primary btn-sm w-100" onclick="aplicarFiltros()">
+                    <i class="fas fa-check"></i> Aplicar Filtros
+                </button>
+                <button class="btn btn-outline-secondary btn-sm w-100 mt-2" onclick="limpiarFiltros()">
+                    <i class="fas fa-times"></i> Limpiar
+                </button>
+            </div>
+        </div>
+
+        <!-- Resumen de Actividad -->
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-white">
+                <h6 class="mb-0">Resumen</h6>
+            </div>
+            <div class="card-body">
+                @if (Model.TipoUsuario == (int)Lado.Models.TipoUsuario.Creador)
+                {
+                    <div class="mb-3">
+                        <small class="text-muted">Esta Semana</small>
+                        <h5 class="mb-0 text-success">$@((ViewBag.IngresosEstaSemana ?? 0m).ToString("N2"))</h5>
+                        <small class="text-muted">en ingresos</small>
+                    </div>
+                    <hr>
+                    <div class="mb-3">
+                        <small class="text-muted">Nuevos Suscriptores</small>
+                        <h5 class="mb-0 text-primary">@(ViewBag.NuevosSuscriptores ?? 0)</h5>
+                    </div>
+                    <hr>
+                    <div>
+                        <small class="text-muted">Publicaciones</small>
+                        <h5 class="mb-0 text-info">@(ViewBag.PublicacionesEstaSemana ?? 0)</h5>
+                    </div>
+                }
+                else
+                {
+                    <div class="mb-3">
+                        <small class="text-muted">Gastos Esta Semana</small>
+                        <h5 class="mb-0 text-danger">$@((ViewBag.GastosEstaSemana ?? 0m).ToString("N2"))</h5>
+                    </div>
+                    <hr>
+                    <div>
+                        <small class="text-muted">Contenido Consumido</small>
+                        <h5 class="mb-0 text-info">@(ViewBag.ContenidoVisto ?? 0)</h5>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline de Actividad -->
+    <div class="col-lg-9">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <!-- Tabs de navegación -->
+                <ul class="nav nav-tabs mb-4" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#todas">
+                            <i class="fas fa-list"></i> Todas
+                        </a>
+                    </li>
+                    @if (Model.TipoUsuario == (int)Lado.Models.TipoUsuario.Creador)
+                    {
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#transacciones">
+                                <i class="fas fa-dollar-sign"></i> Transacciones
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#contenido">
+                                <i class="fas fa-image"></i> Contenido
+                            </a>
+                        </li>
+                    }
+                    else
+                    {
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#suscripciones">
+                                <i class="fas fa-heart"></i> Suscripciones
+                            </a>
+                        </li>
+                    }
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#interacciones">
+                            <i class="fas fa-comments"></i> Interacciones
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- Contenido de tabs -->
+                <div class="tab-content">
+                    <!-- Tab Todas -->
+                    <div class="tab-pane fade show active" id="todas">
+                        <div class="timeline">
+                            @if (ViewBag.Actividades != null && ViewBag.Actividades.Count > 0)
+                            {
+                                @foreach (var actividad in ViewBag.Actividades)
+                                {
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker">
+                                            @if (actividad.Tipo == "suscripcion")
+                                            {
+                                                <i class="fas fa-user-plus text-primary"></i>
+                                            }
+                                            else if (actividad.Tipo == "retiro")
+                                            {
+                                                <i class="fas fa-dollar-sign text-danger"></i>
+                                            }
+                                            else if (actividad.Tipo == "contenido")
+                                            {
+                                                <i class="fas fa-image text-info"></i>
+                                            }
+                                            else if (actividad.Tipo == "like")
+                                            {
+                                                <i class="fas fa-heart text-danger"></i>
+                                            }
+                                            else
+                                            {
+                                                <i class="fas fa-dollar-sign text-success"></i>
+                                            }
+                                        </div>
+                                        <div class="timeline-content">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <div>
+                                                    <h6 class="mb-1">@actividad.Titulo</h6>
+                                                    <p class="text-muted mb-0 small">@actividad.Descripcion</p>
+                                                </div>
+                                                @if (actividad.Monto.HasValue && actividad.Monto > 0)
+                                                {
+                                                    <span class="badge bg-success">+$@actividad.Monto.Value.ToString("N2")</span>
+                                                }
+                                            </div>
+                                            <small class="text-muted">
+                                                <i class="fas fa-clock"></i> @actividad.Fecha.ToString("dd/MM/yyyy HH:mm")
+                                            </small>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="text-center py-5">
+                                    <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+                                    <h5 class="text-muted">No hay actividad reciente</h5>
+                                    <p class="text-muted">Cuando realices acciones, aparecerán aquí</p>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Paginación -->
+                        @if (ViewBag.TotalPaginas > 1)
+                        {
+                            <nav class="mt-4">
+                                <ul class="pagination justify-content-center">
+                                    <li class="page-item">
+                                        <a class="page-link" href="?pagina=1">
+                                            <i class="fas fa-angle-double-left"></i>
+                                        </a>
+                                    </li>
+                                    @for (int i = 1; i <= ViewBag.TotalPaginas; i++)
+                                    {
+                                        <li class="page-item @(i == ViewBag.PaginaActual ? "active" : "")">
+                                            <a class="page-link" href="?pagina=@i">@i</a>
+                                        </li>
+                                    }
+                                    <li class="page-item">
+                                        <a class="page-link" href="?pagina=@ViewBag.TotalPaginas">
+                                            <i class="fas fa-angle-double-right"></i>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        }
+                    </div>
+
+                    <!-- Tab Transacciones -->
+                    @if (Model.TipoUsuario == (int)Lado.Models.TipoUsuario.Creador)
+                    {
+                        <div class="tab-pane fade" id="transacciones">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Tipo</th>
+                                            <th>Descripción</th>
+                                            <th class="text-end">Monto</th>
+                                            <th>Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (ViewBag.Transacciones != null && ViewBag.Transacciones.Count > 0)
+                                        {
+                                            @foreach (var trans in ViewBag.Transacciones)
+                                            {
+                                                <tr>
+                                                    <td><small>@trans.Fecha.ToString("dd/MM/yyyy")</small></td>
+                                                    <td>
+                                                        <span class="badge bg-info">@trans.Tipo</span>
+                                                    </td>
+                                                    <td>@trans.Descripcion</td>
+                                                    <td class="text-end text-success fw-bold">+$@trans.Monto.ToString("N2")</td>
+                                                    <td>
+                                                        <span class="badge bg-success">@trans.Estado</span>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <tr>
+                                                <td colspan="5" class="text-center py-4 text-muted">
+                                                    No hay transacciones registradas
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="contenido">
+                            <div class="row g-3">
+                                @if (ViewBag.ContenidoReciente != null && ViewBag.ContenidoReciente.Count > 0)
+                                {
+                                    @foreach (var contenido in ViewBag.ContenidoReciente)
+                                    {
+                                        <div class="col-md-4">
+                                            <div class="card">
+                                                <img src="@contenido.RutaArchivo" class="card-img-top" style="height: 200px; object-fit: cover;" alt="Contenido">
+                                                <div class="card-body">
+                                                    <p class="small mb-2">@contenido.Descripcion</p>
+                                                    <div class="d-flex justify-content-between text-muted small">
+                                                        <span><i class="fas fa-heart"></i> @contenido.Likes</span>
+                                                        <span>@contenido.FechaPublicacion.ToString("dd/MM/yyyy")</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="col-12 text-center py-5">
+                                        <i class="fas fa-image fa-4x text-muted mb-3"></i>
+                                        <h5 class="text-muted">No has publicado contenido</h5>
+                                        <a href="/Contenido/Crear" class="btn btn-primary mt-3">
+                                            <i class="fas fa-plus"></i> Crear Publicación
+                                        </a>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="tab-pane fade" id="suscripciones">
+                            <div class="list-group">
+                                @if (ViewBag.Suscripciones != null && ViewBag.Suscripciones.Count > 0)
+                                {
+                                    @foreach (var sub in ViewBag.Suscripciones)
+                                    {
+                                        <div class="list-group-item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div class="d-flex align-items-center">
+                                                    @if (!string.IsNullOrEmpty(sub.Creador.FotoPerfil))
+                                                    {
+                                                        <img src="@sub.Creador.FotoPerfil" class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover;" alt="@sub.Creador.UserName">
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="rounded-circle bg-primary d-inline-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
+                                                            <span class="text-white fw-bold">@sub.Creador.NombreCompleto.Substring(0, 1)</span>
+                                                        </div>
+                                                    }
+                                                    <div>
+                                                        <h6 class="mb-0">@sub.Creador.NombreCompleto</h6>
+                                                        <small class="text-muted">Suscrito desde @sub.FechaInicio.ToString("dd/MM/yyyy")</small>
+                                                    </div>
+                                                </div>
+                                                <div class="text-end">
+                                                    <span class="badge bg-success mb-1">Activa</span>
+                                                    <p class="mb-0 small text-muted">$@sub.Precio.ToString("N2")/mes</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="text-center py-5">
+                                        <i class="fas fa-heart-broken fa-4x text-muted mb-3"></i>
+                                        <h5 class="text-muted">No tienes suscripciones activas</h5>
+                                        <a href="/Explorar" class="btn btn-primary mt-3">
+                                            <i class="fas fa-search"></i> Explorar Creadores
+                                        </a>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <div class="tab-pane fade" id="interacciones">
+                        <div class="list-group">
+                            <div class="text-center py-5">
+                                <i class="fas fa-comments fa-4x text-muted mb-3"></i>
+                                <h5 class="text-muted">No hay interacciones recientes</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function filtrarActividad() {
+            alert('Filtros aplicados');
+        }
+
+        function exportarActividad() {
+            alert('Exportando actividad...');
+        }
+
+        function aplicarFiltros() {
+            const tipo = document.getElementById('filtroTipo').value;
+            const periodo = document.getElementById('filtroPeriodo').value;
+
+            console.log('Filtrar por:', tipo, periodo);
+            alert('Filtros aplicados');
+        }
+
+        function limpiarFiltros() {
+            document.getElementById('filtroTipo').value = 'todas';
+            document.getElementById('filtroPeriodo').value = 'semana';
+            alert('Filtros limpiados');
+        }
+    </script>
+}
+
+<style>
+    .timeline {
+        position: relative;
+        padding-left: 50px;
+    }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e0e0e0;
+        }
+
+    .timeline-item {
+        position: relative;
+        margin-bottom: 30px;
+    }
+
+    .timeline-marker {
+        position: absolute;
+        left: -38px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: white;
+        border: 2px solid #e0e0e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+    }
+
+    .timeline-content {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 10px;
+        border-left: 3px solid #00bcd4;
+    }
+
+        .timeline-content:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+            transition: all 0.3s;
+        }
+
+    .nav-tabs .nav-link {
+        color: #666;
+    }
+
+        .nav-tabs .nav-link.active {
+            color: #00bcd4;
+            border-bottom-color: #00bcd4;
+        }
+</style>

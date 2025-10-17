@@ -1,0 +1,247 @@
+﻿@model List<Lado.Models.Contenido>
+@using Lado.Models
+@{
+    ViewData["Title"] = "Moderación de Contenido";
+}
+
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h2><i class="fas fa-eye text-success"></i> Moderación de Contenido</h2>
+            <p class="text-muted">Total: @Model.Count contenidos</p>
+        </div>
+        <div class="col-md-6 text-end">
+            <a href="@Url.Action("Index", "Admin")" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Volver al Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Grid de Contenido -->
+    @if (Model.Any())
+    {
+        <div class="row g-3">
+            @foreach (var contenido in Model)
+            {
+                <div class="col-md-4 col-lg-3">
+                    <div class="card border-0 shadow-sm h-100 position-relative">
+                        <!-- Badge de estado -->
+                        @if (contenido.Censurado)
+                        {
+                            <div class="position-absolute top-0 start-0 w-100 p-2" style="z-index: 10;">
+                                <span class="badge bg-danger">
+                                    <i class="fas fa-ban"></i> CENSURADO
+                                </span>
+                            </div>
+                        }
+
+                        <!-- Imagen de preview -->
+                        <div class="position-relative" style="height: 250px; overflow: hidden;">
+                            @if ((int)contenido.TipoContenido == 0 && !string.IsNullOrEmpty(contenido.RutaArchivo))
+                            {
+                                <img src="@contenido.RutaArchivo" class="w-100 h-100" style="object-fit: cover;"
+                                     alt="Contenido">
+                                @if (contenido.Censurado)
+                                {
+                                    <div class="position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-flex align-items-center justify-content-center">
+                                        <i class="fas fa-eye-slash fa-3x text-white"></i>
+                                    </div>
+                                }
+                            }
+                            else if ((int)contenido.TipoContenido == 1)
+                            {
+                                <div class="bg-dark d-flex align-items-center justify-content-center h-100">
+                                    <i class="fas fa-play-circle fa-4x text-white"></i>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="bg-light d-flex align-items-center justify-content-center h-100">
+                                    <i class="fas fa-file-alt fa-4x text-muted"></i>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="card-body">
+                            <!-- Info del creador -->
+                            @if (contenido.Usuario != null)
+                            {
+                                <div class="d-flex align-items-center mb-2">
+                                    @if (!string.IsNullOrEmpty(contenido.Usuario.FotoPerfil))
+                                    {
+                                        <img src="@contenido.Usuario.FotoPerfil" alt="@contenido.Usuario.UserName"
+                                             class="rounded-circle me-2" style="width: 30px; height: 30px; object-fit: cover;">
+                                    }
+                                    else
+                                    {
+                                        <div class="rounded-circle bg-primary text-white me-2 d-flex align-items-center justify-content-center"
+                                             style="width: 30px; height: 30px; font-size: 0.8rem;">
+                                            <strong>@(contenido.Usuario.UserName?.Substring(0, 1).ToUpper() ?? "?")</strong>
+                                        </div>
+                                    }
+                                    <small class="text-muted">@(contenido.Usuario.UserName ?? "Usuario Desconocido")</small>
+                                </div>
+                            }
+
+                            <!-- Descripción -->
+                            <p class="card-text small mb-2">
+                                @if (!string.IsNullOrEmpty(contenido.Descripcion))
+                                {
+                                    if (contenido.Descripcion.Length > 60)
+                                    {
+                                        @contenido.Descripcion.Substring(0, 60)
+
+                                        <text>...</text>
+                                    }
+                                    else
+                                    {
+                                        @contenido.Descripcion
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted fst-italic">Sin descripción</span>
+                                }
+                            </p>
+
+                            <!-- Tipo y Fecha -->
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-secondary">@contenido.TipoContenido</span>
+                                <small class="text-muted">@contenido.FechaPublicacion.ToString("dd/MM/yy")</small>
+                            </div>
+
+                            <!-- Stats -->
+                            <div class="d-flex justify-content-between text-muted small mb-3">
+                                <span><i class="fas fa-heart"></i> @(contenido.Likes?.Count ?? 0)</span>
+                                <span><i class="fas fa-comment"></i> @(contenido.Comentarios?.Count ?? 0)</span>
+                            </div>
+
+                            <!-- Acciones -->
+                            <div class="d-grid gap-2">
+                                @if (contenido.Censurado)
+                                {
+                                    <form method="post" action="@Url.Action("DescensurarContenido", new { id = contenido.Id })"
+                                          onsubmit="return confirm('¿Descensurar este contenido?')">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-success w-100">
+                                            <i class="fas fa-check"></i> Descensurar
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-warning" data-bs-toggle="modal"
+                                            data-bs-target="#censurarModal" data-contentid="@contenido.Id">
+                                        <i class="fas fa-ban"></i> Censurar
+                                    </button>
+                                }
+                                <button class="btn btn-sm btn-danger" data-bs-toggle="modal"
+                                        data-bs-target="#eliminarModal" data-contentid="@contenido.Id">
+                                    <i class="fas fa-trash"></i> Eliminar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+                <h5 class="text-muted">No se encontró contenido</h5>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Modal Censurar -->
+<div class="modal fade" id="censurarModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">Censurar Contenido</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" id="formCensurar">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <p>Especifica la razón de la censura:</p>
+                    <select name="razon" class="form-select mb-3" required>
+                        <option value="">Selecciona una razón...</option>
+                        <option value="Contenido inapropiado">Contenido inapropiado</option>
+                        <option value="Violación de términos de uso">Violación de términos de uso</option>
+                        <option value="Contenido ofensivo">Contenido ofensivo</option>
+                        <option value="Spam o publicidad no autorizada">Spam o publicidad</option>
+                        <option value="Violación de derechos de autor">Derechos de autor</option>
+                        <option value="Contenido violento">Contenido violento</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                    <textarea name="detalles" class="form-control" rows="3"
+                              placeholder="Detalles adicionales (opcional)"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">Censurar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Eliminar -->
+<div class="modal fade" id="eliminarModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Eliminar Contenido</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" id="formEliminar">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>¡ADVERTENCIA!</strong> Esta acción es permanente.
+                    </div>
+                    <p>¿Estás seguro de eliminar este contenido?</p>
+                    <p class="text-muted small">Se eliminarán también todos sus likes y comentarios.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Eliminar Permanentemente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Modal Censurar
+    document.getElementById('censurarModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var contentId = button.getAttribute('data-contentid');
+        document.getElementById('formCensurar').action = '/Admin/CensurarContenido/' + contentId;
+    });
+
+    // Modal Eliminar
+    document.getElementById('eliminarModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var contentId = button.getAttribute('data-contentid');
+        document.getElementById('formEliminar').action = '/Admin/EliminarContenido/' + contentId;
+    });
+</script>
+
+<style>
+    .card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15) !important;
+        }
+</style>

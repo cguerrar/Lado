@@ -1,0 +1,288 @@
+﻿@model Lado.Models.ApplicationUser
+@using Lado.Controllers
+@{
+    ViewData["Title"] = "Mensajes";
+    var conversaciones = ViewBag.Conversaciones as List<ConversacionViewModel>;
+}
+
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-0 d-flex align-items-center py-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary me-3">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <div>
+                    <h2 class="mb-0 fs-4">Mensajes</h2>
+                    <p class="text-muted mb-0 small">Tus conversaciones</p>
+                </div>
+            </div>
+
+            <div class="card-body p-0">
+                @if (conversaciones != null && conversaciones.Any())
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var conv in conversaciones)
+                        {
+                            <a href="/Mensajes/Chat/@conv.Contacto.Id"
+                               class="list-group-item list-group-item-action conversacion-item @(conv.MensajesNoLeidos > 0 ? "no-leido" : "")">
+                                <div class="d-flex align-items-center">
+                                    <!-- Avatar -->
+                                    <div class="position-relative me-3 flex-shrink-0">
+                                        @if (!string.IsNullOrEmpty(conv.Contacto.FotoPerfil))
+                                        {
+                                            <img src="@conv.Contacto.FotoPerfil"
+                                                 alt="@conv.Contacto.NombreCompleto"
+                                                 class="rounded-circle avatar-img"
+                                                 style="width: 60px; height: 60px; object-fit: cover;">
+                                        }
+                                        else
+                                        {
+                                            <div class="rounded-circle bg-gradient-primary d-flex align-items-center justify-content-center text-white fw-bold avatar-placeholder"
+                                                 style="width: 60px; height: 60px; font-size: 24px;">
+                                                @conv.Contacto.NombreCompleto?.Substring(0, 1).ToUpper()
+                                            </div>
+                                        }
+
+                                        @if (conv.MensajesNoLeidos > 0)
+                                        {
+                                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                                                  style="font-size: 11px;">
+                                                @conv.MensajesNoLeidos
+                                            </span>
+                                        }
+                                    </div>
+
+                                    <!-- Información del contacto y último mensaje -->
+                                    <div class="flex-grow-1 min-width-0">
+                                        <div class="d-flex justify-content-between align-items-start mb-1">
+                                            <div class="min-width-0 flex-grow-1">
+                                                <h6 class="mb-0 @(conv.MensajesNoLeidos > 0 ? "fw-bold" : "") text-truncate">
+                                                    @conv.Contacto.NombreCompleto
+                                                    @if (conv.Contacto.EsVerificado)
+                                                    {
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-primary ms-1">
+                                                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                                        </svg>
+                                                    }
+                                                </h6>
+                                                <small class="text-muted text-truncate d-block">@@@conv.Contacto.UserName</small>
+                                            </div>
+                                            @if (conv.UltimoMensaje != null)
+                                            {
+                                                <small class="text-muted flex-shrink-0 ms-2">
+                                                    @if (conv.UltimoMensaje.FechaEnvio.Date == DateTime.Today)
+                                                    {
+                                                        @conv.UltimoMensaje.FechaEnvio.ToString("HH:mm")
+                                                    }
+                                                    else if (conv.UltimoMensaje.FechaEnvio.Date == DateTime.Today.AddDays(-1))
+                                                    {
+                                                        <text>Ayer</text>
+                                                    }
+                                                    else
+                                                    {
+                                                        @conv.UltimoMensaje.FechaEnvio.ToString("dd/MM/yyyy")
+                                                    }
+                                                </small>
+                                            }
+                                        </div>
+
+                                        @if (conv.TieneConversacion && conv.UltimoMensaje != null)
+                                        {
+                                            <p class="mb-0 text-muted small text-truncate @(conv.MensajesNoLeidos > 0 ? "fw-semibold" : "")"
+                                               style="max-width: 100%;">
+                                                @if (conv.UltimoMensaje.RemitenteId == Model.Id)
+                                                {
+                                                    <span class="me-1">Tú:</span>
+                                                }
+                                                @conv.UltimoMensaje.Contenido
+                                            </p>
+                                        }
+                                        else
+                                        {
+                                            <p class="mb-0 text-muted small fst-italic">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
+                                                    <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
+                                                    <path d="m9 12 2 2 4-4"></path>
+                                                </svg>
+                                                @if (Model.TipoUsuario == 0)
+                                                {
+                                                    <text>Estás suscrito - Envía tu primer mensaje</text>
+                                                }
+                                                else
+                                                {
+                                                    <text>Sin mensajes aún</text>
+                                                }
+                                            </p>
+                                        }
+                                    </div>
+
+                                    <!-- Indicador visual -->
+                                    <div class="flex-shrink-0 ms-2 d-none d-md-block">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted">
+                                            <polyline points="9 18 15 12 9 6"></polyline>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </a>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-5 px-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-muted mb-3">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <h5 class="text-muted mb-2">
+                            @if (Model.TipoUsuario == 0)
+                            {
+                                <text>No tienes suscripciones activas</text>
+                            }
+                            else
+                            {
+                                <text>No tienes mensajes</text>
+                            }
+                        </h5>
+                        <p class="text-muted mb-4">
+                            @if (Model.TipoUsuario == 0)
+                            {
+                                <text>Suscríbete a creadores para poder enviarles mensajes</text>
+                            }
+                            else
+                            {
+                                <text>Cuando alguien te escriba, verás tus conversaciones aquí</text>
+                            }
+                        </p>
+                        <a href="/Explorar" class="btn btn-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                            Explorar Creadores
+                        </a>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .conversacion-item {
+        transition: all 0.2s ease;
+        border-left: 3px solid transparent;
+        padding: 1rem 1.5rem;
+    }
+
+        .conversacion-item:hover {
+            background-color: #f8f9fa;
+            border-left-color: #0d6efd;
+            text-decoration: none;
+        }
+
+        .conversacion-item.no-leido {
+            background-color: #f0f8ff;
+        }
+
+            .conversacion-item.no-leido:hover {
+                background-color: #e6f2ff;
+            }
+
+    .text-truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .bg-gradient-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .min-width-0 {
+        min-width: 0;
+    }
+
+    /* Estilos para avatares */
+    .avatar-img {
+        transition: transform 0.2s;
+    }
+
+    .conversacion-item:hover .avatar-img {
+        transform: scale(1.05);
+    }
+
+    /* Responsive Design */
+    @@media (max-width: 768px) {
+        .conversacion-item
+
+    {
+        padding: 0.875rem 1rem;
+    }
+
+    .avatar-img,
+    .avatar-placeholder {
+        width: 50px !important;
+        height: 50px !important;
+        font-size: 20px !important;
+    }
+
+    .card-header h2 {
+        font-size: 1.25rem !important;
+    }
+
+    .card-header svg {
+        width: 24px;
+        height: 24px;
+    }
+
+    }
+
+    @@media (max-width: 576px) {
+        .conversacion-item
+
+    {
+        padding: 0.75rem;
+    }
+
+    .avatar-img,
+    .avatar-placeholder {
+        width: 45px !important;
+        height: 45px !important;
+        font-size: 18px !important;
+    }
+
+    .conversacion-item h6 {
+        font-size: 0.95rem;
+    }
+
+    .conversacion-item small {
+        font-size: 0.75rem;
+    }
+
+    .conversacion-item p {
+        font-size: 0.85rem;
+    }
+
+    .card-header {
+        padding: 0.75rem 1rem !important;
+    }
+
+    }
+
+    @@media (max-width: 400px) {
+        .conversacion-item
+
+    {
+        padding: 0.625rem 0.75rem;
+    }
+
+    .avatar-img,
+    .avatar-placeholder {
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 16px !important;
+    }
+
+    }
+</style>

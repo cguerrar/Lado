@@ -1,0 +1,426 @@
+﻿@{
+    ViewData["Title"] = "Nueva Publicación";
+}
+
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h4 class="mb-0">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 8px;">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
+                    </svg>
+                    Nueva Publicación
+                </h4>
+            </div>
+            <div class="card-body">
+                <form asp-action="Crear" method="post" enctype="multipart/form-data" id="formContenido">
+                    <div asp-validation-summary="All" class="alert alert-danger"></div>
+
+                    <!-- Tipo de Contenido -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Tipo de contenido</label>
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <div class="tipo-contenido-card active" data-tipo="0">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" style="color: var(--primary-color);" class="mb-2">
+                                        <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+                                    </svg>
+                                    <div class="fw-bold">Foto</div>
+                                    <small class="text-muted d-none d-sm-block">JPG, PNG, GIF</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="tipo-contenido-card" data-tipo="1">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" style="color: var(--primary-color);" class="mb-2">
+                                        <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
+                                    </svg>
+                                    <div class="fw-bold">Video</div>
+                                    <small class="text-muted d-none d-sm-block">MP4, MOV, AVI</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="tipo-contenido-card" data-tipo="3">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" style="color: var(--primary-color);" class="mb-2">
+                                        <path d="M3 3h18v2H3V3zm0 4h12v2H3V7zm0 4h18v2H3v-2zm0 4h12v2H3v-2zm0 4h18v2H3v-2z" />
+                                    </svg>
+                                    <div class="fw-bold">Post</div>
+                                    <small class="text-muted d-none d-sm-block">Solo texto</small>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" name="TipoContenido" id="tipoContenidoInput" value="0" />
+                    </div>
+
+                    <!-- Subir Archivo -->
+                    <div class="mb-4" id="archivoSection">
+                        <label class="form-label fw-bold">
+                            Subir archivo
+                            <span class="text-danger">*</span>
+                        </label>
+                        <div class="upload-area" id="uploadArea">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="white" class="mb-3">
+                                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z" />
+                            </svg>
+                            <p class="mb-2 text-white">Arrastra tu archivo aquí o haz clic para seleccionar</p>
+                            <small class="text-white-50">Máximo 100 MB</small>
+                            <input type="file" name="archivo" id="archivoInput" class="d-none" accept="image/*,video/*" required>
+                        </div>
+                        <div id="previewArea" class="mt-3 d-none">
+                            <div class="position-relative">
+                                <img id="imagePreview" class="img-fluid rounded d-none" style="max-height: 300px;">
+                                <video id="videoPreview" class="w-100 rounded d-none" style="max-height: 300px;" controls></video>
+                                <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2" id="removeFileBtn">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="mt-2 text-muted small" id="fileInfo"></div>
+                        </div>
+                    </div>
+
+                    <!-- Descripción -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Descripción</label>
+                        <textarea name="Descripcion" class="form-control" rows="4" placeholder="Escribe una descripción atractiva para tu contenido..." maxlength="500" id="descripcionTextarea"></textarea>
+                        <div class="form-text">
+                            <span id="charCount">0</span>/500 caracteres
+                        </div>
+                    </div>
+
+                    <!-- Configuración Premium -->
+                    <div class="card bg-light mb-4">
+                        <div class="card-body">
+                            <div class="form-check form-switch mb-3">
+                                <input name="EsPremium" class="form-check-input" type="checkbox" id="esPremiumSwitch" value="true">
+                                <input type="hidden" name="EsPremium" value="false">
+                                <label class="form-check-label fw-bold" for="esPremiumSwitch">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffc107" style="vertical-align: middle; margin-right: 4px;">
+                                        <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
+                                    </svg>
+                                    Contenido Premium
+                                </label>
+                                <div class="form-text">Los usuarios deberán pagar para desbloquear este contenido</div>
+                            </div>
+
+                            <div id="precioSection" class="d-none">
+                                <label class="form-label">Precio de desbloqueo</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <select name="PrecioDesbloqueo" class="form-select" id="precioSelect">
+                                        <option value="5">5</option>
+                                        <option value="10" selected>10</option>
+                                        <option value="15">15</option>
+                                        <option value="20">20</option>
+                                        <option value="25">25</option>
+                                        <option value="30">30</option>
+                                        <option value="35">35</option>
+                                        <option value="40">40</option>
+                                        <option value="45">45</option>
+                                        <option value="50">50</option>
+                                        <option value="55">55</option>
+                                        <option value="60">60</option>
+                                        <option value="65">65</option>
+                                        <option value="70">70</option>
+                                        <option value="75">75</option>
+                                        <option value="80">80</option>
+                                        <option value="85">85</option>
+                                        <option value="90">90</option>
+                                        <option value="95">95</option>
+                                        <option value="100">100</option>
+                                    </select>
+                                </div>
+                                <small class="form-text text-muted">Precios en incrementos de $5</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botones -->
+                    <div class="d-flex flex-column flex-sm-row gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg flex-grow-1" id="btnPublicar">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="white" style="vertical-align: middle; margin-right: 4px;">
+                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                            </svg>
+                            Publicar Ahora
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-lg" id="btnBorrador">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 4px;">
+                                <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
+                            </svg>
+                            Guardar Borrador
+                        </button>
+                        <a href="/Contenido" class="btn btn-outline-danger btn-lg">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 4px;">
+                                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                            </svg>
+                            Cancelar
+                        </a>
+                    </div>
+
+                    <input type="hidden" name="EsBorrador" id="esBorradorInput" value="false">
+                </form>
+            </div>
+        </div>
+
+        <!-- Tips Card -->
+        <div class="card shadow-sm mt-4">
+            <div class="card-body">
+                <h5>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffc107" style="vertical-align: middle; margin-right: 8px;">
+                        <path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z" />
+                    </svg>
+                    Tips para contenido exitoso
+                </h5>
+                <ul class="mb-0">
+                    <li>Usa descripciones claras y atractivas</li>
+                    <li>Sube imágenes de alta calidad (mínimo 1080p)</li>
+                    <li>El contenido premium genera más ingresos</li>
+                    <li>Publica consistentemente para mantener a tu audiencia</li>
+                    <li>Interactúa con los comentarios de tus fans</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .tipo-contenido-card {
+        text-align: center;
+        padding: 30px;
+        border: 2px solid #e0e0e0;
+        border-radius: 15px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+        .tipo-contenido-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-5px);
+        }
+
+        .tipo-contenido-card.active {
+            border-color: var(--primary-color);
+            background: rgba(0, 188, 212, 0.05);
+        }
+
+        .tipo-contenido-card svg {
+            width: 48px;
+            height: 48px;
+        }
+
+        .tipo-contenido-card .fw-bold {
+            font-size: 1rem;
+        }
+
+        .tipo-contenido-card small {
+            font-size: 0.75rem;
+        }
+
+    .upload-area {
+        border: 3px dashed #ddd;
+        border-radius: 15px;
+        padding: 60px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        background: linear-gradient(135deg, var(--primary-color) 0%, #0097a7 100%);
+    }
+
+        .upload-area:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 20px rgba(0, 188, 212, 0.3);
+        }
+
+        .upload-area.dragover {
+            border-color: white;
+            background: linear-gradient(135deg, #0097a7 0%, var(--primary-color) 100%);
+            transform: scale(1.02);
+        }
+
+    @@media (max-width: 576px) {
+        .tipo-contenido-card
+
+    {
+        padding: 15px 10px;
+    }
+
+    .tipo-contenido-card svg {
+        width: 32px !important;
+        height: 32px !important;
+    }
+
+    .tipo-contenido-card .fw-bold {
+        font-size: 0.875rem;
+    }
+
+    .tipo-contenido-card small {
+        font-size: 0.7rem;
+    }
+
+    .upload-area {
+        padding: 40px 15px;
+    }
+
+    .d-flex.gap-2 {
+        flex-direction: column !important;
+    }
+
+    }
+</style>
+
+@section Scripts {
+    <script>
+        // Tipo de contenido
+        document.querySelectorAll('.tipo-contenido-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.tipo-contenido-card').forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById('tipoContenidoInput').value = this.dataset.tipo;
+
+                const archivoSection = document.getElementById('archivoSection');
+                const archivoInput = document.getElementById('archivoInput');
+
+                if (this.dataset.tipo === '3') {
+                    archivoSection.classList.add('d-none');
+                    archivoInput.removeAttribute('required');
+                } else {
+                    archivoSection.classList.remove('d-none');
+                    archivoInput.setAttribute('required', 'required');
+                }
+            });
+        });
+
+        // Upload area
+        const uploadArea = document.getElementById('uploadArea');
+        const archivoInput = document.getElementById('archivoInput');
+        const previewArea = document.getElementById('previewArea');
+        const imagePreview = document.getElementById('imagePreview');
+        const videoPreview = document.getElementById('videoPreview');
+        const fileInfo = document.getElementById('fileInfo');
+        const removeFileBtn = document.getElementById('removeFileBtn');
+
+        uploadArea.addEventListener('click', () => archivoInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const dt = new DataTransfer();
+                dt.items.add(files[0]);
+                archivoInput.files = dt.files;
+                handleFileSelect(files[0]);
+            }
+        });
+
+        archivoInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+
+        removeFileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            archivoInput.value = '';
+            previewArea.classList.add('d-none');
+            imagePreview.classList.add('d-none');
+            videoPreview.classList.add('d-none');
+        });
+
+        function handleFileSelect(file) {
+            const reader = new FileReader();
+            previewArea.classList.remove('d-none');
+
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            fileInfo.textContent = `${file.name} (${sizeMB} MB)`;
+
+            if (file.type.startsWith('image/')) {
+                videoPreview.classList.add('d-none');
+                imagePreview.classList.remove('d-none');
+                reader.onload = (e) => {
+                    imagePreview.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            } else if (file.type.startsWith('video/')) {
+                imagePreview.classList.add('d-none');
+                videoPreview.classList.remove('d-none');
+                reader.onload = (e) => {
+                    videoPreview.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Premium toggle
+        const esPremiumSwitch = document.getElementById('esPremiumSwitch');
+        const precioSection = document.getElementById('precioSection');
+        const precioSelect = document.getElementById('precioSelect');
+
+        esPremiumSwitch.addEventListener('change', function() {
+            if (this.checked) {
+                precioSection.classList.remove('d-none');
+                precioSelect.required = true;
+            } else {
+                precioSection.classList.add('d-none');
+                precioSelect.required = false;
+            }
+        });
+
+        // Character counter
+        const descripcionInput = document.getElementById('descripcionTextarea');
+        const charCount = document.getElementById('charCount');
+
+        descripcionInput.addEventListener('input', function() {
+            charCount.textContent = this.value.length;
+        });
+
+        // Guardar como borrador
+        const btnBorrador = document.getElementById('btnBorrador');
+        const formContenido = document.getElementById('formContenido');
+        const esBorradorInput = document.getElementById('esBorradorInput');
+
+        btnBorrador.addEventListener('click', function() {
+            esBorradorInput.value = 'true';
+            archivoInput.removeAttribute('required');
+            descripcionInput.removeAttribute('required');
+            formContenido.submit();
+        });
+
+        // Publicar
+        document.getElementById('btnPublicar').addEventListener('click', function(e) {
+            esBorradorInput.value = 'false';
+        });
+
+        // Validación de formulario
+        formContenido.addEventListener('submit', function(e) {
+            const tipoContenido = document.getElementById('tipoContenidoInput').value;
+            const esBorrador = esBorradorInput.value === 'true';
+
+            if (!esBorrador && tipoContenido !== '3' && !archivoInput.files.length) {
+                e.preventDefault();
+                alert('Por favor selecciona un archivo para publicar');
+                return false;
+            }
+
+            // Validar precio si es premium
+            if (esPremiumSwitch.checked) {
+                const precio = parseInt(precioSelect.value);
+                if (!precio || precio <= 0 || precio % 5 !== 0) {
+                    e.preventDefault();
+                    alert('El precio debe ser un múltiplo de 5 (5, 10, 15, 20...)');
+                    return false;
+                }
+            }
+        });
+    </script>
+}

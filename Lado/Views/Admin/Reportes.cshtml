@@ -1,0 +1,264 @@
+﻿@model List<Lado.Models.Reporte>
+@{
+    ViewData["Title"] = "Gestión de Reportes";
+    var pendientes = Model.Count(r => r.Estado == "Pendiente");
+    var resueltos = Model.Count(r => r.Estado == "Resuelto");
+}
+
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h2><i class="fas fa-flag text-danger"></i> Gestión de Reportes</h2>
+            <p class="text-muted">
+                <span class="badge bg-warning">@pendientes Pendientes</span>
+                <span class="badge bg-success ms-2">@resueltos Resueltos</span>
+            </p>
+        </div>
+        <div class="col-md-6 text-end">
+            <a href="@Url.Action("Index", "Admin")" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Volver al Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Tabs: Pendientes / Resueltos -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <ul class="nav nav-tabs mb-3" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" data-bs-toggle="tab" href="#pendientes">
+                        <i class="fas fa-clock text-warning"></i>
+                        Pendientes (@pendientes)
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#resueltos">
+                        <i class="fas fa-check-circle text-success"></i>
+                        Resueltos (@resueltos)
+                    </a>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <!-- Tab Pendientes -->
+                <div class="tab-pane fade show active" id="pendientes">
+                    @{
+                        var reportesPendientes = Model.Where(r => r.Estado == "Pendiente").OrderByDescending(r => r.FechaReporte).ToList();
+                    }
+                    @if (reportesPendientes.Any())
+                    {
+                        <div class="row g-3">
+                            @foreach (var reporte in reportesPendientes)
+                            {
+                                <div class="col-md-6">
+                                    <div class="card border-warning h-100">
+                                        <div class="card-header bg-warning bg-opacity-10">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span class="badge bg-warning">
+                                                    <i class="fas fa-exclamation-triangle"></i> @reporte.TipoReporte
+                                                </span>
+                                                <small class="text-muted">@reporte.FechaReporte.ToString("dd/MM/yy HH:mm")</small>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <!-- Reportador -->
+                                            <div class="mb-3">
+                                                <strong class="text-muted">Reportado por:</strong>
+                                                <div class="d-flex align-items-center mt-1">
+                                                    @if (!string.IsNullOrEmpty(reporte.UsuarioReportador.FotoPerfil))
+                                                    {
+                                                        <img src="@reporte.UsuarioReportador.FotoPerfil"
+                                                             class="rounded-circle me-2" style="width: 30px; height: 30px;">
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="rounded-circle bg-primary text-white me-2 d-flex align-items-center justify-content-center"
+                                                             style="width: 30px; height: 30px; font-size: 0.8rem;">
+                                                            @reporte.UsuarioReportador.UserName.Substring(0, 1).ToUpper()
+                                                        </div>
+                                                    }
+                                                    <strong>@reporte.UsuarioReportador.UserName</strong>
+                                                </div>
+                                            </div>
+
+                                            <!-- Reportado -->
+                                            @if (reporte.TipoReporte == "Usuario" && reporte.UsuarioReportado != null)
+                                            {
+                                                <div class="mb-3">
+                                                    <strong class="text-danger">Usuario reportado:</strong>
+                                                    <div class="d-flex align-items-center mt-1">
+                                                        @if (!string.IsNullOrEmpty(reporte.UsuarioReportado.FotoPerfil))
+                                                        {
+                                                            <img src="@reporte.UsuarioReportado.FotoPerfil"
+                                                                 class="rounded-circle me-2" style="width: 30px; height: 30px;">
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="rounded-circle bg-danger text-white me-2 d-flex align-items-center justify-content-center"
+                                                                 style="width: 30px; height: 30px; font-size: 0.8rem;">
+                                                                @reporte.UsuarioReportado.UserName.Substring(0, 1).ToUpper()
+                                                            </div>
+                                                        }
+                                                        <strong>@reporte.UsuarioReportado.UserName</strong>
+                                                        <a href="@Url.Action("DetalleUsuario", new { id = reporte.UsuarioReportado.Id })"
+                                                           class="btn btn-sm btn-outline-primary ms-auto">
+                                                            Ver Perfil
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            }
+
+                                            @if (reporte.TipoReporte == "Contenido" && reporte.ContenidoReportado != null)
+                                            {
+                                                <div class="mb-3">
+                                                    <strong class="text-danger">Contenido reportado:</strong>
+                                                    <div class="mt-1">
+                                                        <p class="mb-1">
+                                                            @(reporte.ContenidoReportado.Descripcion.Length > 50
+                                                                ? reporte.ContenidoReportado.Descripcion.Substring(0, 50) + "..."
+                                                                : reporte.ContenidoReportado.Descripcion)
+                                                        </p>
+                                                        <a href="@Url.Action("DetalleContenido", new { id = reporte.ContenidoReportado.Id })"
+                                                           class="btn btn-sm btn-outline-primary">
+                                                            Ver Contenido
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            }
+
+                                            <!-- Motivo -->
+                                            <div class="mb-3">
+                                                <strong>Motivo:</strong>
+                                                <p class="mb-0">@reporte.Motivo</p>
+                                            </div>
+
+                                            <!-- Descripción -->
+                                            @if (!string.IsNullOrEmpty(reporte.Descripcion))
+                                            {
+                                                <div class="mb-3">
+                                                    <strong>Descripción:</strong>
+                                                    <p class="mb-0 text-muted small">@reporte.Descripcion</p>
+                                                </div>
+                                            }
+
+                                            <!-- Acciones -->
+                                            <div class="d-grid gap-2">
+                                                <button class="btn btn-success" data-bs-toggle="modal"
+                                                        data-bs-target="#resolverModal" data-reportid="@reporte.Id">
+                                                    <i class="fas fa-check"></i> Resolver Reporte
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                            <h5 class="text-muted">No hay reportes pendientes</h5>
+                        </div>
+                    }
+                </div>
+
+                <!-- Tab Resueltos -->
+                <div class="tab-pane fade" id="resueltos">
+                    @{
+                        var reportesResueltos = Model.Where(r => r.Estado == "Resuelto").OrderByDescending(r => r.FechaResolucion).ToList();
+                    }
+                    @if (reportesResueltos.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Tipo</th>
+                                        <th>Reportado por</th>
+                                        <th>Motivo</th>
+                                        <th>Fecha Reporte</th>
+                                        <th>Fecha Resolución</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var reporte in reportesResueltos)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <span class="badge bg-success">@reporte.TipoReporte</span>
+                                            </td>
+                                            <td>@reporte.UsuarioReportador.UserName</td>
+                                            <td>@reporte.Motivo</td>
+                                            <td>@reporte.FechaReporte.ToString("dd/MM/yy")</td>
+                                            <td>@reporte.FechaResolucion?.ToString("dd/MM/yy")</td>
+                                            <td>
+                                                @if (!string.IsNullOrEmpty(reporte.Accion))
+                                                {
+                                                    <small class="text-muted">@reporte.Accion</small>
+                                                }
+                                                else
+                                                {
+                                                    <small class="text-muted">-</small>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+                            <h5 class="text-muted">No hay reportes resueltos</h5>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Resolver Reporte -->
+<div class="modal fade" id="resolverModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Resolver Reporte</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" id="formResolver">
+                <div class="modal-body">
+                    <p>Especifica la acción tomada:</p>
+                    <select name="accion" class="form-select mb-3" required>
+                        <option value="">Selecciona una acción...</option>
+                        <option value="Usuario bloqueado">Usuario bloqueado</option>
+                        <option value="Contenido eliminado">Contenido eliminado</option>
+                        <option value="Contenido censurado">Contenido censurado</option>
+                        <option value="Advertencia enviada">Advertencia enviada</option>
+                        <option value="Reporte infundado">Reporte infundado</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                    <textarea name="detalles" class="form-control" rows="3"
+                              placeholder="Detalles adicionales (opcional)"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Marcar como Resuelto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('resolverModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var reportId = button.getAttribute('data-reportid');
+        document.getElementById('formResolver').action = '/Admin/ResolverReporte/' + reportId;
+    });
+</script>

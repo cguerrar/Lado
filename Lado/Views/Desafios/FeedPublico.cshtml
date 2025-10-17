@@ -1,0 +1,507 @@
+﻿@model IEnumerable<Lado.Models.Desafio>
+
+@{
+    ViewData["Title"] = "Desafíos Públicos";
+}
+
+<style>
+    .quest-world {
+        background: linear-gradient(135deg, #E0F7FA 0%, #ffffff 100%);
+        min-height: 100vh;
+        position: relative;
+        overflow: hidden;
+    }
+
+        .quest-world::before {
+            content: '';
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(0, 188, 212, 0.12) 0%, transparent 70%);
+            border-radius: 50%;
+            top: -150px;
+            right: -150px;
+            pointer-events: none;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .quest-world::after {
+            content: '';
+            position: absolute;
+            width: 350px;
+            height: 350px;
+            background: radial-gradient(circle, rgba(38, 198, 218, 0.08) 0%, transparent 70%);
+            border-radius: 50%;
+            bottom: 100px;
+            left: -100px;
+            pointer-events: none;
+            animation: float 8s ease-in-out infinite reverse;
+        }
+
+    @@keyframes float {
+        0%, 100%
+
+    {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-20px);
+    }
+
+    }
+
+    .quest-hero {
+        background: linear-gradient(135deg, #00BCD4 0%, #26C6DA 50%, #4DD0E1 100%);
+        border-radius: 30px;
+        padding: 50px;
+        box-shadow: 0 15px 40px rgba(0, 188, 212, 0.3);
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 40px;
+        z-index: 5;
+    }
+
+        .quest-hero::before {
+            content: '🏆';
+            position: absolute;
+            font-size: 180px;
+            opacity: 0.08;
+            right: -20px;
+            top: 50%;
+            transform: translateY(-50%) rotate(-15deg);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .quest-hero h1 {
+            color: white;
+            font-weight: 900;
+            font-size: 3rem;
+            margin: 0 0 15px 0;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .quest-hero p {
+            color: rgba(255,255,255,0.95);
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 500;
+            position: relative;
+            z-index: 10;
+        }
+
+    .quest-create-btn {
+        background: white;
+        color: #00BCD4;
+        border: none;
+        padding: 15px 35px;
+        border-radius: 30px;
+        font-weight: 700;
+        font-size: 1.1rem;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        position: relative;
+        z-index: 10;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+        .quest-create-btn:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.2);
+            color: #00BCD4;
+            text-decoration: none;
+        }
+
+    .quest-filters {
+        background: white;
+        border-radius: 25px;
+        padding: 30px;
+        box-shadow: 0 8px 25px rgba(0,188,212,0.1);
+        margin-bottom: 40px;
+    }
+
+        .quest-filters .form-label {
+            color: #00BCD4;
+            font-weight: 700;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .quest-filters .form-control,
+        .quest-filters .form-select {
+            border: 2px solid #B2EBF2;
+            border-radius: 15px;
+            padding: 12px 18px;
+            transition: all 0.3s ease;
+            background: #F0FDFF;
+        }
+
+            .quest-filters .form-control:focus,
+            .quest-filters .form-select:focus {
+                border-color: #00BCD4;
+                box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.1);
+                background: white;
+            }
+
+        .quest-filters .btn-primary {
+            background: linear-gradient(135deg, #00BCD4 0%, #26C6DA 100%);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 15px;
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(0, 188, 212, 0.3);
+            transition: all 0.3s ease;
+        }
+
+            .quest-filters .btn-primary:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(0, 188, 212, 0.4);
+            }
+
+    .quest-card {
+        background: white;
+        border-radius: 25px;
+        overflow: hidden;
+        box-shadow: 0 5px 20px rgba(0,188,212,0.1);
+        transition: all 0.3s ease;
+        height: 100%;
+        border: 3px solid transparent;
+        position: relative;
+    }
+
+        .quest-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: linear-gradient(90deg, #00BCD4 0%, #26C6DA 100%);
+        }
+
+        .quest-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 15px 40px rgba(0, 188, 212, 0.2);
+            border-color: #00BCD4;
+        }
+
+    .quest-card-body {
+        padding: 30px;
+    }
+
+    .quest-category {
+        display: inline-block;
+        padding: 8px 18px;
+        background: linear-gradient(135deg, #00BCD4 0%, #26C6DA 100%);
+        color: white;
+        border-radius: 20px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        margin-bottom: 15px;
+        box-shadow: 0 3px 10px rgba(0, 188, 212, 0.3);
+    }
+
+    .quest-card h5 {
+        color: #333;
+        font-weight: 800;
+        font-size: 1.4rem;
+        margin-bottom: 15px;
+        line-height: 1.3;
+    }
+
+    .quest-description {
+        color: #666;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        margin-bottom: 20px;
+        min-height: 60px;
+    }
+
+    .quest-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .quest-stat {
+        background: linear-gradient(135deg, #E0F7FA 0%, #B2EBF2 100%);
+        padding: 15px;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+        .quest-stat svg {
+            flex-shrink: 0;
+        }
+
+    .quest-stat-value {
+        font-weight: 800;
+        color: #00BCD4;
+        font-size: 1.1rem;
+    }
+
+    .quest-stat-label {
+        color: #666;
+        font-size: 0.8rem;
+    }
+
+    .quest-proposals {
+        background: linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-bottom: 15px;
+        font-weight: 700;
+        box-shadow: 0 3px 10px rgba(76, 175, 80, 0.3);
+    }
+
+    .quest-expiry {
+        background: linear-gradient(135deg, #FFC107 0%, #FFD54F 100%);
+        color: #333;
+        padding: 10px 15px;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 3px 10px rgba(255, 193, 7, 0.3);
+    }
+
+    .quest-action-btn {
+        background: linear-gradient(135deg, #00BCD4 0%, #26C6DA 100%);
+        color: white;
+        border: none;
+        padding: 15px;
+        border-radius: 15px;
+        font-weight: 700;
+        width: 100%;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        box-shadow: 0 4px 15px rgba(0, 188, 212, 0.3);
+        text-decoration: none;
+    }
+
+        .quest-action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 188, 212, 0.4);
+            color: white;
+            text-decoration: none;
+        }
+
+    .quest-empty {
+        text-align: center;
+        padding: 80px 30px;
+        background: white;
+        border-radius: 25px;
+        box-shadow: 0 8px 25px rgba(0,188,212,0.1);
+    }
+
+    .quest-empty-icon {
+        font-size: 100px;
+        margin-bottom: 25px;
+        opacity: 0.3;
+    }
+
+    .quest-empty h4 {
+        color: #333;
+        font-weight: 800;
+        font-size: 1.8rem;
+        margin-bottom: 15px;
+    }
+
+    .quest-empty p {
+        color: #666;
+        font-size: 1.1rem;
+        margin: 0;
+    }
+
+    @@media (max-width: 768px) {
+        .quest-hero
+
+    {
+        padding: 30px 20px;
+    }
+
+    .quest-hero h1 {
+        font-size: 2rem;
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .quest-stats {
+        grid-template-columns: 1fr;
+    }
+
+    }
+</style>
+
+<div class="quest-world py-4">
+    <div class="container-fluid" style="position: relative; z-index: 1;">
+        <!-- Hero Header -->
+        <div class="quest-hero">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-4" style="position: relative; z-index: 10;">
+                <div>
+                    <h1>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" fill="white" viewBox="0 0 16 16">
+                            <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536a3 3 0 1 1-1.133 5.89c-.79 1.865-1.878 2.777-2.833 3.011v2.173l1.425.356c.194.048.377.135.537.255L13.3 15.1a.5.5 0 0 1-.3.9H3a.5.5 0 0 1-.3-.9l1.838-1.379c.16-.12.343-.207.537-.255L6.5 13.11v-2.173c-.955-.234-2.043-1.146-2.833-3.012a3 3 0 1 1-1.132-5.89A33.076 33.076 0 0 1 2.5.5z" />
+                        </svg>
+                        Desafíos Épicos
+                    </h1>
+                    <p>Encuentra tu próxima aventura creativa y gana recompensas</p>
+                </div>
+                <a href="@Url.Action("CrearPublico", "Desafios")" class="quest-create-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.5 4.5a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-3v-3z" />
+                    </svg>
+                    Crear Desafío
+                </a>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="quest-filters">
+            <form method="get" action="@Url.Action("FeedPublico", "Desafios")" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">🎯 Categoría</label>
+                    <select name="categoria" class="form-select">
+                        <option value="">Todas las categorías</option>
+                        <option value="Fitness">💪 Fitness</option>
+                        <option value="Cocina">🍳 Cocina</option>
+                        <option value="Arte">🎨 Arte</option>
+                        <option value="Música">🎵 Música</option>
+                        <option value="Educación">📚 Educación</option>
+                        <option value="Tecnología">💻 Tecnología</option>
+                        <option value="Otro">✨ Otro</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">💰 Presupuesto Mín.</label>
+                    <input type="number" name="presupuestoMin" class="form-control" placeholder="$0">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">💎 Presupuesto Máx.</label>
+                    <input type="number" name="presupuestoMax" class="form-control" placeholder="$1000">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="white" viewBox="0 0 16 16">
+                            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z" />
+                        </svg>
+                        Buscar
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Quest Cards -->
+        <div class="row g-4">
+            @if (Model != null && Model.Any())
+            {
+                @foreach (var desafio in Model)
+                {
+                    <div class="col-lg-4 col-md-6">
+                        <div class="quest-card">
+                            <div class="quest-card-body">
+                                @if (!string.IsNullOrEmpty(desafio.Categoria))
+                                {
+                                    <span class="quest-category">@desafio.Categoria</span>
+                                }
+
+                                <h5>@desafio.Titulo</h5>
+
+                                <p class="quest-description">
+                                    @(desafio.Descripcion.Length > 100
+                                        ? desafio.Descripcion.Substring(0, 100) + "..."
+                                        : desafio.Descripcion)
+                                </p>
+
+                                <div class="quest-stats">
+                                    <div class="quest-stat">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00BCD4" viewBox="0 0 16 16">
+                                            <path fill-rule="evenodd" d="M11 15a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm5-4a5 5 0 1 1-10 0 5 5 0 0 1 10 0z" />
+                                            <path d="M9.438 11.944c.047.596.518 1.06 1.363 1.116v.44h.375v-.443c.875-.061 1.386-.529 1.386-1.207 0-.618-.39-.936-1.09-1.1l-.296-.07v-1.2c.376.043.614.248.671.532h.658c-.047-.575-.54-1.024-1.329-1.073V8.5h-.375v.45c-.747.073-1.255.522-1.255 1.158 0 .562.378.92 1.007 1.066l.248.061v1.272c-.384-.058-.639-.27-.696-.563h-.668zm1.36-1.354c-.369-.085-.569-.26-.569-.522 0-.294.216-.514.572-.578v1.1h-.003zm.432.746c.449.104.655.272.655.569 0 .339-.257.571-.709.614v-1.195l.054.012z" />
+                                            <path d="M1 0a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h4.083c.058-.344.145-.678.258-1H3a2 2 0 0 0-2-2V3a2 2 0 0 0 2-2h10a2 2 0 0 0 2 2v3.528c.38.34.717.728 1 1.154V1a1 1 0 0 0-1-1H1z" />
+                                            <path d="M9.998 5.083 10 5a2 2 0 1 0-3.132 1.65 5.982 5.982 0 0 1 3.13-1.567z" />
+                                        </svg>
+                                        <div>
+                                            <div class="quest-stat-value">$@desafio.Presupuesto</div>
+                                            <div class="quest-stat-label">Recompensa</div>
+                                        </div>
+                                    </div>
+                                    <div class="quest-stat">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00BCD4" viewBox="0 0 16 16">
+                                            <path d="M2.5 15a.5.5 0 1 1 0-1h1v-1a4.5 4.5 0 0 1 2.557-4.06c.29-.139.443-.377.443-.59v-.7c0-.213-.154-.451-.443-.59A4.5 4.5 0 0 1 3.5 3V2h-1a.5.5 0 0 1 0-1h11a.5.5 0 0 1 0 1h-1v1a4.5 4.5 0 0 1-2.557 4.06c-.29.139-.443.377-.443.59v.7c0 .213.154.451.443.59A4.5 4.5 0 0 1 12.5 13v1h1a.5.5 0 0 1 0 1h-11zm2-13v1c0 .537.12 1.045.337 1.5h6.326c.216-.455.337-.963.337-1.5V2h-7zm3 6.35c0 .701-.478 1.236-1.011 1.492A3.5 3.5 0 0 0 4.5 13s.866-1.299 3-1.48V8.35zm1 0v3.17c2.134.181 3 1.48 3 1.48a3.5 3.5 0 0 0-1.989-3.158C8.978 9.586 8.5 9.052 8.5 8.351z" />
+                                        </svg>
+                                        <div>
+                                            <div class="quest-stat-value">@desafio.DiasPlazoPlazo</div>
+                                            <div class="quest-stat-label">Días</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="quest-proposals">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="white" viewBox="0 0 16 16">
+                                        <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7Zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5.784 6A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216ZM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+                                    </svg>
+                                    @desafio.Propuestas.Count Aventureros compitiendo
+                                </div>
+
+                                @if (desafio.FechaExpiracion.HasValue)
+                                {
+                                    var diasRestantes = (desafio.FechaExpiracion.Value - DateTime.Now).Days;
+                                    <div class="quest-expiry">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                            <path d="M6 .5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1H9v1.07a7.001 7.001 0 0 1 3.274 12.474l.601.602a.5.5 0 0 1-.707.708l-.746-.746A6.97 6.97 0 0 1 8 16a6.97 6.97 0 0 1-3.422-.892l-.746.746a.5.5 0 0 1-.707-.708l.602-.602A7.001 7.001 0 0 1 7 2.07V1h-.5A.5.5 0 0 1 6 .5zm2.5 5a.5.5 0 0 0-1 0v3.362l-1.429 2.38a.5.5 0 1 0 .858.515l1.5-2.5A.5.5 0 0 0 8.5 9V5.5zM.86 5.387A2.5 2.5 0 1 1 4.387 1.86 8.035 8.035 0 0 0 .86 5.387zM11.613 1.86a2.5 2.5 0 1 1 3.527 3.527 8.035 8.035 0 0 0-3.527-3.527z" />
+                                        </svg>
+                                        ¡Expira en @diasRestantes día(s)!
+                                    </div>
+                                }
+
+                                <a href="@Url.Action("Detalles", "Desafios", new { id = desafio.Id })" class="quest-action-btn">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 16 16">
+                                        <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z" />
+                                    </svg>
+                                    Enviar Propuesta
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="col-12">
+                    <div class="quest-empty">
+                        <div class="quest-empty-icon">🎯</div>
+                        <h4>¡Aún no hay desafíos épicos!</h4>
+                        <p>Sé el primero en crear un desafío y encuentra creadores talentosos</p>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

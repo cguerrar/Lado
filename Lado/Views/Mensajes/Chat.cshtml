@@ -1,0 +1,500 @@
+﻿@model Lado.Models.ApplicationUser
+@{
+    var otroUsuario = ViewBag.Destinatario as Lado.Models.ApplicationUser;
+    ViewData["Title"] = otroUsuario != null ? $"Chat con {otroUsuario.NombreCompleto}" : "Chat";
+}
+
+<div class="chat-container">
+    <!-- Header del Chat -->
+    <div class="chat-header">
+        <div class="d-flex align-items-center">
+            <a href="/Mensajes" class="btn btn-link text-dark p-0 me-2 me-md-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+            </a>
+
+            <div class="d-flex align-items-center flex-grow-1 min-width-0">
+                @if (!string.IsNullOrEmpty(otroUsuario.FotoPerfil))
+                {
+                    <img src="@otroUsuario.FotoPerfil"
+                         class="rounded-circle me-2 me-md-3"
+                         style="width: 40px; height: 40px; object-fit: cover;"
+                         alt="@otroUsuario.UserName">
+                }
+                else
+                {
+                    <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-2 me-md-3"
+                         style="width: 40px; height: 40px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                    </div>
+                }
+                <div class="text-truncate">
+                    <h6 class="mb-0 text-truncate">@otroUsuario.NombreCompleto</h6>
+                    <small class="text-muted text-truncate d-block">@@@otroUsuario.UserName</small>
+                </div>
+            </div>
+
+            <div class="dropdown">
+                <button class="btn btn-link text-dark p-0" type="button" data-bs-toggle="dropdown">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="1"></circle>
+                        <circle cx="12" cy="5" r="1"></circle>
+                        <circle cx="12" cy="19" r="1"></circle>
+                    </svg>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <a class="dropdown-item" href="/Explorar/Perfil/@otroUsuario.Id">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            Ver Perfil
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item text-danger" href="#" onclick="eliminarConversacion('@otroUsuario.Id'); return false;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                            Eliminar Conversación
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Área de Mensajes -->
+    <div class="chat-messages" id="chatMessages">
+        @if (ViewBag.Mensajes != null && ViewBag.Mensajes.Count > 0)
+        {
+            @foreach (var mensaje in ViewBag.Mensajes)
+            {
+                var esMio = mensaje.RemitenteId == Model.Id;
+                <div class="mensaje @(esMio ? "mensaje-enviado" : "mensaje-recibido")">
+                    <div class="mensaje-contenido">
+                        @mensaje.Contenido
+                        <div class="mensaje-info">
+                            <small>@mensaje.FechaEnvio.ToString("HH:mm")</small>
+                            @if (esMio)
+                            {
+                                @if (mensaje.Leido)
+                                {
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ms-1">
+                                        <polyline points="18 8 22 12 18 16"></polyline>
+                                        <polyline points="12 8 16 12 12 16"></polyline>
+                                    </svg>
+                                }
+                                else
+                                {
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ms-1">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="text-center py-5 text-muted">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mb-3">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <p>No hay mensajes aún. ¡Envía el primero!</p>
+            </div>
+        }
+    </div>
+
+    <!-- Input para Enviar Mensajes -->
+    <div class="chat-input">
+        <form id="formEnviarMensaje" class="d-flex align-items-center gap-2">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="destinatarioId" value="@otroUsuario.Id">
+
+            <button type="button" class="btn btn-link text-muted p-2 d-none d-md-inline-flex">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                </svg>
+            </button>
+
+            <input type="text"
+                   id="inputMensaje"
+                   class="form-control"
+                   placeholder="Escribe un mensaje..."
+                   autocomplete="off">
+
+            <button type="submit" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 45px; height: 45px; flex-shrink: 0;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
+        </form>
+    </div>
+</div>
+
+<style>
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 120px);
+        min-height: 500px;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .chat-header {
+        padding: 1rem;
+        background: white;
+        border-bottom: 1px solid #e9ecef;
+        flex-shrink: 0;
+    }
+
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        background: #f8f9fa;
+        scroll-behavior: smooth;
+    }
+
+    .mensaje {
+        margin-bottom: 1rem;
+        display: flex;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @@keyframes fadeIn {
+        from
+
+    {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    }
+
+    .mensaje-recibido {
+        justify-content: flex-start;
+    }
+
+    .mensaje-enviado {
+        justify-content: flex-end;
+    }
+
+    .mensaje-contenido {
+        max-width: 70%;
+        padding: 0.75rem 1rem;
+        border-radius: 12px;
+        word-wrap: break-word;
+        word-break: break-word;
+        position: relative;
+    }
+
+    .mensaje-recibido .mensaje-contenido {
+        background: white;
+        border-bottom-left-radius: 4px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    .mensaje-enviado .mensaje-contenido {
+        background: #0d6efd;
+        color: white;
+        border-bottom-right-radius: 4px;
+    }
+
+    .mensaje-info {
+        margin-top: 0.25rem;
+        text-align: right;
+        font-size: 0.7rem;
+        opacity: 0.7;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+    }
+
+    .chat-input {
+        padding: 1rem;
+        background: white;
+        border-top: 1px solid #e9ecef;
+        flex-shrink: 0;
+    }
+
+        .chat-input .form-control {
+            border-radius: 25px;
+            border: 1px solid #dee2e6;
+            padding: 0.65rem 1.25rem;
+        }
+
+            .chat-input .form-control:focus {
+                border-color: #0d6efd;
+                box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+            }
+
+    .min-width-0 {
+        min-width: 0;
+    }
+
+    .text-truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Scrollbar personalizado */
+    .chat-messages::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .chat-messages::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 3px;
+    }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+    /* Responsive Design */
+    @@media (max-width: 768px) {
+        .chat-container
+
+    {
+        height: calc(100vh - 80px);
+        border-radius: 0;
+        min-height: unset;
+    }
+
+    .chat-header {
+        padding: 0.75rem;
+    }
+
+    .chat-messages {
+        padding: 0.75rem;
+    }
+
+    .mensaje-contenido {
+        max-width: 85%;
+        padding: 0.6rem 0.85rem;
+    }
+
+    .chat-input {
+        padding: 0.75rem;
+    }
+
+        .chat-input .gap-2 {
+            gap: 0.5rem !important;
+        }
+
+    }
+
+    @@media (max-width: 576px) {
+        .mensaje-contenido
+
+    {
+        max-width: 90%;
+        font-size: 0.95rem;
+    }
+
+    .chat-header h6 {
+        font-size: 0.9rem;
+    }
+
+    .chat-header small {
+        font-size: 0.75rem;
+    }
+
+    }
+
+    @@media (max-width: 400px) {
+        .mensaje-contenido
+
+    {
+        max-width: 95%;
+        font-size: 0.9rem;
+        padding: 0.5rem 0.75rem;
+    }
+
+    }
+</style>
+
+@section Scripts {
+    <script>
+        const usuarioActualId = '@Model.Id';
+        const otroUsuarioId = '@otroUsuario.Id';
+
+        function scrollToBottom() {
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        }
+
+        function agregarMensaje(mensaje, esMio) {
+            const checkIcon = esMio ? `
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ms-1">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            ` : '';
+
+            const mensajeHtml = `
+                <div class="mensaje ${esMio ? 'mensaje-enviado' : 'mensaje-recibido'}">
+                    <div class="mensaje-contenido">
+                        ${mensaje.contenido}
+                        <div class="mensaje-info">
+                            <small>${mensaje.fechaEnvio}</small>
+                            ${checkIcon}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.insertAdjacentHTML('beforeend', mensajeHtml);
+            scrollToBottom();
+        }
+
+        function actualizarMensajes(mensajes) {
+            const chatMessages = document.getElementById('chatMessages');
+            const mensajesActuales = chatMessages.querySelectorAll('.mensaje').length;
+
+            if (mensajes.length > mensajesActuales) {
+                const nuevosMensajes = mensajes.slice(mensajesActuales);
+                nuevosMensajes.forEach(function(mensaje) {
+                    const esMio = mensaje.remitenteId === usuarioActualId;
+                    agregarMensaje(mensaje, esMio);
+                });
+            }
+        }
+
+        function cargarMensajesActualizados() {
+            fetch('@Url.Action("CargarMensajes", "Mensajes")?contactoId=' + otroUsuarioId)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.mensajes) {
+                        actualizarMensajes(data.mensajes);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al cargar mensajes:', error);
+                });
+        }
+
+        function enviarMensaje(e) {
+            e.preventDefault();
+            console.log('=== ENVIAR MENSAJE ===');
+
+            const inputMensaje = document.getElementById('inputMensaje');
+            const contenido = inputMensaje.value.trim();
+            console.log('Contenido:', contenido);
+
+            if (!contenido) {
+                console.log('❌ Mensaje vacío, cancelando');
+                return;
+            }
+
+            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+            console.log('Token encontrado:', token ? 'SÍ' : 'NO');
+
+            const formData = new FormData();
+            formData.append('destinatarioId', otroUsuarioId);
+            formData.append('contenido', contenido);
+            formData.append('__RequestVerificationToken', token);
+
+            console.log('Destinatario ID:', otroUsuarioId);
+            console.log('URL de envío:', '@Url.Action("EnviarMensaje", "Mensajes")');
+
+            fetch('@Url.Action("EnviarMensaje", "Mensajes")', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Respuesta recibida:', data);
+                if (data.success) {
+                    console.log('✅ Mensaje enviado exitosamente');
+                    agregarMensaje(data.mensaje, true);
+                    inputMensaje.value = '';
+                } else {
+                    console.error('❌ Error en respuesta:', data.message);
+                    alert(data.message || 'Error al enviar el mensaje');
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error al enviar:', error);
+                alert('Error al enviar el mensaje. Revisa la consola (F12) para más detalles.');
+            });
+        }
+
+        function eliminarConversacion(contactoId) {
+            if (!confirm('¿Estás seguro de que quieres eliminar esta conversación?')) {
+                return false;
+            }
+
+            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+            const formData = new FormData();
+            formData.append('contactoId', contactoId);
+            formData.append('__RequestVerificationToken', token);
+
+            fetch('@Url.Action("EliminarConversacion", "Mensajes")', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                window.location.href = '@Url.Action("Index", "Mensajes")';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error al eliminar la conversación');
+            });
+
+            return false;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== CHAT INICIALIZADO ===');
+            console.log('Usuario actual ID:', usuarioActualId);
+            console.log('Otro usuario ID:', otroUsuarioId);
+            scrollToBottom();
+
+            const formEnviar = document.getElementById('formEnviarMensaje');
+            if (formEnviar) {
+                formEnviar.addEventListener('submit', enviarMensaje);
+            }
+
+            const inputMensaje = document.getElementById('inputMensaje');
+            if (inputMensaje) {
+                inputMensaje.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        formEnviar.dispatchEvent(new Event('submit'));
+                    }
+                });
+            }
+
+            setInterval(cargarMensajesActualizados, 5000);
+        });
+    </script>
+}

@@ -1,0 +1,285 @@
+﻿@model Lado.Models.ApplicationUser
+@{
+    ViewData["Title"] = "Editar Perfil";
+}
+
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2><i class="fas fa-edit text-primary"></i> Editar Perfil</h2>
+                <p class="text-muted">Actualiza tu información personal</p>
+            </div>
+            <a href="/Usuario/Perfil" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Volver al Perfil
+            </a>
+        </div>
+    </div>
+</div>
+
+<form asp-action="EditarPerfil" method="post" enctype="multipart/form-data">
+    <div class="row">
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-body text-center p-4">
+                    <h6 class="text-muted mb-3">Foto de Perfil</h6>
+
+                    <div class="position-relative d-inline-block mb-3">
+                        @if (!string.IsNullOrEmpty(Model.FotoPerfil))
+                        {
+                            <img src="@Model.FotoPerfil"
+                                 id="previewFoto"
+                                 class="rounded-circle"
+                                 style="width: 150px; height: 150px; object-fit: cover; border: 4px solid #00bcd4;"
+                                 alt="Foto de perfil" />
+                        }
+                        else
+                        {
+                            <div class="rounded-circle bg-primary d-inline-flex align-items-center justify-content-center"
+                                 id="previewFoto"
+                                 style="width: 150px; height: 150px; border: 4px solid #00bcd4;">
+                                <span class="text-white" style="font-size: 3rem; font-weight: 700;">
+                                    @Model.NombreCompleto.Substring(0, 1).ToUpper()
+                                </span>
+                            </div>
+                        }
+                    </div>
+
+                    <input type="file"
+                           id="fotoPerfil"
+                           name="fotoPerfil"
+                           class="d-none"
+                           accept="image/*" />
+
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-primary" onclick="document.getElementById('fotoPerfil').click()">
+                            <i class="fas fa-camera"></i> Cambiar Foto
+                        </button>
+                        @if (!string.IsNullOrEmpty(Model.FotoPerfil))
+                        {
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="eliminarFoto()">
+                                <i class="fas fa-trash"></i> Eliminar Foto
+                            </button>
+                        }
+                    </div>
+
+                    <small class="text-muted d-block mt-2">
+                        JPG, PNG o GIF (máx. 5MB)
+                    </small>
+                </div>
+            </div>
+
+            @if (Model.TipoUsuario == 1)
+            {
+                <div class="card shadow-sm mt-3">
+                    <div class="card-body text-center p-4">
+                        <h6 class="text-muted mb-3">Foto de Portada</h6>
+
+                        @if (!string.IsNullOrEmpty(Model.FotoPortada))
+                        {
+                            <img src="@Model.FotoPortada"
+                                 id="previewPortada"
+                                 class="rounded mb-3"
+                                 style="width: 100%; height: 150px; object-fit: cover;"
+                                 alt="Foto de portada" />
+                        }
+                        else
+                        {
+                            <div class="bg-secondary rounded mb-3 d-flex align-items-center justify-content-center"
+                                 id="previewPortada"
+                                 style="width: 100%; height: 150px;">
+                                <i class="fas fa-image fa-3x text-white"></i>
+                            </div>
+                        }
+
+                        <input type="file"
+                               id="fotoPortada"
+                               name="fotoPortada"
+                               class="d-none"
+                               accept="image/*" />
+
+                        <button type="button" class="btn btn-outline-primary w-100" onclick="document.getElementById('fotoPortada').click()">
+                            <i class="fas fa-image"></i> Cambiar Portada
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-user me-2"></i>Información Personal</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Nombre Completo <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" asp-for="NombreCompleto" required />
+                            <span asp-validation-for="NombreCompleto" class="text-danger"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Nombre de Usuario <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">@@</span>
+                                <input type="text" class="form-control" asp-for="UserName" required />
+                            </div>
+                            <span asp-validation-for="UserName" class="text-danger"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Correo Electrónico <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" asp-for="Email" required />
+                            <span asp-validation-for="Email" class="text-danger"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Teléfono</label>
+                            <input type="tel" class="form-control" asp-for="PhoneNumber" placeholder="+56 9 1234 5678" />
+                            <span asp-validation-for="PhoneNumber" class="text-danger"></span>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Biografía</label>
+                            <textarea class="form-control"
+                                      asp-for="Biografia"
+                                      rows="4"
+                                      maxlength="500"
+                                      placeholder="Cuéntale a tu audiencia sobre ti..."></textarea>
+                            <small class="text-muted">Máximo 500 caracteres</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @if (Model.TipoUsuario == 1)
+            {
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-dollar-sign me-2"></i>Configuración de Creador</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Precio de Suscripción Mensual <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number"
+                                           class="form-control"
+                                           asp-for="PrecioSuscripcion"
+                                           step="0.01"
+                                           min="0"
+                                           required />
+                                </div>
+                                <small class="text-muted">Precio que cobrarás a tus suscriptores mensualmente</small>
+                            </div>
+
+                            <div class="col-md-12">
+                                <label class="form-label">Categoría de Contenido</label>
+                                <select class="form-select" asp-for="Categoria">
+                                    <option value="">Selecciona una categoría</option>
+                                    <option value="Arte">Arte</option>
+                                    <option value="Fitness">Fitness</option>
+                                    <option value="Música">Música</option>
+                                    <option value="Gaming">Gaming</option>
+                                    <option value="Cocina">Cocina</option>
+                                    <option value="Educación">Educación</option>
+                                    <option value="Lifestyle">Lifestyle</option>
+                                    <option value="Tecnología">Tecnología</option>
+                                    <option value="Entretenimiento">Entretenimiento</option>
+                                    <option value="Otro">Otro</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-share-alt me-2"></i>Redes Sociales</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="fab fa-instagram text-danger"></i> Instagram
+                            </label>
+                            <input type="text" class="form-control" name="Instagram" placeholder="@@usuario" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="fab fa-twitter text-info"></i> Twitter/X
+                            </label>
+                            <input type="text" class="form-control" name="Twitter" placeholder="@@usuario" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="fab fa-facebook text-primary"></i> Facebook
+                            </label>
+                            <input type="text" class="form-control" name="Facebook" placeholder="facebook.com/usuario" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="fab fa-youtube text-danger"></i> YouTube
+                            </label>
+                            <input type="text" class="form-control" name="YouTube" placeholder="youtube.com/@@usuario" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex gap-2 justify-content-end">
+                        <a href="/Usuario/Perfil" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        document.getElementById('fotoPerfil').addEventListener('change', function(e) {
+            var file = e.target.files[0];
+            if (file) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('previewFoto').innerHTML = '<img src="' + e.target.result + '" class="rounded-circle" style="width: 150px; height: 150px; object-fit: cover; border: 4px solid #00bcd4;" alt="Preview" />';
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        var fotoPortadaInput = document.getElementById('fotoPortada');
+        if (fotoPortadaInput) {
+            fotoPortadaInput.addEventListener('change', function(e) {
+                var file = e.target.files[0];
+                if (file) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        document.getElementById('previewPortada').innerHTML = '<img src="' + e.target.result + '" class="rounded" style="width: 100%; height: 150px; object-fit: cover;" alt="Preview" />';
+                    }
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        function eliminarFoto() {
+            if (confirm('¿Estás seguro de que deseas eliminar tu foto de perfil?')) {
+                window.location.href = '/Usuario/EliminarFoto';
+            }
+        }
+    </script>
+}

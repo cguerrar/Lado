@@ -1,0 +1,272 @@
+﻿using Lado.Data;
+using Lado.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace Lado.Controllers
+{
+    [Authorize(Roles = "Admin")]
+    public class AdminController : Controller
+    {
+        private readonly ApplicationDbContext _context;
+        private readonly UserManager<ApplicationUser>
+    _userManager;
+
+    public AdminController(
+    ApplicationDbContext context,
+    UserManager<ApplicationUser>
+        userManager)
+        {
+        _context = context;
+        _userManager = userManager;
+        }
+
+        // Método que se ejecuta antes de cada acción para pasar reportes pendientes
+        public override void OnActionExecuting(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext context)
+        {
+        base.OnActionExecuting(context);
+        ViewBag.ReportesPendientes = _context.Reportes.Count(r => r.Estado == "Pendiente");
+        }
+
+        public async Task<IActionResult>
+            Index()
+            {
+            ViewBag.TotalUsuarios = await _context.Users.CountAsync();
+            ViewBag.TotalCreadores = await _context.Users.CountAsync(u => u.TipoUsuario == 1);
+            ViewBag.TotalFans = await _context.Users.CountAsync(u => u.TipoUsuario == 2);
+            ViewBag.TotalSuscripciones = await _context.Suscripciones.CountAsync(s => s.EstaActiva);
+            ViewBag.TotalPublicaciones = await _context.Contenidos.CountAsync();
+            ViewBag.PublicacionesHoy = await _context.Contenidos
+            .CountAsync(c => c.FechaPublicacion.Date == DateTime.Today);
+            ViewBag.UsuariosBloqueados = await _context.Users.CountAsync(u => !u.EstaActivo);
+
+            return View();
+            }
+
+            // Resto de métodos...
+            public async Task<IActionResult>
+                Usuarios()
+                {
+                var usuarios = await _context.Users
+                .OrderByDescending(u => u.FechaRegistro)
+                .ToListAsync();
+
+                // Crear lista de tuplas con usuario y rol
+                var usuariosConRoles = new List<(ApplicationUser, string)>
+                    ();
+
+                    foreach (var usuario in usuarios)
+                    {
+                    var roles = await _userManager.GetRolesAsync(usuario);
+                    var rol = roles.FirstOrDefault() ?? "Sin Rol";
+                    usuariosConRoles.Add((usuario, rol));
+                    }
+
+                    return View(usuariosConRoles);
+                    }
+
+                    [HttpPost]
+                    public async Task<IActionResult>
+                        BloquearUsuario(string id)
+                        {
+                        var usuario = await _context.Users.FindAsync(id);
+                        if (usuario != null)
+                        {
+                        usuario.EstaActivo = false;
+                        await _context.SaveChangesAsync();
+                        TempData["Success"] = $"Usuario {usuario.NombreCompleto} bloqueado exitosamente.";
+                        }
+
+                        return RedirectToAction(nameof(Usuarios));
+                        }
+
+                        [HttpPost]
+                        public async Task<IActionResult>
+                            DesbloquearUsuario(string id)
+                            {
+                            var usuario = await _context.Users.FindAsync(id);
+                            if (usuario != null)
+                            {
+                            usuario.EstaActivo = true;
+                            await _context.SaveChangesAsync();
+                            TempData["Success"] = $"Usuario {usuario.NombreCompleto} desbloqueado exitosamente.";
+                            }
+
+                            return RedirectToAction(nameof(Usuarios));
+                            }
+
+                            public async Task<IActionResult>
+                                Contenido()
+                                {
+                                var contenidos = await _context.Contenidos
+                                .Include(c => c.Usuario)
+                                .Include(c => c.Likes)
+                                .Include(c => c.Comentarios)
+                                .OrderByDescending(c => c.FechaPublicacion)
+                                .Take(100) // Limitar a 100 para mejor rendimiento
+                                .ToListAsync();
+
+                                return View(contenidos);
+                                }
+
+                                [HttpPost]
+                                public async Task<IActionResult>
+                                    CensurarContenido(int id, string razon)
+                                    {
+                                    var contenido = await _context.Contenidos.FindAsync(id);
+                                    if (contenido != null)
+                                    {
+                                    contenido.Censurado = true;
+                                    contenido.RazonCensura = razon;
+                                    await _context.SaveChangesAsync();
+                                    TempData["Success"] = "Contenido censurado exitosamente.";
+                                    }
+
+                                    return RedirectToAction(nameof(Contenido));
+                                    }
+
+                                    [HttpPost]
+                                    public async Task<IActionResult>
+                                        DescensurarContenido(int id)
+                                        {
+                                        var contenido = await _context.Contenidos.FindAsync(id);
+                                        if (contenido != null)
+                                        {
+                                        contenido.Censurado = false;
+                                        contenido.RazonCensura = null;
+                                        await _context.SaveChangesAsync();
+                                        TempData["Success"] = "Contenido descensurado exitosamente.";
+                                        }
+
+                                        return RedirectToAction(nameof(Contenido));
+                                        }
+
+                                        [HttpPost]
+                                        public async Task<IActionResult>
+                                            EliminarContenido(int id)
+                                            {
+                                            var contenido = await _context.Contenidos.FindAsync(id);
+                                            if (contenido != null)
+                                            {
+                                            _context.Contenidos.Remove(contenido);
+                                            await _context.SaveChangesAsync();
+                                            TempData["Success"] = "Contenido eliminado permanentemente.";
+                                            }
+
+                                            return RedirectToAction(nameof(Contenido));
+                                            }
+
+                                            public async Task<IActionResult>
+                                                Reportes()
+                                                {
+                                                var reportes = await _context.Reportes
+                                                .Include(r => r.UsuarioReportador)
+                                                .Include(r => r.ContenidoReportado)
+                                                .ThenInclude(c => c.Usuario)
+                                                .OrderByDescending(r => r.FechaReporte)
+                                                .ToListAsync();
+
+                                                return View(reportes);
+                                                }
+
+                                                [HttpPost]
+                                                public async Task<IActionResult>
+                                                    ResolverReporte(int id, string accion)
+                                                    {
+                                                    var reporte = await _context.Reportes
+                                                    .Include(r => r.ContenidoReportado)
+                                                    .FirstOrDefaultAsync(r => r.Id == id);
+
+                                                    if (reporte != null)
+                                                    {
+                                                    reporte.Estado = "Resuelto";
+                                                    reporte.FechaResolucion = DateTime.Now;
+
+                                                    if (accion == "censurar" && reporte.ContenidoReportado != null)
+                                                    {
+                                                    reporte.ContenidoReportado.Censurado = true;
+                                                    reporte.ContenidoReportado.RazonCensura = $"Reporte: {reporte.Motivo}";
+                                                    }
+
+                                                    await _context.SaveChangesAsync();
+                                                    TempData["Success"] = "Reporte resuelto exitosamente.";
+                                                    }
+
+                                                    return RedirectToAction(nameof(Reportes));
+                                                    }
+
+                                                    public async Task<IActionResult>
+                                                        Estadisticas()
+                                                        {
+                                                        // Stats generales
+                                                        ViewBag.TotalUsuarios = await _context.Users.CountAsync();
+                                                        ViewBag.TotalCreadores = await _context.Users.CountAsync(u => u.TipoUsuario == 1);
+                                                        ViewBag.TotalSuscripciones = await _context.Suscripciones.CountAsync(s => s.EstaActiva);
+                                                        ViewBag.TotalPublicaciones = await _context.Contenidos.CountAsync();
+
+                                                        // Datos para gráficos
+                                                        var registrosPorMes = await _context.Users
+                                                        .GroupBy(u => new { u.FechaRegistro.Year, u.FechaRegistro.Month })
+                                                        .Select(g => new {
+                                                        año = g.Key.Year,
+                                                        mes = g.Key.Month,
+                                                        total = g.Count()
+                                                        })
+                                                        .OrderBy(x => x.año).ThenBy(x => x.mes)
+                                                        .ToListAsync();
+
+                                                        var contenidosPorTipo = await _context.Contenidos
+                                                        .GroupBy(c => c.TipoContenido)
+                                                        .Select(g => new {
+                                                        tipo = g.Key.ToString(),
+                                                        total = g.Count()
+                                                        })
+                                                        .ToListAsync();
+
+                                                        var topCreadores = await _context.Contenidos
+                                                        .GroupBy(c => c.UsuarioId)
+                                                        .Select(g => new {
+                                                        UsuarioId = g.Key,
+                                                        Total = g.Count()
+                                                        })
+                                                        .OrderByDescending(x => x.Total)
+                                                        .Take(10)
+                                                        .ToListAsync();
+
+                                                        // Obtener nombres de los top creadores
+                                                        var topCreadoresConNombres = new List
+                                                        <object>
+                                                            ();
+                                                            foreach (var item in topCreadores)
+                                                            {
+                                                            var usuario = await _context.Users.FindAsync(item.UsuarioId);
+                                                            topCreadoresConNombres.Add(new {
+                                                            nombre = usuario?.UserName ?? "Desconocido",
+                                                            total = item.Total
+                                                            });
+                                                            }
+
+                                                            ViewBag.RegistrosPorMes = registrosPorMes;
+                                                            ViewBag.ContenidosPorTipo = contenidosPorTipo;
+                                                            ViewBag.TopCreadores = topCreadoresConNombres;
+
+                                                            return View();
+                                                            }
+
+                                                            public IActionResult Configuracion()
+                                                            {
+                                                            return View();
+                                                            }
+
+                                                            [HttpPost]
+                                                            public async Task
+                                                            <IActionResult>
+                                                                ActualizarComision(decimal comision)
+                                                                {
+                                                                TempData["Success"] = $"Comisión actualizada a {comision}%";
+                                                                return RedirectToAction(nameof(Configuracion));
+                                                                }
+                                                                }
+                                                                }

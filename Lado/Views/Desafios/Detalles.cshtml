@@ -1,0 +1,753 @@
+﻿@model Lado.Models.Desafio
+@inject UserManager<ApplicationUser> UserManager
+
+@{
+    ViewData["Title"] = "Detalles del Desafío";
+    var usuarioActual = await UserManager.GetUserAsync(User);
+    var esFan = Model.FanId == usuarioActual?.Id;
+    var esCreadorObjetivo = Model.CreadorObjetivoId == usuarioActual?.Id;
+    var esCreadorAsignado = Model.CreadorAsignadoId == usuarioActual?.Id;
+}
+
+<style>
+    .mission-world {
+        background: linear-gradient(135deg, #E0F7FA 0%, #ffffff 100%);
+        min-height: 100vh;
+        padding: 30px 0;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .mission-back {
+        background: white;
+        border: 2px solid #00BCD4;
+        color: #00BCD4;
+        padding: 10px 25px;
+        border-radius: 20px;
+        font-weight: 700;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 25px;
+        text-decoration: none;
+    }
+
+        .mission-back:hover {
+            background: #00BCD4;
+            color: white;
+            transform: translateX(-5px);
+            text-decoration: none;
+        }
+
+    .mission-header {
+        background: linear-gradient(135deg, #00BCD4 0%, #26C6DA 50%, #4DD0E1 100%);
+        border-radius: 30px;
+        padding: 40px;
+        box-shadow: 0 15px 40px rgba(0, 188, 212, 0.3);
+        margin-bottom: 30px;
+    }
+
+        .mission-header h1 {
+            color: white;
+            font-weight: 900;
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+
+    .mission-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .mission-badge {
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+        .mission-badge.publico {
+            background: linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%);
+            color: white;
+        }
+
+        .mission-badge.directo {
+            background: white;
+            color: #00BCD4;
+        }
+
+    .mission-card {
+        background: white;
+        border-radius: 25px;
+        padding: 35px;
+        box-shadow: 0 8px 25px rgba(0,188,212,0.1);
+        margin-bottom: 25px;
+        border: 3px solid transparent;
+    }
+
+        .mission-card h5 {
+            color: #00BCD4;
+            font-weight: 800;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+    .form-game {
+        background: white;
+        border: 2px solid #B2EBF2;
+        border-radius: 15px;
+        padding: 15px;
+        transition: all 0.3s ease;
+        font-size: 1rem;
+    }
+
+        .form-game:focus {
+            border-color: #00BCD4;
+            box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.1);
+            outline: none;
+        }
+
+    .mission-btn {
+        background: linear-gradient(135deg, #00BCD4 0%, #26C6DA 100%);
+        border: none;
+        color: white;
+        padding: 15px 30px;
+        border-radius: 20px;
+        font-weight: 700;
+        font-size: 1.05rem;
+        box-shadow: 0 5px 20px rgba(0, 188, 212, 0.3);
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+        cursor: pointer;
+    }
+
+        .mission-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 188, 212, 0.4);
+            color: white;
+        }
+
+        .mission-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+    .upload-area {
+        border: 3px dashed #B2EBF2;
+        border-radius: 20px;
+        padding: 40px;
+        text-align: center;
+        background: linear-gradient(135deg, #E0F7FA 0%, #B2EBF2 10%, #E0F7FA 100%);
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+        .upload-area:hover {
+            border-color: #00BCD4;
+            background: linear-gradient(135deg, #B2EBF2 0%, #E0F7FA 50%, #B2EBF2 100%);
+            transform: scale(1.02);
+        }
+
+        .upload-area.dragover {
+            border-color: #00BCD4;
+            background: #B2EBF2;
+            transform: scale(1.05);
+        }
+
+    .upload-icon {
+        font-size: 60px;
+        color: #00BCD4;
+        margin-bottom: 15px;
+    }
+
+    .file-preview {
+        background: white;
+        border: 2px solid #00BCD4;
+        border-radius: 15px;
+        padding: 20px;
+        margin-top: 20px;
+        display: none;
+    }
+
+        .file-preview.active {
+            display: block;
+        }
+
+    .mission-sidebar {
+        background: white;
+        border-radius: 25px;
+        padding: 30px;
+        box-shadow: 0 8px 25px rgba(0,188,212,0.1);
+        margin-bottom: 25px;
+        border-top: 5px solid #00BCD4;
+    }
+
+    .mission-info-item {
+        margin-bottom: 20px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid #f5f5f5;
+    }
+
+        .mission-info-item:last-child {
+            border-bottom: none;
+        }
+
+    .mission-info-label {
+        color: #999;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+
+    .mission-info-value {
+        color: #333;
+        font-size: 1.1rem;
+        font-weight: 700;
+    }
+
+    @@media (max-width: 768px) {
+        .mission-header h1 {
+            font-size: 1.8rem;
+        }
+
+        .mission-card {
+            padding: 20px;
+        }
+
+        .upload-area {
+            padding: 30px 15px;
+        }
+    }
+</style>
+
+<div class="mission-world">
+    <div class="container" style="max-width: 1200px;">
+        @Html.AntiForgeryToken()
+
+        <!-- Back Button -->
+        @if (esCreadorAsignado || esCreadorObjetivo)
+        {
+            <a href="@Url.Action("DesafiosRecibidos", "Desafios")" class="mission-back">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z" />
+                </svg>
+                Volver
+            </a>
+        }
+        else
+        {
+            <a href="@Url.Action("MisDesafios", "Desafios")" class="mission-back">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z" />
+                </svg>
+                Volver
+            </a>
+        }
+
+        <!-- Header -->
+        <div class="mission-header">
+            <h1>@Model.Titulo</h1>
+            <div class="mission-badges">
+                @if (Model.TipoDesafio == TipoDesafio.Publico)
+                {
+                    <span class="mission-badge publico">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" viewBox="0 0 16 16">
+                            <path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm7.5-6.923c-.67.204-1.335.82-1.887 1.855A7.97 7.97 0 0 0 5.145 4H7.5V1.077zM4.09 4a9.267 9.267 0 0 1 .64-1.539 6.7 6.7 0 0 1 .597-.933A7.025 7.025 0 0 0 2.255 4H4.09zm-.582 3.5c.03-.877.138-1.718.312-2.5H1.674a6.958 6.958 0 0 0-.656 2.5h2.49zM4.847 5a12.5 12.5 0 0 0-.338 2.5H7.5V5H4.847zM8.5 5v2.5h2.99a12.495 12.495 0 0 0-.337-2.5H8.5zM4.51 8.5a12.5 12.5 0 0 0 .337 2.5H7.5V8.5H4.51zm3.99 0V11h2.653c.187-.765.306-1.608.338-2.5H8.5zM5.145 12c.138.386.295.744.468 1.068.552 1.035 1.218 1.65 1.887 1.855V12H5.145zm.182 2.472a6.696 6.696 0 0 1-.597-.933A9.268 9.268 0 0 1 4.09 12H2.255a7.024 7.024 0 0 0 3.072 2.472zM3.82 11a13.652 13.652 0 0 1-.312-2.5h-2.49c.062.89.291 1.733.656 2.5H3.82zm6.853 3.472A7.024 7.024 0 0 0 13.745 12H11.91a9.27 9.27 0 0 1-.64 1.539 6.688 6.688 0 0 1-.597.933zM8.5 12v2.923c.67-.204 1.335-.82 1.887-1.855.173-.324.33-.682.468-1.068H8.5zm3.68-1h2.146c.365-.767.594-1.61.656-2.5h-2.49a13.65 13.65 0 0 1-.312 2.5zm2.802-3.5a6.959 6.959 0 0 0-.656-2.5H12.18c.174.782.282 1.623.312 2.5h2.49zM11.27 2.461c.247.464.462.98.64 1.539h1.835a7.024 7.024 0 0 0-3.072-2.472c.218.284.418.598.597.933zM10.855 4a7.966 7.966 0 0 0-.468-1.068C9.835 1.897 9.17 1.282 8.5 1.077V4h2.355z" />
+                        </svg>
+                        Público
+                    </span>
+                }
+                else
+                {
+                    <span class="mission-badge directo">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4Zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10Z" />
+                        </svg>
+                        Directo
+                    </span>
+                }
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Main Content -->
+            <div class="col-lg-8">
+                <!-- Description -->
+                <div class="mission-card">
+                    <h5>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M4 11a1 1 0 1 1 2 0v1a1 1 0 1 1-2 0v-1zm6-4a1 1 0 1 1 2 0v5a1 1 0 1 1-2 0V7zM7 9a1 1 0 0 1 2 0v3a1 1 0 1 1-2 0V9z" />
+                            <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z" />
+                            <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z" />
+                        </svg>
+                        Descripción de la Misión
+                    </h5>
+                    <p style="color: #666; line-height: 1.8;">@Model.Descripcion</p>
+                </div>
+
+                @* ========================================
+                   VISTA DEL CONTENIDO ENTREGADO (PARA EL FAN)
+                   ======================================== *@
+                @if (esFan && Model.Estado == EstadoDesafio.ContenidoSubido && !string.IsNullOrEmpty(Model.ArchivoEntregaUrl))
+                {
+                    <div class="mission-card" style="border: 3px solid #4CAF50; background: linear-gradient(135deg, #E8F5E9 0%, #FFFFFF 100%);">
+                        <h5>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="#4CAF50" viewBox="0 0 16 16">
+                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z" />
+                            </svg>
+                            ¡Contenido Entregado! 🎉
+                        </h5>
+
+                        <div style="background: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; border: 2px solid #4CAF50;">
+                            <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+                                @if (!string.IsNullOrEmpty(Model.CreadorAsignado?.FotoPerfil))
+                                {
+                                    <img src="@Model.CreadorAsignado.FotoPerfil" style="width: 50px; height: 50px; border-radius: 50%; border: 3px solid #4CAF50; object-fit: cover;" alt="@Model.CreadorAsignado.NombreCompleto">
+                                }
+                                else
+                                {
+                                    <div style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #00BCD4, #26C6DA); display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 1.2rem; border: 3px solid white; box-shadow: 0 4px 15px rgba(0,188,212,0.3);">
+                                        <span>@Model.CreadorAsignado?.NombreCompleto?.Substring(0, 1).ToUpper()</span>
+                                    </div>
+                                }
+                                <div class="flex-grow-1">
+                                    <small style="color: #666; display: block;">Creador:</small>
+                                    <strong style="color: #4CAF50; font-size: 1.1rem;">@Model.CreadorAsignado?.NombreCompleto</strong>
+                                </div>
+                                <div style="text-align: right;">
+                                    <small style="color: #666; display: block;">Entregado:</small>
+                                    <strong style="color: #333;">@Model.FechaEntrega?.ToString("dd/MM/yyyy HH:mm")</strong>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(Model.NotasCreador))
+                            {
+                                <div style="background: linear-gradient(135deg, #E0F7FA 0%, #B2EBF2 100%); border-left: 4px solid #00BCD4; padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+                                    <strong style="color: #00BCD4; display: block; margin-bottom: 8px;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16" style="vertical-align: middle; margin-right: 5px;">
+                                            <path d="M5 4a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm-.5 2.5A.5.5 0 0 1 5 6h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zM5 8a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1H5z" />
+                                        </svg>
+                                        Mensaje del creador:
+                                    </strong>
+                                    <p style="color: #666; margin: 0; line-height: 1.6; white-space: pre-wrap;">@Model.NotasCreador</p>
+                                </div>
+                            }
+
+                            <!-- Previsualización del Archivo -->
+                            <div style="background: #f9f9f9; border-radius: 15px; padding: 20px; text-align: center; margin-bottom: 20px;">
+                                @{
+                                    var extension = System.IO.Path.GetExtension(Model.ArchivoEntregaUrl).ToLower();
+                                    var isImage = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" }.Contains(extension);
+                                    var isVideo = new[] { ".mp4", ".webm", ".mov" }.Contains(extension);
+                                }
+
+                                @if (isImage)
+                                {
+                                    <img src="@Model.ArchivoEntregaUrl" style="max-width: 100%; max-height: 500px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);" alt="Contenido entregado">
+                                }
+                                else if (isVideo)
+                                {
+                                    <video controls style="max-width: 100%; max-height: 500px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                                        <source src="@Model.ArchivoEntregaUrl" type="video/@extension.TrimStart('.')">
+                                        Tu navegador no soporta la reproducción de video.
+                                    </video>
+                                }
+                                else
+                                {
+                                    <div style="padding: 40px;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" fill="#00BCD4" viewBox="0 0 16 16">
+                                            <path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5z" />
+                                            <path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5L9.5 0zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z" />
+                                        </svg>
+                                        <h5 style="color: #333; margin: 20px 0 10px 0;">Archivo Adjunto</h5>
+                                        <p style="color: #666; margin-bottom: 20px;">@System.IO.Path.GetFileName(Model.ArchivoEntregaUrl)</p>
+                                    </div>
+                                }
+
+                                <a href="@Model.ArchivoEntregaUrl" download class="btn" style="background: linear-gradient(135deg, #00BCD4, #26C6DA); color: white; border: none; padding: 12px 30px; border-radius: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; margin-top: 15px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="white" viewBox="0 0 16 16">
+                                        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
+                                        <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z" />
+                                    </svg>
+                                    Descargar Archivo
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Botones de Aprobación/Rechazo -->
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <button type="button" class="mission-btn" style="background: linear-gradient(135deg, #4CAF50, #8BC34A); width: 100%;" onclick="aprobarContenido(@Model.Id)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 16 16">
+                                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z" />
+                                    </svg>
+                                    ✅ Aprobar y Completar Misión
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <button type="button" class="mission-btn" style="background: linear-gradient(135deg, #f44336, #e57373); width: 100%;" onclick="rechazarContenido(@Model.Id)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 16 16">
+                                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z" />
+                                    </svg>
+                                    ❌ Solicitar Corrección
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @* ========================================
+                   FORMULARIO DE ENTREGA (PARA EL CREADOR)
+                   ======================================== *@
+                @if (esCreadorAsignado && (Model.Estado == EstadoDesafio.Asignado || Model.Estado == EstadoDesafio.EnProgreso))
+                {
+                    <div class="mission-card" style="border: 3px solid #4CAF50;">
+                        <h5>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
+                                <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" />
+                            </svg>
+                            Entregar Contenido
+                        </h5>
+
+                        <form id="formEntrega" enctype="multipart/form-data">
+                            <!-- Área de Subida de Archivo -->
+                            <div class="upload-area" id="uploadArea" onclick="document.getElementById('archivoInput').click()">
+                                <div class="upload-icon">📤</div>
+                                <h4 style="color: #00BCD4; font-weight: 800;">Sube tu contenido aquí</h4>
+                                <p style="color: #666; margin: 10px 0;">Haz clic o arrastra el archivo</p>
+                                <small style="color: #999;">Máximo 50MB - Imágenes, Videos o Documentos</small>
+                                <input type="file" id="archivoInput" name="archivo" style="display: none;" accept="image/*,video/*,.pdf,.doc,.docx" required>
+                            </div>
+
+                            <!-- Vista Previa del Archivo -->
+                            <div class="file-preview" id="filePreview">
+                                <div style="display: flex; align-items: center; gap: 15px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="#4CAF50" viewBox="0 0 16 16">
+                                        <path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5z" />
+                                        <path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5L9.5 0zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z" />
+                                    </svg>
+                                    <div style="flex: 1;">
+                                        <strong id="fileName" style="color: #00BCD4;"></strong>
+                                        <br>
+                                        <small id="fileSize" style="color: #999;"></small>
+                                    </div>
+                                    <button type="button" onclick="removeFile()" style="background: #f44336; color: white; border: none; padding: 8px 15px; border-radius: 10px; cursor: pointer;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" viewBox="0 0 16 16">
+                                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Notas del Creador -->
+                            <div class="mb-4 mt-4">
+                                <label class="form-label" style="color: #00BCD4; font-weight: 700;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 8px;">
+                                        <path d="M5 4a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm-.5 2.5A.5.5 0 0 1 5 6h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zM5 8a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1H5z" />
+                                        <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2zm10-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1z" />
+                                    </svg>
+                                    Mensaje para el cliente (opcional)
+                                </label>
+                                <textarea id="notasCreador" name="notasCreador" class="form-game" rows="4" placeholder="Escribe un mensaje para tu cliente sobre la entrega..."></textarea>
+                            </div>
+
+                            <button type="button" class="mission-btn" id="btnEntregar" onclick="entregarDesafio(@Model.Id)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 16 16">
+                                    <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z" />
+                                </svg>
+                                Entregar Contenido
+                            </button>
+                        </form>
+                    </div>
+                }
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <div class="mission-sidebar">
+                    <h6 style="color: #00BCD4; font-weight: 800; margin-bottom: 20px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" />
+                        </svg>
+                        Información
+                    </h6>
+
+                    <div class="mission-info-item">
+                        <div class="mission-info-label">Tipo de Contenido</div>
+                        <div class="mission-info-value">@Model.TipoContenido.ToString()</div>
+                    </div>
+
+                    <div class="mission-info-item">
+                        <div class="mission-info-label">Presupuesto</div>
+                        <div class="mission-info-value" style="color: #00BCD4; font-size: 1.5rem;">$@Model.Presupuesto</div>
+                    </div>
+
+                    @if (Model.PrecioFinal.HasValue && Model.PrecioFinal != Model.Presupuesto)
+                    {
+                        <div class="mission-info-item">
+                            <div class="mission-info-label">Precio Final</div>
+                            <div class="mission-info-value" style="color: #4CAF50; font-size: 1.5rem;">$@Model.PrecioFinal</div>
+                        </div>
+                    }
+
+                    <div class="mission-info-item">
+                        <div class="mission-info-label">Plazo de Entrega</div>
+                        <div class="mission-info-value">@Model.DiasPlazoPlazo días</div>
+                    </div>
+
+                    @if (Model.FechaExpiracion.HasValue)
+                    {
+                        <div class="mission-info-item">
+                            <div class="mission-info-label">Expira</div>
+                            <div class="mission-info-value">@Model.FechaExpiracion.Value.ToString("dd/MM/yyyy")</div>
+                        </div>
+                    }
+
+                    @if (Model.FechaAsignacion.HasValue)
+                    {
+                        <div class="mission-info-item">
+                            <div class="mission-info-label">Asignado</div>
+                            <div class="mission-info-value">@Model.FechaAsignacion.Value.ToString("dd/MM/yyyy")</div>
+                        </div>
+                    }
+
+                    <div class="mission-info-item">
+                        <div class="mission-info-label">Estado</div>
+                        <div class="mission-info-value">@Model.Estado.ToString()</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Token CSRF
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+
+        if (!token) {
+            console.error('❌ Token CSRF no encontrado');
+        }
+
+        // ========================================
+        // MANEJO DE SUBIDA DE ARCHIVOS (CREADOR)
+        // ========================================
+        const uploadArea = document.getElementById('uploadArea');
+        const archivoInput = document.getElementById('archivoInput');
+        const filePreview = document.getElementById('filePreview');
+
+        if (uploadArea && archivoInput && filePreview) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, () => uploadArea.classList.add('dragover'), false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, () => uploadArea.classList.remove('dragover'), false);
+            });
+
+            uploadArea.addEventListener('drop', function(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length > 0) {
+                    archivoInput.files = files;
+                    showFilePreview(files[0]);
+                }
+            });
+
+            archivoInput.addEventListener('change', function(e) {
+                if (this.files.length > 0) {
+                    showFilePreview(this.files[0]);
+                }
+            });
+        }
+
+        function showFilePreview(file) {
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatBytes(file.size);
+            filePreview.classList.add('active');
+            uploadArea.style.display = 'none';
+        }
+
+        function removeFile() {
+            archivoInput.value = '';
+            filePreview.classList.remove('active');
+            uploadArea.style.display = 'block';
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        // ========================================
+        // ENTREGAR DESAFÍO (CREADOR)
+        // ========================================
+        async function entregarDesafio(desafioId) {
+            const archivo = document.getElementById('archivoInput')?.files[0];
+            if (!archivo) {
+                alert('⚠️ Por favor selecciona un archivo antes de entregar');
+                return;
+            }
+
+            if (archivo.size > 52428800) {
+                alert('⚠️ El archivo no puede superar los 50MB');
+                return;
+            }
+
+            if (!confirm('¿Estás seguro de entregar este contenido? Una vez entregado, el cliente lo revisará.')) {
+                return;
+            }
+
+            const btnEntregar = document.getElementById('btnEntregar');
+            btnEntregar.disabled = true;
+            btnEntregar.innerHTML = '<span>⏳ Subiendo...</span>';
+
+            const formData = new FormData();
+            formData.append('desafioId', desafioId);
+            formData.append('archivo', archivo);
+            formData.append('notasCreador', document.getElementById('notasCreador')?.value || '');
+            formData.append('__RequestVerificationToken', token);
+
+            try {
+                const response = await fetch('/Desafios/EntregarContenido', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    window.location.href = '/Desafios/DesafiosRecibidos';
+                } else {
+                    alert('❌ ' + data.message);
+                    btnEntregar.disabled = false;
+                    btnEntregar.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 16 16">
+                            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                        </svg>
+                        Entregar Contenido
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('❌ Error al entregar el contenido. Por favor intenta de nuevo.');
+                btnEntregar.disabled = false;
+                btnEntregar.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 16 16">
+                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                    </svg>
+                    Entregar Contenido
+                `;
+            }
+        }
+
+        // ========================================
+        // APROBAR CONTENIDO (FAN)
+        // ========================================
+        async function aprobarContenido(desafioId) {
+            if (!confirm('¿Estás satisfecho con el contenido? Esto completará el desafío y procesará el pago al creador.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/Desafios/AprobarContenido', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        desafioId: desafioId,
+                        __RequestVerificationToken: token
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    window.location.href = '/Desafios/MisDesafios';
+                } else {
+                    alert('❌ ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('❌ Error al aprobar el contenido. Por favor intenta de nuevo.');
+            }
+        }
+
+        // ========================================
+        // RECHAZAR CONTENIDO (FAN)
+        // ========================================
+        async function rechazarContenido(desafioId) {
+            const motivo = prompt('¿Qué necesita corregirse en el contenido?');
+            if (!motivo || motivo.trim() === '') {
+                return;
+            }
+
+            try {
+                const response = await fetch('/Desafios/RechazarContenido', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        desafioId: desafioId,
+                        motivo: motivo,
+                        __RequestVerificationToken: token
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('📝 ' + data.message);
+                    location.reload();
+                } else {
+                    alert('❌ ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('❌ Error al solicitar corrección. Por favor intenta de nuevo.');
+            }
+        }
+
+        // Exponer funciones al scope global
+        window.entregarDesafio = entregarDesafio;
+        window.aprobarContenido = aprobarContenido;
+        window.rechazarContenido = rechazarContenido;
+        window.removeFile = removeFile;
+    </script>
+}

@@ -1,0 +1,411 @@
+﻿@model Lado.Models.Desafio
+@inject UserManager<ApplicationUser> UserManager
+
+@{
+    ViewData["Title"] = "Lanzar Desafío";
+    var creador = ViewBag.Creador as ApplicationUser;
+}
+
+<style>
+    .game-bg {
+        background: linear-gradient(135deg, #E0F7FA 0%, #ffffff 100%);
+        min-height: 100vh;
+        padding: 30px 0;
+    }
+
+    .game-card {
+        background: white;
+        border-radius: 25px;
+        padding: 30px;
+        box-shadow: 0 8px 25px rgba(0,188,212,0.12);
+        margin-bottom: 25px;
+        border-top: 5px solid #00BCD4;
+    }
+
+    .game-header {
+        background: linear-gradient(135deg, #00BCD4 0%, #26C6DA 100%);
+        padding: 30px;
+        border-radius: 20px;
+        margin-bottom: 30px;
+        box-shadow: 0 6px 20px rgba(0,188,212,0.25);
+    }
+
+        .game-header h1 {
+            color: white;
+            font-weight: 800;
+            font-size: 2rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .game-header p {
+            color: rgba(255,255,255,0.95);
+            margin: 0;
+            font-size: 1rem;
+        }
+
+    .creator-card {
+        background: linear-gradient(135deg, #E0F7FA 0%, #B2EBF2 100%);
+        border-radius: 20px;
+        padding: 25px;
+        margin-bottom: 30px;
+        border: 2px solid #00BCD4;
+    }
+
+    .creator-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        border: 3px solid #00BCD4;
+        object-fit: cover;
+    }
+
+    .creator-initial {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #00BCD4 0%, #26C6DA 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 800;
+        font-size: 1.5rem;
+        border: 3px solid white;
+        box-shadow: 0 4px 15px rgba(0,188,212,0.3);
+    }
+
+    .form-label {
+        color: #00BCD4;
+        font-weight: 700;
+        font-size: 0.95rem;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .form-control, .form-select {
+        border: 2px solid #B2EBF2;
+        border-radius: 15px;
+        padding: 12px 18px;
+        transition: all 0.3s ease;
+        background: #F0FDFF;
+    }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #00BCD4;
+            box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.1);
+            background: white;
+            outline: none;
+        }
+
+    .btn-game-primary {
+        background: linear-gradient(135deg, #00BCD4 0%, #26C6DA 100%);
+        color: white;
+        border: none;
+        padding: 15px 35px;
+        border-radius: 15px;
+        font-weight: 700;
+        font-size: 1.05rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 5px 20px rgba(0,188,212,0.3);
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+        .btn-game-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,188,212,0.4);
+            color: white;
+        }
+
+    .btn-game-secondary {
+        background: white;
+        border: 2px solid #00BCD4;
+        color: #00BCD4;
+        padding: 15px 35px;
+        border-radius: 15px;
+        font-weight: 700;
+        font-size: 1.05rem;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+    }
+
+        .btn-game-secondary:hover {
+            background: #00BCD4;
+            color: white;
+            transform: translateY(-2px);
+            text-decoration: none;
+        }
+
+    .info-alert {
+        background: linear-gradient(135deg, #E0F7FA 0%, #B2EBF2 100%);
+        border-left: 5px solid #00BCD4;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 25px;
+    }
+
+        .info-alert strong {
+            color: #00BCD4;
+            font-size: 1.1rem;
+        }
+
+    .input-icon {
+        position: relative;
+    }
+
+        .input-icon svg {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .input-icon .form-control {
+            padding-left: 45px;
+        }
+
+    @@media (max-width: 768px) {
+        .game-header h1
+
+    {
+        font-size: 1.5rem;
+    }
+
+    .game-card {
+        padding: 20px;
+    }
+
+    }
+</style>
+
+<div class="game-bg">
+    <div class="container" style="max-width: 800px;">
+        <!-- Header -->
+        <div class="game-header">
+            <h1>
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="white" viewBox="0 0 16 16">
+                    <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z" />
+                </svg>
+                Lanzar Desafío Directo
+            </h1>
+            <p>Envía un desafío personalizado directamente a este creador</p>
+        </div>
+
+        <!-- Info del Creador -->
+        @if (creador != null)
+        {
+            <div class="creator-card">
+                <div class="d-flex align-items-center gap-3">
+                    @if (!string.IsNullOrEmpty(creador.FotoPerfil))
+                    {
+                        <img src="@creador.FotoPerfil" class="creator-avatar" alt="@creador.NombreCompleto">
+                    }
+                    else
+                    {
+                        <div class="creator-initial">
+                            <span>@creador.NombreCompleto?.Substring(0, 1).ToUpper()</span>
+                        </div>
+                    }
+                    <div class="flex-grow-1">
+                        <h5 class="mb-1" style="color: #00BCD4; font-weight: 800;">
+                            @creador.NombreCompleto
+                            @if (creador.EsVerificado)
+                            {
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#00BCD4" viewBox="0 0 16 16">
+                                    <path d="M10.067.87a2.89 2.89 0 0 0-4.134 0l-.622.638-.89-.011a2.89 2.89 0 0 0-2.924 2.924l.01.89-.636.622a2.89 2.89 0 0 0 0 4.134l.637.622-.011.89a2.89 2.89 0 0 0 2.924 2.924l.89-.01.622.636a2.89 2.89 0 0 0 4.134 0l.622-.637.89.011a2.89 2.89 0 0 0 2.924-2.924l-.01-.89.636-.622a2.89 2.89 0 0 0 0-4.134l-.637-.622.011-.89a2.89 2.89 0 0 0-2.924-2.924l-.89.01-.622-.636zm.287 5.984-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7 8.793l2.646-2.647a.5.5 0 0 1 .708.708z" />
+                                </svg>
+                            }
+                        </h5>
+                        @if (!string.IsNullOrEmpty(creador.Categoria))
+                        {
+                            <p class="mb-1 text-muted">@creador.Categoria</p>
+                        }
+                        @if (!string.IsNullOrEmpty(creador.Biografia))
+                        {
+                            <small class="text-muted">@creador.Biografia</small>
+                        }
+                    </div>
+                    <div class="text-end">
+                        <div style="color: #00BCD4; font-weight: 700; font-size: 1.2rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1h8Zm-7.978-1A.261.261 0 0 1 7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002a.274.274 0 0 1-.014.002H7.022ZM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM6.936 9.28a5.88 5.88 0 0 0-1.23-.247A7.35 7.35 0 0 0 5 9c-4 0-5 3-5 4 0 .667.333 1 1 1h4.216A2.238 2.238 0 0 1 5 13c0-1.01.377-2.042 1.09-2.904.243-.294.526-.569.846-.816ZM4.92 10A5.493 5.493 0 0 0 4 13H1c0-.26.164-1.03.76-1.724.545-.636 1.492-1.256 3.16-1.275ZM1.5 5.5a3 3 0 1 1 6 0 3 3 0 0 1-6 0Zm3-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z" />
+                            </svg>
+                            @creador.NumeroSeguidores
+                        </div>
+                        <small class="text-muted">seguidores</small>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Formulario -->
+        <form method="post" asp-action="CrearDirecto" asp-controller="Desafios" asp-route-creadorId="@creador?.Id">
+            @Html.AntiForgeryToken()
+
+            <div class="game-card">
+                <!-- Título -->
+                <div class="mb-4">
+                    <label asp-for="Titulo" class="form-label">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>
+                            <line x1="4" y1="22" x2="4" y2="15"></line>
+                        </svg>
+                        Título del Desafío
+                        <span class="text-danger">*</span>
+                    </label>
+                    <input asp-for="Titulo" class="form-control" placeholder="Ej: Video tutorial de cocina mediterránea" maxlength="100" required>
+                    <span asp-validation-for="Titulo" class="text-danger"></span>
+                    <small class="text-muted">Describe lo que necesitas en pocas palabras</small>
+                </div>
+
+                <!-- Descripción -->
+                <div class="mb-4">
+                    <label asp-for="Descripcion" class="form-label">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M5 4a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm-.5 2.5A.5.5 0 0 1 5 6h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zM5 8a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1H5z" />
+                            <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2zm10-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1z" />
+                        </svg>
+                        Descripción Detallada
+                        <span class="text-danger">*</span>
+                    </label>
+                    <textarea asp-for="Descripcion" class="form-control" rows="5" placeholder="Describe exactamente qué necesitas: estilo, duración, requisitos específicos, etc." maxlength="2000" required></textarea>
+                    <span asp-validation-for="Descripcion" class="text-danger"></span>
+                </div>
+
+                <!-- Presupuesto y Plazo -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <label asp-for="Presupuesto" class="form-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M4 10.781c.148 1.667 1.513 2.85 3.591 3.003V15h1.043v-1.216c2.27-.179 3.678-1.438 3.678-3.3 0-1.59-.947-2.51-2.956-3.028l-.722-.187V3.467c1.122.11 1.879.714 2.07 1.616h1.47c-.166-1.6-1.54-2.748-3.54-2.875V1H7.591v1.233c-1.939.23-3.27 1.472-3.27 3.156 0 1.454.966 2.483 2.661 2.917l.61.162v4.031c-1.149-.17-1.94-.8-2.131-1.718H4zm3.391-3.836c-1.043-.263-1.6-.825-1.6-1.616 0-.944.704-1.641 1.8-1.828v3.495l-.2-.05zm1.591 1.872c1.287.323 1.852.859 1.852 1.769 0 1.097-.826 1.828-2.2 1.939V8.73l.348.086z" />
+                            </svg>
+                            Presupuesto (USD)
+                            <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#00BCD4" viewBox="0 0 16 16">
+                                <path d="M4 10.781c.148 1.667 1.513 2.85 3.591 3.003V15h1.043v-1.216c2.27-.179 3.678-1.438 3.678-3.3 0-1.59-.947-2.51-2.956-3.028l-.722-.187V3.467c1.122.11 1.879.714 2.07 1.616h1.47c-.166-1.6-1.54-2.748-3.54-2.875V1H7.591v1.233c-1.939.23-3.27 1.472-3.27 3.156 0 1.454.966 2.483 2.661 2.917l.61.162v4.031c-1.149-.17-1.94-.8-2.131-1.718H4zm3.391-3.836c-1.043-.263-1.6-.825-1.6-1.616 0-.944.704-1.641 1.8-1.828v3.495l-.2-.05zm1.591 1.872c1.287.323 1.852.859 1.852 1.769 0 1.097-.826 1.828-2.2 1.939V8.73l.348.086z" />
+                            </svg>
+                            <input asp-for="Presupuesto" type="number" class="form-control" min="1" max="100000" step="0.01" placeholder="100.00" required>
+                        </div>
+                        <span asp-validation-for="Presupuesto" class="text-danger"></span>
+                        @if (creador != null && creador.PrecioSuscripcion > 0)
+                        {
+                            <small class="text-muted">Precio de suscripción del creador: $@creador.PrecioSuscripcion/mes</small>
+                        }
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="DiasPlazoPlazo" class="form-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z" />
+                            </svg>
+                            Plazo de Entrega (días)
+                            <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#00BCD4" viewBox="0 0 16 16">
+                                <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z" />
+                            </svg>
+                            <input asp-for="DiasPlazoPlazo" type="number" class="form-control" min="1" max="30" placeholder="7" required>
+                        </div>
+                        <span asp-validation-for="DiasPlazoPlazo" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <!-- Categoría -->
+                <div class="mb-4">
+                    <label asp-for="Categoria" class="form-label">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zM2.5 2a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zM1 10.5A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3z" />
+                        </svg>
+                        Categoría
+                    </label>
+                    <select asp-for="Categoria" class="form-select">
+                        <option value="">Seleccionar categoría</option>
+                        <option value="Fitness">💪 Fitness</option>
+                        <option value="Cocina">🍳 Cocina</option>
+                        <option value="Arte">🎨 Arte</option>
+                        <option value="Música">🎵 Música</option>
+                        <option value="Educación">📚 Educación</option>
+                        <option value="Tecnología">💻 Tecnología</option>
+                        <option value="Otro">✨ Otro</option>
+                    </select>
+                </div>
+
+                <!-- Tipo de Contenido -->
+                <div class="mb-4">
+                    <label asp-for="TipoContenido" class="form-label">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z" />
+                            <path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2h-12zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1h12z" />
+                        </svg>
+                        Tipo de Contenido
+                        <span class="text-danger">*</span>
+                    </label>
+                    <select asp-for="TipoContenido" class="form-select" required>
+                        <option value="0">📸 Imagen</option>
+                        <option value="1">🎬 Video</option>
+                        <option value="2">🎙️ Audio</option>
+                        <option value="3">📝 Texto</option>
+                    </select>
+                </div>
+
+                <!-- Visibilidad -->
+                <div class="mb-4">
+                    <label asp-for="Visibilidad" class="form-label">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z" />
+                            <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" />
+                        </svg>
+                        Visibilidad del Contenido
+                    </label>
+                    <select asp-for="Visibilidad" class="form-select">
+                        <option value="0">🔒 Privado (solo para mí)</option>
+                        <option value="1">🌐 Público (se publicará en el perfil del creador)</option>
+                    </select>
+                    <small class="text-muted">Si eliges público, el contenido aparecerá en el feed del creador</small>
+                </div>
+
+                <!-- Info Box -->
+                <div class="info-alert">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00BCD4" viewBox="0 0 16 16" style="margin-right: 12px; vertical-align: middle;">
+                        <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" />
+                    </svg>
+                    <strong>Desafío Directo</strong>
+                    <p class="mb-0 mt-2">El creador recibirá tu desafío y podrá aceptarlo o rechazarlo. Si lo acepta, comenzará a trabajar en tu contenido personalizado.</p>
+                </div>
+            </div>
+
+            <!-- Botones -->
+            <div class="d-flex gap-3 mt-4">
+                <a href="@Url.Action("Detalles", "Perfil", new { username = creador?.UserName })" class="btn-game-secondary">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z" />
+                    </svg>
+                    Volver al Perfil
+                </a>
+                <button type="submit" class="btn-game-primary flex-grow-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="white" viewBox="0 0 16 16">
+                        <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z" />
+                    </svg>
+                    Enviar Desafío
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

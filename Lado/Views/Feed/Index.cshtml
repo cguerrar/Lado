@@ -1,0 +1,1130 @@
+﻿@model IEnumerable<Lado.Models.Contenido>
+@{
+    ViewData["Title"] = "Feed";
+}
+
+@Html.AntiForgeryToken()
+
+<style>
+    /* Variables de colores del proyecto */
+    :root {
+        --primary-color: #00bcd4;
+        --primary-dark: #0288d1;
+        --dark-bg: #0a1929;
+        --light-bg: #f8f9fa;
+    }
+
+    /* Container principal */
+    .feed-container {
+        padding: 24px 16px;
+    }
+
+    /* Header del feed */
+    .feed-header {
+        margin-bottom: 32px;
+    }
+
+        .feed-header h2 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+        }
+
+        .feed-header p {
+            color: #6b7280;
+            font-size: 15px;
+            margin: 0;
+        }
+
+    /* Post Card Mejorado */
+    .post-card {
+        background: white;
+        border-radius: 16px;
+        margin-bottom: 24px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        transition: all 0.3s ease;
+    }
+
+        .post-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+
+    /* Header del post */
+    .post-header {
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .post-user-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+        flex: 1;
+    }
+
+    .post-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+        .post-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+    .avatar-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 16px;
+    }
+
+    .post-user-details h6 {
+        margin: 0 0 2px 0;
+        font-size: 15px;
+        font-weight: 600;
+        color: #1a1a1a;
+    }
+
+    .post-user-details small {
+        color: #6b7280;
+        font-size: 13px;
+    }
+
+    .post-menu-btn {
+        background: none;
+        border: none;
+        padding: 8px;
+        cursor: pointer;
+        color: #6b7280;
+        transition: all 0.2s;
+        border-radius: 8px;
+    }
+
+        .post-menu-btn:hover {
+            background: #f3f4f6;
+            color: var(--primary-color);
+        }
+
+    /* Contenido multimedia */
+    .post-media {
+        position: relative;
+        background: #000;
+        line-height: 0;
+    }
+
+        .post-media img,
+        .post-media video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+    .post-video {
+        max-height: 600px;
+        object-fit: contain;
+    }
+
+    /* Video Overlay y Controles */
+    .video-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        cursor: pointer;
+        display: flex;
+        align-items: flex-end;
+        justify-content: flex-end;
+        padding: 16px;
+        background: linear-gradient(to top, rgba(0,0,0,0.3) 0%, transparent 30%);
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+
+    .post-media:hover .video-overlay {
+        opacity: 1;
+    }
+
+    .sound-indicator {
+        width: 40px;
+        height: 40px;
+        background: rgba(0,0,0,0.6);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(8px);
+        transition: all 0.3s;
+    }
+
+        .sound-indicator:hover {
+            background: rgba(0,0,0,0.8);
+            transform: scale(1.1);
+        }
+
+    /* Premium Lock Overlay */
+    .premium-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.8) 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        backdrop-filter: blur(8px);
+    }
+
+    .premium-lock-icon {
+        width: 64px;
+        height: 64px;
+        background: var(--primary-color);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 12px;
+        box-shadow: 0 8px 24px rgba(0, 188, 212, 0.4);
+    }
+
+    .premium-overlay h4 {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0 0 8px 0;
+    }
+
+    .premium-overlay p {
+        font-size: 14px;
+        opacity: 0.9;
+        margin: 0 0 20px 0;
+    }
+
+    .unlock-btn {
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 12px 32px;
+        border-radius: 24px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+        .unlock-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 188, 212, 0.3);
+        }
+
+    /* Descripción del post */
+    .post-description {
+        padding: 16px 20px;
+        font-size: 15px;
+        line-height: 1.5;
+        color: #1a1a1a;
+    }
+
+    /* Acciones del post */
+    .post-actions {
+        padding: 12px 20px 16px;
+        border-top: 1px solid #f3f4f6;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 12px;
+    }
+
+    .action-btn {
+        background: none;
+        border: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        cursor: pointer;
+        color: #374151;
+        font-size: 14px;
+        font-weight: 500;
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+
+        .action-btn:hover {
+            background: #f3f4f6;
+            color: var(--primary-color);
+        }
+
+        .action-btn.liked {
+            color: #ef4444;
+        }
+
+            .action-btn.liked svg {
+                fill: #ef4444;
+                stroke: #ef4444;
+            }
+
+        .action-btn.bookmarked {
+            color: var(--primary-color);
+        }
+
+            .action-btn.bookmarked svg {
+                fill: var(--primary-color);
+                stroke: var(--primary-color);
+            }
+
+    /* Sección de comentarios */
+    .comments-preview {
+        margin-top: 12px;
+    }
+
+    .view-comments-link {
+        color: #6b7280;
+        font-size: 14px;
+        text-decoration: none;
+        display: inline-block;
+        margin-bottom: 12px;
+        cursor: pointer;
+    }
+
+        .view-comments-link:hover {
+            color: var(--primary-color);
+        }
+
+    .add-comment-form {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .comment-input {
+        flex: 1;
+        border: 1px solid #e5e7eb;
+        border-radius: 24px;
+        padding: 10px 16px;
+        font-size: 14px;
+        outline: none;
+        transition: all 0.2s;
+    }
+
+        .comment-input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.1);
+        }
+
+        .comment-input::placeholder {
+            color: #9ca3af;
+        }
+
+    .post-comment-btn {
+        background: none;
+        border: none;
+        color: var(--primary-color);
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        padding: 8px 16px;
+        border-radius: 8px;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+        .post-comment-btn:hover:not(:disabled) {
+            background: rgba(0, 188, 212, 0.1);
+        }
+
+        .post-comment-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+    /* Estado vacío */
+    .empty-feed {
+        text-align: center;
+        padding: 80px 20px;
+    }
+
+    .empty-icon {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 24px;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .empty-feed h3 {
+        font-size: 24px;
+        font-weight: 700;
+        color: #1a1a1a;
+        margin-bottom: 12px;
+    }
+
+    .empty-feed p {
+        font-size: 16px;
+        color: #6b7280;
+        margin-bottom: 32px;
+        max-width: 400px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .explore-btn {
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 14px 32px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 16px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s;
+    }
+
+        .explore-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 188, 212, 0.3);
+            color: white;
+        }
+
+    /* Suggestions Sidebar */
+    .suggestions-sidebar {
+        position: sticky;
+        top: 90px;
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+        .suggestions-sidebar h5 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 20px;
+        }
+
+    .suggestion-card {
+        padding: 16px;
+        border-radius: 12px;
+        margin-bottom: 12px;
+        background: #f8f9fa;
+        transition: all 0.2s;
+    }
+
+        .suggestion-card:hover {
+            background: #f3f4f6;
+            transform: translateY(-2px);
+        }
+
+    .suggestion-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+        margin-bottom: 12px;
+    }
+
+    .suggestion-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        overflow: hidden;
+        flex-shrink: 0;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    }
+
+        .suggestion-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+    .avatar-placeholder-small {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 18px;
+    }
+
+    .suggestion-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+        .suggestion-info h6 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin: 0 0 2px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .suggestion-info p {
+            font-size: 13px;
+            color: #6b7280;
+            margin: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+    .btn-view-profile {
+        display: block;
+        width: 100%;
+        padding: 8px;
+        background: var(--primary-color);
+        color: white;
+        text-align: center;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+        .btn-view-profile:hover {
+            background: var(--primary-dark);
+            color: white;
+            transform: translateY(-1px);
+        }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .feed-container {
+            padding: 16px 12px;
+        }
+
+        .post-card {
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        .feed-header h2 {
+            font-size: 24px;
+        }
+
+        .action-buttons {
+            gap: 12px;
+        }
+
+        .action-btn {
+            padding: 6px 8px;
+            font-size: 13px;
+            gap: 6px;
+        }
+
+        .add-comment-form {
+            flex-wrap: wrap;
+        }
+
+        .post-comment-btn {
+            padding: 10px 20px;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .post-header {
+            padding: 12px 16px;
+        }
+
+        .post-actions {
+            padding: 10px 16px 14px;
+        }
+
+        .post-description {
+            padding: 12px 16px;
+            font-size: 14px;
+        }
+
+        .action-btn span {
+            font-size: 12px;
+        }
+    }
+</style>
+
+<div class="row">
+    <!-- Feed Principal -->
+    <div class="col-lg-8">
+        <div class="feed-container">
+            <!-- Header del Feed -->
+            <div class="feed-header">
+                <h2>Tu Feed</h2>
+                <p>Contenido de tus creadores favoritos</p>
+            </div>
+
+            @if (Model.Any())
+            {
+                @foreach (var contenido in Model)
+                {
+                    <div class="post-card" data-content-id="@contenido.Id">
+                        <!-- Header del post -->
+                        <div class="post-header">
+                            <a href="/Feed/Perfil/@contenido.UsuarioId" class="post-user-info">
+                                <div class="post-avatar">
+                                    @if (!string.IsNullOrEmpty(contenido.Usuario?.FotoPerfil))
+                                    {
+                                        <img src="@contenido.Usuario.FotoPerfil" alt="@contenido.Usuario.NombreCompleto">
+                                    }
+                                    else
+                                    {
+                                        <div class="avatar-placeholder">
+                                            @(contenido.Usuario?.NombreCompleto?.Substring(0, 1) ?? "U")
+                                        </div>
+                                    }
+                                </div>
+                                <div class="post-user-details">
+                                    <h6>@(contenido.Usuario?.NombreCompleto ?? "Usuario")</h6>
+                                    <small>
+                                        @@@(contenido.Usuario?.UserName ?? "usuario") ·
+                                        @{
+                                            var tiempo = DateTime.Now - contenido.FechaPublicacion;
+                                            var tiempoTexto = tiempo.TotalDays >= 1 ? $"{(int)tiempo.TotalDays}d" :
+                                            tiempo.TotalHours >= 1 ? $"{(int)tiempo.TotalHours}h" : $"{(int)tiempo.TotalMinutes}m";
+                                        }
+                                        @tiempoTexto
+                                    </small>
+                                </div>
+                            </a>
+                            <button class="post-menu-btn">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="1" />
+                                    <circle cx="12" cy="5" r="1" />
+                                    <circle cx="12" cy="19" r="1" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Contenido multimedia -->
+                        <div class="post-media">
+                            @if (contenido.EsPremium && !(ViewBag.EstaSuscrito ?? true))
+                            {
+                                @if ((int)contenido.TipoContenido == 1)
+                                {
+                                    <video src="@contenido.RutaArchivo" class="post-video" style="filter: blur(20px);" playsinline muted></video>
+                                }
+                                else
+                                {
+                                    <img src="@(contenido.RutaArchivo ?? "/images/placeholder.jpg")" alt="Premium content" style="filter: blur(20px);">
+                                }
+                                <div class="premium-overlay">
+                                    <div class="premium-lock-icon">
+                                        <!-- ✅ SVG BLANCO DE ALTA CALIDAD -->
+                                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                        </svg>
+                                    </div>
+                                    <h4>Contenido Premium</h4>
+                                    <p>Suscríbete para desbloquear</p>
+                                    <button class="unlock-btn" onclick="window.location.href='/Feed/Perfil/@contenido.UsuarioId'">
+                                        <!-- ✅ SVG BLANCO -->
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="white" stroke="white"/>
+                                        </svg>
+                                        Suscribirse
+                                    </button>
+                                </div>
+                            }
+                            else if (!string.IsNullOrEmpty(contenido.RutaArchivo))
+                            {
+                                @if ((int)contenido.TipoContenido == 0)
+                                {
+                                    <img src="@contenido.RutaArchivo" alt="Post content">
+                                }
+                                else if ((int)contenido.TipoContenido == 1)
+                                {
+                                    <video src="@contenido.RutaArchivo" controls></video>
+                                }
+                            }
+                        </div>
+
+                        <!-- Descripción -->
+                        @if (!string.IsNullOrEmpty(contenido.Descripcion))
+                        {
+                            <div class="post-description">
+                                @contenido.Descripcion
+                            </div>
+                        }
+
+                        <!-- Acciones -->
+                        <div class="post-actions">
+                            <div class="action-buttons">
+                                <button class="action-btn like-btn" data-id="@contenido.Id">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                                    </svg>
+                                    <span class="like-count">@contenido.NumeroLikes</span>
+                                </button>
+                                <button class="action-btn comment-btn">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                    </svg>
+                                    <span class="comment-count">@contenido.NumeroComentarios</span>
+                                </button>
+                                <!-- ✅ BOTÓN DE COMPARTIR CON FUNCIONALIDAD -->
+                                <button class="action-btn share-btn" data-id="@contenido.Id" data-username="@contenido.Usuario?.UserName">
+                                    <!-- ✅ SVG DE ALTA CALIDAD -->
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="22" y1="2" x2="11" y2="13" />
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                                    </svg>
+                                    <span>Compartir</span>
+                                </button>
+                                <button class="action-btn bookmark-btn" style="margin-left: auto;">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <!-- Comentarios -->
+                            <div class="comments-preview">
+                                @if (contenido.NumeroComentarios > 0)
+                                {
+                                    <a class="view-comments-link" onclick="verComentarios(@contenido.Id)">
+                                        Ver los @contenido.NumeroComentarios comentarios
+                                    </a>
+                                }
+                                <div class="add-comment-form">
+                                    <input type="text" class="comment-input" placeholder="Añade un comentario..." data-content-id="@contenido.Id">
+                                    <button class="post-comment-btn" disabled data-content-id="@contenido.Id">Publicar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="empty-feed">
+                    <div class="empty-icon">
+                        <!-- ✅ SVG BLANCO DE ALTA CALIDAD -->
+                        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 11a9 9 0 0 1 9 9" />
+                            <path d="M4 4a16 16 0 0 1 16 16" />
+                            <circle cx="5" cy="19" r="1" />
+                        </svg>
+                    </div>
+                    <h3>Tu feed está vacío</h3>
+                    <p>Aún no sigues a ningún creador. Descubre contenido increíble suscribiéndote a tus favoritos.</p>
+                    <a href="/Feed/Explorar" class="explore-btn">
+                        <!-- ✅ SVG BLANCO -->
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8" stroke="white"/>
+                            <path d="m21 21-4.35-4.35" stroke="white"/>
+                        </svg>
+                        Explorar Creadores
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Sidebar de Sugerencias -->
+    <div class="col-lg-4 d-none d-lg-block">
+        <div class="suggestions-sidebar">
+            <h5>Creadores sugeridos</h5>
+
+            @if (ViewBag.CreadoresSugeridos != null && ((List<Lado.Models.ApplicationUser>)ViewBag.CreadoresSugeridos).Any())
+            {
+                @foreach (var creador in (List<Lado.Models.ApplicationUser>)ViewBag.CreadoresSugeridos)
+                {
+                    <div class="suggestion-card">
+                        <a href="/Feed/Perfil/@creador.Id" class="suggestion-link">
+                            <div class="suggestion-avatar">
+                                @if (!string.IsNullOrEmpty(creador.FotoPerfil))
+                                {
+                                    <img src="@creador.FotoPerfil" alt="@creador.NombreCompleto">
+                                }
+                                else
+                                {
+                                    <div class="avatar-placeholder-small">
+                                        @creador.NombreCompleto.Substring(0, 1)
+                                    </div>
+                                }
+                            </div>
+                            <div class="suggestion-info">
+                                <h6>@creador.NombreCompleto</h6>
+                                <p>@@@creador.UserName</p>
+                            </div>
+                        </a>
+                        <a href="/Feed/Perfil/@creador.Id" class="btn-view-profile">Ver perfil</a>
+                    </div>
+                }
+            }
+            else
+            {
+                <p class="text-muted">No hay sugerencias disponibles</p>
+            }
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🎬 Sistema de feed iniciado');
+
+        // ========================================
+        // ✅ COMENTARIOS - FUNCIONALIDAD COMPLETA
+        // ========================================
+
+        // Habilitar/deshabilitar botón de publicar
+        document.querySelectorAll('.comment-input').forEach(input => {
+            input.addEventListener('input', function() {
+                const contentId = this.dataset.contentId;
+                const btn = document.querySelector(`.post-comment-btn[data-content-id="${contentId}"]`);
+                btn.disabled = this.value.trim() === '';
+            });
+
+            // Publicar con Enter
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    const contentId = this.dataset.contentId;
+                    const btn = document.querySelector(`.post-comment-btn[data-content-id="${contentId}"]`);
+                    if (!btn.disabled) {
+                        publicarComentario(contentId, this.value.trim());
+                    }
+                }
+            });
+        });
+
+        // Publicar comentario al hacer click
+        document.querySelectorAll('.post-comment-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const contentId = this.dataset.contentId;
+                const input = document.querySelector(`.comment-input[data-content-id="${contentId}"]`);
+                const texto = input.value.trim();
+                
+                if (texto) {
+                    publicarComentario(contentId, texto);
+                }
+            });
+        });
+
+        async function publicarComentario(contentId, texto) {
+            const btn = document.querySelector(`.post-comment-btn[data-content-id="${contentId}"]`);
+            const input = document.querySelector(`.comment-input[data-content-id="${contentId}"]`);
+            const commentCountSpan = document.querySelector(`[data-content-id="${contentId}"] .comment-count`);
+
+            // Estado de carga
+            const textoOriginal = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Publicando...';
+
+            try {
+                const response = await fetch('/Feed/Comentar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                    },
+                    body: `id=${contentId}&texto=${encodeURIComponent(texto)}`
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Limpiar input
+                    input.value = '';
+                    btn.disabled = true;
+                    btn.textContent = textoOriginal;
+
+                    // Actualizar contador
+                    if (commentCountSpan) {
+                        commentCountSpan.textContent = data.totalComentarios;
+                    }
+
+                    // Mostrar mensaje de éxito
+                    mostrarNotificacion('Comentario publicado ✓', 'success');
+                    
+                    console.log('✅ Comentario publicado exitosamente');
+                } else {
+                    mostrarNotificacion(data.message || 'Error al publicar comentario', 'error');
+                    btn.textContent = textoOriginal;
+                    btn.disabled = false;
+                }
+            } catch (error) {
+                console.error('❌ Error al publicar comentario:', error);
+                mostrarNotificacion('Error al publicar el comentario', 'error');
+                btn.textContent = textoOriginal;
+                btn.disabled = false;
+            }
+        }
+
+        // ========================================
+        // ✅ COMPARTIR - WEB SHARE API
+        // ========================================
+
+        document.querySelectorAll('.share-btn').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const contentId = this.dataset.id;
+                const username = this.dataset.username;
+                const url = `${window.location.origin}/Contenido/Detalle/${contentId}`;
+                const title = `Contenido de @@${username}`;
+                const text = `Mira este increíble contenido de @@${username} en Lado`;
+
+                // Verificar si el navegador soporta Web Share API
+                if (navigator.share) {
+                    try {
+                        await navigator.share({
+                            title: title,
+                            text: text,
+                            url: url
+                        });
+                        console.log('✅ Contenido compartido exitosamente');
+                    } catch (error) {
+                        if (error.name !== 'AbortError') {
+                            console.log('Usuario canceló el compartir');
+                            copiarAlPortapapeles(url);
+                        }
+                    }
+                } else {
+                    // Fallback: copiar al portapapeles
+                    copiarAlPortapapeles(url);
+                }
+            });
+        });
+
+        function copiarAlPortapapeles(texto) {
+            navigator.clipboard.writeText(texto).then(() => {
+                mostrarNotificacion('Enlace copiado al portapapeles ✓', 'success');
+            }).catch(() => {
+                mostrarNotificacion('No se pudo copiar el enlace', 'error');
+            });
+        }
+
+        // ========================================
+        // LIKES
+        // ========================================
+
+        document.querySelectorAll('.like-btn').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const contentId = this.dataset.id;
+                const likeCountSpan = this.querySelector('.like-count');
+
+                try {
+                    const response = await fetch(`/Contenido/Like/${contentId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.classList.toggle('liked');
+                        likeCountSpan.textContent = data.likes;
+                    }
+                } catch (error) {
+                    console.error('Error al dar like:', error);
+                }
+            });
+        });
+
+        // ========================================
+        // BOOKMARKS
+        // ========================================
+
+        document.querySelectorAll('.bookmark-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.classList.toggle('bookmarked');
+                const guardado = this.classList.contains('bookmarked');
+                mostrarNotificacion(guardado ? 'Guardado ✓' : 'Eliminado de guardados', 'success');
+            });
+        });
+
+        // ========================================
+        // AUTOPLAY DE VIDEOS
+        // ========================================
+
+        let currentPlayingVideo = null;
+        const videos = document.querySelectorAll('.post-media video');
+
+        if (videos.length > 0) {
+            const videoObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const video = entry.target;
+
+                    if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+                        playVideo(video);
+                    } else {
+                        pauseVideo(video);
+                    }
+                });
+            }, {
+                threshold: [0, 0.5, 1.0],
+                rootMargin: '0px'
+            });
+
+            videos.forEach((video, index) => {
+                video.removeAttribute('controls');
+                video.muted = true;
+                video.loop = true;
+                video.playsInline = true;
+                video.setAttribute('data-video-id', index + 1);
+
+                videoObserver.observe(video);
+
+                // Crear overlay de mute toggle
+                if (!video.nextElementSibling?.classList.contains('video-overlay')) {
+                    const overlay = document.createElement('div');
+                    overlay.className = 'video-overlay';
+                    overlay.onclick = function() { toggleMute(video); };
+                    overlay.innerHTML = `
+                        <div class="sound-indicator">
+                            <svg class="sound-off" width="24" height="24" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2">
+                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                                <line x1="23" y1="9" x2="17" y2="15"/>
+                                <line x1="17" y1="9" x2="23" y2="15"/>
+                            </svg>
+                            <svg class="sound-on" width="24" height="24" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2" style="display: none;">
+                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                            </svg>
+                        </div>
+                    `;
+                    video.parentElement.appendChild(overlay);
+                }
+            });
+        }
+
+        function playVideo(video) {
+            if (currentPlayingVideo && currentPlayingVideo !== video) {
+                pauseVideo(currentPlayingVideo);
+            }
+
+            video.play().then(() => {
+                currentPlayingVideo = video;
+            }).catch(err => {
+                setTimeout(() => video.play().catch(() => {}), 100);
+            });
+        }
+
+        function pauseVideo(video) {
+            video.pause();
+            if (currentPlayingVideo === video) {
+                currentPlayingVideo = null;
+            }
+        }
+
+        window.toggleMute = function(video) {
+            const overlay = video.nextElementSibling;
+            const soundOff = overlay.querySelector('.sound-off');
+            const soundOn = overlay.querySelector('.sound-on');
+
+            if (video.muted) {
+                video.muted = false;
+                soundOff.style.display = 'none';
+                soundOn.style.display = 'block';
+            } else {
+                video.muted = true;
+                soundOff.style.display = 'block';
+                soundOn.style.display = 'none';
+            }
+        };
+
+        // ========================================
+        // UTILIDADES
+        // ========================================
+
+        function mostrarNotificacion(mensaje, tipo = 'success') {
+            const notif = document.createElement('div');
+            notif.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 16px 24px;
+                background: ${tipo === 'success' ? '#10b981' : '#ef4444'};
+                color: white;
+                border-radius: 12px;
+                font-weight: 600;
+                font-size: 14px;
+                z-index: 9999;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                animation: slideIn 0.3s ease;
+            `;
+            notif.textContent = mensaje;
+            document.body.appendChild(notif);
+
+            setTimeout(() => {
+                notif.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notif.remove(), 300);
+            }, 3000);
+        }
+
+        window.verComentarios = function(contentId) {
+            window.location.href = `/Feed/Detalle/${contentId}`;
+        };
+
+        console.log('✅ Sistema de feed completamente inicializado');
+    });
+
+    // Animaciones CSS
+    const style = document.createElement('style');
+    style.textContent = `
+        @@keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @@keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+</script>

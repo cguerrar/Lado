@@ -1,0 +1,478 @@
+﻿@model Lado.Models.ApplicationUser
+@{
+    ViewData["Title"] = $"Perfil de {Model.NombreCompleto}";
+    var estaSuscrito = ViewBag.EstaSuscrito ?? false;
+    var contenidos = ViewBag.Contenidos as List<Lado.Models.Contenido> ?? new List<Lado.Models.Contenido>();
+    var totalContenidos = ViewBag.TotalContenidos ?? 0;
+}
+
+<div class="container py-4">
+    <!-- Banner y Header del Perfil -->
+    <div class="card shadow-sm mb-4 overflow-hidden" style="border-radius: 15px;">
+        <!-- Banner -->
+        <div class="perfil-banner">
+            @if (!string.IsNullOrEmpty(Model.FotoPortada))
+            {
+                <img src="@Model.FotoPortada" alt="Portada" class="w-100 h-100 object-fit-cover">
+            }
+            else
+            {
+                <div class="banner-gradient"></div>
+            }
+        </div>
+
+        <div class="card-body">
+            <div class="row align-items-end">
+                <!-- Avatar -->
+                <div class="col-auto">
+                    <div class="avatar-large-container">
+                        @if (!string.IsNullOrEmpty(Model.FotoPerfil))
+                        {
+                            <img src="@Model.FotoPerfil" class="avatar-large" alt="@Model.UserName">
+                        }
+                        else
+                        {
+                            <div class="avatar-large avatar-placeholder">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="12" cy="7" r="4"></circle>
+                                </svg>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Info -->
+                <div class="col">
+                    <h2 class="mb-1 fw-bold">@Model.NombreCompleto</h2>
+                    <p class="text-muted mb-2">@@@Model.UserName</p>
+
+                    @if (!string.IsNullOrEmpty(Model.Biografia))
+                    {
+                        <p class="mb-3">@Model.Biografia</p>
+                    }
+
+                    <!-- Stats -->
+                    <div class="d-flex gap-4 flex-wrap">
+                        <div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            <strong>@Model.NumeroSeguidores</strong>
+                            <span class="text-muted">Seguidores</span>
+                        </div>
+                        <div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            <strong>@totalContenidos</strong>
+                            <span class="text-muted">Publicaciones</span>
+                        </div>
+                        <div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
+                            <strong class="text-success">$@Model.PrecioSuscripcion.ToString("N2")</strong>
+                            <span class="text-muted">/mes</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botones de acción -->
+                <div class="col-auto">
+                    <div class="d-flex flex-column gap-2" style="min-width: 200px;">
+                        @if (estaSuscrito)
+                        {
+                            <button class="btn btn-success btn-lg">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                Suscrito
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="cancelarSuscripcion('@Model.Id')">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                                Cancelar Suscripción
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-primary btn-lg" onclick="suscribirse('@Model.Id', @Model.PrecioSuscripcion)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
+                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                </svg>
+                                Suscribirse - $@Model.PrecioSuscripcion.ToString("N2")/mes
+                            </button>
+                        }
+
+                        <a href="@Url.Action("CrearDirecto", "Desafios", new { creadorId = Model.Id })"
+                           class="btn btn-outline-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16" style="display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z" />
+                            </svg>
+                            Lanzar Desafío
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="mb-3 fw-bold">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                Contenido (@totalContenidos)
+            </h4>
+
+            @if (contenidos.Any())
+            {
+                <div class="row g-3">
+                    @foreach (var contenido in contenidos)
+                    {
+                        <div class="col-sm-6 col-md-4 col-lg-3">
+                            <div class="card contenido-card h-100 shadow-sm">
+                                <div class="contenido-media">
+                                    @if ((int)contenido.TipoContenido == 0)
+                                    {
+                                        @if (!string.IsNullOrEmpty(contenido.RutaArchivo))
+                                        {
+                                            <img src="@contenido.RutaArchivo" alt="Contenido">
+                                        }
+                                        else
+                                        {
+                                            <div class="media-placeholder">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                                    <polyline points="21 15 16 10 5 21"></polyline>
+                                                </svg>
+                                            </div>
+                                        }
+                                    }
+                                    else if ((int)contenido.TipoContenido == 1)
+                                    {
+                                        <div class="media-placeholder media-video">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <polygon points="10 8 16 12 10 16 10 8" fill="white"></polygon>
+                                            </svg>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="media-placeholder">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                <polyline points="14 2 14 8 20 8"></polyline>
+                                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                                <polyline points="10 9 9 9 8 9"></polyline>
+                                            </svg>
+                                        </div>
+                                    }
+
+                                    @if (contenido.EsPremium && !estaSuscrito)
+                                    {
+                                        <div class="premium-overlay">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mb-2">
+                                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                            </svg>
+                                            <p class="mb-0"><strong>Premium</strong></p>
+                                            <small>Suscríbete para ver</small>
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="card-body">
+                                    @if (!string.IsNullOrEmpty(contenido.Descripcion))
+                                    {
+                                        <p class="card-text small mb-2">
+                                            @(contenido.Descripcion.Length > 50 ? contenido.Descripcion.Substring(0, 50) + "..." : contenido.Descripcion)
+                                        </p>
+                                    }
+
+                                    <!-- DEBUG INFO - Remover después -->
+                                    @* <small class="text-danger">DEBUG: ID=@contenido.Id, Likes=@contenido.NumeroLikes (@(contenido.Likes?.Count ?? 0)), Comentarios=@contenido.NumeroComentarios (@(contenido.Comentarios?.Count ?? 0)), Vistas=@contenido.NumeroVistas</small> *@
+
+                                    <div class="d-flex justify-content-between text-muted small">
+                                        <span title="@contenido.NumeroLikes likes">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 3px;">
+                                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                                            </svg>
+                                            @(contenido.Likes?.Count ?? contenido.NumeroLikes)
+                                        </span>
+                                        <span title="@contenido.NumeroComentarios comentarios">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 3px;">
+                                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                            </svg>
+                                            @(contenido.Comentarios?.Count ?? contenido.NumeroComentarios)
+                                        </span>
+                                        <span title="@contenido.NumeroVistas vistas">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 3px;">
+                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                <circle cx="12" cy="12" r="3"></circle>
+                                            </svg>
+                                            @if (contenido.NumeroVistas >= 1000)
+                                            {
+                                                <text>@((contenido.NumeroVistas / 1000.0).ToString("0.#"))K</text>
+                                            }
+                                            else
+                                            {
+                                                <text>@contenido.NumeroVistas</text>
+                                            }
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="card shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-muted mb-3">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                        <h5>Sin contenido disponible</h5>
+                        <p class="text-muted mb-0">
+                            @if (estaSuscrito)
+                            {
+                                <text>Este creador aún no ha publicado contenido</text>
+                            }
+                            else
+                            {
+                                <text>Suscríbete para ver todo el contenido exclusivo</text>
+                            }
+                        </p>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .perfil-banner {
+        height: 200px;
+        overflow: hidden;
+    }
+
+        .perfil-banner img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+    .banner-gradient {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .avatar-large-container {
+        margin-top: -60px;
+        position: relative;
+        z-index: 10;
+    }
+
+    .avatar-large {
+        width: 130px;
+        height: 130px;
+        border-radius: 50%;
+        border: 5px solid white;
+        object-fit: cover;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+
+    .avatar-placeholder {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .contenido-card {
+        transition: all 0.3s;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+        .contenido-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+        }
+
+    .contenido-media {
+        position: relative;
+        height: 200px;
+        overflow: hidden;
+        background: #f8f9fa;
+    }
+
+        .contenido-media img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+    .media-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        color: #6c757d;
+    }
+
+    .media-video {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.3), rgba(118, 75, 162, 0.3));
+    }
+
+        .media-video svg {
+            opacity: 0.9;
+        }
+
+    .premium-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(5px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        text-align: center;
+        padding: 20px;
+    }
+
+    /* Responsivo */
+    @@media (max-width: 768px) {
+        .perfil-banner
+
+    {
+        height: 150px;
+    }
+
+    .avatar-large-container {
+        margin-top: -50px;
+    }
+
+    .avatar-large {
+        width: 100px;
+        height: 100px;
+    }
+
+    .contenido-media {
+        height: 180px;
+    }
+
+    }
+
+    @@media (max-width: 576px) {
+        .perfil-banner
+
+    {
+        height: 120px;
+    }
+
+    .avatar-large-container {
+        margin-top: -40px;
+    }
+
+    .avatar-large {
+        width: 80px;
+        height: 80px;
+    }
+
+    .contenido-media {
+        height: 150px;
+    }
+
+    }
+</style>
+
+@section Scripts {
+    <script>
+        async function suscribirse(creadorId, precio) {
+            if (!confirm(`¿Confirmas que quieres suscribirte por $${precio.toFixed(2)} al mes?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/Explorar/Suscribirse', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ creadorId: creadorId })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('¡Suscripción exitosa! Ahora puedes ver todo el contenido.');
+                    location.reload();
+                } else {
+                    alert(data.message || 'Error al procesar la suscripción');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al procesar la suscripción');
+            }
+        }
+
+        async function cancelarSuscripcion(creadorId) {
+            if (!confirm('¿Seguro que quieres cancelar tu suscripción? Perderás acceso al contenido premium.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/Explorar/Cancelar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ creadorId: creadorId })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('Suscripción cancelada exitosamente');
+                    location.reload();
+                } else {
+                    alert(data.message || 'Error al cancelar');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al cancelar la suscripción');
+            }
+        }
+    </script>
+}

@@ -1,0 +1,371 @@
+﻿@model IEnumerable<Lado.Models.Contenido>
+@{
+    ViewData["Title"] = "Gestión de Contenido";
+    var filtroActual = ViewBag.FiltroActual ?? "todos";
+}
+
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2>Gestión de Contenido</h2>
+        <p class="text-muted">Total de publicaciones: <span id="totalCount">@Model.Count()</span></p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="/Contenido/Crear" class="btn btn-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="white" style="vertical-align: middle; margin-right: 4px;">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
+            </svg>
+            Nueva Publicación
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <ul class="nav nav-tabs" role="tablist" id="filtroTabs">
+                    <li class="nav-item">
+                        <a class="nav-link @(filtroActual == "todos" ? "active" : "")" href="#" data-filtro="todos">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 4px;">
+                                <path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z" />
+                            </svg>
+                            Todos
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @(filtroActual == "publicados" ? "active" : "")" href="#" data-filtro="publicados">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 4px;">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                            </svg>
+                            Publicados
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @(filtroActual == "borradores" ? "active" : "")" href="#" data-filtro="borradores">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 4px;">
+                                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                            </svg>
+                            Borradores
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @(filtroActual == "programados" ? "active" : "")" href="#" data-filtro="programados">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 4px;">
+                                <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
+                            </svg>
+                            Programados
+                        </a>
+                    </li>
+                </ul>
+
+                <div class="mt-3 d-flex gap-2">
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-secondary active">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z" />
+                            </svg>
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" />
+                            </svg>
+                        </button>
+                    </div>
+                    <input type="text" class="form-control form-control-sm" style="max-width: 300px;" placeholder="Buscar contenido...">
+                    <select class="form-select form-select-sm" style="max-width: 150px;">
+                        <option>Todos los tipos</option>
+                        <option>Fotos</option>
+                        <option>Videos</option>
+                        <option>Posts</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="contenido-grid">
+    @if (Model.Any())
+    {
+        <div class="row g-3">
+            @foreach (var contenido in Model)
+            {
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <div class="card h-100 shadow-sm @(contenido.EsBorrador ? "borrador-card" : "")">
+                        <!-- DEBUG: TipoContenido = @contenido.TipoContenido -->
+                        @if ((int)contenido.TipoContenido == 0)
+                        {
+                            <div class="position-relative">
+                                @if (!string.IsNullOrEmpty(contenido.RutaArchivo))
+                                {
+                                    <img src="@contenido.RutaArchivo" class="card-img-top" alt="Contenido" style="height: 200px; object-fit: cover;">
+                                }
+                                else
+                                {
+                                    <div class="bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                                        <svg width="64" height="64" viewBox="0 0 24 24" fill="#999">
+                                            <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+                                        </svg>
+                                    </div>
+                                }
+
+                                @if (contenido.EsBorrador)
+                                {
+                                    <span class="position-absolute top-0 start-0 m-2 badge bg-secondary">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="white" style="vertical-align: middle; margin-right: 2px;">
+                                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                                        </svg>
+                                        BORRADOR
+                                    </span>
+                                }
+
+                                @if (contenido.EsPremium)
+                                {
+                                    <span class="position-absolute top-0 end-0 m-2 badge bg-warning text-dark">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 2px;">
+                                            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
+                                        </svg>
+                                        $@contenido.PrecioDesbloqueo
+                                    </span>
+                                }
+                            </div>
+                        }
+                        else if ((int)contenido.TipoContenido == 1)
+                        {
+                            <div class="position-relative">
+                                <div class="bg-dark d-flex align-items-center justify-content-center" style="height: 200px;">
+                                    <svg width="64" height="64" viewBox="0 0 24 24" fill="white">
+                                        <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
+                                    </svg>
+                                </div>
+                                <div class="position-absolute top-50 start-50 translate-middle">
+                                    <svg width="64" height="64" viewBox="0 0 24 24" fill="white" opacity="0.8">
+                                        <path d="M8 5v14l11-7z" />
+                                    </svg>
+                                </div>
+
+                                @if (contenido.EsBorrador)
+                                {
+                                    <span class="position-absolute top-0 start-0 m-2 badge bg-secondary">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="white" style="vertical-align: middle; margin-right: 2px;">
+                                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                                        </svg>
+                                        BORRADOR
+                                    </span>
+                                }
+
+                                @if (contenido.EsPremium)
+                                {
+                                    <span class="position-absolute top-0 end-0 m-2 badge bg-warning text-dark">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 2px;">
+                                            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
+                                        </svg>
+                                        Premium
+                                    </span>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="position-relative">
+                                <div class="bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                                    <svg width="64" height="64" viewBox="0 0 24 24" fill="#999">
+                                        <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+                                    </svg>
+                                </div>
+
+                                @if (contenido.EsBorrador)
+                                {
+                                    <span class="position-absolute top-0 start-0 m-2 badge bg-secondary">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="white" style="vertical-align: middle; margin-right: 2px;">
+                                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                                        </svg>
+                                        BORRADOR
+                                    </span>
+                                }
+                            </div>
+                        }
+
+                        <div class="card-body">
+                            <p class="card-text text-muted small mb-2">
+                                @if (contenido.EsBorrador)
+                                {
+                                    <span class="text-warning">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;">
+                                            <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
+                                        </svg>
+                                        Borrador guardado
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span>Hace @((DateTime.Now - contenido.FechaPublicacion).Days) días</span>
+                                }
+                            </p>
+                            <p class="card-text">
+                                @if (string.IsNullOrEmpty(contenido.Descripcion))
+                                {
+                                    <em class="text-muted">Sin descripción</em>
+                                }
+                                else
+                                {
+                                    @(contenido.Descripcion.Length > 80 ? contenido.Descripcion.Substring(0, 80) + "..." : contenido.Descripcion)
+                                }
+                            </p>
+                            <div class="d-flex justify-content-between text-muted small">
+                                <span>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;">
+                                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                                    </svg>
+                                    @contenido.NumeroLikes
+                                </span>
+                                <span>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;">
+                                        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
+                                    </svg>
+                                    @contenido.NumeroComentarios
+                                </span>
+                                <span>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;">
+                                        <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                                    </svg>
+                                    @(contenido.NumeroVistas / 1000.0)K
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            @if (contenido.EsBorrador)
+                            {
+                                <div class="d-flex gap-2 mb-2">
+                                    <form asp-action="Publicar" asp-route-id="@contenido.Id" method="post" class="flex-grow-1">
+                                        <button type="submit" class="btn btn-sm btn-success w-100">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="white" style="vertical-align: middle; margin-right: 2px;">
+                                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                                            </svg>
+                                            Publicar
+                                        </button>
+                                    </form>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <a href="/Contenido/Editar/@contenido.Id" class="btn btn-sm btn-outline-primary flex-grow-1">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 2px;">
+                                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                                        </svg>
+                                        Editar
+                                    </a>
+                                    <form asp-action="Eliminar" asp-route-id="@contenido.Id" method="post" class="flex-grow-1">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger w-100" onclick="return confirm('¿Eliminar este borrador?')">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 2px;">
+                                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                                            </svg>
+                                            Eliminar
+                                        </button>
+                                    </form>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="d-flex gap-2">
+                                    <a href="/Contenido/Editar/@contenido.Id" class="btn btn-sm btn-outline-primary flex-grow-1">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 2px;">
+                                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                                        </svg>
+                                        Editar
+                                    </a>
+                                    <form asp-action="Eliminar" asp-route-id="@contenido.Id" method="post" class="flex-grow-1">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger w-100" onclick="return confirm('¿Eliminar este contenido?')">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 2px;">
+                                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                                            </svg>
+                                            Eliminar
+                                        </button>
+                                    </form>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="#999" class="mb-3">
+                    <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+                </svg>
+                @if (filtroActual == "borradores")
+                {
+                    <h4>No hay borradores guardados</h4>
+                    <p class="text-muted mb-4">Los borradores te permiten guardar contenido sin publicar</p>
+                }
+                else if (filtroActual == "publicados")
+                {
+                    <h4>No hay contenido publicado</h4>
+                    <p class="text-muted mb-4">Publica contenido para que tus fans puedan verlo</p>
+                }
+                else if (filtroActual == "programados")
+                {
+                    <h4>No hay contenido programado</h4>
+                    <p class="text-muted mb-4">Programa publicaciones para el futuro</p>
+                }
+                else
+                {
+                    <h4>No hay contenido aún</h4>
+                    <p class="text-muted mb-4">Comienza a compartir contenido exclusivo con tus fans</p>
+                }
+                <a href="/Contenido/Crear" class="btn btn-primary">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="white" style="vertical-align: middle; margin-right: 4px;">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
+                    </svg>
+                    Crear Publicación
+                </a>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .card {
+        transition: all 0.3s;
+    }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15) !important;
+        }
+
+    .borrador-card {
+        opacity: 0.85;
+        border: 2px dashed #6c757d;
+    }
+
+        .borrador-card:hover {
+            opacity: 1;
+        }
+
+    .nav-tabs .nav-link {
+        cursor: pointer;
+    }
+</style>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('#filtroTabs .nav-link').forEach(tab => {
+            tab.addEventListener('click', function(e) {
+                e.preventDefault();
+                const filtro = this.dataset.filtro;
+                window.location.href = `/Contenido/Index?filtro=${filtro}`;
+            });
+        });
+
+        document.querySelectorAll('form[action*="Publicar"]').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                if (!confirm('¿Publicar este contenido? Estará visible para todos tus suscriptores.')) {
+                    e.preventDefault();
+                }
+            });
+        });
+    </script>
+}

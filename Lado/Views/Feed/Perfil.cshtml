@@ -1,0 +1,848 @@
+﻿@model Lado.Models.ApplicationUser
+@{
+    ViewData["Title"] = Model.NombreCompleto;
+    var estaSuscrito = (bool)ViewBag.EstaSuscrito;
+    var contenidos = ViewBag.Contenidos as List<Lado.Models.Contenido>;
+}
+
+<style>
+    :root {
+        --primary-color: #00bcd4;
+        --primary-dark: #0288d1;
+    }
+
+    /* Profile Header Mejorado */
+    .profile-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 16px 32px;
+    }
+
+    .profile-banner {
+        width: 100%;
+        height: 280px;
+        position: relative;
+        border-radius: 0 0 24px 24px;
+        overflow: hidden;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    }
+
+        .profile-banner img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+    .profile-header-card {
+        background: white;
+        border-radius: 20px;
+        margin: -60px 16px 24px;
+        padding: 24px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        position: relative;
+        z-index: 10;
+    }
+
+    .profile-main {
+        display: flex;
+        gap: 24px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .profile-avatar-wrapper {
+        flex-shrink: 0;
+    }
+
+    .profile-avatar {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        border: 4px solid white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        overflow: hidden;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    }
+
+        .profile-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+    .avatar-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 40px;
+        font-weight: 700;
+    }
+
+    .profile-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .profile-name {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1a1a1a;
+        margin: 0 0 4px 0;
+    }
+
+    .profile-username {
+        font-size: 16px;
+        color: #6b7280;
+        margin: 0 0 12px 0;
+    }
+
+    .profile-bio {
+        font-size: 15px;
+        color: #374151;
+        line-height: 1.6;
+        margin: 0 0 16px 0;
+    }
+
+    .profile-stats {
+        display: flex;
+        gap: 32px;
+        flex-wrap: wrap;
+    }
+
+    .stat-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .stat-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--primary-color);
+        line-height: 1;
+        margin-bottom: 4px;
+    }
+
+    .stat-label {
+        font-size: 14px;
+        color: #6b7280;
+    }
+
+    .profile-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-width: 200px;
+    }
+
+    .btn-primary-custom {
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 14px 28px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.3s;
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+        .btn-primary-custom:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 188, 212, 0.3);
+            color: white;
+        }
+
+        .btn-primary-custom:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+    .btn-outline-custom {
+        background: white;
+        color: var(--primary-color);
+        border: 2px solid var(--primary-color);
+        padding: 12px 28px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.3s;
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+        .btn-outline-custom:hover {
+            background: rgba(0, 188, 212, 0.1);
+            color: var(--primary-color);
+        }
+
+    .btn-danger-custom {
+        background: #ef4444;
+        color: white;
+        border: none;
+        padding: 12px 28px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+
+        .btn-danger-custom:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+
+    /* Tabs Mejorados */
+    .custom-tabs {
+        display: flex;
+        gap: 8px;
+        border-bottom: 2px solid #f3f4f6;
+        margin: 32px 0 24px;
+        padding: 0 16px;
+    }
+
+    .tab-link {
+        padding: 12px 20px;
+        font-size: 15px;
+        font-weight: 600;
+        color: #6b7280;
+        background: none;
+        border: none;
+        border-bottom: 3px solid transparent;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+        margin-bottom: -2px;
+    }
+
+        .tab-link:hover {
+            color: var(--primary-color);
+        }
+
+        .tab-link.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .tab-link svg {
+            width: 18px;
+            height: 18px;
+        }
+
+    /* Grid de Contenido Mejorado */
+    .content-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+        padding: 0 16px;
+    }
+
+    .content-card {
+        position: relative;
+        border-radius: 16px;
+        overflow: hidden;
+        background: #f8f9fa;
+        cursor: pointer;
+        transition: all 0.3s;
+        aspect-ratio: 1;
+    }
+
+        .content-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        }
+
+    .content-media {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .video-indicator {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: rgba(0,0,0,0.75);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+        .video-indicator svg {
+            width: 14px;
+            height: 14px;
+        }
+
+    /* Premium Lock Mejorado */
+    .premium-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.8) 100%);
+        backdrop-filter: blur(12px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+
+    .lock-icon {
+        width: 56px;
+        height: 56px;
+        background: var(--primary-color);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 12px;
+        box-shadow: 0 8px 24px rgba(0, 188, 212, 0.4);
+    }
+
+        .lock-icon svg {
+            width: 24px;
+            height: 24px;
+        }
+
+    .premium-label {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    /* Content Overlay en Hover */
+    .content-hover-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 16px;
+        background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
+        color: white;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+
+    .content-card:hover .content-hover-overlay {
+        opacity: 1;
+    }
+
+    .content-stats-overlay {
+        display: flex;
+        gap: 16px;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+        .content-stats-overlay svg {
+            width: 16px;
+            height: 16px;
+            margin-right: 4px;
+        }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+    }
+
+    .empty-icon {
+        width: 100px;
+        height: 100px;
+        margin: 0 auto 24px;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+        .empty-icon svg {
+            width: 50px;
+            height: 50px;
+            stroke: white;
+            stroke-width: 2;
+        }
+
+    .empty-state h4 {
+        font-size: 22px;
+        font-weight: 700;
+        color: #1a1a1a;
+        margin-bottom: 8px;
+    }
+
+    .empty-state p {
+        font-size: 15px;
+        color: #6b7280;
+        margin: 0;
+    }
+
+    /* About Section */
+    .about-card {
+        background: white;
+        border-radius: 16px;
+        padding: 32px;
+        margin: 0 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+        .about-card h5 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 16px;
+        }
+
+        .about-card p {
+            font-size: 15px;
+            color: #374151;
+            line-height: 1.7;
+        }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .profile-banner
+
+    {
+        height: 200px;
+        border-radius: 0 0 16px 16px;
+    }
+
+    .profile-header-card {
+        margin: -40px 12px 16px;
+        padding: 20px;
+    }
+
+    .profile-main {
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .profile-avatar {
+        width: 100px;
+        height: 100px;
+    }
+
+    .profile-name {
+        font-size: 24px;
+    }
+
+    .profile-stats {
+        gap: 20px;
+    }
+
+    .stat-value {
+        font-size: 20px;
+    }
+
+    .profile-actions {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .content-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 8px;
+        padding: 0 12px;
+    }
+
+    .custom-tabs {
+        padding: 0 12px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .tab-link {
+        padding: 10px 16px;
+        font-size: 14px;
+        white-space: nowrap;
+    }
+
+    .about-card {
+        margin: 0 12px;
+        padding: 24px;
+    }
+
+    }
+
+    @@media (max-width: 480px) {
+        .content-grid
+
+    {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    }
+</style>
+
+<div class="profile-container">
+    <!-- Mensajes de TempData -->
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert" style="margin: 16px; border-radius: 12px;">
+            <strong>✓</strong> @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert" style="margin: 16px; border-radius: 12px;">
+            <strong>✗</strong> @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Banner -->
+    <div class="profile-banner">
+        @if (!string.IsNullOrEmpty(Model.FotoPortada))
+        {
+            <img src="@Model.FotoPortada" alt="Portada de @Model.NombreCompleto">
+        }
+    </div>
+
+    <!-- Profile Header Card -->
+    <div class="profile-header-card">
+        <div class="profile-main">
+            <!-- Avatar -->
+            <div class="profile-avatar-wrapper">
+                <div class="profile-avatar">
+                    @if (!string.IsNullOrEmpty(Model.FotoPerfil))
+                    {
+                        <img src="@Model.FotoPerfil" alt="@Model.NombreCompleto">
+                    }
+                    else
+                    {
+                        <div class="avatar-placeholder">
+                            @Model.NombreCompleto.Substring(0, 1)
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Info -->
+            <div class="profile-info">
+                <h1 class="profile-name">@Model.NombreCompleto</h1>
+                <p class="profile-username">@@@Model.UserName</p>
+
+                @if (!string.IsNullOrEmpty(Model.Biografia))
+                {
+                    <p class="profile-bio">@Model.Biografia</p>
+                }
+
+                <!-- Stats -->
+                <div class="profile-stats">
+                    <div class="stat-item">
+                        <div class="stat-value">@ViewBag.NumeroSuscriptores</div>
+                        <div class="stat-label">Suscriptores</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">@ViewBag.TotalPublicaciones</div>
+                        <div class="stat-label">Publicaciones</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">@(ViewBag.TotalLikes / 1000.0)K</div>
+                        <div class="stat-label">Likes</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="profile-actions">
+                @if (!estaSuscrito)
+                {
+                    <!-- ✅ CORREGIDO: Cambiar asp-action a "Suscribirse" -->
+                    <form id="formSuscribirse" asp-controller="Pagos" asp-action="Suscribirse" method="post" onsubmit="handleSuscripcion(event)">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="creadorId" value="@Model.Id" />
+                        <input type="hidden" name="precio" value="@Model.PrecioSuscripcion" />
+                        <button type="submit" class="btn-primary-custom" id="btnSuscribirse">
+                            <!-- ✅ SVG Blanco de Alta Calidad -->
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="white" stroke="white" />
+                            </svg>
+                            <span id="textoBoton">Suscribirse - $@Model.PrecioSuscripcion.ToString("N2")/mes</span>
+                        </button>
+                    </form>
+                    <button class="btn-outline-custom" data-bs-toggle="modal" data-bs-target="#tipModal">
+                        <!-- ✅ SVG de Alta Calidad -->
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="1" x2="12" y2="23" />
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                        </svg>
+                        Enviar Tip
+                    </button>
+                }
+                else
+                {
+                    <button class="btn-outline-custom" data-bs-toggle="modal" data-bs-target="#tipModal">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="1" x2="12" y2="23" />
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                        </svg>
+                        Enviar Tip
+                    </button>
+                    <button class="btn-danger-custom" data-bs-toggle="modal" data-bs-target="#cancelModal">
+                        <!-- ✅ SVG Blanco -->
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="15" y1="9" x2="9" y2="15" stroke="white" />
+                            <line x1="9" y1="9" x2="15" y2="15" stroke="white" />
+                        </svg>
+                        Cancelar Suscripción
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="custom-tabs">
+        <button class="tab-link active" onclick="showTab('posts')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+            </svg>
+            Posts (@ViewBag.TotalPublicaciones)
+        </button>
+        <button class="tab-link" onclick="showTab('about')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            Acerca de
+        </button>
+    </div>
+
+    <!-- Tab Content: Posts -->
+    <div id="posts-tab" class="tab-content-custom">
+        @if (contenidos != null && contenidos.Any())
+        {
+            <div class="content-grid">
+                @foreach (var contenido in contenidos)
+                {
+                    <div class="content-card" onclick="window.location.href='/Contenido/Detalle/@contenido.Id'">
+                        @if (contenido.EsPremium && !estaSuscrito)
+                        {
+                            <img src="@(contenido.RutaArchivo ?? "/images/placeholder.jpg")" alt="Premium" class="content-media" style="filter: blur(20px);">
+                            <div class="premium-overlay">
+                                <div class="lock-icon">
+                                    <!-- ✅ SVG Blanco -->
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                    </svg>
+                                </div>
+                                <p class="premium-label">Premium</p>
+                            </div>
+                        }
+                        else if (!string.IsNullOrEmpty(contenido.RutaArchivo))
+                        {
+                            @if ((int)contenido.TipoContenido == 0)
+                            {
+                                <img src="@contenido.RutaArchivo" alt="Contenido" class="content-media">
+                            }
+                            else if ((int)contenido.TipoContenido == 1)
+                            {
+                                <video src="@contenido.RutaArchivo" class="content-media"></video>
+                                <div class="video-indicator">
+                                    <!-- ✅ SVG Blanco -->
+                                    <svg viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polygon points="5 3 19 12 5 21 5 3" />
+                                    </svg>
+                                    Video
+                                </div>
+                            }
+
+                            <div class="content-hover-overlay">
+                                <div class="content-stats-overlay">
+                                    <span>
+                                        <svg viewBox="0 0 24 24" fill="white" stroke="white" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                                        </svg>
+                                        @contenido.NumeroLikes
+                                    </span>
+                                    <span>
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                        </svg>
+                                        @contenido.NumeroComentarios
+                                    </span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                </div>
+                <h4>Aún no hay publicaciones</h4>
+                <p>Este creador no ha compartido contenido todavía</p>
+            </div>
+        }
+    </div>
+
+    <!-- Tab Content: About -->
+    <div id="about-tab" class="tab-content-custom" style="display: none;">
+        <div class="about-card">
+            <h5>Sobre @Model.NombreCompleto</h5>
+            <p>@(Model.Biografia ?? "Este creador no ha agregado una biografía.")</p>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Tip -->
+<div class="modal fade" id="tipModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 16px; border: none;">
+            <div class="modal-header" style="border-bottom: 1px solid #f3f4f6;">
+                <h5 class="modal-title" style="font-weight: 700;">Enviar Tip a @Model.NombreCompleto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+                <form asp-controller="Pagos" asp-action="EnviarTip" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="creadorId" value="@Model.Id" />
+                    <div style="margin-bottom: 20px;">
+                        <label style="font-weight: 600; margin-bottom: 12px; display: block;">Monto del Tip</label>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+                            <button type="button" class="btn-outline-custom" style="flex: 1; min-width: 80px;" onclick="document.getElementById('montoTip').value='5'">$5</button>
+                            <button type="button" class="btn-outline-custom" style="flex: 1; min-width: 80px;" onclick="document.getElementById('montoTip').value='10'">$10</button>
+                            <button type="button" class="btn-outline-custom" style="flex: 1; min-width: 80px;" onclick="document.getElementById('montoTip').value='20'">$20</button>
+                            <button type="button" class="btn-outline-custom" style="flex: 1; min-width: 80px;" onclick="document.getElementById('montoTip').value='50'">$50</button>
+                        </div>
+                        <input type="number" id="montoTip" name="monto" class="form-control" placeholder="O ingresa un monto personalizado" min="1" required style="border-radius: 12px; padding: 12px;">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label style="font-weight: 600; margin-bottom: 8px; display: block;">Mensaje (opcional)</label>
+                        <textarea name="mensaje" class="form-control" rows="3" placeholder="Añade un mensaje..." style="border-radius: 12px; padding: 12px;"></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary-custom" style="width: 100%;">
+                        <!-- ✅ SVG Blanco -->
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" stroke="white" />
+                        </svg>
+                        Enviar Tip
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Cancelar -->
+<div class="modal fade" id="cancelModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 16px; border: none;">
+            <div class="modal-header" style="border-bottom: 1px solid #f3f4f6;">
+                <h5 class="modal-title" style="font-weight: 700;">Cancelar Suscripción</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+                <p style="font-size: 15px; color: #374151; margin-bottom: 20px;">¿Estás seguro de que deseas cancelar tu suscripción a @Model.NombreCompleto? Perderás acceso a su contenido exclusivo.</p>
+                <div style="display: flex; gap: 12px;">
+                    <button type="button" class="btn-outline-custom" data-bs-dismiss="modal" style="flex: 1;">Mantener</button>
+                    <form asp-controller="Pagos" asp-action="CancelarDesdeCreador" method="post" style="flex: 1;">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="creadorId" value="@Model.Id" />
+                        <button type="submit" class="btn-danger-custom" style="width: 100%;">Cancelar Suscripción</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Debug: Log cuando carga la página
+    console.log('✅ Página de perfil cargada');
+    console.log('Creador ID: @Model.Id');
+    console.log('Está suscrito: @estaSuscrito.ToString().ToLower()');
+
+    // Función para manejar suscripción con feedback visual
+    function handleSuscripcion(event) {
+        console.log('🔵 Iniciando proceso de suscripción...');
+
+        const btn = document.getElementById('btnSuscribirse');
+        const textoBoton = document.getElementById('textoBoton');
+
+        // Deshabilitar botón y mostrar loading
+        btn.disabled = true;
+        textoBoton.textContent = 'Procesando...';
+
+        console.log('✅ Formulario enviándose...');
+
+        // Permitir que el formulario se envíe normalmente
+        return true;
+    }
+
+    function showTab(tabName) {
+        // Hide all tabs
+        document.querySelectorAll('.tab-content-custom').forEach(tab => {
+            tab.style.display = 'none';
+        });
+
+        // Remove active from all links
+        document.querySelectorAll('.tab-link').forEach(link => {
+            link.classList.remove('active');
+        });
+
+        // Show selected tab
+        document.getElementById(tabName + '-tab').style.display = 'block';
+
+        // Add active to clicked link
+        event.target.closest('.tab-link').classList.add('active');
+    }
+
+    // Debug: Verificar que el formulario existe
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('formSuscribirse');
+        if (form) {
+            console.log('✅ Formulario encontrado');
+            console.log('Action:', form.action);
+            console.log('Method:', form.method);
+        } else {
+            console.warn('⚠️ Formulario NO encontrado');
+        }
+    });
+</script>

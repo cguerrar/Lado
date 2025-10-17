@@ -1,0 +1,167 @@
+﻿@model Lado.Models.ViewModels.AgeVerificationViewModel
+@{
+    ViewData["Title"] = "Verificación de Edad";
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Lado</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .verification-container {
+            max-width: 500px;
+            width: 100%;
+            padding: 20px;
+        }
+
+        .verification-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+
+        .icon-container {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
+        }
+
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+
+        .btn-verify {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 14px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            transition: transform 0.2s;
+        }
+
+            .btn-verify:hover {
+                background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
+                transform: translateY(-2px);
+            }
+
+        .warning-text {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="verification-container">
+        <div class="verification-card">
+            <div class="icon-container">
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" />
+                    <path d="M12 6v6l4 2" />
+                </svg>
+            </div>
+
+            <h2 class="text-center mb-2">Verificación de Edad</h2>
+            <p class="text-center text-muted mb-4">Confirma que cumples con los requisitos legales</p>
+
+            <div class="warning-text">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#856404" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; margin-right: 8px;">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                Esta plataforma contiene contenido exclusivo para adultos. Debes ser mayor de edad según las leyes de tu país.
+            </div>
+
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="alert alert-danger" role="alert">
+                    @Html.ValidationSummary(false, "", new { @class = "mb-0" })
+                </div>
+            }
+
+            <form asp-action="Verify" method="post">
+                @Html.AntiForgeryToken()
+
+                <div class="mb-3">
+                    <label asp-for="FechaNacimiento" class="form-label">Fecha de Nacimiento</label>
+                    <input asp-for="FechaNacimiento" type="date" class="form-control" max="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+                    <span asp-validation-for="FechaNacimiento" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Pais" class="form-label">País de Residencia</label>
+                    <select asp-for="Pais" class="form-select" required>
+                        <option value="">Selecciona tu país</option>
+                        <option value="CL">Chile</option>
+                        <option value="US">Estados Unidos</option>
+                        <option value="MX">México</option>
+                        <option value="AR">Argentina</option>
+                        <option value="CO">Colombia</option>
+                        <option value="ES">España</option>
+                        <option value="PE">Perú</option>
+                        <option value="VE">Venezuela</option>
+                        <option value="EC">Ecuador</option>
+                        <option value="UY">Uruguay</option>
+                        <option value="BO">Bolivia</option>
+                        <option value="PY">Paraguay</option>
+                        <option value="BR">Brasil</option>
+                        <option value="OTHER">Otro</option>
+                    </select>
+                    <span asp-validation-for="Pais" class="text-danger"></span>
+                </div>
+
+                <div class="mb-4">
+                    <div class="form-check">
+                        <input asp-for="AceptoTerminos" type="checkbox" class="form-check-input" required />
+                        <label asp-for="AceptoTerminos" class="form-check-label">
+                            Confirmo que tengo la edad mínima requerida y acepto los <a href="/Home/Terms" target="_blank">Términos de Servicio</a>
+                        </label>
+                    </div>
+                    <span asp-validation-for="AceptoTerminos" class="text-danger"></span>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-verify w-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Verificar y Continuar
+                </button>
+            </form>
+
+            <p class="text-center text-muted mt-4 mb-0" style="font-size: 12px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                Tus datos están protegidos y encriptados
+            </p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

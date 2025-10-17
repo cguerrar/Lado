@@ -1,0 +1,245 @@
+﻿@model IEnumerable<CreatorVerificationRequest>
+@{
+    ViewData["Title"] = "Panel de Verificaciones";
+    var pendientes = Model.Where(x => x.Estado == "Pendiente").Count();
+    var aprobadas = Model.Where(x => x.Estado == "Aprobada").Count();
+    var rechazadas = Model.Where(x => x.Estado == "Rechazada").Count();
+    Layout = "_AdminLayout";
+}
+
+<div class="container-fluid my-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2>
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="8.5" cy="7" r="4" />
+                    <polyline points="17 11 19 13 23 9" />
+                </svg>
+                Panel de Verificaciones
+            </h2>
+            <p class="text-muted">Gestiona las solicitudes de verificación de creadores</p>
+        </div>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="rounded-circle p-3" style="background: #fff3cd;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#856404" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <polyline points="12 6 12 12 16 14" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h3 class="mb-0">@pendientes</h3>
+                            <p class="text-muted mb-0">Pendientes</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="rounded-circle p-3" style="background: #d4edda;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#155724" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h3 class="mb-0">@aprobadas</h3>
+                            <p class="text-muted mb-0">Aprobadas</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="rounded-circle p-3" style="background: #f8d7da;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#721c24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h3 class="mb-0">@rechazadas</h3>
+                            <p class="text-muted mb-0">Rechazadas</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-primary active" onclick="filtrarPor('todos')">Todas</button>
+                <button type="button" class="btn btn-outline-warning" onclick="filtrarPor('Pendiente')">Pendientes</button>
+                <button type="button" class="btn btn-outline-success" onclick="filtrarPor('Aprobada')">Aprobadas</button>
+                <button type="button" class="btn btn-outline-danger" onclick="filtrarPor('Rechazada')">Rechazadas</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de Solicitudes -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-0">
+                    @if (Model.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Creador</th>
+                                        <th>Nombre Real</th>
+                                        <th>País</th>
+                                        <th>Documento</th>
+                                        <th>Fecha Solicitud</th>
+                                        <th>Estado</th>
+                                        <th class="text-center">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var solicitud in Model)
+                                    {
+                                        <tr data-estado="@solicitud.Estado">
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <img src="@(solicitud.User.FotoPerfil ?? "/images/default-avatar.png")"
+                                                         alt="@solicitud.User.UserName"
+                                                         class="rounded-circle me-2"
+                                                         style="width: 40px; height: 40px; object-fit: cover;">
+                                                    <div>
+                                                        <div class="fw-bold">@solicitud.User.UserName</div>
+                                                        <small class="text-muted">@solicitud.User.Email</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>@solicitud.NombreCompleto</td>
+                                            <td>@solicitud.Pais</td>
+                                            <td>
+                                                <span class="badge bg-secondary">@solicitud.TipoDocumento</span>
+                                                <br />
+                                                <small class="text-muted">@solicitud.NumeroDocumento</small>
+                                            </td>
+                                            <td>
+                                                <div>@solicitud.FechaSolicitud.ToString("dd/MM/yyyy")</div>
+                                                <small class="text-muted">@solicitud.FechaSolicitud.ToString("HH:mm")</small>
+                                            </td>
+                                            <td>
+                                                @if (solicitud.Estado == "Pendiente")
+                                                {
+                                                    <span class="badge bg-warning text-dark">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                                                            <circle cx="12" cy="12" r="10" />
+                                                            <polyline points="12 6 12 12 16 14" />
+                                                        </svg>
+                                                        Pendiente
+                                                    </span>
+                                                }
+                                                else if (solicitud.Estado == "Aprobada")
+                                                {
+                                                    <span class="badge bg-success">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                                                            <polyline points="20 6 9 17 4 12" />
+                                                        </svg>
+                                                        Aprobada
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-danger">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                                                            <line x1="18" y1="6" x2="6" y2="18" />
+                                                            <line x1="6" y1="6" x2="18" y2="18" />
+                                                        </svg>
+                                                        Rechazada
+                                                    </span>
+                                                }
+                                            </td>
+                                            <td class="text-center">
+                                                <a href="/CreatorVerification/Review/@solicitud.Id" class="btn btn-sm btn-primary">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                                        <circle cx="12" cy="12" r="3" />
+                                                    </svg>
+                                                    Revisar
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="12" y1="8" x2="12" y2="12" />
+                                <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                            <p class="text-muted mt-3">No hay solicitudes de verificación</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function filtrarPor(estado) {
+        const filas = document.querySelectorAll('tbody tr');
+        const botones = document.querySelectorAll('.btn-group button');
+
+        // Actualizar botones activos
+        botones.forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+
+        // Filtrar filas
+        filas.forEach(fila => {
+            const estadoFila = fila.getAttribute('data-estado');
+            if (estado === 'todos' || estadoFila === estado) {
+                fila.style.display = '';
+            } else {
+                fila.style.display = 'none';
+            }
+        });
+    }
+</script>
+
+<style>
+    .table-responsive {
+        border-radius: 8px;
+    }
+
+    tbody tr {
+        transition: background-color 0.2s;
+    }
+
+        tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+</style>

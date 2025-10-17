@@ -1,0 +1,614 @@
+﻿@model List<(Lado.Models.ApplicationUser, string)>
+@{
+    ViewData["Title"] = "Gestión de Usuarios";
+    var verificacionesPendientes = (List<Lado.Models.CreatorVerificationRequest>)ViewBag.VerificacionesPendientes ?? new List<Lado.Models.CreatorVerificationRequest>();
+}
+
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-2 text-dark">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#00BCD4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                            <circle cx="9" cy="7" r="4" />
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        </svg>
+                        Gestión de Usuarios
+                    </h2>
+                    <p class="text-muted mb-0">Administra todos los usuarios y verificaciones de la plataforma</p>
+                </div>
+                <a href="/Admin" class="btn btn-outline-secondary">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                        <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                    Volver
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-primary">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p>Total</p>
+                    <h3>@Model.Count</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-success">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p>Creadores</p>
+                    <h3>@Model.Count(u => u.Item1.TipoUsuario == 1)</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-warning">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p>Pendientes</p>
+                    <h3>@verificacionesPendientes.Count</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-danger">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p>Bloqueados</p>
+                    <h3>@Model.Count(u => !u.Item1.EstaActivo)</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#usuarios">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                </svg>
+                Todos los Usuarios
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#verificaciones">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                    <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Verificaciones
+                @if (verificacionesPendientes.Count > 0)
+                {
+                    <span class="badge bg-warning text-dark ms-2">@verificacionesPendientes.Count</span>
+                }
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+        <!-- TAB USUARIOS -->
+        <div class="tab-pane fade show active" id="usuarios">
+            <!-- Filtros -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <path d="m21 21-4.35-4.35" />
+                                </svg>
+                                Buscar
+                            </label>
+                            <input type="text" name="buscar" class="form-control" placeholder="Nombre, email o usuario">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Tipo</label>
+                            <select name="tipo" class="form-select">
+                                <option value="">Todos</option>
+                                <option value="1">Creadores</option>
+                                <option value="0">Fans</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Estado</label>
+                            <select name="activo" class="form-select">
+                                <option value="">Todos</option>
+                                <option value="true">Activos</option>
+                                <option value="false">Bloqueados</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <path d="m21 21-4.35-4.35" />
+                                </svg>
+                                Filtrar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Lista Usuarios -->
+            @if (Model.Any())
+            {
+                <div class="row g-3">
+                    @foreach (var (usuario, rol) in Model)
+                    {
+                        <div class="col-12">
+                            <div class="user-card @(!usuario.EstaActivo ? "user-blocked" : "")">
+                                <div class="row align-items-center">
+                                    <div class="col-auto">
+                                        @if (!string.IsNullOrEmpty(usuario.FotoPerfil))
+                                        {
+                                            <img src="@usuario.FotoPerfil" alt="@usuario.UserName" class="user-avatar">
+                                        }
+                                        else
+                                        {
+                                            <div class="user-avatar-placeholder">
+                                                @usuario.NombreCompleto?.Substring(0, 1).ToUpper()
+                                            </div>
+                                        }
+                                    </div>
+
+                                    <div class="col">
+                                        <div class="d-flex align-items-start justify-content-between flex-wrap">
+                                            <div class="mb-2 mb-md-0">
+                                                <h5 class="mb-1">
+                                                    @usuario.NombreCompleto
+                                                    @if (usuario.EsVerificado)
+                                                    {
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#00BCD4" style="display: inline-block; vertical-align: middle;">
+                                                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                                        </svg>
+                                                    }
+                                                    @if (!usuario.EstaActivo)
+                                                    {
+                                                        <span class="badge bg-danger ms-2">BLOQUEADO</span>
+                                                    }
+                                                </h5>
+                                                <p class="text-muted mb-2">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                                                        <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                                                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
+                                                    </svg>
+                                                    @usuario.Email
+                                                </p>
+                                                <div class="d-flex flex-wrap gap-2">
+                                                    @if (rol == "Admin")
+                                                    {
+                                                        <span class="badge bg-danger">Admin</span>
+                                                    }
+                                                    else if (usuario.TipoUsuario == 1)
+                                                    {
+                                                        <span class="badge bg-primary">Creador</span>
+                                                        @if (usuario.CreadorVerificado)
+                                                        {
+                                                            <span class="badge bg-success">Verificado</span>
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-info">Fan</span>
+                                                    }
+                                                    <small class="text-muted">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                                            <line x1="16" y1="2" x2="16" y2="6" />
+                                                            <line x1="8" y1="2" x2="8" y2="6" />
+                                                            <line x1="3" y1="10" x2="21" y2="10" />
+                                                        </svg>
+                                                        @usuario.FechaRegistro.ToString("dd/MM/yyyy")
+                                                    </small>
+                                                </div>
+                                            </div>
+
+                                            <!-- Acciones -->
+                                            <div class="btn-group-actions">
+                                                <a href="/Admin/DetalleUsuario/@usuario.Id" class="btn btn-outline-primary btn-sm">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                                        <circle cx="12" cy="12" r="3" />
+                                                    </svg>
+                                                    Ver
+                                                </a>
+
+                                                @if (rol != "Admin")
+                                                {
+                                                    @if (usuario.EstaActivo)
+                                                    {
+                                                        <form method="post" asp-action="BloquearUsuario" asp-route-id="@usuario.Id" class="d-inline" onsubmit="return confirm('¿Bloquear a @usuario.NombreCompleto?')">
+                                                            @Html.AntiForgeryToken()
+                                                            <button type="submit" class="btn btn-warning btn-sm">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                                    <circle cx="12" cy="12" r="10" />
+                                                                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                                                                </svg>
+                                                                Bloquear
+                                                            </button>
+                                                        </form>
+                                                    }
+                                                    else
+                                                    {
+                                                        <form method="post" asp-action="DesbloquearUsuario" asp-route-id="@usuario.Id" class="d-inline" onsubmit="return confirm('¿Desbloquear a @usuario.NombreCompleto?')">
+                                                            @Html.AntiForgeryToken()
+                                                            <button type="submit" class="btn btn-success btn-sm">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                                    <polyline points="20 6 9 17 4 12" />
+                                                                </svg>
+                                                                Desbloquear
+                                                            </button>
+                                                        </form>
+                                                    }
+
+                                                    <!-- BOTÓN ELIMINAR USUARIO -->
+                                                    <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#eliminarModal" data-userid="@usuario.Id" data-username="@usuario.NombreCompleto">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                        </svg>
+                                                        Eliminar
+                                                    </button>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        <h5 class="text-muted mt-3">No se encontraron usuarios</h5>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- TAB VERIFICACIONES -->
+        <div class="tab-pane fade" id="verificaciones">
+            @if (verificacionesPendientes.Count > 0)
+            {
+                <div class="row g-3">
+                    @foreach (var solicitud in verificacionesPendientes)
+                    {
+                        <div class="col-md-6">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-header bg-warning bg-opacity-10 border-0">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="badge bg-warning text-dark">Pendiente</span>
+                                        <small class="text-muted">@solicitud.FechaSolicitud.ToString("dd/MM/yyyy")</small>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center mb-3">
+                                        @if (!string.IsNullOrEmpty(solicitud.User.FotoPerfil))
+                                        {
+                                            <img src="@solicitud.User.FotoPerfil" alt="@solicitud.User.UserName" class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover;">
+                                        }
+                                        else
+                                        {
+                                            <div class="rounded-circle bg-primary text-white me-3 d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                                <strong>@solicitud.User.NombreCompleto?.Substring(0, 1).ToUpper()</strong>
+                                            </div>
+                                        }
+                                        <div>
+                                            <h6 class="mb-0">@solicitud.User.UserName</h6>
+                                            <small class="text-muted">@solicitud.User.Email</small>
+                                        </div>
+                                    </div>
+
+                                    <hr />
+
+                                    <div class="row mb-3">
+                                        <div class="col-6">
+                                            <small class="text-muted d-block">Nombre</small>
+                                            <strong>@solicitud.NombreCompleto</strong>
+                                        </div>
+                                        <div class="col-6">
+                                            <small class="text-muted d-block">Documento</small>
+                                            <strong>@solicitud.TipoDocumento @solicitud.NumeroDocumento</strong>
+                                        </div>
+                                    </div>
+
+                                    <div class="d-grid">
+                                        <a href="/CreatorVerification/Review/@solicitud.Id" class="btn btn-primary">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                                <circle cx="12" cy="12" r="3" />
+                                            </svg>
+                                            Revisar
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        <h5 class="text-success mt-3">No hay verificaciones pendientes</h5>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Modal Eliminar Usuario -->
+<div class="modal fade" id="eliminarModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    Eliminar Usuario Permanentemente
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" id="formEliminar">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div class="alert alert-danger">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="15" y1="9" x2="9" y2="15" />
+                            <line x1="9" y1="9" x2="15" y2="15" />
+                        </svg>
+                        <strong>¡ADVERTENCIA!</strong> Esta acción es irreversible.
+                    </div>
+                    <p>¿Estás seguro de eliminar permanentemente al usuario <strong id="modalUsername"></strong>?</p>
+                    <p class="text-muted small">Se eliminarán:</p>
+                    <ul class="text-muted small">
+                        <li>Toda su información personal</li>
+                        <li>Todo su contenido publicado</li>
+                        <li>Sus suscripciones y transacciones</li>
+                        <li>Sus mensajes y comentarios</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        Eliminar Permanentemente
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Modal Eliminar
+    document.getElementById('eliminarModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var userId = button.getAttribute('data-userid');
+        var username = button.getAttribute('data-username');
+        document.getElementById('formEliminar').action = '/Admin/EliminarUsuario/' + userId;
+        document.getElementById('modalUsername').textContent = username;
+    });
+</script>
+
+<style>
+    :root {
+        --primary-color: #00BCD4;
+        --success-color: #4CAF50;
+        --warning-color: #FF9800;
+        --danger-color: #F44336;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        transition: all 0.3s ease;
+        border: 1px solid #e9ecef;
+    }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 16px rgba(0,188,212,0.15);
+            border-color: var(--primary-color);
+        }
+
+    .stat-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+        .stat-icon.bg-primary {
+            background: var(--primary-color);
+        }
+
+        .stat-icon.bg-success {
+            background: var(--success-color);
+        }
+
+        .stat-icon.bg-warning {
+            background: var(--warning-color);
+        }
+
+        .stat-icon.bg-danger {
+            background: var(--danger-color);
+        }
+
+    .stat-content p {
+        margin: 0;
+        font-size: 13px;
+        color: #718096;
+        font-weight: 500;
+    }
+
+    .stat-content h3 {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 700;
+        color: #2D3748;
+    }
+
+    .user-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        transition: all 0.2s;
+        border: 1px solid #e9ecef;
+    }
+
+        .user-card:hover {
+            box-shadow: 0 4px 16px rgba(0,188,212,0.1);
+            border-color: var(--primary-color);
+        }
+
+        .user-card.user-blocked {
+            opacity: 0.7;
+            background: #fff5f5;
+            border-color: #feb2b2;
+        }
+
+    .user-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid #e9ecef;
+    }
+
+    .user-avatar-placeholder {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        font-weight: bold;
+        border: 3px solid #e9ecef;
+    }
+
+    .btn-group-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .nav-tabs .nav-link {
+        color: #6c757d;
+        border: none;
+        padding: 12px 24px;
+        font-weight: 500;
+    }
+
+        .nav-tabs .nav-link:hover {
+            color: var(--primary-color);
+        }
+
+        .nav-tabs .nav-link.active {
+            color: var(--primary-color);
+            background: white;
+            border-bottom: 3px solid var(--primary-color);
+        }
+
+    .btn-primary {
+        background: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+
+        .btn-primary:hover {
+            background: #0097A7;
+            border-color: #0097A7;
+        }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .stat-card
+
+    {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .btn-group-actions {
+        width: 100%;
+        margin-top: 12px;
+    }
+
+        .btn-group-actions .btn {
+            flex: 1;
+        }
+
+    }
+</style>
