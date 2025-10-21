@@ -28,9 +28,19 @@ namespace Lado.Controllers
             _logger = logger;
         }
 
+        // ========================================
+        // INDEX - LISTADO DE CONTENIDO DEL USUARIO
+        // ========================================
+
         public async Task<IActionResult> Index(string filtro = "todos")
         {
             var usuario = await _userManager.GetUserAsync(User);
+
+            if (usuario == null)
+            {
+                _logger.LogWarning("Usuario no encontrado en Index");
+                return RedirectToAction("Login", "Account");
+            }
 
             var query = _context.Contenidos.AsQueryable();
             query = query.Where(c => c.UsuarioId == usuario.Id && c.EstaActivo);
@@ -46,6 +56,12 @@ namespace Lado.Controllers
                 case "programados":
                     query = query.Where(c => false);
                     break;
+                case "ladoa":
+                    query = query.Where(c => c.TipoLado == TipoLado.LadoA);
+                    break;
+                case "ladob":
+                    query = query.Where(c => c.TipoLado == TipoLado.LadoB);
+                    break;
                 case "todos":
                 default:
                     break;
@@ -56,8 +72,19 @@ namespace Lado.Controllers
                 .ToListAsync();
 
             ViewBag.FiltroActual = filtro ?? "todos";
+
+            // Estadísticas por tipo
+            ViewBag.TotalLadoA = await _context.Contenidos
+                .CountAsync(c => c.UsuarioId == usuario.Id && c.EstaActivo && c.TipoLado == TipoLado.LadoA);
+            ViewBag.TotalLadoB = await _context.Contenidos
+                .CountAsync(c => c.UsuarioId == usuario.Id && c.EstaActivo && c.TipoLado == TipoLado.LadoB);
+
             return View(contenidos);
         }
+
+        // ========================================
+        // COMENTARIOS
+        // ========================================
 
         [HttpPost]
         public async Task<IActionResult> Comentar(int id, string texto)
@@ -149,22 +176,26 @@ namespace Lado.Controllers
             }
         }
 
+        // ========================================
+        // CREAR CONTENIDO
+        // ========================================
+
         [HttpGet]
         public async Task<IActionResult> Crear()
         {
             var user = await _userManager.GetUserAsync(User);
 
-            if (user.TipoUsuario == 0)
+            if (user == null)
             {
-                TempData["Error"] = "Solo los creadores pueden publicar contenido";
-                return RedirectToAction("Index", "Dashboard");
+                _logger.LogWarning("Usuario no encontrado en Crear");
+                return RedirectToAction("Login", "Account");
             }
 
-            if (!user.CreadorVerificado)
-            {
-                TempData["Error"] = "Debes completar la verificación de identidad para publicar contenido.";
-                return RedirectToAction("Request", "CreatorVerification");
-            }
+            // ✅ Pasar información de verificación a la vista
+            ViewBag.UsuarioVerificado = user.CreadorVerificado;
+
+            _logger.LogInformation("GET Crear - Usuario: {Username}, Verificado: {Verificado}",
+                user.UserName, user.CreadorVerificado);
 
             return View();
         }
@@ -175,59 +206,77 @@ namespace Lado.Controllers
             IFormFile archivo,
             string Descripcion,
             int TipoContenido,
-            bool EsPremium,
-            decimal PrecioDesbloqueo,
+            bool EsGratis = true,
+            decimal PrecioDesbloqueo = 0,
             bool EsBorrador = false)
         {
             try
             {
                 var usuario = await _userManager.GetUserAsync(User);
 
-                _logger.LogInformation($"=== CREAR CONTENIDO ===");
-                _logger.LogInformation($"Usuario: {usuario?.UserName}");
-                _logger.LogInformation($"Archivo recibido: {archivo?.FileName ?? "NULL"}");
-                _logger.LogInformation($"Tamaño archivo: {archivo?.Length ?? 0} bytes");
-                _logger.LogInformation($"Tipo: {TipoContenido}, EsBorrador: {EsBorrador}");
-                _logger.LogInformation($"EsPremium: {EsPremium}, Precio: {PrecioDesbloqueo}");
-
-                if (usuario.TipoUsuario == 0)
+                if (usuario == null)
                 {
-                    TempData["Error"] = "Solo los creadores pueden publicar contenido";
-                    return RedirectToAction("Index", "Dashboard");
+                    _logger.LogWarning("Usuario no encontrado en Crear POST");
+                    return RedirectToAction("Login", "Account");
                 }
 
-                if (!usuario.CreadorVerificado)
+                _logger.LogInformation("=== CREAR CONTENIDO ===");
+                _logger.LogInformation("Usuario: {Username} (Real: {NombreCompleto}, Seudónimo: {Seudonimo})",
+                    usuario.UserName, usuario.NombreCompleto, usuario.Seudonimo);
+                _logger.LogInformation("Verificado: {Verificado}", usuario.CreadorVerificado);
+                _logger.LogInformation("🔴 PARÁMETRO RECIBIDO - EsGratis: {EsGratis}, Precio: {Precio}",
+                    EsGratis, PrecioDesbloqueo);
+
+                // ✅ Validar verificación SOLO si es contenido de pago (LadoB)
+                if (!EsGratis && !usuario.CreadorVerificado)
                 {
-                    TempData["Error"] = "No tienes permisos para publicar contenido. Completa tu verificación de identidad.";
-                    return RedirectToAction("Request", "CreatorVerification");
+                    _logger.LogWarning("❌ Usuario {Username} intentó crear contenido LadoB sin verificación",
+                        usuario.UserName);
+                    TempData["Error"] = "Para monetizar contenido (LadoB) debes verificar tu identidad primero.";
+                    ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
+                    return View();
                 }
 
+                // Validaciones
                 if (!EsBorrador && string.IsNullOrWhiteSpace(Descripcion))
                 {
                     TempData["Error"] = "La descripción es requerida para publicar";
+                    ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
                     return View();
                 }
 
                 if (!EsBorrador && TipoContenido != 3 && (archivo == null || archivo.Length == 0))
                 {
                     TempData["Error"] = "Debes subir un archivo para este tipo de contenido";
+                    ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
                     return View();
                 }
 
-                // VALIDACIÓN MEJORADA: Precio múltiplo de 5
-                if (EsPremium && (PrecioDesbloqueo <= 0 || PrecioDesbloqueo % 5 != 0))
+                // Validación de precio múltiplo de 5
+                if (!EsGratis && (PrecioDesbloqueo <= 0 || PrecioDesbloqueo % 5 != 0))
                 {
                     TempData["Error"] = "El precio debe ser un múltiplo de 5 (5, 10, 15, 20...)";
+                    ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
                     return View();
                 }
+
+                // ⭐ Determinar tipo de lado y nombre a mostrar
+                var tipoLado = EsGratis ? TipoLado.LadoA : TipoLado.LadoB;
+                var nombreMostrado = EsGratis ? usuario.NombreCompleto : usuario.Seudonimo;
+
+                _logger.LogInformation("Tipo de Lado: {TipoLado} (mostrará como: {NombreMostrado})",
+                    tipoLado, nombreMostrado);
 
                 var contenido = new Contenido
                 {
                     UsuarioId = usuario.Id,
                     TipoContenido = (Models.TipoContenido)TipoContenido,
                     Descripcion = Descripcion ?? "",
-                    EsPremium = EsPremium,
-                    PrecioDesbloqueo = EsPremium ? PrecioDesbloqueo : 0,
+                    TipoLado = tipoLado,
+                    EsGratis = EsGratis,
+                    NombreMostrado = nombreMostrado,
+                    EsPremium = !EsGratis,
+                    PrecioDesbloqueo = EsGratis ? 0 : PrecioDesbloqueo,
                     EsBorrador = EsBorrador,
                     FechaPublicacion = DateTime.Now,
                     EstaActivo = true,
@@ -236,13 +285,13 @@ namespace Lado.Controllers
                     NumeroVistas = 0
                 };
 
+                // Procesar archivo
                 if (archivo != null && archivo.Length > 0)
                 {
-                    _logger.LogInformation("Procesando archivo...");
-
                     if (archivo.Length > 100 * 1024 * 1024)
                     {
                         TempData["Error"] = "El archivo excede el tamaño máximo de 100 MB";
+                        ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
                         return View();
                     }
 
@@ -252,55 +301,45 @@ namespace Lado.Controllers
                     if (!tiposPermitidos.Contains(extension))
                     {
                         TempData["Error"] = "Tipo de archivo no permitido";
+                        ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
                         return View();
                     }
 
-                    var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", usuario.Id);
-                    _logger.LogInformation($"Carpeta de uploads: {uploadsFolder}");
+                    var carpetaUsuario = usuario.UserName?.Replace("@", "_").Replace(".", "_") ?? usuario.Id;
+                    var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", carpetaUsuario);
 
                     if (!Directory.Exists(uploadsFolder))
                     {
                         Directory.CreateDirectory(uploadsFolder);
-                        _logger.LogInformation("Carpeta creada");
                     }
 
                     var uniqueFileName = $"{Guid.NewGuid()}{extension}";
                     var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-                    _logger.LogInformation($"Guardando en: {filePath}");
 
                     using (var fileStream = new FileStream(filePath, FileMode.Create))
                     {
                         await archivo.CopyToAsync(fileStream);
                     }
 
-                    contenido.RutaArchivo = $"/uploads/{usuario.Id}/{uniqueFileName}";
-                    _logger.LogInformation($"Archivo guardado: {contenido.RutaArchivo}");
+                    contenido.RutaArchivo = $"/uploads/{carpetaUsuario}/{uniqueFileName}";
+                    _logger.LogInformation("Archivo guardado: {RutaArchivo}", contenido.RutaArchivo);
                 }
 
                 _context.Contenidos.Add(contenido);
-                var cambiosGuardados = await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync();
 
-                _logger.LogInformation($"Cambios guardados: {cambiosGuardados}");
-                _logger.LogInformation($"Contenido guardado - ID: {contenido.Id}, EsPremium: {contenido.EsPremium}, Precio: {contenido.PrecioDesbloqueo}");
+                _logger.LogInformation("Contenido guardado - ID: {Id}, TipoLado: {TipoLado}, NombreMostrado: {Nombre}, Precio: {Precio}",
+                    contenido.Id, contenido.TipoLado, contenido.NombreMostrado, contenido.PrecioDesbloqueo);
 
-                if (cambiosGuardados > 0)
+                if (EsBorrador)
                 {
-                    if (EsBorrador)
-                    {
-                        TempData["Success"] = "Borrador guardado exitosamente";
-                    }
-                    else
-                    {
-                        TempData["Success"] = EsPremium
-                            ? $"Contenido premium publicado exitosamente (${PrecioDesbloqueo})"
-                            : "Contenido publicado exitosamente";
-                    }
+                    TempData["Success"] = "✅ Borrador guardado exitosamente";
                 }
                 else
                 {
-                    _logger.LogWarning("No se guardaron cambios en la base de datos");
-                    TempData["Error"] = "Error al guardar el contenido";
+                    TempData["Success"] = EsGratis
+                        ? $"✅ Contenido público (LadoA) publicado como {usuario.NombreCompleto}"
+                        : $"✅ Contenido premium (LadoB) publicado como {usuario.Seudonimo} (${PrecioDesbloqueo})";
                 }
 
                 return RedirectToAction("Index");
@@ -309,9 +348,14 @@ namespace Lado.Controllers
             {
                 _logger.LogError(ex, "Error al crear contenido");
                 TempData["Error"] = $"Error al crear contenido: {ex.Message}";
+                ViewBag.UsuarioVerificado = false;
                 return View();
             }
         }
+
+        // ========================================
+        // PUBLICAR BORRADOR
+        // ========================================
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -319,30 +363,53 @@ namespace Lado.Controllers
         {
             var usuario = await _userManager.GetUserAsync(User);
 
-            if (!usuario.CreadorVerificado)
+            if (usuario == null)
             {
-                TempData["Error"] = "No puedes publicar contenido sin completar tu verificación de identidad.";
-                return RedirectToAction("Request", "CreatorVerification");
+                _logger.LogWarning("Usuario no encontrado en Publicar");
+                return RedirectToAction("Login", "Account");
             }
 
             var contenido = await _context.Contenidos
                 .FirstOrDefaultAsync(c => c.Id == id && c.UsuarioId == usuario.Id);
 
             if (contenido == null)
+            {
+                _logger.LogWarning("Contenido no encontrado: {Id}", id);
                 return NotFound();
+            }
+
+            // ✅ Verificar si es LadoB y requiere verificación
+            if (contenido.TipoLado == TipoLado.LadoB && !usuario.CreadorVerificado)
+            {
+                TempData["Error"] = "Para publicar contenido premium (LadoB) debes verificar tu identidad.";
+                return RedirectToAction("Request", "CreatorVerification");
+            }
 
             contenido.EsBorrador = false;
             contenido.FechaPublicacion = DateTime.Now;
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = "Contenido publicado exitosamente";
+            var tipoContenido = contenido.TipoLado == TipoLado.LadoA ? "público (LadoA)" : "premium (LadoB)";
+            TempData["Success"] = $"✅ Contenido {tipoContenido} publicado exitosamente";
+
             return RedirectToAction("Index");
         }
+
+        // ========================================
+        // EDITAR CONTENIDO
+        // ========================================
 
         [HttpGet]
         public async Task<IActionResult> Editar(int id)
         {
             var usuario = await _userManager.GetUserAsync(User);
+
+            if (usuario == null)
+            {
+                _logger.LogWarning("Usuario no encontrado en Editar");
+                return RedirectToAction("Login", "Account");
+            }
+
             var contenido = await _context.Contenidos
                 .FirstOrDefaultAsync(c => c.Id == id && c.UsuarioId == usuario.Id && c.EstaActivo);
 
@@ -351,6 +418,12 @@ namespace Lado.Controllers
                 TempData["Error"] = "Contenido no encontrado";
                 return RedirectToAction("Index");
             }
+
+            // ✅ CRÍTICO: Pasar estado de verificación a la vista
+            ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
+
+            _logger.LogInformation("🔵 Editando contenido ID: {Id}, TipoContenido: {TipoContenido}, TipoLado: {TipoLado}, EsGratis: {EsGratis}",
+                id, contenido.TipoContenido, contenido.TipoLado, contenido.EsGratis);
 
             return View(contenido);
         }
@@ -362,12 +435,19 @@ namespace Lado.Controllers
             IFormFile archivo,
             string Descripcion,
             int TipoContenido,
-            bool EsPremium,
-            decimal PrecioDesbloqueo)
+            bool EsGratis,
+            decimal? PrecioDesbloqueo)
         {
             try
             {
                 var usuario = await _userManager.GetUserAsync(User);
+
+                if (usuario == null)
+                {
+                    _logger.LogWarning("Usuario no encontrado en Editar POST");
+                    return RedirectToAction("Login", "Account");
+                }
+
                 var contenido = await _context.Contenidos
                     .FirstOrDefaultAsync(c => c.Id == id && c.UsuarioId == usuario.Id && c.EstaActivo);
 
@@ -377,81 +457,109 @@ namespace Lado.Controllers
                     return RedirectToAction("Index");
                 }
 
-                _logger.LogInformation($"=== EDITAR CONTENIDO ID: {id} ===");
-                _logger.LogInformation($"EsPremium recibido: {EsPremium}, Precio: {PrecioDesbloqueo}");
+                _logger.LogInformation("=== EDITAR CONTENIDO ID: {Id} ===", id);
+                _logger.LogInformation("EsGratis recibido: {EsGratis}, Precio: {Precio}", EsGratis, PrecioDesbloqueo);
+
+                // ✅ Validar verificación SOLO si intenta publicar en LadoB (no gratis)
+                if (!EsGratis && !usuario.CreadorVerificado)
+                {
+                    TempData["Error"] = "Debes verificar tu identidad para publicar contenido premium (LadoB)";
+                    return RedirectToAction("Request", "CreatorVerification");
+                }
 
                 if (!contenido.EsBorrador && string.IsNullOrWhiteSpace(Descripcion))
                 {
                     TempData["Error"] = "La descripción es requerida para contenido publicado";
+                    ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
                     return View(contenido);
                 }
 
-                // VALIDACIÓN MEJORADA: Precio múltiplo de 5
-                if (EsPremium && (PrecioDesbloqueo <= 0 || PrecioDesbloqueo % 5 != 0))
+                // ✅ Validar precio SOLO si es contenido de pago (LadoB)
+                if (!EsGratis)
                 {
-                    TempData["Error"] = "El precio debe ser un múltiplo de 5 (5, 10, 15, 20...)";
-                    return View(contenido);
+                    if (!PrecioDesbloqueo.HasValue || PrecioDesbloqueo <= 0 || PrecioDesbloqueo % 5 != 0)
+                    {
+                        TempData["Error"] = "El precio debe ser un múltiplo de 5 (5, 10, 15, 20...)";
+                        ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
+                        return View(contenido);
+                    }
                 }
 
+                // ✅ Actualizar campos básicos
                 contenido.TipoContenido = (Models.TipoContenido)TipoContenido;
                 contenido.Descripcion = Descripcion ?? "";
-                contenido.EsPremium = EsPremium;
-                contenido.PrecioDesbloqueo = EsPremium ? PrecioDesbloqueo : 0;
-                contenido.FechaActualizacion = DateTime.Now;
 
-                _logger.LogInformation($"Valores a guardar - EsPremium: {contenido.EsPremium}, Precio: {contenido.PrecioDesbloqueo}");
+                // ✅ Actualizar tipo de lado y campos relacionados
+                var tipoAnterior = contenido.TipoLado;
+                contenido.TipoLado = EsGratis ? TipoLado.LadoA : TipoLado.LadoB;
+                contenido.EsGratis = EsGratis;
+                contenido.EsPremium = !EsGratis;
+                contenido.PrecioDesbloqueo = EsGratis ? 0 : (PrecioDesbloqueo ?? 10);
+                contenido.NombreMostrado = EsGratis ? usuario.NombreCompleto : usuario.Seudonimo;
 
+                _logger.LogInformation("Tipo anterior: {TipoAnterior}, Nuevo tipo: {TipoNuevo}",
+                    tipoAnterior, contenido.TipoLado);
+                _logger.LogInformation("Precio asignado: ${Precio}, Nombre: {Nombre}",
+                    contenido.PrecioDesbloqueo, contenido.NombreMostrado);
+
+                // ✅ Subir nuevo archivo si se proporciona
                 if (archivo != null && archivo.Length > 0)
                 {
-                    _logger.LogInformation("Actualizando archivo...");
-
-                    if (archivo.Length > 100 * 1024 * 1024)
+                    // Validar tipo de archivo según TipoContenido
+                    var extensionPermitida = false;
+                    if (contenido.TipoContenido == Models.TipoContenido.Foto)
                     {
-                        TempData["Error"] = "El archivo excede el tamaño máximo de 100 MB";
+                        extensionPermitida = archivo.ContentType.StartsWith("image/");
+                    }
+                    else if (contenido.TipoContenido == Models.TipoContenido.Video)
+                    {
+                        extensionPermitida = archivo.ContentType.StartsWith("video/");
+                    }
+
+                    if (!extensionPermitida)
+                    {
+                        TempData["Error"] = "El tipo de archivo no coincide con el tipo de contenido seleccionado";
+                        ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
                         return View(contenido);
                     }
 
-                    var extension = Path.GetExtension(archivo.FileName).ToLower();
-                    var tiposPermitidos = new[] { ".jpg", ".jpeg", ".png", ".gif", ".mp4", ".mov", ".avi", ".webm" };
-
-                    if (!tiposPermitidos.Contains(extension))
-                    {
-                        TempData["Error"] = "Tipo de archivo no permitido";
-                        return View(contenido);
-                    }
-
+                    // Eliminar archivo anterior si existe
                     if (!string.IsNullOrEmpty(contenido.RutaArchivo))
                     {
-                        var archivoAnterior = Path.Combine(_environment.WebRootPath, contenido.RutaArchivo.TrimStart('/'));
-                        if (System.IO.File.Exists(archivoAnterior))
+                        var rutaAnterior = Path.Combine(_environment.WebRootPath, contenido.RutaArchivo.TrimStart('/'));
+                        if (System.IO.File.Exists(rutaAnterior))
                         {
-                            System.IO.File.Delete(archivoAnterior);
-                            _logger.LogInformation($"Archivo anterior eliminado: {archivoAnterior}");
+                            System.IO.File.Delete(rutaAnterior);
+                            _logger.LogInformation("Archivo anterior eliminado: {Ruta}", rutaAnterior);
                         }
                     }
 
-                    var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", usuario.Id);
+                    // Subir nuevo archivo
+                    var carpeta = contenido.TipoContenido == Models.TipoContenido.Foto ? "images" : "videos";
+                    var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", carpeta);
                     Directory.CreateDirectory(uploadsFolder);
 
-                    var uniqueFileName = $"{Guid.NewGuid()}{extension}";
-                    var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+                    var nombreArchivo = $"{Guid.NewGuid()}_{Path.GetFileName(archivo.FileName)}";
+                    var rutaCompleta = Path.Combine(uploadsFolder, nombreArchivo);
 
-                    using (var fileStream = new FileStream(filePath, FileMode.Create))
+                    using (var stream = new FileStream(rutaCompleta, FileMode.Create))
                     {
-                        await archivo.CopyToAsync(fileStream);
+                        await archivo.CopyToAsync(stream);
                     }
 
-                    contenido.RutaArchivo = $"/uploads/{usuario.Id}/{uniqueFileName}";
-                    _logger.LogInformation($"Nuevo archivo guardado: {contenido.RutaArchivo}");
+                    contenido.RutaArchivo = $"/uploads/{carpeta}/{nombreArchivo}";
+                    _logger.LogInformation("Nuevo archivo guardado: {Ruta}", contenido.RutaArchivo);
                 }
 
+                contenido.FechaActualizacion = DateTime.Now;
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation($"Contenido actualizado - EsPremium: {contenido.EsPremium}, Precio: {contenido.PrecioDesbloqueo}");
+                _logger.LogInformation("✅ Contenido ID {Id} actualizado exitosamente", id);
 
-                TempData["Success"] = EsPremium
-                    ? $"Contenido actualizado como premium (${PrecioDesbloqueo})"
-                    : "Contenido actualizado exitosamente";
+                TempData["Success"] = !EsGratis
+                    ? $"Contenido actualizado como premium en LadoB (${PrecioDesbloqueo})"
+                    : "Contenido actualizado como gratuito en LadoA";
+
                 return RedirectToAction("Index");
             }
             catch (Exception ex)
@@ -461,6 +569,10 @@ namespace Lado.Controllers
                 return RedirectToAction("Editar", new { id });
             }
         }
+
+        // ========================================
+        // ELIMINAR CONTENIDO
+        // ========================================
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -480,38 +592,69 @@ namespace Lado.Controllers
             return RedirectToAction("Index");
         }
 
+        // ========================================
+        // LIKES
+        // ========================================
+
         [HttpPost]
         public async Task<IActionResult> Like(int id)
         {
-            var usuario = await _userManager.GetUserAsync(User);
-            var contenido = await _context.Contenidos.FindAsync(id);
-
-            if (contenido == null)
-                return NotFound();
-
-            var likeExistente = await _context.Likes
-                .FirstOrDefaultAsync(l => l.ContenidoId == id && l.UsuarioId == usuario.Id);
-
-            if (likeExistente != null)
+            try
             {
-                _context.Likes.Remove(likeExistente);
-                contenido.NumeroLikes--;
-            }
-            else
-            {
-                var like = new Like
+                var usuario = await _userManager.GetUserAsync(User);
+
+                if (usuario == null)
                 {
-                    ContenidoId = id,
-                    UsuarioId = usuario.Id,
-                    FechaLike = DateTime.Now
-                };
-                _context.Likes.Add(like);
-                contenido.NumeroLikes++;
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                var contenido = await _context.Contenidos.FindAsync(id);
+
+                if (contenido == null)
+                {
+                    return Json(new { success = false, message = "Contenido no encontrado" });
+                }
+
+                var likeExistente = await _context.Likes
+                    .FirstOrDefaultAsync(l => l.ContenidoId == id && l.UsuarioId == usuario.Id);
+
+                bool liked;
+
+                if (likeExistente != null)
+                {
+                    _context.Likes.Remove(likeExistente);
+                    contenido.NumeroLikes = Math.Max(0, contenido.NumeroLikes - 1);
+                    liked = false;
+                    _logger.LogInformation("Like removido - Contenido: {Id}, Usuario: {Username}", id, usuario.UserName);
+                }
+                else
+                {
+                    var like = new Like
+                    {
+                        ContenidoId = id,
+                        UsuarioId = usuario.Id,
+                        FechaLike = DateTime.Now
+                    };
+                    _context.Likes.Add(like);
+                    contenido.NumeroLikes++;
+                    liked = true;
+                    _logger.LogInformation("Like agregado - Contenido: {Id}, Usuario: {Username}", id, usuario.UserName);
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Json(new
+                {
+                    success = true,
+                    likes = contenido.NumeroLikes,
+                    liked = liked
+                });
             }
-
-            await _context.SaveChangesAsync();
-
-            return Json(new { success = true, likes = contenido.NumeroLikes });
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al procesar like para contenido {Id}", id);
+                return Json(new { success = false, message = "Error al procesar el like" });
+            }
         }
     }
 }

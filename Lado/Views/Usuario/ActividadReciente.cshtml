@@ -8,7 +8,7 @@
         <div class="d-flex justify-content-between align-items-center">
             <div>
                 <h2><i class="fas fa-history text-primary"></i> Actividad Reciente</h2>
-                <p class="text-muted">Revisa tu historial de actividad y transacciones</p>
+                <p class="text-muted">Revisa tu historial de actividad y transacciones en ambas identidades</p>
             </div>
             <div>
                 <button class="btn btn-outline-primary me-2" onclick="filtrarActividad()">
@@ -30,24 +30,26 @@
                 <h6 class="mb-0">Filtros</h6>
             </div>
             <div class="card-body">
+                <!-- ⭐ NUEVO: Filtro por tipo de contenido -->
+                <div class="mb-3">
+                    <label class="form-label small">Identidad</label>
+                    <select class="form-select form-select-sm" id="filtroIdentidad">
+                        <option value="todas">Ambas Identidades</option>
+                        <option value="ladoa">LadoA (Público)</option>
+                        <option value="ladob">LadoB (Premium)</option>
+                    </select>
+                </div>
+
                 <div class="mb-3">
                     <label class="form-label small">Tipo de Actividad</label>
                     <select class="form-select form-select-sm" id="filtroTipo">
                         <option value="todas">Todas</option>
-                        @if (Model.TipoUsuario == (int)Lado.Models.TipoUsuario.Creador)
-                        {
-                            <option value="suscripcion">Nuevas Suscripciones</option>
-                            <option value="pago">Pagos Recibidos</option>
-                            <option value="retiro">Retiros</option>
-                            <option value="contenido">Nuevo Contenido</option>
-                        }
-                        else
-                        {
-                            <option value="suscripcion">Suscripciones</option>
-                            <option value="pago">Pagos Realizados</option>
-                            <option value="like">Likes</option>
-                            <option value="comentario">Comentarios</option>
-                        }
+                        <option value="suscripcion">Suscripciones</option>
+                        <option value="pago">Pagos</option>
+                        <option value="retiro">Retiros</option>
+                        <option value="contenido">Contenido</option>
+                        <option value="like">Likes</option>
+                        <option value="comentario">Comentarios</option>
                     </select>
                 </div>
 
@@ -73,39 +75,67 @@
         <!-- Resumen de Actividad -->
         <div class="card shadow-sm mt-3">
             <div class="card-header bg-white">
-                <h6 class="mb-0">Resumen</h6>
+                <h6 class="mb-0">Resumen Esta Semana</h6>
             </div>
             <div class="card-body">
-                @if (Model.TipoUsuario == (int)Lado.Models.TipoUsuario.Creador)
-                {
-                    <div class="mb-3">
-                        <small class="text-muted">Esta Semana</small>
-                        <h5 class="mb-0 text-success">$@((ViewBag.IngresosEstaSemana ?? 0m).ToString("N2"))</h5>
-                        <small class="text-muted">en ingresos</small>
+                <div class="mb-3">
+                    <small class="text-muted">Ingresos Totales</small>
+                    <h5 class="mb-0 text-success">$@((ViewBag.IngresosEstaSemana ?? 0m).ToString("N2"))</h5>
+                    <div class="d-flex justify-content-between mt-1">
+                        <small class="text-muted">LadoA: $@((ViewBag.IngresosLadoA ?? 0m).ToString("N2"))</small>
+                        <small class="text-muted">LadoB: $@((ViewBag.IngresosLadoB ?? 0m).ToString("N2"))</small>
                     </div>
-                    <hr>
-                    <div class="mb-3">
-                        <small class="text-muted">Nuevos Suscriptores</small>
-                        <h5 class="mb-0 text-primary">@(ViewBag.NuevosSuscriptores ?? 0)</h5>
+                </div>
+                <hr>
+                <div class="mb-3">
+                    <small class="text-muted">Nuevos Suscriptores</small>
+                    <h5 class="mb-0 text-primary">@(ViewBag.NuevosSuscriptores ?? 0)</h5>
+                </div>
+                <hr>
+                <div class="mb-3">
+                    <small class="text-muted">Publicaciones</small>
+                    <h5 class="mb-0 text-info">@(ViewBag.PublicacionesEstaSemana ?? 0)</h5>
+                    <div class="d-flex justify-content-between mt-1">
+                        <small class="text-success">
+                            <i class="fas fa-globe"></i> LadoA: @(ViewBag.PublicacionesLadoA ?? 0)
+                        </small>
+                        <small class="text-warning">
+                            <i class="fas fa-lock"></i> LadoB: @(ViewBag.PublicacionesLadoB ?? 0)
+                        </small>
                     </div>
-                    <hr>
+                </div>
+                <hr>
+                <div>
+                    <small class="text-muted">Engagement Total</small>
+                    <h5 class="mb-0 text-danger">@(ViewBag.TotalLikes ?? 0) <i class="fas fa-heart"></i></h5>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⭐ NUEVO: Card de Identidades -->
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-white">
+                <h6 class="mb-0">Mis Identidades</h6>
+            </div>
+            <div class="card-body p-2">
+                <div class="identity-item ladoa">
+                    <div class="identity-icon">
+                        <i class="fas fa-user"></i>
+                    </div>
                     <div>
-                        <small class="text-muted">Publicaciones</small>
-                        <h5 class="mb-0 text-info">@(ViewBag.PublicacionesEstaSemana ?? 0)</h5>
+                        <div class="identity-name">@Model.NombreCompleto</div>
+                        <small class="identity-type">Contenido Público</small>
                     </div>
-                }
-                else
-                {
-                    <div class="mb-3">
-                        <small class="text-muted">Gastos Esta Semana</small>
-                        <h5 class="mb-0 text-danger">$@((ViewBag.GastosEstaSemana ?? 0m).ToString("N2"))</h5>
+                </div>
+                <div class="identity-item ladob">
+                    <div class="identity-icon">
+                        <i class="fas fa-mask"></i>
                     </div>
-                    <hr>
                     <div>
-                        <small class="text-muted">Contenido Consumido</small>
-                        <h5 class="mb-0 text-info">@(ViewBag.ContenidoVisto ?? 0)</h5>
+                        <div class="identity-name">@@@Model.Seudonimo</div>
+                        <small class="identity-type">Contenido Premium</small>
                     </div>
-                }
+                </div>
             </div>
         </div>
     </div>
@@ -121,27 +151,21 @@
                             <i class="fas fa-list"></i> Todas
                         </a>
                     </li>
-                    @if (Model.TipoUsuario == (int)Lado.Models.TipoUsuario.Creador)
-                    {
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#transacciones">
-                                <i class="fas fa-dollar-sign"></i> Transacciones
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#contenido">
-                                <i class="fas fa-image"></i> Contenido
-                            </a>
-                        </li>
-                    }
-                    else
-                    {
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#suscripciones">
-                                <i class="fas fa-heart"></i> Suscripciones
-                            </a>
-                        </li>
-                    }
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#transacciones">
+                            <i class="fas fa-dollar-sign"></i> Transacciones
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#contenido">
+                            <i class="fas fa-image"></i> Contenido
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#suscripciones">
+                            <i class="fas fa-heart"></i> Suscripciones
+                        </a>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link" data-bs-toggle="tab" href="#interacciones">
                             <i class="fas fa-comments"></i> Interacciones
@@ -159,32 +183,49 @@
                                 @foreach (var actividad in ViewBag.Actividades)
                                 {
                                     <div class="timeline-item">
-                                        <div class="timeline-marker">
+                                        <div class="timeline-marker @(actividad.EsLadoB ? "marker-ladob" : "marker-ladoa")">
                                             @if (actividad.Tipo == "suscripcion")
                                             {
-                                                <i class="fas fa-user-plus text-primary"></i>
+                                                <i class="fas fa-user-plus"></i>
                                             }
                                             else if (actividad.Tipo == "retiro")
                                             {
-                                                <i class="fas fa-dollar-sign text-danger"></i>
+                                                <i class="fas fa-dollar-sign"></i>
                                             }
                                             else if (actividad.Tipo == "contenido")
                                             {
-                                                <i class="fas fa-image text-info"></i>
+                                                <i class="fas fa-image"></i>
                                             }
                                             else if (actividad.Tipo == "like")
                                             {
-                                                <i class="fas fa-heart text-danger"></i>
+                                                <i class="fas fa-heart"></i>
                                             }
                                             else
                                             {
-                                                <i class="fas fa-dollar-sign text-success"></i>
+                                                <i class="fas fa-dollar-sign"></i>
                                             }
                                         </div>
                                         <div class="timeline-content">
                                             <div class="d-flex justify-content-between align-items-start mb-2">
                                                 <div>
-                                                    <h6 class="mb-1">@actividad.Titulo</h6>
+                                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                                        <h6 class="mb-0">@actividad.Titulo</h6>
+                                                        @if (actividad.EsLadoB.HasValue)
+                                                        {
+                                                            @if (actividad.EsLadoB.Value)
+                                                            {
+                                                                <span class="badge-identity ladob">
+                                                                    <i class="fas fa-lock"></i> LadoB
+                                                                </span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="badge-identity ladoa">
+                                                                    <i class="fas fa-globe"></i> LadoA
+                                                                </span>
+                                                            }
+                                                        }
+                                                    </div>
                                                     <p class="text-muted mb-0 small">@actividad.Descripcion</p>
                                                 </div>
                                                 @if (actividad.Monto.HasValue && actividad.Monto > 0)
@@ -236,132 +277,168 @@
                     </div>
 
                     <!-- Tab Transacciones -->
-                    @if (Model.TipoUsuario == (int)Lado.Models.TipoUsuario.Creador)
-                    {
-                        <div class="tab-pane fade" id="transacciones">
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>Fecha</th>
-                                            <th>Tipo</th>
-                                            <th>Descripción</th>
-                                            <th class="text-end">Monto</th>
-                                            <th>Estado</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @if (ViewBag.Transacciones != null && ViewBag.Transacciones.Count > 0)
-                                        {
-                                            @foreach (var trans in ViewBag.Transacciones)
-                                            {
-                                                <tr>
-                                                    <td><small>@trans.Fecha.ToString("dd/MM/yyyy")</small></td>
-                                                    <td>
-                                                        <span class="badge bg-info">@trans.Tipo</span>
-                                                    </td>
-                                                    <td>@trans.Descripcion</td>
-                                                    <td class="text-end text-success fw-bold">+$@trans.Monto.ToString("N2")</td>
-                                                    <td>
-                                                        <span class="badge bg-success">@trans.Estado</span>
-                                                    </td>
-                                                </tr>
-                                            }
-                                        }
-                                        else
+                    <div class="tab-pane fade" id="transacciones">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Identidad</th>
+                                        <th>Tipo</th>
+                                        <th>Descripción</th>
+                                        <th class="text-end">Monto</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (ViewBag.Transacciones != null && ViewBag.Transacciones.Count > 0)
+                                    {
+                                        @foreach (var trans in ViewBag.Transacciones)
                                         {
                                             <tr>
-                                                <td colspan="5" class="text-center py-4 text-muted">
-                                                    No hay transacciones registradas
-                                                </td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div class="tab-pane fade" id="contenido">
-                            <div class="row g-3">
-                                @if (ViewBag.ContenidoReciente != null && ViewBag.ContenidoReciente.Count > 0)
-                                {
-                                    @foreach (var contenido in ViewBag.ContenidoReciente)
-                                    {
-                                        <div class="col-md-4">
-                                            <div class="card">
-                                                <img src="@contenido.RutaArchivo" class="card-img-top" style="height: 200px; object-fit: cover;" alt="Contenido">
-                                                <div class="card-body">
-                                                    <p class="small mb-2">@contenido.Descripcion</p>
-                                                    <div class="d-flex justify-content-between text-muted small">
-                                                        <span><i class="fas fa-heart"></i> @contenido.Likes</span>
-                                                        <span>@contenido.FechaPublicacion.ToString("dd/MM/yyyy")</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    }
-                                }
-                                else
-                                {
-                                    <div class="col-12 text-center py-5">
-                                        <i class="fas fa-image fa-4x text-muted mb-3"></i>
-                                        <h5 class="text-muted">No has publicado contenido</h5>
-                                        <a href="/Contenido/Crear" class="btn btn-primary mt-3">
-                                            <i class="fas fa-plus"></i> Crear Publicación
-                                        </a>
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="tab-pane fade" id="suscripciones">
-                            <div class="list-group">
-                                @if (ViewBag.Suscripciones != null && ViewBag.Suscripciones.Count > 0)
-                                {
-                                    @foreach (var sub in ViewBag.Suscripciones)
-                                    {
-                                        <div class="list-group-item">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <div class="d-flex align-items-center">
-                                                    @if (!string.IsNullOrEmpty(sub.Creador.FotoPerfil))
+                                                <td><small>@trans.Fecha.ToString("dd/MM/yyyy")</small></td>
+                                                <td>
+                                                    @if (trans.EsLadoB)
                                                     {
-                                                        <img src="@sub.Creador.FotoPerfil" class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover;" alt="@sub.Creador.UserName">
+                                                        <span class="badge-identity ladob">
+                                                            <i class="fas fa-mask"></i> LadoB
+                                                        </span>
                                                     }
                                                     else
                                                     {
-                                                        <div class="rounded-circle bg-primary d-inline-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
-                                                            <span class="text-white fw-bold">@sub.Creador.NombreCompleto.Substring(0, 1)</span>
-                                                        </div>
+                                                        <span class="badge-identity ladoa">
+                                                            <i class="fas fa-user"></i> LadoA
+                                                        </span>
                                                     }
-                                                    <div>
-                                                        <h6 class="mb-0">@sub.Creador.NombreCompleto</h6>
-                                                        <small class="text-muted">Suscrito desde @sub.FechaInicio.ToString("dd/MM/yyyy")</small>
-                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-info">@trans.Tipo</span>
+                                                </td>
+                                                <td>@trans.Descripcion</td>
+                                                <td class="text-end text-success fw-bold">+$@trans.Monto.ToString("N2")</td>
+                                                <td>
+                                                    <span class="badge bg-success">@trans.Estado</span>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <tr>
+                                            <td colspan="6" class="text-center py-4 text-muted">
+                                                No hay transacciones registradas
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Tab Contenido -->
+                    <div class="tab-pane fade" id="contenido">
+                        <div class="row g-3">
+                            @if (ViewBag.ContenidoReciente != null && ViewBag.ContenidoReciente.Count > 0)
+                            {
+                                @foreach (var contenido in ViewBag.ContenidoReciente)
+                                {
+                                    <div class="col-md-4">
+                                        <div class="card">
+                                            @if (!string.IsNullOrEmpty(contenido.RutaArchivo))
+                                            {
+                                                <img src="@contenido.RutaArchivo" class="card-img-top" style="height: 200px; object-fit: cover;" alt="Contenido">
+                                            }
+                                            else
+                                            {
+                                                <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                                                    <i class="fas fa-image fa-3x text-muted"></i>
                                                 </div>
-                                                <div class="text-end">
-                                                    <span class="badge bg-success mb-1">Activa</span>
-                                                    <p class="mb-0 small text-muted">$@sub.Precio.ToString("N2")/mes</p>
+                                            }
+                                            <div class="card-body">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <p class="small mb-0">@(contenido.Descripcion ?? "Sin descripción")</p>
+                                                    @if (contenido.TipoLado == Lado.Models.TipoLado.LadoB)
+                                                    {
+                                                        <span class="badge-identity ladob">
+                                                            <i class="fas fa-lock"></i>
+                                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge-identity ladoa">
+                                                            <i class="fas fa-globe"></i>
+                                                        </span>
+                                                    }
+                                                </div>
+                                                <div class="d-flex justify-content-between text-muted small">
+                                                    <span><i class="fas fa-heart"></i> @contenido.NumeroLikes</span>
+                                                    <span>@contenido.FechaPublicacion.ToString("dd/MM/yyyy")</span>
                                                 </div>
                                             </div>
                                         </div>
-                                    }
-                                }
-                                else
-                                {
-                                    <div class="text-center py-5">
-                                        <i class="fas fa-heart-broken fa-4x text-muted mb-3"></i>
-                                        <h5 class="text-muted">No tienes suscripciones activas</h5>
-                                        <a href="/Explorar" class="btn btn-primary mt-3">
-                                            <i class="fas fa-search"></i> Explorar Creadores
-                                        </a>
                                     </div>
                                 }
-                            </div>
+                            }
+                            else
+                            {
+                                <div class="col-12 text-center py-5">
+                                    <i class="fas fa-image fa-4x text-muted mb-3"></i>
+                                    <h5 class="text-muted">No has publicado contenido</h5>
+                                    <a href="/Contenido/Crear" class="btn btn-primary mt-3">
+                                        <i class="fas fa-plus"></i> Crear Publicación
+                                    </a>
+                                </div>
+                            }
                         </div>
-                    }
+                    </div>
 
+                    <!-- Tab Suscripciones -->
+                    <div class="tab-pane fade" id="suscripciones">
+                        <div class="list-group">
+                            @if (ViewBag.Suscripciones != null && ViewBag.Suscripciones.Count > 0)
+                            {
+                                @foreach (var sub in ViewBag.Suscripciones)
+                                {
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div class="d-flex align-items-center">
+                                                @if (!string.IsNullOrEmpty(sub.Creador.FotoPerfil))
+                                                {
+                                                    <img src="@sub.Creador.FotoPerfil" class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover;" alt="@sub.Creador.UserName">
+                                                }
+                                                else
+                                                {
+                                                    <div class="rounded-circle bg-primary d-inline-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
+                                                        <span class="text-white fw-bold">@sub.Creador.NombreCompleto.Substring(0, 1)</span>
+                                                    </div>
+                                                }
+                                                <div>
+                                                    <h6 class="mb-0">@sub.Creador.NombreCompleto</h6>
+                                                    <small class="text-muted">Suscrito desde @sub.FechaInicio.ToString("dd/MM/yyyy")</small>
+                                                </div>
+                                            </div>
+                                            <div class="text-end">
+                                                <span class="badge bg-success mb-1">Activa</span>
+                                                <p class="mb-0 small text-muted">$@sub.Precio.ToString("N2")/mes</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="text-center py-5">
+                                    <i class="fas fa-heart-broken fa-4x text-muted mb-3"></i>
+                                    <h5 class="text-muted">No tienes suscripciones activas</h5>
+                                    <a href="/Explorar" class="btn btn-primary mt-3">
+                                        <i class="fas fa-search"></i> Explorar Creadores
+                                    </a>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Tab Interacciones -->
                     <div class="tab-pane fade" id="interacciones">
                         <div class="list-group">
                             <div class="text-center py-5">
@@ -387,14 +464,16 @@
         }
 
         function aplicarFiltros() {
+            const identidad = document.getElementById('filtroIdentidad').value;
             const tipo = document.getElementById('filtroTipo').value;
             const periodo = document.getElementById('filtroPeriodo').value;
 
-            console.log('Filtrar por:', tipo, periodo);
+            console.log('Filtrar por:', identidad, tipo, periodo);
             alert('Filtros aplicados');
         }
 
         function limpiarFiltros() {
+            document.getElementById('filtroIdentidad').value = 'todas';
             document.getElementById('filtroTipo').value = 'todas';
             document.getElementById('filtroPeriodo').value = 'semana';
             alert('Filtros limpiados');
@@ -403,6 +482,76 @@
 }
 
 <style>
+    /* ⭐ NUEVO: Estilos para badges de identidad */
+    .badge-identity {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 8px;
+        border-radius: 8px;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+
+        .badge-identity.ladoa {
+            background: #e6f9ee;
+            color: #16a34a;
+        }
+
+        .badge-identity.ladob {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+    /* ⭐ NUEVO: Cards de identidad en sidebar */
+    .identity-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+    }
+
+        .identity-item.ladoa {
+            background: #e6f9ee;
+        }
+
+        .identity-item.ladob {
+            background: #fef3c7;
+        }
+
+    .identity-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .identity-item.ladoa .identity-icon {
+        color: #16a34a;
+    }
+
+    .identity-item.ladob .identity-icon {
+        color: #92400e;
+    }
+
+    .identity-name {
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: #111827;
+    }
+
+    .identity-type {
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+
+    /* Timeline */
     .timeline {
         position: relative;
         padding-left: 50px;
@@ -435,7 +584,21 @@
         align-items: center;
         justify-content: center;
         font-size: 1.2rem;
+        color: #6b7280;
     }
+
+        /* ⭐ NUEVO: Markers con colores según identidad */
+        .timeline-marker.marker-ladoa {
+            border-color: #32d67b;
+            color: #16a34a;
+            background: #e6f9ee;
+        }
+
+        .timeline-marker.marker-ladob {
+            border-color: #fbbf24;
+            color: #92400e;
+            background: #fef3c7;
+        }
 
     .timeline-content {
         background: #f8f9fa;
@@ -455,7 +618,11 @@
     }
 
         .nav-tabs .nav-link.active {
-            color: #00bcd4;
-            border-bottom-color: #00bcd4;
+            color: #32d67b;
+            border-bottom-color: #32d67b;
+        }
+
+        .nav-tabs .nav-link:hover {
+            color: #32d67b;
         }
 </style>

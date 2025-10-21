@@ -12,23 +12,38 @@ namespace Lado.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly ILogger<ExplorarController> _logger;
 
         public ExplorarController(
             ApplicationDbContext context,
-            UserManager<ApplicationUser> userManager)
+            UserManager<ApplicationUser> userManager,
+            ILogger<ExplorarController> logger)
         {
             _context = context;
             _userManager = userManager;
+            _logger = logger;
         }
 
-        // GET: /Explorar
+        // ========================================
+        // INDEX - EXPLORAR USUARIOS
+        // ========================================
+
         public async Task<IActionResult> Index(string buscar = "", string categoria = "todos")
         {
             var usuarioActual = await _userManager.GetUserAsync(User);
+            if (usuarioActual == null)
+            {
+                _logger.LogWarning("Usuario no autenticado en Index");
+                return RedirectToAction("Login", "Account");
+            }
 
-            // Obtener creadores activos
+            _logger.LogInformation("Explorando usuarios - Buscar: {Buscar}, Categoría: {Categoria}",
+                buscar, categoria);
+
+            // ⭐ CAMBIO: Ya no filtramos por TipoUsuario, todos son creadores
+            // Excluir solo al usuario actual
             var query = _context.Users
-                .Where(u => u.TipoUsuario == (int)TipoUsuario.Creador && u.Id != usuarioActual.Id);
+                .Where(u => u.Id != usuarioActual.Id && u.EstaActivo);
 
             // Filtrar por búsqueda
             if (!string.IsNullOrWhiteSpace(buscar))
@@ -36,6 +51,7 @@ namespace Lado.Controllers
                 query = query.Where(u =>
                     u.UserName.Contains(buscar) ||
                     u.NombreCompleto.Contains(buscar) ||
+                    u.Seudonimo.Contains(buscar) || // ⭐ NUEVO: Buscar por seudónimo
                     (u.Biografia != null && u.Biografia.Contains(buscar)));
             }
 
@@ -45,10 +61,13 @@ namespace Lado.Controllers
                 query = query.Where(u => u.Categoria == categoria);
             }
 
-            var creadores = await query
+            var usuarios = await query
                 .OrderByDescending(u => u.NumeroSeguidores)
+                .ThenByDescending(u => u.CreadorVerificado) // Verificados primero
                 .Take(50)
                 .ToListAsync();
+
+            _logger.LogInformation("Usuarios encontrados: {Count}", usuarios.Count);
 
             // Obtener suscripciones actuales del usuario
             var suscripcionesIds = await _context.Suscripciones
@@ -59,23 +78,43 @@ namespace Lado.Controllers
             ViewBag.SuscripcionesIds = suscripcionesIds;
             ViewBag.BuscarTexto = buscar;
             ViewBag.Categoria = categoria;
+            ViewBag.TotalUsuarios = usuarios.Count;
 
-            return View(creadores);
+            return View(usuarios);
         }
 
-        // GET: /Explorar/Perfil/id
+        // ========================================
+        // PERFIL - VER PERFIL DE USUARIO
+        // ========================================
+
         public async Task<IActionResult> Perfil(string id)
         {
-            var creador = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == id && u.TipoUsuario == (int)TipoUsuario.Creador);
-
-            if (creador == null)
+            if (string.IsNullOrWhiteSpace(id))
             {
-                TempData["Error"] = "Creador no encontrado";
+                _logger.LogWarning("ID de usuario vacío en Perfil");
+                TempData["Error"] = "Usuario no especificado";
+                return RedirectToAction("Index");
+            }
+
+            // ⭐ CAMBIO: Ya no verificamos TipoUsuario, todos son creadores
+            var usuario = await _context.Users
+                .FirstOrDefaultAsync(u => u.Id == id && u.EstaActivo);
+
+            if (usuario == null)
+            {
+                _logger.LogWarning("Usuario no encontrado: {Id}", id);
+                TempData["Error"] = "Usuario no encontrado";
                 return RedirectToAction("Index");
             }
 
             var usuarioActual = await _userManager.GetUserAsync(User);
+            if (usuarioActual == null)
+            {
+                _logger.LogWarning("Usuario actual no autenticado");
+                return RedirectToAction("Login", "Account");
+            }
+
+            _logger.LogInformation("Viendo perfil de: {Username} ({Id})", usuario.UserName, usuario.Id);
 
             // Verificar si está suscrito
             var suscripcion = await _context.Suscripciones
@@ -84,24 +123,44 @@ namespace Lado.Controllers
                     s.FanId == usuarioActual.Id &&
                     s.EstaActiva);
 
-            ViewBag.EstaSuscrito = suscripcion != null;
+            var estaSuscrito = suscripcion != null;
+            ViewBag.EstaSuscrito = estaSuscrito;
 
-            // ✅ CARGAR contenido CON relaciones
-            var contenidos = await _context.Contenidos
+            // ⭐ NUEVO: Obtener contenido separado por LadoA/LadoB
+            // LadoA: Siempre visible (público)
+            var contenidoLadoA = await _context.Contenidos
                 .Include(c => c.Likes)
                 .Include(c => c.Comentarios)
                 .Where(c => c.UsuarioId == id &&
                            c.EstaActivo &&
                            !c.EsBorrador &&
-                           (!c.EsPremium || suscripcion != null))
+                           c.TipoLado == TipoLado.LadoA)
                 .OrderByDescending(c => c.FechaPublicacion)
                 .Take(12)
                 .ToListAsync();
 
-            // ✅ ACTUALIZAR contadores desde las relaciones cargadas
+            // LadoB: Solo si está suscrito
+            var contenidoLadoB = estaSuscrito
+                ? await _context.Contenidos
+                    .Include(c => c.Likes)
+                    .Include(c => c.Comentarios)
+                    .Where(c => c.UsuarioId == id &&
+                               c.EstaActivo &&
+                               !c.EsBorrador &&
+                               c.TipoLado == TipoLado.LadoB)
+                    .OrderByDescending(c => c.FechaPublicacion)
+                    .Take(12)
+                    .ToListAsync()
+                : new List<Contenido>();
+
+            // Combinar ambos tipos de contenido
+            var contenidos = contenidoLadoA.Union(contenidoLadoB)
+                .OrderByDescending(c => c.FechaPublicacion)
+                .ToList();
+
+            // Actualizar contadores desde las relaciones cargadas
             foreach (var contenido in contenidos)
             {
-                // Si los contadores no coinciden con las colecciones, actualizarlos
                 if (contenido.Likes != null && contenido.NumeroLikes != contenido.Likes.Count)
                 {
                     contenido.NumeroLikes = contenido.Likes.Count;
@@ -113,130 +172,206 @@ namespace Lado.Controllers
             }
 
             ViewBag.Contenidos = contenidos;
+            ViewBag.ContenidoLadoA = contenidoLadoA;
+            ViewBag.ContenidoLadoB = contenidoLadoB;
+
             ViewBag.TotalContenidos = await _context.Contenidos
                 .CountAsync(c => c.UsuarioId == id && c.EstaActivo && !c.EsBorrador);
 
-            return View(creador);
+            ViewBag.TotalLadoA = await _context.Contenidos
+                .CountAsync(c => c.UsuarioId == id && c.EstaActivo && !c.EsBorrador && c.TipoLado == TipoLado.LadoA);
+
+            ViewBag.TotalLadoB = await _context.Contenidos
+                .CountAsync(c => c.UsuarioId == id && c.EstaActivo && !c.EsBorrador && c.TipoLado == TipoLado.LadoB);
+
+            _logger.LogInformation("Contenido cargado - LadoA: {LadoA}, LadoB: {LadoB}",
+                contenidoLadoA.Count, contenidoLadoB.Count);
+
+            return View(usuario);
         }
 
-        // POST: /Explorar/Suscribirse
+        // ========================================
+        // SUSCRIBIRSE
+        // ========================================
+
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Suscribirse([FromBody] SuscripcionRequest request)
         {
             try
             {
-                var usuarioActual = await _userManager.GetUserAsync(User);
-                var creador = await _context.Users.FindAsync(request.CreadorId);
-
-                if (creador == null || creador.TipoUsuario != (int)TipoUsuario.Creador)
+                if (request == null || string.IsNullOrWhiteSpace(request.CreadorId))
                 {
-                    return Json(new { success = false, message = "Creador no encontrado" });
+                    _logger.LogWarning("Request inválido en Suscribirse");
+                    return Json(new { success = false, message = "Datos inválidos" });
                 }
 
-                // ✅ VERIFICAR SALDO DEL FAN
+                var usuarioActual = await _userManager.GetUserAsync(User);
+                if (usuarioActual == null)
+                {
+                    _logger.LogError("Usuario no autenticado en Suscribirse");
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                // ⭐ CAMBIO: Ya no verificamos TipoUsuario del creador
+                var creador = await _context.Users.FindAsync(request.CreadorId);
+                if (creador == null || !creador.EstaActivo)
+                {
+                    _logger.LogWarning("Usuario/Creador no encontrado: {CreadorId}", request.CreadorId);
+                    return Json(new { success = false, message = "Usuario no encontrado" });
+                }
+
+                // No puedes suscribirte a ti mismo
+                if (creador.Id == usuarioActual.Id)
+                {
+                    return Json(new { success = false, message = "No puedes suscribirte a ti mismo" });
+                }
+
+                _logger.LogInformation("Suscripción: {Fan} → {Creador} (${Precio})",
+                    usuarioActual.UserName, creador.UserName, creador.PrecioSuscripcion);
+
+                // Verificar saldo
                 if (usuarioActual.Saldo < creador.PrecioSuscripcion)
                 {
+                    _logger.LogWarning("Saldo insuficiente: {Saldo} < {Precio}",
+                        usuarioActual.Saldo, creador.PrecioSuscripcion);
+
                     return Json(new
                     {
                         success = false,
-                        message = $"Saldo insuficiente. Necesitas ${creador.PrecioSuscripcion:N2} pero solo tienes ${usuarioActual.Saldo:N2}. Carga saldo desde tu billetera."
+                        message = $"Saldo insuficiente. Necesitas ${creador.PrecioSuscripcion:N2} pero solo tienes ${usuarioActual.Saldo:N2}. Recarga tu billetera."
                     });
                 }
 
-                // Verificar si ya está suscrito
+                // Verificar suscripción existente
                 var suscripcionExistente = await _context.Suscripciones
                     .FirstOrDefaultAsync(s =>
                         s.CreadorId == request.CreadorId &&
                         s.FanId == usuarioActual.Id);
 
-                if (suscripcionExistente != null)
+                if (suscripcionExistente != null && suscripcionExistente.EstaActiva)
                 {
-                    if (suscripcionExistente.EstaActiva)
+                    _logger.LogWarning("Suscripción ya activa");
+                    return Json(new { success = false, message = "Ya estás suscrito a este usuario" });
+                }
+
+                using var transaction = await _context.Database.BeginTransactionAsync();
+
+                try
+                {
+                    if (suscripcionExistente != null)
                     {
-                        return Json(new { success = false, message = "Ya estás suscrito a este creador" });
+                        // Reactivar suscripción
+                        suscripcionExistente.EstaActiva = true;
+                        suscripcionExistente.FechaInicio = DateTime.Now;
+                        suscripcionExistente.ProximaRenovacion = DateTime.Now.AddMonths(1);
+                        suscripcionExistente.RenovacionAutomatica = true;
+                        suscripcionExistente.FechaCancelacion = null;
+                        suscripcionExistente.PrecioMensual = creador.PrecioSuscripcion;
+                        _logger.LogInformation("Suscripción reactivada");
+                    }
+                    else
+                    {
+                        // Nueva suscripción
+                        var suscripcion = new Suscripcion
+                        {
+                            CreadorId = request.CreadorId,
+                            FanId = usuarioActual.Id,
+                            PrecioMensual = creador.PrecioSuscripcion,
+                            FechaInicio = DateTime.Now,
+                            ProximaRenovacion = DateTime.Now.AddMonths(1),
+                            EstaActiva = true,
+                            RenovacionAutomatica = true
+                        };
+                        _context.Suscripciones.Add(suscripcion);
+                        _logger.LogInformation("Nueva suscripción creada");
                     }
 
-                    // Reactivar suscripción cancelada
-                    suscripcionExistente.EstaActiva = true;
-                    suscripcionExistente.FechaInicio = DateTime.Now;
-                    suscripcionExistente.ProximaRenovacion = DateTime.Now.AddMonths(1);
-                    suscripcionExistente.RenovacionAutomatica = true;
-                    suscripcionExistente.FechaCancelacion = null;
-                    suscripcionExistente.PrecioMensual = creador.PrecioSuscripcion;
-                }
-                else
-                {
-                    // Crear nueva suscripción
-                    var suscripcion = new Suscripcion
+                    // Transacción Fan (Gasto)
+                    var transaccionFan = new Transaccion
                     {
-                        CreadorId = request.CreadorId,
-                        FanId = usuarioActual.Id,
-                        PrecioMensual = creador.PrecioSuscripcion,
-                        FechaInicio = DateTime.Now,
-                        ProximaRenovacion = DateTime.Now.AddMonths(1),
-                        EstaActiva = true,
-                        RenovacionAutomatica = true
+                        UsuarioId = usuarioActual.Id,
+                        Monto = creador.PrecioSuscripcion,
+                        TipoTransaccion = TipoTransaccion.Suscripcion,
+                        Descripcion = $"Suscripción a {creador.NombreCompleto} (@{creador.Seudonimo})",
+                        EstadoPago = "Completado",
+                        EstadoTransaccion = EstadoTransaccion.Completada,
+                        FechaTransaccion = DateTime.Now
                     };
-                    _context.Suscripciones.Add(suscripcion);
+                    _context.Transacciones.Add(transaccionFan);
+
+                    // Transacción Creador (Ingreso)
+                    var transaccionCreador = new Transaccion
+                    {
+                        UsuarioId = creador.Id,
+                        Monto = creador.PrecioSuscripcion,
+                        TipoTransaccion = TipoTransaccion.IngresoSuscripcion,
+                        Descripcion = $"Nueva suscripción de {usuarioActual.NombreCompleto}",
+                        EstadoPago = "Completado",
+                        EstadoTransaccion = EstadoTransaccion.Completada,
+                        FechaTransaccion = DateTime.Now
+                    };
+                    _context.Transacciones.Add(transaccionCreador);
+
+                    // Actualizar saldos
+                    usuarioActual.Saldo -= creador.PrecioSuscripcion;
+                    creador.Saldo += creador.PrecioSuscripcion;
+                    creador.NumeroSeguidores++;
+                    creador.TotalGanancias += creador.PrecioSuscripcion;
+
+                    await _userManager.UpdateAsync(usuarioActual);
+                    await _userManager.UpdateAsync(creador);
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+
+                    _logger.LogInformation("✅ Suscripción completada exitosamente");
+
+                    return Json(new
+                    {
+                        success = true,
+                        message = $"¡Suscripción exitosa a {creador.NombreCompleto}! ${creador.PrecioSuscripcion:N2}/mes. Tu nuevo saldo: ${usuarioActual.Saldo:N2}"
+                    });
                 }
-
-                // ✅ CREAR TRANSACCIÓN PARA EL FAN (GASTO)
-                var transaccionFan = new Transaccion
+                catch (Exception ex)
                 {
-                    UsuarioId = usuarioActual.Id,
-                    Monto = creador.PrecioSuscripcion,
-                    TipoTransaccion = TipoTransaccion.Suscripcion,
-                    Descripcion = $"Suscripción a {creador.NombreCompleto}",
-                    EstadoPago = "Completado",
-                    FechaTransaccion = DateTime.Now
-                };
-                _context.Transacciones.Add(transaccionFan);
-
-                // ✅ CREAR TRANSACCIÓN PARA EL CREADOR (INGRESO)
-                var transaccionCreador = new Transaccion
-                {
-                    UsuarioId = creador.Id,
-                    Monto = creador.PrecioSuscripcion,
-                    TipoTransaccion = TipoTransaccion.Suscripcion,
-                    Descripcion = $"Nueva suscripción de {usuarioActual.NombreCompleto}",
-                    EstadoPago = "Completado",
-                    FechaTransaccion = DateTime.Now
-                };
-                _context.Transacciones.Add(transaccionCreador);
-
-                // ✅ ACTUALIZAR SALDOS
-                usuarioActual.Saldo -= creador.PrecioSuscripcion;
-                creador.Saldo += creador.PrecioSuscripcion;
-
-                // Actualizar contador de seguidores
-                creador.NumeroSeguidores++;
-
-                // Actualizar ganancias totales del creador
-                creador.TotalGanancias += creador.PrecioSuscripcion;
-
-                await _userManager.UpdateAsync(usuarioActual);
-                await _userManager.UpdateAsync(creador);
-                await _context.SaveChangesAsync();
-
-                return Json(new
-                {
-                    success = true,
-                    message = $"¡Suscripción exitosa! ${creador.PrecioSuscripcion:N2}/mes. Tu nuevo saldo: ${usuarioActual.Saldo:N2}"
-                });
+                    await transaction.RollbackAsync();
+                    _logger.LogError(ex, "Error en transacción de suscripción");
+                    throw;
+                }
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error al procesar la suscripción: " + ex.Message });
+                _logger.LogError(ex, "Error al procesar suscripción");
+                return Json(new
+                {
+                    success = false,
+                    message = "Error al procesar la suscripción. Por favor intenta nuevamente."
+                });
             }
         }
 
-        // POST: /Explorar/Cancelar
+        // ========================================
+        // CANCELAR SUSCRIPCIÓN
+        // ========================================
+
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Cancelar([FromBody] SuscripcionRequest request)
         {
             try
             {
+                if (request == null || string.IsNullOrWhiteSpace(request.CreadorId))
+                {
+                    _logger.LogWarning("Request inválido en Cancelar");
+                    return Json(new { success = false, message = "Datos inválidos" });
+                }
+
                 var usuarioActual = await _userManager.GetUserAsync(User);
+                if (usuarioActual == null)
+                {
+                    _logger.LogError("Usuario no autenticado en Cancelar");
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
 
                 var suscripcion = await _context.Suscripciones
                     .FirstOrDefaultAsync(s =>
@@ -246,8 +381,16 @@ namespace Lado.Controllers
 
                 if (suscripcion == null)
                 {
-                    return Json(new { success = false, message = "No tienes una suscripción activa con este creador" });
+                    _logger.LogWarning("Suscripción no encontrada para cancelar");
+                    return Json(new
+                    {
+                        success = false,
+                        message = "No tienes una suscripción activa con este usuario"
+                    });
                 }
+
+                _logger.LogInformation("Cancelando suscripción: {Fan} → {Creador}",
+                    usuarioActual.UserName, request.CreadorId);
 
                 // Cancelar suscripción
                 suscripcion.EstaActiva = false;
@@ -259,18 +402,83 @@ namespace Lado.Controllers
                 if (creador != null && creador.NumeroSeguidores > 0)
                 {
                     creador.NumeroSeguidores--;
+                    await _userManager.UpdateAsync(creador);
                 }
 
                 await _context.SaveChangesAsync();
 
-                return Json(new { success = true, message = "Suscripción cancelada exitosamente" });
+                _logger.LogInformation("✅ Suscripción cancelada exitosamente");
+
+                return Json(new
+                {
+                    success = true,
+                    message = "Suscripción cancelada exitosamente. Puedes reactivarla cuando quieras."
+                });
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error al cancelar: " + ex.Message });
+                _logger.LogError(ex, "Error al cancelar suscripción");
+                return Json(new
+                {
+                    success = false,
+                    message = "Error al cancelar la suscripción. Por favor intenta nuevamente."
+                });
+            }
+        }
+
+        // ========================================
+        // BUSCAR USUARIOS (AJAX)
+        // ========================================
+
+        [HttpGet]
+        public async Task<IActionResult> BuscarUsuarios(string query)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+                {
+                    return Json(new { success = false, message = "Mínimo 2 caracteres" });
+                }
+
+                var usuarioActual = await _userManager.GetUserAsync(User);
+                if (usuarioActual == null)
+                {
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                var usuarios = await _context.Users
+                    .Where(u => u.Id != usuarioActual.Id && u.EstaActivo &&
+                               (u.UserName.Contains(query) ||
+                                u.NombreCompleto.Contains(query) ||
+                                u.Seudonimo.Contains(query)))
+                    .OrderByDescending(u => u.NumeroSeguidores)
+                    .Take(10)
+                    .Select(u => new
+                    {
+                        id = u.Id,
+                        username = u.UserName,
+                        nombreCompleto = u.NombreCompleto,
+                        seudonimo = u.Seudonimo,
+                        fotoPerfil = u.FotoPerfil,
+                        precio = u.PrecioSuscripcion,
+                        seguidores = u.NumeroSeguidores,
+                        verificado = u.CreadorVerificado
+                    })
+                    .ToListAsync();
+
+                return Json(new { success = true, usuarios });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al buscar usuarios");
+                return Json(new { success = false, message = "Error en la búsqueda" });
             }
         }
     }
+
+    // ========================================
+    // VIEW MODEL
+    // ========================================
 
     public class SuscripcionRequest
     {

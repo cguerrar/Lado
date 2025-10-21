@@ -29,14 +29,7 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-            if (usuario.TipoUsuario == 1)
-            {
-                await CargarDatosCreador(usuario);
-            }
-            else
-            {
-                await CargarDatosFan(usuario);
-            }
+        
 
             return View(usuario);
         }

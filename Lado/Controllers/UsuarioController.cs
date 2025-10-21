@@ -36,22 +36,7 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-            // Cargar estadísticas para creadores
-            if (usuario.TipoUsuario == 1) // 1 = Creador
-            {
-                ViewBag.Suscriptores = await _context.Suscripciones
-                    .CountAsync(s => s.CreadorId == usuario.Id && s.EstaActiva);
-
-                ViewBag.Publicaciones = await _context.Contenidos
-                    .CountAsync(c => c.UsuarioId == usuario.Id);
-
-                ViewBag.IngresosTotales = await _context.Transacciones
-                    .Where(t => t.UsuarioId == usuario.Id &&
-                                t.TipoTransaccion != TipoTransaccion.Retiro &&
-                                t.EstadoPago == "Completado")
-                    .SumAsync(t => (decimal?)t.Monto) ?? 0;
-            }
-
+    
             return View(usuario);
         }
 
@@ -182,12 +167,7 @@ namespace Lado.Controllers
             usuario.PhoneNumber = model.PhoneNumber;
             usuario.Biografia = model.Biografia;
 
-            if (usuario.TipoUsuario == 1) // 1 = Creador
-            {
-                usuario.PrecioSuscripcion = model.PrecioSuscripcion;
-                usuario.Categoria = model.Categoria;
-            }
-
+     
             // Procesar foto de perfil
             if (fotoPerfil != null && fotoPerfil.Length > 0)
             {
@@ -195,13 +175,7 @@ namespace Lado.Controllers
                 usuario.FotoPerfil = fileName;
             }
 
-            // Procesar foto de portada (solo creadores)
-            if (fotoPortada != null && fotoPortada.Length > 0 && usuario.TipoUsuario == 1)
-            {
-                var fileName = await GuardarArchivo(fotoPortada, "portadas");
-                usuario.FotoPortada = fileName;
-            }
-
+      
             var result = await _userManager.UpdateAsync(usuario);
 
             if (result.Succeeded)
@@ -460,73 +434,6 @@ namespace Lado.Controllers
 
             int itemsPorPagina = 20;
 
-            if (usuario.TipoUsuario == 1) // 1 = Creador
-            {
-                // Actividades para creadores
-                var transacciones = await _context.Transacciones
-                    .Where(t => t.UsuarioId == usuario.Id)
-                    .OrderByDescending(t => t.FechaTransaccion)
-                    .Skip((pagina - 1) * itemsPorPagina)
-                    .Take(itemsPorPagina)
-                    .Select(t => new
-                    {
-                        Titulo = t.TipoTransaccion == TipoTransaccion.Retiro ? "Retiro Procesado" : "Nuevo Ingreso",
-                        Descripcion = t.Descripcion,
-                        Tipo = t.TipoTransaccion.ToString().ToLower(),
-                        Monto = t.TipoTransaccion != TipoTransaccion.Retiro ? (decimal?)t.Monto : null,
-                        Fecha = t.FechaTransaccion
-                    })
-                    .ToListAsync();
-
-                ViewBag.Actividades = transacciones;
-
-                // Estadísticas para el resumen
-                ViewBag.IngresosEstaSemana = await _context.Transacciones
-                    .Where(t => t.UsuarioId == usuario.Id &&
-                                t.TipoTransaccion != TipoTransaccion.Retiro &&
-                                t.FechaTransaccion >= DateTime.Now.AddDays(-7) &&
-                                t.EstadoPago == "Completado")
-                    .SumAsync(t => (decimal?)t.Monto) ?? 0;
-
-                ViewBag.NuevosSuscriptores = await _context.Suscripciones
-                    .CountAsync(s => s.CreadorId == usuario.Id &&
-                                     s.FechaInicio >= DateTime.Now.AddDays(-7));
-
-                ViewBag.PublicacionesEstaSemana = await _context.Contenidos
-                    .CountAsync(c => c.UsuarioId == usuario.Id &&
-                                     c.FechaPublicacion >= DateTime.Now.AddDays(-7));
-
-                // Transacciones para tab
-                ViewBag.Transacciones = await _context.Transacciones
-     .Where(t => t.UsuarioId == usuario.Id)
-     .OrderByDescending(t => t.FechaTransaccion)
-     .Take(10)
-     .Select(t => new TransaccionDto
-     {
-         Id = t.Id,
-         FechaTransaccion = t.FechaTransaccion,
-         Tipo = t.TipoTransaccion.ToString(),
-         Descripcion = t.Descripcion,
-         Monto = t.Monto,
-         Estado = t.EstadoPago ?? "Completado",
-         TipoTransaccion = t.TipoTransaccion
-     })
-     .ToListAsync();
-                // Contenido reciente
-                ViewBag.ContenidoReciente = await _context.Contenidos
-                    .Where(c => c.UsuarioId == usuario.Id)
-                    .OrderByDescending(c => c.FechaPublicacion)
-                    .Take(6)
-                    .Select(c => new
-                    {
-                        c.RutaArchivo,
-                        c.Descripcion,
-                        Likes = _context.Set<Like>().Count(l => l.ContenidoId == c.Id),
-                        c.FechaPublicacion
-                    })
-                    .ToListAsync();
-            }
-            else
             {
                 // Actividades para fans
                 var suscripciones = await _context.Suscripciones

@@ -3,88 +3,662 @@
     ViewData["Title"] = "Configuración";
 }
 
-<div class="row">
-    <div class="col-12 mb-4">
-        <h2><i class="fas fa-cog text-primary"></i> Configuración</h2>
-        <p class="text-muted">Administra la configuración de tu cuenta y preferencias</p>
-    </div>
-</div>
+<style>
+    .config-page-wrapper {
+        --config-primary: #32d67b;
+        --config-primary-dark: #28b369;
+        --config-danger: #ef4444;
+        --config-danger-dark: #dc2626;
+        --config-dark-bg: #111827;
+        --config-card-bg: #ffffff;
+        --config-border: #e5e7eb;
+        --config-text-primary: #1a1a1a;
+        --config-text-secondary: #6b7280;
+        --config-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+        --config-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 32px 24px;
+    }
 
-<div class="row">
-    <div class="col-lg-3 mb-4">
-        <!-- Menú de Navegación -->
-        <div class="card shadow-sm">
-            <div class="list-group list-group-flush">
-                <a href="#cuenta" class="list-group-item list-group-item-action active" data-bs-toggle="list">
-                    <i class="fas fa-user me-2"></i> Cuenta
-                </a>
-                <a href="#seguridad" class="list-group-item list-group-item-action" data-bs-toggle="list">
-                    <i class="fas fa-lock me-2"></i> Seguridad
-                </a>
-                <a href="#notificaciones" class="list-group-item list-group-item-action" data-bs-toggle="list">
-                    <i class="fas fa-bell me-2"></i> Notificaciones
-                </a>
-                <a href="#privacidad" class="list-group-item list-group-item-action" data-bs-toggle="list">
-                    <i class="fas fa-shield-alt me-2"></i> Privacidad
-                </a>
-                @if (Model.TipoUsuario == (int)Lado.Models.TipoUsuario.Creador)
-                {
-                    <a href="#pagos" class="list-group-item list-group-item-action" data-bs-toggle="list">
-                        <i class="fas fa-credit-card me-2"></i> Pagos
-                    </a>
-                }
-            </div>
+    /* Logo */
+    .config-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+        color: #111827;
+        font-weight: 800;
+        font-size: 1.4rem;
+        transition: transform 0.2s ease;
+        margin-bottom: 24px;
+    }
+
+    .config-brand:hover {
+        transform: scale(1.02);
+    }
+
+    .config-brand-badge {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: #32d67b;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        box-shadow: 0 2px 8px rgba(50, 214, 123, 0.25);
+    }
+
+    /* Header */
+    .config-header {
+        margin-bottom: 32px;
+    }
+
+    .config-header h2 {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--config-text-primary);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .config-header p {
+        color: var(--config-text-secondary);
+        font-size: 15px;
+        margin: 0;
+    }
+
+    /* Layout */
+    .config-layout {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 24px;
+    }
+
+    /* Sidebar */
+    .config-sidebar {
+        background: var(--config-card-bg);
+        border: 1px solid var(--config-border);
+        border-radius: 16px;
+        padding: 8px;
+        height: fit-content;
+        position: sticky;
+        top: 24px;
+    }
+
+    .config-nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        color: var(--config-text-secondary);
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 15px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+        background: transparent;
+        width: 100%;
+        text-align: left;
+    }
+
+    .config-nav-item:hover {
+        background: #f9fafb;
+        color: var(--config-text-primary);
+    }
+
+    .config-nav-item.active {
+        background: rgba(50, 214, 123, 0.1);
+        color: var(--config-primary);
+        font-weight: 600;
+    }
+
+    .config-nav-icon {
+        width: 20px;
+        height: 20px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    /* Cards */
+    .config-card {
+        background: var(--config-card-bg);
+        border: 1px solid var(--config-border);
+        border-radius: 16px;
+        box-shadow: var(--config-shadow-sm);
+        margin-bottom: 24px;
+    }
+
+    .config-card-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--config-border);
+    }
+
+    .config-card-header h5 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--config-text-primary);
+    }
+
+    .config-card-body {
+        padding: 24px;
+    }
+
+    /* Danger Zone */
+    .config-card-danger {
+        border-color: var(--config-danger);
+    }
+
+    .config-card-danger .config-card-header {
+        background: rgba(239, 68, 68, 0.05);
+        border-bottom-color: var(--config-danger);
+    }
+
+    .config-card-danger .config-card-header h5 {
+        color: var(--config-danger);
+    }
+
+    /* Form Elements */
+    .config-form-label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--config-text-primary);
+        margin-bottom: 8px;
+    }
+
+    .config-form-control {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid var(--config-border);
+        border-radius: 12px;
+        font-size: 15px;
+        color: var(--config-text-primary);
+        transition: all 0.2s;
+        font-family: inherit;
+    }
+
+    .config-form-control:focus {
+        outline: none;
+        border-color: var(--config-primary);
+        box-shadow: 0 0 0 3px rgba(50, 214, 123, 0.1);
+    }
+
+    .config-form-control:disabled {
+        background: #f9fafb;
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    .config-form-text {
+        display: block;
+        font-size: 13px;
+        color: var(--config-text-secondary);
+        margin-top: 6px;
+    }
+
+    .config-input-group {
+        display: flex;
+        gap: 0;
+    }
+
+    .config-input-group-text {
+        padding: 12px 16px;
+        background: #f9fafb;
+        border: 1px solid var(--config-border);
+        border-right: none;
+        border-radius: 12px 0 0 12px;
+        color: var(--config-text-secondary);
+        font-weight: 600;
+    }
+
+    .config-input-group .config-form-control {
+        border-radius: 0 12px 12px 0;
+    }
+
+    .config-form-group {
+        margin-bottom: 20px;
+    }
+
+    /* Settings Row */
+    .config-settings-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--config-border);
+    }
+
+    .config-settings-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .config-settings-row:first-child {
+        padding-top: 0;
+    }
+
+    .config-settings-info h6 {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--config-text-primary);
+        margin: 0 0 4px 0;
+    }
+
+    .config-settings-info p {
+        font-size: 13px;
+        color: var(--config-text-secondary);
+        margin: 0;
+    }
+
+    /* Switch */
+    .config-switch {
+        position: relative;
+        display: inline-block;
+        width: 48px;
+        height: 28px;
+    }
+
+    .config-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .config-switch-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #cbd5e1;
+        transition: 0.3s;
+        border-radius: 34px;
+    }
+
+    .config-switch-slider:before {
+        position: absolute;
+        content: "";
+        height: 20px;
+        width: 20px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: 0.3s;
+        border-radius: 50%;
+    }
+
+    .config-switch input:checked + .config-switch-slider {
+        background-color: var(--config-primary);
+    }
+
+    .config-switch input:checked + .config-switch-slider:before {
+        transform: translateX(20px);
+    }
+
+    /* Buttons */
+    .config-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 15px;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .config-btn-primary {
+        background: var(--config-primary);
+        color: white;
+    }
+
+    .config-btn-primary:hover:not(:disabled) {
+        background: var(--config-primary-dark);
+        transform: translateY(-1px);
+        box-shadow: var(--config-shadow-md);
+    }
+
+    .config-btn-outline-danger {
+        background: transparent;
+        color: var(--config-danger);
+        border: 1px solid var(--config-danger);
+    }
+
+    .config-btn-outline-danger:hover {
+        background: var(--config-danger);
+        color: white;
+    }
+
+    .config-btn-danger {
+        background: var(--config-danger);
+        color: white;
+    }
+
+    .config-btn-danger:hover:not(:disabled) {
+        background: var(--config-danger-dark);
+    }
+
+    .config-btn-secondary {
+        background: #6b7280;
+        color: white;
+    }
+
+    .config-btn-secondary:hover {
+        background: #4b5563;
+    }
+
+    .config-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* Icons */
+    .config-icon {
+        width: 20px;
+        height: 20px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .config-icon-fill {
+        fill: currentColor;
+        stroke: none;
+    }
+
+    /* Modal */
+    .config-modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+    }
+
+    .config-modal.show {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .config-modal-dialog {
+        background: white;
+        border-radius: 16px;
+        max-width: 500px;
+        width: 90%;
+        margin: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .config-modal-header {
+        padding: 24px;
+        border-bottom: 1px solid var(--config-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .config-modal-header h5 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--config-danger);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .config-btn-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--config-text-secondary);
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+
+    .config-btn-close:hover {
+        background: #f3f4f6;
+    }
+
+    .config-modal-body {
+        padding: 24px;
+    }
+
+    .config-modal-body ul {
+        padding-left: 20px;
+        margin: 16px 0;
+    }
+
+    .config-modal-body li {
+        margin-bottom: 8px;
+        color: var(--config-text-secondary);
+    }
+
+    .config-modal-footer {
+        padding: 24px;
+        border-top: 1px solid var(--config-border);
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+    }
+
+    .config-alert {
+        padding: 16px;
+        border-radius: 12px;
+        margin: 16px 0;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .config-alert-danger {
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid var(--config-danger);
+        color: var(--config-danger);
+    }
+
+    /* Tab Content */
+    .config-tab-content {
+        display: none;
+    }
+
+    .config-tab-content.active {
+        display: block;
+    }
+
+    /* Responsive */
+    @@media (max-width: 992px) {
+        .config-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .config-sidebar {
+            position: static;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .config-page-wrapper {
+            padding: 24px 16px;
+        }
+
+        .config-header h2 {
+            font-size: 24px;
+        }
+
+        .config-card-body {
+            padding: 20px;
+        }
+
+        .config-settings-row {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .config-modal-dialog {
+            margin: 10px;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .config-page-wrapper {
+            padding: 16px 12px;
+        }
+
+        .config-header h2 {
+            font-size: 20px;
+        }
+
+        .config-card-header {
+            padding: 16px 20px;
+        }
+
+        .config-card-body {
+            padding: 16px;
+        }
+
+        .config-btn {
+            padding: 10px 20px;
+            font-size: 14px;
+        }
+    }
+</style>
+
+<div class="config-page-wrapper">
+    <!-- Logo -->
+    <a href="/" class="config-brand">
+        <span class="config-brand-badge">L</span>
+        <span>lado</span>
+    </a>
+
+    <!-- Header -->
+    <div class="config-header">
+        <h2>
+            <svg class="config-icon" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 1v6m0 6v6m6-12h6M6 12H0m15.364 6.364l4.243 4.242M4.393 4.393l4.243 4.242m8.728 0l4.243-4.242M4.393 19.607l4.243-4.242" />
+            </svg>
+            Configuración
+        </h2>
+        <p>Administra la configuración de tu cuenta y preferencias</p>
+    </div>
+
+    <div class="config-layout">
+        <!-- Sidebar -->
+        <div class="config-sidebar">
+            <button class="config-nav-item active" onclick="cambiarTab('cuenta')">
+                <svg class="config-nav-icon" viewBox="0 0 24 24">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                </svg>
+                Cuenta
+            </button>
+            <button class="config-nav-item" onclick="cambiarTab('seguridad')">
+                <svg class="config-nav-icon" viewBox="0 0 24 24">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                Seguridad
+            </button>
+            <button class="config-nav-item" onclick="cambiarTab('notificaciones')">
+                <svg class="config-nav-icon" viewBox="0 0 24 24">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                Notificaciones
+            </button>
+            <button class="config-nav-item" onclick="cambiarTab('privacidad')">
+                <svg class="config-nav-icon" viewBox="0 0 24 24">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                Privacidad
+            </button>
         </div>
-    </div>
 
-    <div class="col-lg-9">
-        <div class="tab-content">
+        <!-- Content -->
+        <div>
             <!-- Tab Cuenta -->
-            <div class="tab-pane fade show active" id="cuenta">
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0">Información de la Cuenta</h5>
+            <div class="config-tab-content active" id="cuenta">
+                <div class="config-card">
+                    <div class="config-card-header">
+                        <h5>Información de la Cuenta</h5>
                     </div>
-                    <div class="card-body">
+                    <div class="config-card-body">
                         <form asp-action="ActualizarCuenta" method="post">
-                            <div class="mb-3">
-                                <label class="form-label">Correo Electrónico</label>
-                                <input type="email" class="form-control" value="@Model.Email" disabled>
-                                <small class="text-muted">Para cambiar tu correo, contacta con soporte</small>
+                            <div class="config-form-group">
+                                <label class="config-form-label">Correo Electrónico</label>
+                                <input type="email" class="config-form-control" value="@Model.Email" disabled>
+                                <small class="config-form-text">Para cambiar tu correo, contacta con soporte</small>
                             </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">Nombre de Usuario</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">@@</span>
-                                    <input type="text" class="form-control" value="@Model.UserName" asp-for="UserName">
+                            <div class="config-form-group">
+                                <label class="config-form-label">Nombre de Usuario</label>
+                                <div class="config-input-group">
+                                    <span class="config-input-group-text">@@</span>
+                                    <input type="text" class="config-form-control" value="@Model.UserName" asp-for="UserName">
                                 </div>
                             </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">Tipo de Cuenta</label>
-                                <input type="text" class="form-control" value="@((Lado.Models.TipoUsuario)Model.TipoUsuario)" disabled>
-                            </div>
-
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Guardar Cambios
+                            <button type="submit" class="config-btn config-btn-primary">
+                                <svg class="config-icon" viewBox="0 0 24 24">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                                    <polyline points="17 21 17 13 7 13 7 21" />
+                                    <polyline points="7 3 7 8 15 8" />
+                                </svg>
+                                Guardar Cambios
                             </button>
                         </form>
                     </div>
                 </div>
 
-                <div class="card shadow-sm border-danger">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0 text-danger">Zona de Peligro</h5>
+                <div class="config-card config-card-danger">
+                    <div class="config-card-header">
+                        <h5>Zona de Peligro</h5>
                     </div>
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
+                    <div class="config-card-body">
+                        <div class="config-settings-row">
+                            <div class="config-settings-info">
                                 <h6>Eliminar Cuenta</h6>
-                                <p class="text-muted mb-0">Una vez eliminada, no podrás recuperar tu cuenta</p>
+                                <p>Una vez eliminada, no podrás recuperar tu cuenta</p>
                             </div>
-                            <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalEliminar">
-                                <i class="fas fa-trash"></i> Eliminar Cuenta
+                            <button class="config-btn config-btn-outline-danger" onclick="abrirModal()">
+                                <svg class="config-icon" viewBox="0 0 24 24">
+                                    <polyline points="3 6 5 6 21 6" />
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                </svg>
+                                Eliminar Cuenta
                             </button>
                         </div>
                     </div>
@@ -92,122 +666,113 @@
             </div>
 
             <!-- Tab Seguridad -->
-            <div class="tab-pane fade" id="seguridad">
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0">Cambiar Contraseña</h5>
+            <div class="config-tab-content" id="seguridad">
+                <div class="config-card">
+                    <div class="config-card-header">
+                        <h5>Cambiar Contraseña</h5>
                     </div>
-                    <div class="card-body">
+                    <div class="config-card-body">
                         <form asp-action="CambiarContrasena" method="post">
-                            <div class="mb-3">
-                                <label class="form-label">Contraseña Actual</label>
-                                <input type="password" class="form-control" name="ContrasenaActual" required>
+                            <div class="config-form-group">
+                                <label class="config-form-label">Contraseña Actual</label>
+                                <input type="password" class="config-form-control" name="ContrasenaActual" required>
                             </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">Nueva Contraseña</label>
-                                <input type="password" class="form-control" name="NuevaContrasena" required>
-                                <small class="text-muted">Mínimo 8 caracteres</small>
+                            <div class="config-form-group">
+                                <label class="config-form-label">Nueva Contraseña</label>
+                                <input type="password" class="config-form-control" name="NuevaContrasena" required>
+                                <small class="config-form-text">Mínimo 8 caracteres</small>
                             </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">Confirmar Nueva Contraseña</label>
-                                <input type="password" class="form-control" name="ConfirmarContrasena" required>
+                            <div class="config-form-group">
+                                <label class="config-form-label">Confirmar Nueva Contraseña</label>
+                                <input type="password" class="config-form-control" name="ConfirmarContrasena" required>
                             </div>
 
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-key"></i> Cambiar Contraseña
+                            <button type="submit" class="config-btn config-btn-primary">
+                                <svg class="config-icon" viewBox="0 0 24 24">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                </svg>
+                                Cambiar Contraseña
                             </button>
                         </form>
                     </div>
                 </div>
 
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0">Autenticación de Dos Factores</h5>
+                <div class="config-card">
+                    <div class="config-card-header">
+                        <h5>Autenticación de Dos Factores</h5>
                     </div>
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
+                    <div class="config-card-body">
+                        <div class="config-settings-row">
+                            <div class="config-settings-info">
                                 <h6>Autenticación de Dos Factores (2FA)</h6>
-                                <p class="text-muted mb-0">Agrega una capa extra de seguridad a tu cuenta</p>
+                                <p>Agrega una capa extra de seguridad a tu cuenta</p>
                             </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="switch2FA" style="width: 3rem; height: 1.5rem;">
-                            </div>
+                            <label class="config-switch">
+                                <input type="checkbox" id="switch2FA">
+                                <span class="config-switch-slider"></span>
+                            </label>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Tab Notificaciones -->
-            <div class="tab-pane fade" id="notificaciones">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0">Preferencias de Notificaciones</h5>
+            <div class="config-tab-content" id="notificaciones">
+                <div class="config-card">
+                    <div class="config-card-header">
+                        <h5>Preferencias de Notificaciones</h5>
                     </div>
-                    <div class="card-body">
+                    <div class="config-card-body">
                         <form asp-action="ActualizarNotificaciones" method="post">
-                            <h6 class="mb-3">Notificaciones por Email</h6>
+                            <h6 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Notificaciones por Email</h6>
 
-                            <div class="mb-3 d-flex justify-content-between align-items-center">
-                                <div>
-                                    <label class="form-label mb-0">Nuevos Seguidores</label>
-                                    <small class="text-muted d-block">Recibe un email cuando alguien te siga</small>
+                            <div class="config-settings-row">
+                                <div class="config-settings-info">
+                                    <h6>Nuevos Seguidores</h6>
+                                    <p>Recibe un email cuando alguien te siga</p>
                                 </div>
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" name="EmailNuevosSeguidores" checked>
-                                </div>
+                                <label class="config-switch">
+                                    <input type="checkbox" name="EmailNuevosSeguidores" checked>
+                                    <span class="config-switch-slider"></span>
+                                </label>
                             </div>
 
-                            <div class="mb-3 d-flex justify-content-between align-items-center">
-                                <div>
-                                    <label class="form-label mb-0">Nuevos Mensajes</label>
-                                    <small class="text-muted d-block">Notificación de mensajes directos</small>
+                            <div class="config-settings-row">
+                                <div class="config-settings-info">
+                                    <h6>Nuevos Mensajes</h6>
+                                    <p>Notificación de mensajes directos</p>
                                 </div>
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" name="EmailNuevosMensajes" checked>
-                                </div>
+                                <label class="config-switch">
+                                    <input type="checkbox" name="EmailNuevosMensajes" checked>
+                                    <span class="config-switch-slider"></span>
+                                </label>
                             </div>
 
-                            @if (Model.TipoUsuario == (int)Lado.Models.TipoUsuario.Creador)
-                            {
-                                <div class="mb-3 d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <label class="form-label mb-0">Nuevas Suscripciones</label>
-                                        <small class="text-muted d-block">Cuando alguien se suscriba a tu contenido</small>
-                                    </div>
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" name="EmailNuevasSuscripciones" checked>
-                                    </div>
-                                </div>
+                            <hr style="border: none; border-top: 1px solid var(--config-border); margin: 24px 0;">
 
-                                <div class="mb-3 d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <label class="form-label mb-0">Pagos Recibidos</label>
-                                        <small class="text-muted d-block">Cuando recibas un pago</small>
-                                    </div>
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" name="EmailPagos" checked>
-                                    </div>
-                                </div>
-                            }
+                            <h6 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Notificaciones Push</h6>
 
-                            <hr>
-                            <h6 class="mb-3">Notificaciones Push</h6>
-
-                            <div class="mb-3 d-flex justify-content-between align-items-center">
-                                <div>
-                                    <label class="form-label mb-0">Activar Notificaciones Push</label>
-                                    <small class="text-muted d-block">Recibe notificaciones en tu dispositivo</small>
+                            <div class="config-settings-row">
+                                <div class="config-settings-info">
+                                    <h6>Activar Notificaciones Push</h6>
+                                    <p>Recibe notificaciones en tu dispositivo</p>
                                 </div>
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" name="PushNotifications">
-                                </div>
+                                <label class="config-switch">
+                                    <input type="checkbox" name="PushNotifications">
+                                    <span class="config-switch-slider"></span>
+                                </label>
                             </div>
 
-                            <button type="submit" class="btn btn-primary mt-3">
-                                <i class="fas fa-save"></i> Guardar Preferencias
+                            <button type="submit" class="config-btn config-btn-primary" style="margin-top: 24px;">
+                                <svg class="config-icon" viewBox="0 0 24 24">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                                    <polyline points="17 21 17 13 7 13 7 21" />
+                                    <polyline points="7 3 7 8 15 8" />
+                                </svg>
+                                Guardar Preferencias
                             </button>
                         </form>
                     </div>
@@ -215,231 +780,197 @@
             </div>
 
             <!-- Tab Privacidad -->
-            <div class="tab-pane fade" id="privacidad">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0">Configuración de Privacidad</h5>
+            <div class="config-tab-content" id="privacidad">
+                <div class="config-card">
+                    <div class="config-card-header">
+                        <h5>Configuración de Privacidad</h5>
                     </div>
-                    <div class="card-body">
+                    <div class="config-card-body">
                         <form asp-action="ActualizarPrivacidad" method="post">
-                            <div class="mb-4 d-flex justify-content-between align-items-center">
-                                <div>
-                                    <label class="form-label mb-0">Perfil Público</label>
-                                    <small class="text-muted d-block">Permite que cualquiera vea tu perfil</small>
+                            <div class="config-settings-row">
+                                <div class="config-settings-info">
+                                    <h6>Perfil Público</h6>
+                                    <p>Permite que cualquiera vea tu perfil</p>
                                 </div>
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" name="PerfilPublico" checked>
-                                </div>
+                                <label class="config-switch">
+                                    <input type="checkbox" name="PerfilPublico" checked>
+                                    <span class="config-switch-slider"></span>
+                                </label>
                             </div>
 
-                            <div class="mb-4 d-flex justify-content-between align-items-center">
-                                <div>
-                                    <label class="form-label mb-0">Mostrar en Búsquedas</label>
-                                    <small class="text-muted d-block">Aparecer en resultados de búsqueda</small>
+                            <div class="config-settings-row">
+                                <div class="config-settings-info">
+                                    <h6>Mostrar en Búsquedas</h6>
+                                    <p>Aparecer en resultados de búsqueda</p>
                                 </div>
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" name="MostrarBusquedas" checked>
-                                </div>
+                                <label class="config-switch">
+                                    <input type="checkbox" name="MostrarBusquedas" checked>
+                                    <span class="config-switch-slider"></span>
+                                </label>
                             </div>
 
-                            <div class="mb-4 d-flex justify-content-between align-items-center">
-                                <div>
-                                    <label class="form-label mb-0">Mensajes de Desconocidos</label>
-                                    <small class="text-muted d-block">Permite mensajes de personas que no sigues</small>
+                            <div class="config-settings-row">
+                                <div class="config-settings-info">
+                                    <h6>Mensajes de Desconocidos</h6>
+                                    <p>Permite mensajes de personas que no sigues</p>
                                 </div>
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" name="MensajesDesconocidos">
-                                </div>
+                                <label class="config-switch">
+                                    <input type="checkbox" name="MensajesDesconocidos">
+                                    <span class="config-switch-slider"></span>
+                                </label>
                             </div>
 
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Guardar Configuración
+                            <button type="submit" class="config-btn config-btn-primary" style="margin-top: 24px;">
+                                <svg class="config-icon" viewBox="0 0 24 24">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                                    <polyline points="17 21 17 13 7 13 7 21" />
+                                    <polyline points="7 3 7 8 15 8" />
+                                </svg>
+                                Guardar Configuración
                             </button>
                         </form>
                     </div>
                 </div>
             </div>
-
-            <!-- Tab Pagos (Solo Creadores) -->
-            @if (Model.TipoUsuario == (int)Lado.Models.TipoUsuario.Creador)
-            {
-                <div class="tab-pane fade" id="pagos">
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header bg-white">
-                            <h5 class="mb-0">Métodos de Pago</h5>
-                        </div>
-                        <div class="card-body">
-                            <p class="text-muted">Configura cómo deseas recibir tus pagos</p>
-
-                            <div class="mb-3">
-                                <label class="form-label">Método de Retiro Preferido</label>
-                                <select class="form-select">
-                                    <option>Transferencia Bancaria</option>
-                                    <option>PayPal</option>
-                                    <option>Stripe</option>
-                                </select>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Cuenta Bancaria</label>
-                                <input type="text" class="form-control" placeholder="Número de cuenta">
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Banco</label>
-                                <input type="text" class="form-control" placeholder="Nombre del banco">
-                            </div>
-
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Guardar Información
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-white">
-                            <h5 class="mb-0">Historial de Retiros</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="text-center py-4">
-                                <i class="fas fa-file-invoice-dollar fa-3x text-muted mb-3"></i>
-                                <p class="text-muted">No hay retiros registrados</p>
-                                <a href="/Billetera" class="btn btn-outline-primary">
-                                    <i class="fas fa-wallet"></i> Ir a Billetera
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            }
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="modalEliminar" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form asp-action="EliminarCuenta" asp-controller="Usuario" method="post">
-                @Html.AntiForgeryToken()
+<!-- Modal Eliminar -->
+<div class="config-modal" id="modalEliminar">
+    <div class="config-modal-dialog">
+        <form asp-action="EliminarCuenta" asp-controller="Usuario" method="post">
+            @Html.AntiForgeryToken()
 
-                <div class="modal-header border-0">
-                    <h5 class="modal-title text-danger">
-                        <i class="fas fa-exclamation-triangle"></i> Eliminar Cuenta
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
+            <div class="config-modal-header">
+                <h5>
+                    <svg class="config-icon" viewBox="0 0 24 24">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    Eliminar Cuenta
+                </h5>
+                <button type="button" class="config-btn-close" onclick="cerrarModal()">×</button>
+            </div>
 
-                <div class="modal-body">
-                    <p><strong>¿Estás seguro de que deseas eliminar tu cuenta?</strong></p>
-                    <p class="text-muted">Esta acción es permanente y no se puede deshacer. Perderás:</p>
-                    <ul class="text-muted">
-                        <li>Todo tu contenido publicado</li>
-                        <li>Tus seguidores y suscriptores</li>
-                        <li>Tu historial de transacciones</li>
-                        <li>Todos tus mensajes y conversaciones</li>
-                        <li>Todos tus datos personales</li>
-                    </ul>
+            <div class="config-modal-body">
+                <p style="font-weight: 600; margin-bottom: 12px;">¿Estás seguro de que deseas eliminar tu cuenta?</p>
+                <p style="color: var(--config-text-secondary); margin-bottom: 16px;">Esta acción es permanente y no se puede deshacer. Perderás:</p>
+                <ul>
+                    <li>Todo tu contenido publicado</li>
+                    <li>Tus seguidores y suscriptores</li>
+                    <li>Tu historial de transacciones</li>
+                    <li>Todos tus mensajes y conversaciones</li>
+                    <li>Todos tus datos personales</li>
+                </ul>
 
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-circle"></i>
+                <div class="config-alert config-alert-danger">
+                    <svg class="config-icon" viewBox="0 0 24 24" style="flex-shrink: 0;">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    <div>
                         <strong>¡Advertencia!</strong> Esta acción no se puede revertir.
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Escribe <strong>ELIMINAR</strong> para confirmar</label>
-                        <input type="text"
-                               class="form-control"
-                               id="confirmarEliminar"
-                               name="confirmacion"
-                               placeholder="ELIMINAR"
-                               required>
-                    </div>
                 </div>
 
-                <div class="modal-footer border-0">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="fas fa-times"></i> Cancelar
-                    </button>
-                    <button type="submit" class="btn btn-danger" id="btnEliminarCuenta" disabled>
-                        <i class="fas fa-trash"></i> Eliminar Mi Cuenta
-                    </button>
+                <div class="config-form-group">
+                    <label class="config-form-label">Escribe <strong>ELIMINAR</strong> para confirmar</label>
+                    <input type="text"
+                           class="config-form-control"
+                           id="confirmarEliminar"
+                           name="confirmacion"
+                           placeholder="ELIMINAR"
+                           required>
                 </div>
-            </form>
-        </div>
+            </div>
+
+            <div class="config-modal-footer">
+                <button type="button" class="config-btn config-btn-secondary" onclick="cerrarModal()">
+                    <svg class="config-icon" viewBox="0 0 24 24">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                    Cancelar
+                </button>
+                <button type="submit" class="config-btn config-btn-danger" id="btnEliminarCuenta" disabled>
+                    <svg class="config-icon" viewBox="0 0 24 24">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                    Eliminar Mi Cuenta
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
-@section Scripts {
-    <script>
-        // Validar que se escriba "ELIMINAR" correctamente
-        document.getElementById('confirmarEliminar').addEventListener('input', function() {
-            const btnEliminar = document.getElementById('btnEliminarCuenta');
-            if (this.value === 'ELIMINAR') {
-                btnEliminar.disabled = false;
-                btnEliminar.classList.remove('btn-secondary');
-                btnEliminar.classList.add('btn-danger');
-            } else {
-                btnEliminar.disabled = true;
-                btnEliminar.classList.remove('btn-danger');
-                btnEliminar.classList.add('btn-secondary');
-            }
+<script>
+    // Cambiar entre tabs
+    function cambiarTab(tabId) {
+        // Ocultar todos los tabs
+        document.querySelectorAll('.config-tab-content').forEach(tab => {
+            tab.classList.remove('active');
         });
-
-        // Confirmar antes de enviar
-        document.querySelector('#modalEliminar form').addEventListener('submit', function(e) {
-            const confirmacion = document.getElementById('confirmarEliminar').value;
-
-            if (confirmacion !== 'ELIMINAR') {
-                e.preventDefault();
-                alert('Debes escribir "ELIMINAR" exactamente para confirmar');
-                return false;
-            }
-
-            // Confirmación final
-            if (!confirm('¿Estás ABSOLUTAMENTE seguro? Esta acción NO se puede deshacer.')) {
-                e.preventDefault();
-                return false;
-            }
-
-            // Mostrar mensaje de carga
-            const btnEliminar = document.getElementById('btnEliminarCuenta');
-            btnEliminar.disabled = true;
-            btnEliminar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Eliminando...';
-
-            return true;
+        
+        // Remover active de nav items
+        document.querySelectorAll('.config-nav-item').forEach(item => {
+            item.classList.remove('active');
         });
-
-        // Limpiar al cerrar modal
-        document.getElementById('modalEliminar').addEventListener('hidden.bs.modal', function () {
-            document.getElementById('confirmarEliminar').value = '';
-            document.getElementById('btnEliminarCuenta').disabled = true;
-        });
-    </script>
-}
-
-
-<style>
-    
-
-    .list-group-item-action:hover {
-        background-color: #f8f9fa;
-        border-left: 3px solid #00bcd4;
+        
+        // Mostrar el tab seleccionado
+        document.getElementById(tabId).classList.add('active');
+        
+        // Marcar nav item como activo
+        event.target.closest('.config-nav-item').classList.add('active');
     }
 
-    .list-group-item-action.active {
-        background-color: rgba(0, 188, 212, 0.1);
-        border-left: 3px solid #00bcd4;
-        color: #00bcd4;
+    // Modal
+    function abrirModal() {
+        document.getElementById('modalEliminar').classList.add('show');
     }
 
-    .form-check-input:checked {
-        background-color: #00bcd4;
-        border-color: #00bcd4;
+    function cerrarModal() {
+        document.getElementById('modalEliminar').classList.remove('show');
+        document.getElementById('confirmarEliminar').value = '';
+        document.getElementById('btnEliminarCuenta').disabled = true;
     }
 
-    #btnEliminarCuenta:disabled {
-        cursor: not-allowed;
-        opacity: 0.5;
-    }
+    // Validar confirmación
+    document.getElementById('confirmarEliminar').addEventListener('input', function() {
+        const btnEliminar = document.getElementById('btnEliminarCuenta');
+        btnEliminar.disabled = this.value !== 'ELIMINAR';
+    });
 
-</style>
+    // Confirmar antes de enviar
+    document.querySelector('#modalEliminar form').addEventListener('submit', function(e) {
+        const confirmacion = document.getElementById('confirmarEliminar').value;
+
+        if (confirmacion !== 'ELIMINAR') {
+            e.preventDefault();
+            alert('Debes escribir "ELIMINAR" exactamente para confirmar');
+            return false;
+        }
+
+        if (!confirm('¿Estás ABSOLUTAMENTE seguro? Esta acción NO se puede deshacer.')) {
+            e.preventDefault();
+            return false;
+        }
+
+        const btnEliminar = document.getElementById('btnEliminarCuenta');
+        btnEliminar.disabled = true;
+        btnEliminar.innerHTML = '<svg class="config-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg> Eliminando...';
+
+        return true;
+    });
+
+    // Cerrar modal al hacer clic fuera
+    window.onclick = function(event) {
+        const modal = document.getElementById('modalEliminar');
+        if (event.target === modal) {
+            cerrarModal();
+        }
+    }
+</script>

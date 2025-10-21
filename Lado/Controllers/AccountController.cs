@@ -2,6 +2,7 @@
 using Lado.ViewModels;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Lado.Controllers
 {
@@ -21,52 +22,129 @@ namespace Lado.Controllers
             _logger = logger;
         }
 
+        // ========================================
+        // REGISTRO
+        // ========================================
+
         [HttpGet]
         public IActionResult Register()
         {
             if (User.Identity.IsAuthenticated)
+            {
+                _logger.LogInformation("Usuario ya autenticado, redirigiendo a Dashboard");
                 return RedirectToAction("Index", "Dashboard");
+            }
 
             return View();
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Register(RegisterViewModel model)
         {
             if (!ModelState.IsValid)
+            {
+                _logger.LogWarning("Modelo de registro inválido");
                 return View(model);
-
-            var usuario = new ApplicationUser
-            {
-                UserName = model.NombreUsuario,
-                Email = model.Email,
-                NombreCompleto = model.NombreCompleto,
-                TipoUsuario = (int)model.TipoUsuario,
-                FechaRegistro = DateTime.Now,
-                EstaActivo = true
-            };
-
-            var result = await _userManager.CreateAsync(usuario, model.Contraseña);
-
-            if (result.Succeeded)
-            {
-                await _signInManager.SignInAsync(usuario, isPersistent: false);
-                return RedirectToAction("Index", "Dashboard");
             }
 
-            foreach (var error in result.Errors)
+            try
             {
-                ModelState.AddModelError(string.Empty, error.Description);
+                // ✅ Verificar que el nombre de usuario no exista
+                var existingUser = await _userManager.FindByNameAsync(model.NombreUsuario);
+                if (existingUser != null)
+                {
+                    ModelState.AddModelError("NombreUsuario", "Este nombre de usuario ya está en uso");
+                    return View(model);
+                }
+
+                // ✅ Verificar que el email no exista
+                var existingEmail = await _userManager.FindByEmailAsync(model.Email);
+                if (existingEmail != null)
+                {
+                    ModelState.AddModelError("Email", "Este email ya está registrado");
+                    return View(model);
+                }
+
+                // ✅ Verificar que el seudónimo sea único
+                var existingSeudonimo = await _userManager.Users
+                    .AnyAsync(u => u.Seudonimo == model.Seudonimo);
+                if (existingSeudonimo)
+                {
+                    ModelState.AddModelError("Seudonimo", "Este seudónimo ya está en uso");
+                    return View(model);
+                }
+
+                // ✅ CAMBIO PRINCIPAL: Todos los usuarios son creadores ahora
+                var usuario = new ApplicationUser
+                {
+                    UserName = model.NombreUsuario,
+                    Email = model.Email,
+                    NombreCompleto = model.NombreCompleto,
+                    Seudonimo = model.Seudonimo, // ⭐ NUEVO campo obligatorio
+                    FechaRegistro = DateTime.Now,
+                    EstaActivo = true,
+                    EmailConfirmed = false,
+                    PhoneNumberConfirmed = false,
+                    TwoFactorEnabled = false,
+                    LockoutEnabled = false,
+                    AccessFailedCount = 0,
+                    // Valores predeterminados para creadores
+                    PrecioSuscripcion = 9.99m,
+                    NumeroSeguidores = 0,
+                    Saldo = 0,
+                    TotalGanancias = 0,
+                    EsVerificado = false,
+                    SeudonimoVerificado = false
+                };
+
+                _logger.LogInformation("Creando usuario: {Username}, Email: {Email}, Seudonimo: {Seudonimo}",
+                    usuario.UserName, usuario.Email, usuario.Seudonimo);
+
+                var result = await _userManager.CreateAsync(usuario, model.Contraseña);
+
+                if (result.Succeeded)
+                {
+                    _logger.LogInformation("✅ Usuario creado exitosamente: {Username}", usuario.UserName);
+
+                    // Iniciar sesión automáticamente
+                    await _signInManager.SignInAsync(usuario, isPersistent: false);
+
+                    _logger.LogInformation("✅ Sesión iniciada para: {Username}", usuario.UserName);
+
+                    TempData["Success"] = "¡Bienvenido a LADO! Tu cuenta ha sido creada exitosamente.";
+                    return RedirectToAction("Index", "Dashboard");
+                }
+
+                // Si hay errores, mostrarlos
+                foreach (var error in result.Errors)
+                {
+                    _logger.LogWarning("Error en creación de usuario: {Code} - {Description}",
+                        error.Code, error.Description);
+                    ModelState.AddModelError(string.Empty, error.Description);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Excepción al registrar usuario: {Username}", model.NombreUsuario);
+                ModelState.AddModelError(string.Empty, "Ocurrió un error al crear la cuenta. Por favor intenta nuevamente.");
             }
 
             return View(model);
         }
 
+        // ========================================
+        // LOGIN
+        // ========================================
+
         [HttpGet]
         public IActionResult Login(string returnUrl = null)
         {
             if (User.Identity.IsAuthenticated)
+            {
+                _logger.LogInformation("Usuario ya autenticado, redirigiendo a Dashboard");
                 return RedirectToAction("Index", "Dashboard");
+            }
 
             ViewData["ReturnUrl"] = returnUrl;
             return View();
@@ -88,39 +166,47 @@ namespace Lado.Controllers
             {
                 ApplicationUser user = null;
 
-                // ✅ BUSCAR USUARIO POR EMAIL O USERNAME
+                // ✅ Buscar usuario por EMAIL o USERNAME
                 if (model.EmailOUsuario.Contains("@"))
                 {
-                    _logger.LogInformation("Buscando por email: {Email}", model.EmailOUsuario);
+                    _logger.LogInformation("Buscando usuario por email: {Email}", model.EmailOUsuario);
                     user = await _userManager.FindByEmailAsync(model.EmailOUsuario);
                 }
                 else
                 {
-                    _logger.LogInformation("Buscando por username: {Username}", model.EmailOUsuario);
+                    _logger.LogInformation("Buscando usuario por username: {Username}", model.EmailOUsuario);
                     user = await _userManager.FindByNameAsync(model.EmailOUsuario);
                 }
 
                 if (user == null)
                 {
-                    _logger.LogWarning("Usuario no encontrado: {EmailOUsuario}", model.EmailOUsuario);
+                    _logger.LogWarning("❌ Usuario no encontrado: {EmailOUsuario}", model.EmailOUsuario);
                     ModelState.AddModelError(string.Empty, "Email o contraseña incorrectos.");
                     return View(model);
                 }
 
-                _logger.LogInformation("Usuario encontrado: {Username} ({Email})", user.UserName, user.Email);
+                _logger.LogInformation("✅ Usuario encontrado: {Username} ({Email})", user.UserName, user.Email);
 
-                // ✅ VERIFICAR CONTRASEÑA
+                // ✅ Verificar si la cuenta está activa
+                if (!user.EstaActivo)
+                {
+                    _logger.LogWarning("❌ Cuenta inactiva: {Username}", user.UserName);
+                    ModelState.AddModelError(string.Empty, "Tu cuenta ha sido desactivada. Contacta al soporte.");
+                    return View(model);
+                }
+
+                // ✅ Verificar contraseña
                 var passwordCheck = await _userManager.CheckPasswordAsync(user, model.Contraseña);
                 if (!passwordCheck)
                 {
-                    _logger.LogWarning("Contraseña incorrecta para usuario: {Username}", user.UserName);
+                    _logger.LogWarning("❌ Contraseña incorrecta para: {Username}", user.UserName);
                     ModelState.AddModelError(string.Empty, "Email o contraseña incorrectos.");
                     return View(model);
                 }
 
-                _logger.LogInformation("Contraseña correcta. Intentando login...");
+                _logger.LogInformation("✅ Contraseña correcta. Iniciando sesión...");
 
-                // ✅ HACER LOGIN
+                // ✅ Hacer login
                 var result = await _signInManager.PasswordSignInAsync(
                     user.UserName,
                     model.Contraseña,
@@ -130,53 +216,71 @@ namespace Lado.Controllers
 
                 if (result.Succeeded)
                 {
-                    _logger.LogInformation("Login exitoso para: {Username}", user.UserName);
+                    _logger.LogInformation("✅ Login exitoso para: {Username}", user.UserName);
 
-                    // ✅ VERIFICAR ROL DE ADMIN
+                    // ✅ Verificar si es Admin
                     var roles = await _userManager.GetRolesAsync(user);
                     _logger.LogInformation("Roles del usuario: {Roles}", string.Join(", ", roles));
 
                     if (roles.Contains("Admin"))
                     {
-                        _logger.LogInformation("Redirigiendo a Admin panel");
+                        _logger.LogInformation("Redirigiendo a panel de Admin");
                         return RedirectToAction("Index", "Admin");
                     }
 
-                    // Redireccionar según tipo de usuario
-                    if (user.TipoUsuario == 1) // Creador
+                    // ✅ CAMBIO: Ya no hay diferenciación por tipo de usuario
+                    // Todos van al Dashboard (ya que todos son creadores)
+                    _logger.LogInformation("Redirigiendo a Dashboard");
+
+                    TempData["Success"] = $"¡Bienvenido de nuevo, {user.NombreCompleto}!";
+
+                    // Si hay returnUrl válido, redirigir ahí
+                    if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
                     {
-                        _logger.LogInformation("Redirigiendo a Dashboard (Creador)");
-                        return RedirectToAction("Index", "Dashboard");
+                        return Redirect(returnUrl);
                     }
-                    else // Fan
-                    {
-                        _logger.LogInformation("Redirigiendo a Feed (Fan)");
-                        return RedirectToAction("Index", "Feed");
-                    }
+
+                    return RedirectToAction("Index", "Dashboard");
                 }
 
                 if (result.IsLockedOut)
                 {
-                    _logger.LogWarning("Cuenta bloqueada: {Username}", user.UserName);
+                    _logger.LogWarning("❌ Cuenta bloqueada: {Username}", user.UserName);
                     return View("Lockout");
                 }
 
-                _logger.LogError("Login falló para: {Username}. Result: {Result}", user.UserName, result);
-                ModelState.AddModelError(string.Empty, "Error al iniciar sesión.");
+                if (result.RequiresTwoFactor)
+                {
+                    _logger.LogInformation("Se requiere autenticación de dos factores");
+                    return RedirectToAction("LoginWith2fa", new { returnUrl, model.Recordarme });
+                }
+
+                _logger.LogError("❌ Login falló para: {Username}. Result: {Result}", user.UserName, result);
+                ModelState.AddModelError(string.Empty, "Error al iniciar sesión. Por favor intenta nuevamente.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Excepción en Login para: {EmailOUsuario}", model.EmailOUsuario);
+                _logger.LogError(ex, "❌ Excepción en Login para: {EmailOUsuario}", model.EmailOUsuario);
                 ModelState.AddModelError(string.Empty, "Error del servidor. Por favor intenta nuevamente.");
             }
 
             return View(model);
         }
 
+        // ========================================
+        // LOGOUT
+        // ========================================
+
         [HttpGet]
         public async Task<IActionResult> Logout()
         {
+            var userName = User?.Identity?.Name;
+
             await _signInManager.SignOutAsync();
+
+            _logger.LogInformation("✅ Usuario cerró sesión: {Username}", userName ?? "Unknown");
+
+            TempData["Info"] = "Has cerrado sesión exitosamente.";
             return RedirectToAction("Index", "Home");
         }
 
@@ -184,8 +288,84 @@ namespace Lado.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> LogoutPost()
         {
+            var userName = User?.Identity?.Name;
+
             await _signInManager.SignOutAsync();
+
+            _logger.LogInformation("✅ Usuario cerró sesión (POST): {Username}", userName ?? "Unknown");
+
+            TempData["Info"] = "Has cerrado sesión exitosamente.";
             return RedirectToAction("Index", "Home");
+        }
+
+        // ========================================
+        // ACCESO DENEGADO
+        // ========================================
+
+        [HttpGet]
+        public IActionResult AccessDenied(string returnUrl = null)
+        {
+            _logger.LogWarning("⚠️ Acceso denegado. ReturnUrl: {ReturnUrl}", returnUrl);
+            ViewData["ReturnUrl"] = returnUrl;
+            return View();
+        }
+
+        // ========================================
+        // VERIFICAR DISPONIBILIDAD (AJAX)
+        // ========================================
+
+        [HttpPost]
+        public async Task<JsonResult> CheckUsernameAvailability(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                return Json(new { available = false, message = "Nombre de usuario requerido" });
+            }
+
+            var user = await _userManager.FindByNameAsync(username);
+            var available = user == null;
+
+            return Json(new
+            {
+                available = available,
+                message = available ? "Disponible" : "Ya está en uso"
+            });
+        }
+
+        [HttpPost]
+        public async Task<JsonResult> CheckEmailAvailability(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return Json(new { available = false, message = "Email requerido" });
+            }
+
+            var user = await _userManager.FindByEmailAsync(email);
+            var available = user == null;
+
+            return Json(new
+            {
+                available = available,
+                message = available ? "Disponible" : "Ya está registrado"
+            });
+        }
+
+        [HttpPost]
+        public async Task<JsonResult> CheckSeudonimoAvailability(string seudonimo)
+        {
+            if (string.IsNullOrWhiteSpace(seudonimo))
+            {
+                return Json(new { available = false, message = "Seudónimo requerido" });
+            }
+
+            var exists = await _userManager.Users.AnyAsync(u => u.Seudonimo == seudonimo);
+            var available = !exists;
+
+            return Json(new
+            {
+                available = available,
+                message = available ? "Disponible" : "Ya está en uso"
+            });
         }
     }
 }

@@ -38,6 +38,12 @@ namespace Lado.ViewModels
 
         [Required(ErrorMessage = "Debes aceptar los términos")]
         public bool AceptaTerminos { get; set; }
+
+        [Required(ErrorMessage = "El seudónimo es obligatorio")]
+        [StringLength(50)]
+        [Display(Name = "Seudónimo")]
+        public string Seudonimo { get; set; }
+
     }
 
     public class LoginViewModel

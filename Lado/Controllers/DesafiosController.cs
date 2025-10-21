@@ -185,13 +185,7 @@ namespace Lado.Controllers
             }
 
             var creador = await _userManager.FindByIdAsync(creadorId);
-            // ✅ CORREGIDO: Usar TipoUsuario
-            if (creador == null || creador.TipoUsuario != (int)TipoUsuario.Creador)
-            {
-                TempData["Error"] = "Creador no encontrado";
-                return RedirectToAction("Index", "Home");
-            }
-
+           
             ViewBag.Creador = creador;
             return View();
         }
@@ -205,13 +199,7 @@ namespace Lado.Controllers
                 var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 var creador = await _userManager.FindByIdAsync(creadorId);
 
-                // ✅ CORREGIDO: Usar TipoUsuario
-                if (creador == null || creador.TipoUsuario != (int)TipoUsuario.Creador)
-                {
-                    TempData["Error"] = "Creador no encontrado";
-                    return RedirectToAction("Index", "Home");
-                }
-
+          
                 var desafio = new Desafio
                 {
                     FanId = usuarioId!,
@@ -310,13 +298,7 @@ namespace Lado.Controllers
             // Obtener usuario actual
             var usuario = await _userManager.GetUserAsync(User);
 
-            // ✅ CORREGIDO: Usar TipoUsuario en lugar de EsCreador
-            if (usuario != null && usuario.TipoUsuario != (int)TipoUsuario.Creador)
-            {
-                TempData["Info"] = "Como cliente, puedes ver tus desafíos en 'Mis Desafíos'";
-                return RedirectToAction(nameof(MisDesafios));
-            }
-
+        
             // Solo los creadores pueden ver el feed público
             var query = _context.Desafios
                 .Include(d => d.Fan)
@@ -388,13 +370,7 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "Usuario no autenticado" });
                 }
 
-                var usuario = await _userManager.GetUserAsync(User);
-                if (usuario == null || usuario.TipoUsuario != (int)TipoUsuario.Creador)
-                {
-                    _logger.LogWarning($"Usuario {usuarioId} no es creador. TipoUsuario: {usuario?.TipoUsuario}");
-                    return Json(new { success = false, message = "Solo los creadores pueden enviar propuestas" });
-                }
-
+          
                 var desafio = await _context.Desafios
                     .Include(d => d.Propuestas)
                     .FirstOrDefaultAsync(d => d.Id == desafioId);

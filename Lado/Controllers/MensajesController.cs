@@ -12,56 +12,73 @@ namespace Lado.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly ILogger<MensajesController> _logger;
 
-        public MensajesController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public MensajesController(
+            ApplicationDbContext context,
+            UserManager<ApplicationUser> userManager,
+            ILogger<MensajesController> logger)
         {
             _context = context;
             _userManager = userManager;
+            _logger = logger;
         }
+
+        // ========================================
+        // INDEX - LISTA DE CONVERSACIONES
+        // ========================================
 
         public async Task<IActionResult> Index()
         {
             var usuario = await _userManager.GetUserAsync(User);
             if (usuario == null)
             {
+                _logger.LogWarning("Usuario no autenticado en Index");
                 return RedirectToAction("Login", "Account");
             }
 
-            List<string> contactosIds = new List<string>();
+            _logger.LogInformation("Cargando conversaciones para usuario: {Username}", usuario.UserName);
 
-            if (usuario.TipoUsuario == 0) // Fan
-            {
-                var creadoresSuscritos = await _context.Suscripciones
-                    .Where(s => s.FanId == usuario.Id && s.EstaActiva)
-                    .Select(s => s.CreadorId)
-                    .ToListAsync();
+            // ⭐ CAMBIO: Ya no diferenciamos por TipoUsuario
+            // Todos los usuarios pueden tener conversaciones con cualquiera
 
-                var conversacionesExistentes = await _context.MensajesPrivados
-                    .Where(m => m.RemitenteId == usuario.Id || m.DestinatarioId == usuario.Id)
-                    .Select(m => m.RemitenteId == usuario.Id ? m.DestinatarioId : m.RemitenteId)
-                    .Distinct()
-                    .ToListAsync();
+            // Obtener IDs de usuarios con los que hay suscripciones (en ambas direcciones)
+            var creadoresSuscritos = await _context.Suscripciones
+                .Where(s => s.FanId == usuario.Id && s.EstaActiva)
+                .Select(s => s.CreadorId)
+                .ToListAsync();
 
-                contactosIds = creadoresSuscritos
-                    .Union(conversacionesExistentes)
-                    .Distinct()
-                    .ToList();
-            }
-            else if (usuario.TipoUsuario == 1) // Creador
-            {
-                contactosIds = await _context.MensajesPrivados
-                    .Where(m => m.RemitenteId == usuario.Id || m.DestinatarioId == usuario.Id)
-                    .Select(m => m.RemitenteId == usuario.Id ? m.DestinatarioId : m.RemitenteId)
-                    .Distinct()
-                    .ToListAsync();
-            }
+            var suscriptoresPropios = await _context.Suscripciones
+                .Where(s => s.CreadorId == usuario.Id && s.EstaActiva)
+                .Select(s => s.FanId)
+                .ToListAsync();
+
+            // Obtener IDs de conversaciones existentes
+            var conversacionesExistentes = await _context.MensajesPrivados
+                .Where(m => m.RemitenteId == usuario.Id || m.DestinatarioId == usuario.Id)
+                .Select(m => m.RemitenteId == usuario.Id ? m.DestinatarioId : m.RemitenteId)
+                .Distinct()
+                .ToListAsync();
+
+            // Combinar todos los contactos únicos
+            var contactosIds = creadoresSuscritos
+                .Union(suscriptoresPropios)
+                .Union(conversacionesExistentes)
+                .Distinct()
+                .ToList();
+
+            _logger.LogInformation("Total de contactos encontrados: {Count}", contactosIds.Count);
 
             var conversaciones = new List<ConversacionViewModel>();
 
             foreach (var contactoId in contactosIds)
             {
                 var contacto = await _userManager.FindByIdAsync(contactoId);
-                if (contacto == null) continue;
+                if (contacto == null)
+                {
+                    _logger.LogWarning("Contacto no encontrado: {ContactoId}", contactoId);
+                    continue;
+                }
 
                 var ultimoMensaje = await _context.MensajesPrivados
                     .Where(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == contactoId) ||
@@ -85,42 +102,68 @@ namespace Lado.Controllers
                 });
             }
 
+            // Ordenar: primero los no leídos, luego por fecha
             ViewBag.Conversaciones = conversaciones
                 .OrderByDescending(c => c.MensajesNoLeidos > 0)
                 .ThenByDescending(c => c.UltimoMensaje?.FechaEnvio ?? DateTime.MinValue)
                 .ToList();
 
+            _logger.LogInformation("Conversaciones cargadas: {Count}", conversaciones.Count);
+
             return View(usuario);
         }
+
+        // ========================================
+        // CHAT - VISTA DE CONVERSACIÓN
+        // ========================================
 
         public async Task<IActionResult> Chat(string id)
         {
             var usuario = await _userManager.GetUserAsync(User);
             if (usuario == null)
             {
+                _logger.LogWarning("Usuario no autenticado en Chat");
                 return RedirectToAction("Login", "Account");
+            }
+
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                _logger.LogWarning("ID de destinatario vacío");
+                return RedirectToAction("Index");
             }
 
             var destinatario = await _userManager.FindByIdAsync(id);
             if (destinatario == null)
             {
+                _logger.LogWarning("Destinatario no encontrado: {DestinatarioId}", id);
                 return NotFound();
             }
 
-            if (usuario.TipoUsuario == 0) // Fan
-            {
-                var estaSuscrito = await _context.Suscripciones
-                    .AnyAsync(s => s.FanId == usuario.Id &&
-                                  s.CreadorId == id &&
-                                  s.EstaActiva);
+            _logger.LogInformation("Abriendo chat entre {Usuario} y {Destinatario}",
+                usuario.UserName, destinatario.UserName);
 
-                if (!estaSuscrito)
+            // ⭐ CAMBIO: Verificar si existe una relación de suscripción (en cualquier dirección)
+            var existeRelacion = await _context.Suscripciones
+                .AnyAsync(s => (s.FanId == usuario.Id && s.CreadorId == id && s.EstaActiva) ||
+                              (s.FanId == id && s.CreadorId == usuario.Id && s.EstaActiva));
+
+            if (!existeRelacion)
+            {
+                // Verificar si ya tienen una conversación previa
+                var tieneConversacion = await _context.MensajesPrivados
+                    .AnyAsync(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == id) ||
+                                  (m.RemitenteId == id && m.DestinatarioId == usuario.Id));
+
+                if (!tieneConversacion)
                 {
-                    TempData["Error"] = "Debes estar suscrito para enviar mensajes a este creador.";
+                    _logger.LogWarning("Usuario {Usuario} intentó chatear sin suscripción con {Destinatario}",
+                        usuario.UserName, destinatario.UserName);
+                    TempData["Error"] = "Debes estar suscrito para enviar mensajes a este usuario.";
                     return RedirectToAction("Index");
                 }
             }
 
+            // Cargar mensajes
             var mensajes = await _context.MensajesPrivados
                 .Include(m => m.Remitente)
                 .Include(m => m.Destinatario)
@@ -131,12 +174,22 @@ namespace Lado.Controllers
                 .OrderBy(m => m.FechaEnvio)
                 .ToListAsync();
 
-            var mensajesNoLeidos = mensajes.Where(m => m.DestinatarioId == usuario.Id && !m.Leido).ToList();
-            foreach (var mensaje in mensajesNoLeidos)
+            _logger.LogInformation("Mensajes cargados: {Count}", mensajes.Count);
+
+            // Marcar mensajes como leídos
+            var mensajesNoLeidos = mensajes
+                .Where(m => m.DestinatarioId == usuario.Id && !m.Leido)
+                .ToList();
+
+            if (mensajesNoLeidos.Any())
             {
-                mensaje.Leido = true;
+                foreach (var mensaje in mensajesNoLeidos)
+                {
+                    mensaje.Leido = true;
+                }
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Marcados como leídos: {Count} mensajes", mensajesNoLeidos.Count);
             }
-            await _context.SaveChangesAsync();
 
             ViewBag.Mensajes = mensajes;
             ViewBag.Destinatario = destinatario;
@@ -144,76 +197,86 @@ namespace Lado.Controllers
             return View(usuario);
         }
 
+        // ========================================
+        // ENVIAR MENSAJE
+        // ========================================
+
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> EnviarMensaje(string destinatarioId, string contenido)
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("=== ENVIAR MENSAJE - INICIO ===");
-                System.Diagnostics.Debug.WriteLine($"DestinatarioId recibido: {destinatarioId}");
-                System.Diagnostics.Debug.WriteLine($"Contenido recibido: {contenido}");
+                _logger.LogInformation("=== ENVIAR MENSAJE - INICIO ===");
+                _logger.LogInformation("DestinatarioId: {DestinatarioId}", destinatarioId);
 
                 var usuario = await _userManager.GetUserAsync(User);
                 if (usuario == null)
                 {
-                    System.Diagnostics.Debug.WriteLine("ERROR: Usuario no autenticado");
+                    _logger.LogError("Usuario no autenticado");
                     return Json(new { success = false, message = "Usuario no autenticado" });
                 }
 
-                System.Diagnostics.Debug.WriteLine($"Usuario autenticado: {usuario.UserName} (ID: {usuario.Id})");
+                _logger.LogInformation("Usuario: {Username} (ID: {UserId})", usuario.UserName, usuario.Id);
 
+                // Validaciones
                 if (string.IsNullOrWhiteSpace(contenido))
                 {
-                    System.Diagnostics.Debug.WriteLine("ERROR: Contenido vacío");
+                    _logger.LogWarning("Contenido vacío");
                     return Json(new { success = false, message = "El mensaje no puede estar vacío" });
                 }
 
                 if (string.IsNullOrWhiteSpace(destinatarioId))
                 {
-                    System.Diagnostics.Debug.WriteLine("ERROR: DestinatarioId vacío");
+                    _logger.LogWarning("DestinatarioId vacío");
                     return Json(new { success = false, message = "Destinatario no especificado" });
                 }
 
                 var destinatario = await _userManager.FindByIdAsync(destinatarioId);
                 if (destinatario == null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"ERROR: Destinatario no encontrado con ID: {destinatarioId}");
+                    _logger.LogError("Destinatario no encontrado: {DestinatarioId}", destinatarioId);
                     return Json(new { success = false, message = "Destinatario no encontrado" });
                 }
 
-                System.Diagnostics.Debug.WriteLine($"Destinatario encontrado: {destinatario.UserName}");
+                _logger.LogInformation("Destinatario: {Username}", destinatario.UserName);
 
-                // Verificar permisos para fans
-                if (usuario.TipoUsuario == 0)
+                // ⭐ CAMBIO: Verificar relación de suscripción (bidireccional)
+                var existeRelacion = await _context.Suscripciones
+                    .AnyAsync(s => (s.FanId == usuario.Id && s.CreadorId == destinatarioId && s.EstaActiva) ||
+                                  (s.FanId == destinatarioId && s.CreadorId == usuario.Id && s.EstaActiva));
+
+                // Verificar si ya tienen conversación previa
+                var tieneConversacion = await _context.MensajesPrivados
+                    .AnyAsync(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == destinatarioId) ||
+                                  (m.RemitenteId == destinatarioId && m.DestinatarioId == usuario.Id));
+
+                if (!existeRelacion && !tieneConversacion)
                 {
-                    var estaSuscrito = await _context.Suscripciones
-                        .AnyAsync(s => s.FanId == usuario.Id &&
-                                      s.CreadorId == destinatarioId &&
-                                      s.EstaActiva);
-
-                    System.Diagnostics.Debug.WriteLine($"¿Está suscrito?: {estaSuscrito}");
-
-                    if (!estaSuscrito)
+                    _logger.LogWarning("Sin relación de suscripción ni conversación previa");
+                    return Json(new
                     {
-                        System.Diagnostics.Debug.WriteLine("ERROR: No está suscrito");
-                        return Json(new { success = false, message = "Debes estar suscrito para enviar mensajes" });
-                    }
+                        success = false,
+                        message = "Debes estar suscrito para iniciar una conversación con este usuario"
+                    });
                 }
 
+                // Crear mensaje
                 var mensaje = new MensajePrivado
                 {
                     RemitenteId = usuario.Id,
                     DestinatarioId = destinatarioId,
-                    Contenido = contenido,
+                    Contenido = contenido.Trim(),
                     FechaEnvio = DateTime.Now,
-                    Leido = false
+                    Leido = false,
+                    EliminadoPorRemitente = false,
+                    EliminadoPorDestinatario = false
                 };
 
                 _context.MensajesPrivados.Add(mensaje);
                 await _context.SaveChangesAsync();
 
-                System.Diagnostics.Debug.WriteLine($"✅ Mensaje guardado exitosamente. ID: {mensaje.Id}");
-                System.Diagnostics.Debug.WriteLine("=== ENVIAR MENSAJE - FIN ===");
+                _logger.LogInformation("✅ Mensaje enviado exitosamente. ID: {MensajeId}", mensaje.Id);
 
                 return Json(new
                 {
@@ -223,78 +286,173 @@ namespace Lado.Controllers
                         id = mensaje.Id,
                         contenido = mensaje.Contenido,
                         fechaEnvio = mensaje.FechaEnvio.ToString("HH:mm"),
+                        fechaCompleta = mensaje.FechaEnvio.ToString("dd/MM/yyyy HH:mm"),
                         remitenteId = mensaje.RemitenteId
                     }
                 });
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ EXCEPCIÓN en EnviarMensaje: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"StackTrace: {ex.StackTrace}");
-                return Json(new { success = false, message = "Error al enviar el mensaje: " + ex.Message });
+                _logger.LogError(ex, "❌ Error al enviar mensaje");
+                return Json(new
+                {
+                    success = false,
+                    message = "Error al enviar el mensaje. Por favor intenta nuevamente."
+                });
             }
         }
+
+        // ========================================
+        // ELIMINAR CONVERSACIÓN
+        // ========================================
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> EliminarConversacion(string contactoId)
         {
-            var usuario = await _userManager.GetUserAsync(User);
-            if (usuario == null)
+            try
             {
-                return RedirectToAction("Login", "Account");
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
+                {
+                    _logger.LogWarning("Usuario no autenticado en EliminarConversacion");
+                    return RedirectToAction("Login", "Account");
+                }
+
+                if (string.IsNullOrWhiteSpace(contactoId))
+                {
+                    _logger.LogWarning("ContactoId vacío en EliminarConversacion");
+                    TempData["Error"] = "Contacto no especificado";
+                    return RedirectToAction("Index");
+                }
+
+                _logger.LogInformation("Eliminando conversación entre {Usuario} y {Contacto}",
+                    usuario.UserName, contactoId);
+
+                var mensajes = await _context.MensajesPrivados
+                    .Where(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == contactoId) ||
+                               (m.RemitenteId == contactoId && m.DestinatarioId == usuario.Id))
+                    .ToListAsync();
+
+                foreach (var mensaje in mensajes)
+                {
+                    if (mensaje.RemitenteId == usuario.Id)
+                    {
+                        mensaje.EliminadoPorRemitente = true;
+                    }
+                    else
+                    {
+                        mensaje.EliminadoPorDestinatario = true;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("✅ Conversación eliminada. {Count} mensajes afectados", mensajes.Count);
+                TempData["Success"] = "Conversación eliminada correctamente";
+
+                return RedirectToAction("Index");
             }
-
-            var mensajes = await _context.MensajesPrivados
-                .Where(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == contactoId) ||
-                           (m.RemitenteId == contactoId && m.DestinatarioId == usuario.Id))
-                .ToListAsync();
-
-            foreach (var mensaje in mensajes)
+            catch (Exception ex)
             {
-                if (mensaje.RemitenteId == usuario.Id)
-                {
-                    mensaje.EliminadoPorRemitente = true;
-                }
-                else
-                {
-                    mensaje.EliminadoPorDestinatario = true;
-                }
+                _logger.LogError(ex, "Error al eliminar conversación");
+                TempData["Error"] = "Error al eliminar la conversación";
+                return RedirectToAction("Index");
             }
-
-            await _context.SaveChangesAsync();
-            TempData["Success"] = "Conversación eliminada correctamente";
-
-            return RedirectToAction("Index");
         }
+
+        // ========================================
+        // CARGAR MENSAJES (AJAX)
+        // ========================================
 
         [HttpGet]
         public async Task<IActionResult> CargarMensajes(string contactoId)
         {
-            var usuario = await _userManager.GetUserAsync(User);
-            if (usuario == null)
+            try
             {
-                return Json(new { success = false });
-            }
-
-            var mensajes = await _context.MensajesPrivados
-                .Where(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == contactoId) ||
-                           (m.RemitenteId == contactoId && m.DestinatarioId == usuario.Id))
-                .Where(m => (m.RemitenteId == usuario.Id && !m.EliminadoPorRemitente) ||
-                           (m.DestinatarioId == usuario.Id && !m.EliminadoPorDestinatario))
-                .OrderBy(m => m.FechaEnvio)
-                .Select(m => new
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
                 {
-                    id = m.Id,
-                    remitenteId = m.RemitenteId,
-                    contenido = m.Contenido,
-                    fechaEnvio = m.FechaEnvio.ToString("HH:mm"),
-                    leido = m.Leido
-                })
-                .ToListAsync();
+                    _logger.LogWarning("Usuario no autenticado en CargarMensajes");
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
 
-            return Json(new { success = true, mensajes });
+                if (string.IsNullOrWhiteSpace(contactoId))
+                {
+                    _logger.LogWarning("ContactoId vacío en CargarMensajes");
+                    return Json(new { success = false, message = "Contacto no especificado" });
+                }
+
+                var mensajes = await _context.MensajesPrivados
+                    .Where(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == contactoId) ||
+                               (m.RemitenteId == contactoId && m.DestinatarioId == usuario.Id))
+                    .Where(m => (m.RemitenteId == usuario.Id && !m.EliminadoPorRemitente) ||
+                               (m.DestinatarioId == usuario.Id && !m.EliminadoPorDestinatario))
+                    .OrderBy(m => m.FechaEnvio)
+                    .Select(m => new
+                    {
+                        id = m.Id,
+                        remitenteId = m.RemitenteId,
+                        contenido = m.Contenido,
+                        fechaEnvio = m.FechaEnvio.ToString("HH:mm"),
+                        fechaCompleta = m.FechaEnvio.ToString("dd/MM/yyyy HH:mm"),
+                        leido = m.Leido
+                    })
+                    .ToListAsync();
+
+                _logger.LogInformation("Cargados {Count} mensajes para contacto {ContactoId}",
+                    mensajes.Count, contactoId);
+
+                return Json(new { success = true, mensajes });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al cargar mensajes");
+                return Json(new { success = false, message = "Error al cargar mensajes" });
+            }
+        }
+
+        // ========================================
+        // MARCAR COMO LEÍDO (AJAX)
+        // ========================================
+
+        [HttpPost]
+        public async Task<IActionResult> MarcarComoLeido(int mensajeId)
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
+                {
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                var mensaje = await _context.MensajesPrivados
+                    .FirstOrDefaultAsync(m => m.Id == mensajeId && m.DestinatarioId == usuario.Id);
+
+                if (mensaje == null)
+                {
+                    return Json(new { success = false, message = "Mensaje no encontrado" });
+                }
+
+                mensaje.Leido = true;
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Mensaje {MensajeId} marcado como leído", mensajeId);
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al marcar mensaje como leído");
+                return Json(new { success = false, message = "Error al marcar como leído" });
+            }
         }
     }
+
+    // ========================================
+    // VIEW MODEL
+    // ========================================
 
     public class ConversacionViewModel
     {

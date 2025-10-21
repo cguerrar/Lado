@@ -41,11 +41,7 @@ namespace Lado.Controllers
                     return RedirectToAction("Login", "Account");
                 }
 
-                if (user.TipoUsuario == 1 && user.CreadorVerificado)
-                {
-                    return RedirectToAction("Index", "Dashboard");
-                }
-
+      
                 var solicitudExistente = await _context.CreatorVerificationRequests
                     .FirstOrDefaultAsync(x => x.UserId == user.Id && x.Estado == "Pendiente");
 

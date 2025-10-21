@@ -4,14 +4,593 @@
     var verificacionesPendientes = (List<Lado.Models.CreatorVerificationRequest>)ViewBag.VerificacionesPendientes ?? new List<Lado.Models.CreatorVerificationRequest>();
 }
 
+<style>
+    :root {
+        --primary: #32d67b;
+        --primary-dark: #28b369;
+        --primary-light: #e6f9ee;
+        --success: #22c55e;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --info: #3b82f6;
+        --bg: #ffffff;
+        --fg: #111827;
+        --muted: #6b7280;
+        --light-bg: #f9fafb;
+        --card-bg: #ffffff;
+        --line: #e5e7eb;
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+        --shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.12);
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --radius-lg: 16px;
+    }
+
+    body {
+        background: var(--light-bg);
+    }
+
+    .container-fluid {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    /* Header */
+    .page-header {
+        margin-bottom: 32px;
+    }
+
+    .page-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--fg);
+        margin: 0 0 8px 0;
+    }
+
+    .page-subtitle {
+        color: var(--muted);
+        margin: 0;
+        font-size: 15px;
+    }
+
+    .btn-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        color: var(--fg);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 14px;
+        transition: all 0.2s;
+        background: white;
+    }
+
+        .btn-back:hover {
+            background: var(--light-bg);
+            border-color: var(--muted);
+            color: var(--fg);
+        }
+
+    /* Stat Cards */
+    .stat-card {
+        background: white;
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: var(--shadow-sm);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        transition: all 0.2s;
+        border: 1px solid var(--line);
+        height: 100%;
+    }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+            border-color: var(--primary);
+        }
+
+    .stat-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: var(--radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+        .stat-icon.bg-primary {
+            background: var(--primary);
+        }
+
+        .stat-icon.bg-success {
+            background: var(--success);
+        }
+
+        .stat-icon.bg-warning {
+            background: var(--warning);
+        }
+
+        .stat-icon.bg-danger {
+            background: var(--danger);
+        }
+
+    .stat-content {
+        flex: 1;
+    }
+
+        .stat-content p {
+            margin: 0 0 4px 0;
+            font-size: 13px;
+            color: var(--muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-content h3 {
+            margin: 0;
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--fg);
+        }
+
+    /* Tabs */
+    .nav-tabs {
+        border-bottom: 2px solid var(--line);
+        margin-bottom: 32px;
+    }
+
+        .nav-tabs .nav-link {
+            color: var(--muted);
+            border: none;
+            padding: 12px 24px;
+            font-weight: 600;
+            font-size: 15px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: transparent;
+            transition: all 0.2s;
+        }
+
+            .nav-tabs .nav-link:hover {
+                color: var(--primary);
+                background: transparent;
+            }
+
+            .nav-tabs .nav-link.active {
+                color: var(--primary);
+                background: transparent;
+                border-bottom: 3px solid var(--primary);
+            }
+
+    /* Cards */
+    .card {
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 24px;
+    }
+
+    .card-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--line);
+        background: transparent;
+    }
+
+    .card-body {
+        padding: 24px;
+    }
+
+    /* User Card */
+    .user-card {
+        background: white;
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: var(--shadow-sm);
+        transition: all 0.2s;
+        border: 1px solid var(--line);
+        margin-bottom: 16px;
+    }
+
+        .user-card:hover {
+            box-shadow: var(--shadow-md);
+            border-color: var(--primary);
+        }
+
+        .user-card.user-blocked {
+            opacity: 0.7;
+            background: #fef2f2;
+            border-color: #fecaca;
+        }
+
+    .user-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid var(--line);
+    }
+
+    .user-avatar-placeholder {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        font-weight: 700;
+        border: 3px solid var(--line);
+    }
+
+    .user-info h5 {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--fg);
+        margin: 0 0 4px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .user-info p {
+        color: var(--muted);
+        margin: 0 0 12px 0;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    /* Badges */
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1;
+    }
+
+        .badge.bg-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .badge.bg-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .badge.bg-warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        .badge.bg-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .badge.bg-info {
+            background: var(--info);
+            color: white;
+        }
+
+    /* Buttons */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 20px;
+        border-radius: var(--radius-sm);
+        font-weight: 600;
+        font-size: 14px;
+        text-decoration: none;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.2s;
+        line-height: 1;
+    }
+
+    .btn-primary {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            border-color: var(--primary-dark);
+            color: white;
+        }
+
+    .btn-outline-primary {
+        background: transparent;
+        color: var(--primary);
+        border-color: var(--primary);
+    }
+
+        .btn-outline-primary:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+    .btn-success {
+        background: var(--success);
+        color: white;
+        border-color: var(--success);
+    }
+
+        .btn-success:hover {
+            background: #16a34a;
+            border-color: #16a34a;
+            color: white;
+        }
+
+    .btn-warning {
+        background: var(--warning);
+        color: white;
+        border-color: var(--warning);
+    }
+
+        .btn-warning:hover {
+            background: #d97706;
+            border-color: #d97706;
+            color: white;
+        }
+
+    .btn-danger {
+        background: var(--danger);
+        color: white;
+        border-color: var(--danger);
+    }
+
+        .btn-danger:hover {
+            background: #dc2626;
+            border-color: #dc2626;
+            color: white;
+        }
+
+    .btn-sm {
+        padding: 8px 16px;
+        font-size: 13px;
+    }
+
+    .btn-group-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    /* Forms */
+    .form-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .form-control, .form-select {
+        padding: 10px 16px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        font-size: 14px;
+        transition: all 0.2s;
+    }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(50, 214, 123, 0.1);
+            outline: none;
+        }
+
+    /* Modal */
+    .modal-content {
+        border-radius: var(--radius-md);
+        border: none;
+        box-shadow: var(--shadow-lg);
+    }
+
+    .modal-header {
+        padding: 24px;
+        border-bottom: 1px solid var(--line);
+    }
+
+        .modal-header.bg-danger {
+            background: var(--danger);
+            color: white;
+            border-bottom: none;
+        }
+
+    .modal-body {
+        padding: 24px;
+    }
+
+    .modal-footer {
+        padding: 20px 24px;
+        border-top: 1px solid var(--line);
+    }
+
+    /* Alert */
+    .alert {
+        padding: 16px;
+        border-radius: var(--radius-sm);
+        border: 1px solid;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .alert-danger {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #991b1b;
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+        .empty-state svg {
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .empty-state h5 {
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+    /* Icon Utilities */
+    .icon {
+        width: 20px;
+        height: 20px;
+        display: inline-block;
+        vertical-align: middle;
+    }
+
+    .icon-sm {
+        width: 16px;
+        height: 16px;
+    }
+
+    .icon-md {
+        width: 24px;
+        height: 24px;
+    }
+
+    .icon-lg {
+        width: 32px;
+        height: 32px;
+    }
+
+    /* Responsive */
+    @@media (max-width: 992px) {
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 16px;
+        }
+
+        .btn-back {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .container-fluid {
+            padding: 16px;
+        }
+
+        .page-title {
+            font-size: 24px;
+        }
+
+        .stat-card {
+            flex-direction: column;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .stat-content h3 {
+            font-size: 28px;
+        }
+
+        .nav-tabs .nav-link {
+            padding: 10px 16px;
+            font-size: 14px;
+        }
+
+        .user-card {
+            padding: 16px;
+        }
+
+        .user-avatar, .user-avatar-placeholder {
+            width: 50px;
+            height: 50px;
+            font-size: 20px;
+        }
+
+        .user-info h5 {
+            font-size: 16px;
+        }
+
+        .btn-group-actions {
+            width: 100%;
+            margin-top: 16px;
+        }
+
+            .btn-group-actions .btn {
+                flex: 1;
+                font-size: 12px;
+                padding: 8px 12px;
+            }
+
+        .card-body {
+            padding: 16px;
+        }
+    }
+
+    @@media (max-width: 576px) {
+        .page-title {
+            font-size: 20px;
+        }
+
+        .page-subtitle {
+            font-size: 14px;
+        }
+
+        .stat-content h3 {
+            font-size: 24px;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+        }
+
+        .btn-group-actions {
+            flex-direction: column;
+        }
+
+            .btn-group-actions .btn {
+                width: 100%;
+            }
+    }
+</style>
+
 <div class="container-fluid py-4">
     <!-- Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center page-header">
                 <div>
-                    <h2 class="mb-2 text-dark">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#00BCD4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                    <h2 class="page-title">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                             <circle cx="9" cy="7" r="4" />
                             <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -19,10 +598,10 @@
                         </svg>
                         Gestión de Usuarios
                     </h2>
-                    <p class="text-muted mb-0">Administra todos los usuarios y verificaciones de la plataforma</p>
+                    <p class="page-subtitle">Administra todos los usuarios y verificaciones de la plataforma</p>
                 </div>
-                <a href="/Admin" class="btn btn-outline-secondary">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                <a href="/Admin" class="btn-back">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="15 18 9 12 15 6" />
                     </svg>
                     Volver
@@ -33,7 +612,7 @@
 
     <!-- Estadísticas -->
     <div class="row g-3 mb-4">
-        <div class="col-md-3">
+        <div class="col-md-3 col-sm-6">
             <div class="stat-card">
                 <div class="stat-icon bg-primary">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -50,7 +629,7 @@
             </div>
         </div>
 
-        <div class="col-md-3">
+        <div class="col-md-3 col-sm-6">
             <div class="stat-card">
                 <div class="stat-icon bg-success">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -59,12 +638,12 @@
                 </div>
                 <div class="stat-content">
                     <p>Creadores</p>
-                    <h3>@Model.Count(u => u.Item1.TipoUsuario == 1)</h3>
+                   
                 </div>
             </div>
         </div>
 
-        <div class="col-md-3">
+        <div class="col-md-3 col-sm-6">
             <div class="stat-card">
                 <div class="stat-icon bg-warning">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -79,7 +658,7 @@
             </div>
         </div>
 
-        <div class="col-md-3">
+        <div class="col-md-3 col-sm-6">
             <div class="stat-card">
                 <div class="stat-icon bg-danger">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -96,10 +675,10 @@
     </div>
 
     <!-- Tabs -->
-    <ul class="nav nav-tabs mb-4" role="tablist">
+    <ul class="nav nav-tabs" role="tablist">
         <li class="nav-item">
             <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#usuarios">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                     <circle cx="9" cy="7" r="4" />
                 </svg>
@@ -108,7 +687,7 @@
         </li>
         <li class="nav-item">
             <button class="nav-link" data-bs-toggle="tab" data-bs-target="#verificaciones">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="20 6 9 17 4 12" />
                 </svg>
                 Verificaciones
@@ -125,12 +704,12 @@
         <!-- TAB USUARIOS -->
         <div class="tab-pane fade show active" id="usuarios">
             <!-- Filtros -->
-            <div class="card border-0 shadow-sm mb-4">
+            <div class="card">
                 <div class="card-body">
                     <form method="get" class="row g-3">
                         <div class="col-md-4">
                             <label class="form-label">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <circle cx="11" cy="11" r="8" />
                                     <path d="m21 21-4.35-4.35" />
                                 </svg>
@@ -156,7 +735,7 @@
                         </div>
                         <div class="col-md-2 d-flex align-items-end">
                             <button type="submit" class="btn btn-primary w-100">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <circle cx="11" cy="11" r="8" />
                                     <path d="m21 21-4.35-4.35" />
                                 </svg>
@@ -170,7 +749,7 @@
             <!-- Lista Usuarios -->
             @if (Model.Any())
             {
-                <div class="row g-3">
+                <div class="row">
                     @foreach (var (usuario, rol) in Model)
                     {
                         <div class="col-12">
@@ -191,22 +770,23 @@
 
                                     <div class="col">
                                         <div class="d-flex align-items-start justify-content-between flex-wrap">
-                                            <div class="mb-2 mb-md-0">
-                                                <h5 class="mb-1">
+                                            <div class="mb-2 mb-md-0 user-info">
+                                                <h5>
                                                     @usuario.NombreCompleto
                                                     @if (usuario.EsVerificado)
                                                     {
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#00BCD4" style="display: inline-block; vertical-align: middle;">
-                                                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="var(--primary)" stroke="white" stroke-width="2">
+                                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                                            <polyline points="22 4 12 14.01 9 11.01" />
                                                         </svg>
                                                     }
                                                     @if (!usuario.EstaActivo)
                                                     {
-                                                        <span class="badge bg-danger ms-2">BLOQUEADO</span>
+                                                        <span class="badge bg-danger">BLOQUEADO</span>
                                                     }
                                                 </h5>
-                                                <p class="text-muted mb-2">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                                                <p>
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                         <rect x="2" y="4" width="20" height="16" rx="2"></rect>
                                                         <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
                                                     </svg>
@@ -217,20 +797,13 @@
                                                     {
                                                         <span class="badge bg-danger">Admin</span>
                                                     }
-                                                    else if (usuario.TipoUsuario == 1)
-                                                    {
-                                                        <span class="badge bg-primary">Creador</span>
-                                                        @if (usuario.CreadorVerificado)
-                                                        {
-                                                            <span class="badge bg-success">Verificado</span>
-                                                        }
-                                                    }
+                                                    
                                                     else
                                                     {
                                                         <span class="badge bg-info">Fan</span>
                                                     }
                                                     <small class="text-muted">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                             <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                                                             <line x1="16" y1="2" x2="16" y2="6" />
                                                             <line x1="8" y1="2" x2="8" y2="6" />
@@ -244,7 +817,7 @@
                                             <!-- Acciones -->
                                             <div class="btn-group-actions">
                                                 <a href="/Admin/DetalleUsuario/@usuario.Id" class="btn btn-outline-primary btn-sm">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                                                         <circle cx="12" cy="12" r="3" />
                                                     </svg>
@@ -258,7 +831,7 @@
                                                         <form method="post" asp-action="BloquearUsuario" asp-route-id="@usuario.Id" class="d-inline" onsubmit="return confirm('¿Bloquear a @usuario.NombreCompleto?')">
                                                             @Html.AntiForgeryToken()
                                                             <button type="submit" class="btn btn-warning btn-sm">
-                                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                                     <circle cx="12" cy="12" r="10" />
                                                                     <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
                                                                 </svg>
@@ -271,7 +844,7 @@
                                                         <form method="post" asp-action="DesbloquearUsuario" asp-route-id="@usuario.Id" class="d-inline" onsubmit="return confirm('¿Desbloquear a @usuario.NombreCompleto?')">
                                                             @Html.AntiForgeryToken()
                                                             <button type="submit" class="btn btn-success btn-sm">
-                                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                                     <polyline points="20 6 9 17 4 12" />
                                                                 </svg>
                                                                 Desbloquear
@@ -279,9 +852,8 @@
                                                         </form>
                                                     }
 
-                                                    <!-- BOTÓN ELIMINAR USUARIO -->
                                                     <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#eliminarModal" data-userid="@usuario.Id" data-username="@usuario.NombreCompleto">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                             <polyline points="3 6 5 6 21 6"></polyline>
                                                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                                             <line x1="10" y1="11" x2="10" y2="17"></line>
@@ -301,14 +873,14 @@
             }
             else
             {
-                <div class="card border-0 shadow-sm">
-                    <div class="card-body text-center py-5">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <div class="card">
+                    <div class="card-body empty-state">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="10" />
                             <line x1="12" y1="8" x2="12" y2="12" />
                             <line x1="12" y1="16" x2="12.01" y2="16" />
                         </svg>
-                        <h5 class="text-muted mt-3">No se encontraron usuarios</h5>
+                        <h5>No se encontraron usuarios</h5>
                     </div>
                 </div>
             }
@@ -322,8 +894,8 @@
                     @foreach (var solicitud in verificacionesPendientes)
                     {
                         <div class="col-md-6">
-                            <div class="card border-0 shadow-sm">
-                                <div class="card-header bg-warning bg-opacity-10 border-0">
+                            <div class="card">
+                                <div class="card-header bg-warning bg-opacity-10">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <span class="badge bg-warning text-dark">Pendiente</span>
                                         <small class="text-muted">@solicitud.FechaSolicitud.ToString("dd/MM/yyyy")</small>
@@ -362,7 +934,7 @@
 
                                     <div class="d-grid">
                                         <a href="/CreatorVerification/Review/@solicitud.Id" class="btn btn-primary">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                                                 <circle cx="12" cy="12" r="3" />
                                             </svg>
@@ -377,12 +949,12 @@
             }
             else
             {
-                <div class="card border-0 shadow-sm">
-                    <div class="card-body text-center py-5">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <div class="card">
+                    <div class="card-body empty-state">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="20 6 9 17 4 12" />
                         </svg>
-                        <h5 class="text-success mt-3">No hay verificaciones pendientes</h5>
+                        <h5 class="text-success">No hay verificaciones pendientes</h5>
                     </div>
                 </div>
             }
@@ -396,7 +968,7 @@
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
                 <h5 class="modal-title">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                         <line x1="12" y1="9" x2="12" y2="13" />
                         <line x1="12" y1="17" x2="12.01" y2="17" />
@@ -409,7 +981,7 @@
                 @Html.AntiForgeryToken()
                 <div class="modal-body">
                     <div class="alert alert-danger">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="10" />
                             <line x1="15" y1="9" x2="9" y2="15" />
                             <line x1="9" y1="9" x2="15" y2="15" />
@@ -428,7 +1000,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-danger">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="3 6 5 6 21 6"></polyline>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                         </svg>
@@ -450,165 +1022,3 @@
         document.getElementById('modalUsername').textContent = username;
     });
 </script>
-
-<style>
-    :root {
-        --primary-color: #00BCD4;
-        --success-color: #4CAF50;
-        --warning-color: #FF9800;
-        --danger-color: #F44336;
-    }
-
-    .stat-card {
-        background: white;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        transition: all 0.3s ease;
-        border: 1px solid #e9ecef;
-    }
-
-        .stat-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 4px 16px rgba(0,188,212,0.15);
-            border-color: var(--primary-color);
-        }
-
-    .stat-icon {
-        width: 56px;
-        height: 56px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-    }
-
-        .stat-icon.bg-primary {
-            background: var(--primary-color);
-        }
-
-        .stat-icon.bg-success {
-            background: var(--success-color);
-        }
-
-        .stat-icon.bg-warning {
-            background: var(--warning-color);
-        }
-
-        .stat-icon.bg-danger {
-            background: var(--danger-color);
-        }
-
-    .stat-content p {
-        margin: 0;
-        font-size: 13px;
-        color: #718096;
-        font-weight: 500;
-    }
-
-    .stat-content h3 {
-        margin: 0;
-        font-size: 28px;
-        font-weight: 700;
-        color: #2D3748;
-    }
-
-    .user-card {
-        background: white;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        transition: all 0.2s;
-        border: 1px solid #e9ecef;
-    }
-
-        .user-card:hover {
-            box-shadow: 0 4px 16px rgba(0,188,212,0.1);
-            border-color: var(--primary-color);
-        }
-
-        .user-card.user-blocked {
-            opacity: 0.7;
-            background: #fff5f5;
-            border-color: #feb2b2;
-        }
-
-    .user-avatar {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 3px solid #e9ecef;
-    }
-
-    .user-avatar-placeholder {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        background: var(--primary-color);
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 24px;
-        font-weight: bold;
-        border: 3px solid #e9ecef;
-    }
-
-    .btn-group-actions {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-    }
-
-    .nav-tabs .nav-link {
-        color: #6c757d;
-        border: none;
-        padding: 12px 24px;
-        font-weight: 500;
-    }
-
-        .nav-tabs .nav-link:hover {
-            color: var(--primary-color);
-        }
-
-        .nav-tabs .nav-link.active {
-            color: var(--primary-color);
-            background: white;
-            border-bottom: 3px solid var(--primary-color);
-        }
-
-    .btn-primary {
-        background: var(--primary-color);
-        border-color: var(--primary-color);
-    }
-
-        .btn-primary:hover {
-            background: #0097A7;
-            border-color: #0097A7;
-        }
-
-    /* Responsive */
-    @@media (max-width: 768px) {
-        .stat-card
-
-    {
-        flex-direction: column;
-        text-align: center;
-    }
-
-    .btn-group-actions {
-        width: 100%;
-        margin-top: 12px;
-    }
-
-        .btn-group-actions .btn {
-            flex: 1;
-        }
-
-    }
-</style>

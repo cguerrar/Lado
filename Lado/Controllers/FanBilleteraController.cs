@@ -37,13 +37,7 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-            // Validar que sea Fan (tipo 0)
-            if (usuario.TipoUsuario != 0)
-            {
-                TempData["Error"] = "Esta sección es solo para Fans";
-                return RedirectToAction("Index", "Dashboard");
-            }
-
+           
             // ✅ CORREGIDO: Total gastado este mes (con Math.Abs para convertir negativos a positivos)
             var inicioMes = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
             var gastadoEsteMes = await _context.Transacciones
@@ -117,12 +111,7 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-            // Validaciones
-            if (usuario.TipoUsuario != 0)
-            {
-                TempData["Error"] = "Esta función es solo para Fans";
-                return RedirectToAction(nameof(Index));
-            }
+           
 
             if (monto < 5)
             {

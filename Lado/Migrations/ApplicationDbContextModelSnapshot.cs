@@ -160,6 +160,15 @@ namespace Lado.Migrations
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Seudonimo")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("SeudonimoVerificado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<int>("TipoUsuario")
                         .HasColumnType("int");
 
@@ -177,7 +186,8 @@ namespace Lado.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EsCreador");
+                    b.HasIndex("EsCreador")
+                        .HasDatabaseName("IX_AspNetUsers_EsCreador");
 
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
@@ -187,7 +197,11 @@ namespace Lado.Migrations
                         .HasDatabaseName("UserNameIndex")
                         .HasFilter("[NormalizedUserName] IS NOT NULL");
 
-                    b.HasIndex("TipoUsuario");
+                    b.HasIndex("Seudonimo")
+                        .HasDatabaseName("IX_AspNetUsers_Seudonimo");
+
+                    b.HasIndex("TipoUsuario")
+                        .HasDatabaseName("IX_AspNetUsers_TipoUsuario");
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -235,6 +249,65 @@ namespace Lado.Migrations
                     b.ToTable("ChatMensajes");
                 });
 
+            modelBuilder.Entity("Lado.Models.Coleccion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CreadorId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Descripcion")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int?>("DescuentoPorcentaje")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("EstaActiva")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("FechaActualizacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ImagenPortada")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<decimal>("Precio")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("PrecioOriginal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreadorId")
+                        .HasDatabaseName("IX_Colecciones_CreadorId");
+
+                    b.HasIndex("EstaActiva")
+                        .HasDatabaseName("IX_Colecciones_EstaActiva");
+
+                    b.HasIndex("CreadorId", "EstaActiva")
+                        .HasDatabaseName("IX_Colecciones_Creador_Activa");
+
+                    b.ToTable("Colecciones");
+                });
+
             modelBuilder.Entity("Lado.Models.Comentario", b =>
                 {
                     b.Property<int>("Id")
@@ -270,6 +343,42 @@ namespace Lado.Migrations
                     b.HasIndex("UsuarioId");
 
                     b.ToTable("Comentarios");
+                });
+
+            modelBuilder.Entity("Lado.Models.CompraColeccion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ColeccionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CompradorId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("FechaCompra")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("Precio")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ColeccionId")
+                        .HasDatabaseName("IX_ComprasColeccion_ColeccionId");
+
+                    b.HasIndex("CompradorId")
+                        .HasDatabaseName("IX_ComprasColeccion_CompradorId");
+
+                    b.HasIndex("CompradorId", "ColeccionId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ComprasColeccion_Comprador_Coleccion_Unique");
+
+                    b.ToTable("ComprasColeccion");
                 });
 
             modelBuilder.Entity("Lado.Models.CompraContenido", b =>
@@ -317,7 +426,13 @@ namespace Lado.Migrations
                     b.Property<string>("Descripcion")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("DuracionPreviewSegundos")
+                        .HasColumnType("int");
+
                     b.Property<bool>("EsBorrador")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("EsGratis")
                         .HasColumnType("bit");
 
                     b.Property<bool>("EsPremium")
@@ -332,7 +447,13 @@ namespace Lado.Migrations
                     b.Property<DateTime>("FechaPublicacion")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("NombreMostrado")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("NumeroComentarios")
+                        .HasColumnType("int");
+
+                    b.Property<int>("NumeroCompartidos")
                         .HasColumnType("int");
 
                     b.Property<int>("NumeroLikes")
@@ -350,10 +471,22 @@ namespace Lado.Migrations
                     b.Property<string>("RutaArchivo")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("RutaPreview")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("Thumbnail")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("TienePreview")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<int>("TipoContenido")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TipoLado")
                         .HasColumnType("int");
 
                     b.Property<string>("UsuarioId")
@@ -366,9 +499,35 @@ namespace Lado.Migrations
 
                     b.HasIndex("FechaPublicacion");
 
+                    b.HasIndex("TipoLado");
+
                     b.HasIndex("UsuarioId");
 
                     b.ToTable("Contenidos");
+                });
+
+            modelBuilder.Entity("Lado.Models.ContenidoColeccion", b =>
+                {
+                    b.Property<int>("ContenidoId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ColeccionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Orden")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.HasKey("ContenidoId", "ColeccionId");
+
+                    b.HasIndex("ColeccionId")
+                        .HasDatabaseName("IX_ContenidoColecciones_ColeccionId");
+
+                    b.HasIndex("ContenidoId")
+                        .HasDatabaseName("IX_ContenidoColecciones_ContenidoId");
+
+                    b.ToTable("ContenidoColecciones");
                 });
 
             modelBuilder.Entity("Lado.Models.CreatorVerificationRequest", b =>
@@ -695,6 +854,45 @@ namespace Lado.Migrations
                     b.ToTable("PropuestasDesafios");
                 });
 
+            modelBuilder.Entity("Lado.Models.Reaccion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ContenidoId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("FechaReaccion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("TipoReaccion")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContenidoId")
+                        .HasDatabaseName("IX_Reacciones_ContenidoId");
+
+                    b.HasIndex("UsuarioId")
+                        .HasDatabaseName("IX_Reacciones_UsuarioId");
+
+                    b.HasIndex("ContenidoId", "TipoReaccion")
+                        .HasDatabaseName("IX_Reacciones_Contenido_Tipo");
+
+                    b.HasIndex("UsuarioId", "ContenidoId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Reacciones_Usuario_Contenido_Unique");
+
+                    b.ToTable("Reacciones");
+                });
+
             modelBuilder.Entity("Lado.Models.Reporte", b =>
                 {
                     b.Property<int>("Id")
@@ -753,6 +951,93 @@ namespace Lado.Migrations
                     b.HasIndex("UsuarioReportadorId");
 
                     b.ToTable("Reportes");
+                });
+
+            modelBuilder.Entity("Lado.Models.Story", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CreadorId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("EstaActivo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime>("FechaExpiracion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaPublicacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("NumeroVistas")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("RutaArchivo")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Texto")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("TipoContenido")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreadorId")
+                        .HasDatabaseName("IX_Stories_CreadorId");
+
+                    b.HasIndex("FechaExpiracion")
+                        .HasDatabaseName("IX_Stories_FechaExpiracion");
+
+                    b.HasIndex("CreadorId", "FechaExpiracion", "EstaActivo")
+                        .HasDatabaseName("IX_Stories_Creador_Expiracion_Activo");
+
+                    b.ToTable("Stories");
+                });
+
+            modelBuilder.Entity("Lado.Models.StoryVista", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("FechaVista")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("StoryId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StoryId")
+                        .HasDatabaseName("IX_StoryVistas_StoryId");
+
+                    b.HasIndex("UsuarioId")
+                        .HasDatabaseName("IX_StoryVistas_UsuarioId");
+
+                    b.HasIndex("StoryId", "UsuarioId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_StoryVistas_Story_Usuario_Unique");
+
+                    b.ToTable("StoryVistas");
                 });
 
             modelBuilder.Entity("Lado.Models.Suscripcion", b =>
@@ -867,8 +1152,8 @@ namespace Lado.Migrations
                     b.Property<string>("EstadoPago")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("EstadoTransaccion")
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<int>("EstadoTransaccion")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("FechaTransaccion")
                         .HasColumnType("datetime2");
@@ -1066,6 +1351,17 @@ namespace Lado.Migrations
                     b.Navigation("Remitente");
                 });
 
+            modelBuilder.Entity("Lado.Models.Coleccion", b =>
+                {
+                    b.HasOne("Lado.Models.ApplicationUser", "Creador")
+                        .WithMany()
+                        .HasForeignKey("CreadorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Creador");
+                });
+
             modelBuilder.Entity("Lado.Models.Comentario", b =>
                 {
                     b.HasOne("Lado.Models.Contenido", "Contenido")
@@ -1085,10 +1381,29 @@ namespace Lado.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("Lado.Models.CompraColeccion", b =>
+                {
+                    b.HasOne("Lado.Models.Coleccion", "Coleccion")
+                        .WithMany("Compras")
+                        .HasForeignKey("ColeccionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Lado.Models.ApplicationUser", "Comprador")
+                        .WithMany()
+                        .HasForeignKey("CompradorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Coleccion");
+
+                    b.Navigation("Comprador");
+                });
+
             modelBuilder.Entity("Lado.Models.CompraContenido", b =>
                 {
                     b.HasOne("Lado.Models.Contenido", "Contenido")
-                        .WithMany()
+                        .WithMany("Compras")
                         .HasForeignKey("ContenidoId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -1113,6 +1428,25 @@ namespace Lado.Migrations
                         .IsRequired();
 
                     b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("Lado.Models.ContenidoColeccion", b =>
+                {
+                    b.HasOne("Lado.Models.Coleccion", "Coleccion")
+                        .WithMany("Contenidos")
+                        .HasForeignKey("ColeccionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Lado.Models.Contenido", "Contenido")
+                        .WithMany("Colecciones")
+                        .HasForeignKey("ContenidoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Coleccion");
+
+                    b.Navigation("Contenido");
                 });
 
             modelBuilder.Entity("Lado.Models.CreatorVerificationRequest", b =>
@@ -1208,6 +1542,25 @@ namespace Lado.Migrations
                     b.Navigation("Desafio");
                 });
 
+            modelBuilder.Entity("Lado.Models.Reaccion", b =>
+                {
+                    b.HasOne("Lado.Models.Contenido", "Contenido")
+                        .WithMany("Reacciones")
+                        .HasForeignKey("ContenidoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Lado.Models.ApplicationUser", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Contenido");
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("Lado.Models.Reporte", b =>
                 {
                     b.HasOne("Lado.Models.Contenido", "Contenido")
@@ -1237,6 +1590,36 @@ namespace Lado.Migrations
                     b.Navigation("UsuarioReportado");
 
                     b.Navigation("UsuarioReportador");
+                });
+
+            modelBuilder.Entity("Lado.Models.Story", b =>
+                {
+                    b.HasOne("Lado.Models.ApplicationUser", "Creador")
+                        .WithMany()
+                        .HasForeignKey("CreadorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Creador");
+                });
+
+            modelBuilder.Entity("Lado.Models.StoryVista", b =>
+                {
+                    b.HasOne("Lado.Models.Story", "Story")
+                        .WithMany("Vistas")
+                        .HasForeignKey("StoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Lado.Models.ApplicationUser", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Story");
+
+                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("Lado.Models.Suscripcion", b =>
@@ -1346,16 +1729,34 @@ namespace Lado.Migrations
                     b.Navigation("Suscriptores");
                 });
 
+            modelBuilder.Entity("Lado.Models.Coleccion", b =>
+                {
+                    b.Navigation("Compras");
+
+                    b.Navigation("Contenidos");
+                });
+
             modelBuilder.Entity("Lado.Models.Contenido", b =>
                 {
+                    b.Navigation("Colecciones");
+
                     b.Navigation("Comentarios");
 
+                    b.Navigation("Compras");
+
                     b.Navigation("Likes");
+
+                    b.Navigation("Reacciones");
                 });
 
             modelBuilder.Entity("Lado.Models.Desafio", b =>
                 {
                     b.Navigation("Propuestas");
+                });
+
+            modelBuilder.Entity("Lado.Models.Story", b =>
+                {
+                    b.Navigation("Vistas");
                 });
 #pragma warning restore 612, 618
         }

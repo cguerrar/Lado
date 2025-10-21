@@ -3,168 +3,858 @@
     ViewData["Title"] = "Mi Perfil";
 }
 
-<div class="row">
-    <div class="col-lg-4 mb-4">
-        <!-- Card de Perfil -->
-        <div class="card shadow-sm">
-            <div class="card-body text-center p-4">
-                @if (!string.IsNullOrEmpty(Model.FotoPerfil))
-                {
-                    <img src="@Model.FotoPerfil"
-                         class="rounded-circle mb-3"
-                         style="width: 150px; height: 150px; object-fit: cover; border: 4px solid #00bcd4;"
-                         alt="@Model.UserName">
-                }
-                else
-                {
-                    <div class="rounded-circle bg-primary d-inline-flex align-items-center justify-content-center mb-3"
-                         style="width: 150px; height: 150px; border: 4px solid #00bcd4;">
-                        <span class="text-white" style="font-size: 3rem; font-weight: 700;">
+<style>
+    :root {
+        --primary-color: #32d67b;
+        --primary-dark: #28b369;
+        --dark-bg: #111827;
+        --card-bg: #ffffff;
+        --border-color: #e5e7eb;
+        --text-primary: #1a1a1a;
+        --text-secondary: #6b7280;
+        --accent-blue: #3b82f6;
+        --accent-purple: #8b5cf6;
+        --accent-orange: #f97316;
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.15);
+    }
+
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%);
+        min-height: 100vh;
+    }
+
+    .perfil-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 32px 24px;
+    }
+
+    /* Logo */
+    .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+        color: #111827;
+        font-weight: 800;
+        font-size: 1.4rem;
+        transition: transform 0.2s ease;
+        margin-bottom: 32px;
+    }
+
+        .brand:hover {
+            transform: scale(1.02);
+        }
+
+    .brand-badge {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: #32d67b;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        box-shadow: 0 2px 8px rgba(50, 214, 123, 0.25);
+    }
+
+    /* Header con Banner */
+    .profile-banner {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-blue) 100%);
+        height: 200px;
+        border-radius: 20px;
+        margin-bottom: -80px;
+        box-shadow: var(--shadow-lg);
+        position: relative;
+        overflow: hidden;
+    }
+
+        .profile-banner::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 400px;
+            height: 400px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+
+        .profile-banner::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -5%;
+            width: 300px;
+            height: 300px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 50%;
+        }
+
+    /* Cards */
+    .card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        box-shadow: var(--shadow-sm);
+        transition: transform 0.2s, box-shadow 0.2s;
+        overflow: hidden;
+    }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+    .card-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border-color);
+        background: transparent;
+    }
+
+        .card-header h5 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+    .card-body {
+        padding: 24px;
+    }
+
+    /* Perfil Principal */
+    .profile-main {
+        position: relative;
+        z-index: 1;
+    }
+
+    .profile-header {
+        display: flex;
+        align-items: flex-end;
+        gap: 24px;
+        margin-bottom: 24px;
+        padding: 0 24px;
+    }
+
+    .avatar-container {
+        position: relative;
+        width: 160px;
+        height: 160px;
+        flex-shrink: 0;
+    }
+
+    .avatar-image {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 5px solid white;
+        box-shadow: var(--shadow-lg);
+    }
+
+    .avatar-placeholder {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: var(--primary-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 4rem;
+        font-weight: 700;
+        border: 5px solid white;
+        box-shadow: var(--shadow-lg);
+    }
+
+    .avatar-status {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        width: 24px;
+        height: 24px;
+        background: #22c55e;
+        border: 3px solid white;
+        border-radius: 50%;
+    }
+
+    .profile-info {
+        flex: 1;
+        padding-bottom: 16px;
+    }
+
+    .user-name {
+        font-size: 32px;
+        font-weight: 800;
+        color: var(--text-primary);
+        margin: 0 0 4px 0;
+    }
+
+    .user-username {
+        color: var(--text-secondary);
+        margin-bottom: 12px;
+        font-size: 18px;
+    }
+
+    .user-bio {
+        color: var(--text-primary);
+        margin-bottom: 16px;
+        line-height: 1.6;
+        max-width: 600px;
+    }
+
+    /* Stats */
+    .stats-row {
+        display: flex;
+        gap: 32px;
+        margin-top: 16px;
+    }
+
+    .stat-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .stat-number {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .stat-label {
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Badges */
+    .badges-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .badge-verified {
+        background: var(--accent-blue);
+        color: white;
+    }
+
+    .badge-premium {
+        background: var(--accent-purple);
+        color: white;
+    }
+
+    /* Botones */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 15px;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        width: 100%;
+    }
+
+    .btn-primary {
+        background: var(--primary-color);
+        color: white;
+    }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+            color: white;
+        }
+
+    .btn-outline {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+    }
+
+        .btn-outline:hover {
+            background: #f9fafb;
+            border-color: var(--text-secondary);
+        }
+
+    .btn-success {
+        background: #22c55e;
+        color: white;
+    }
+
+        .btn-success:hover {
+            background: #16a34a;
+            color: white;
+        }
+
+    /* Información */
+    .info-group {
+        margin-bottom: 20px;
+    }
+
+    .info-label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+    }
+
+    .info-value {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-primary);
+        word-break: break-word;
+    }
+
+    /* Iconos SVG */
+    .icon {
+        width: 20px;
+        height: 20px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .icon-fill {
+        fill: currentColor;
+        stroke: none;
+    }
+
+    /* Layout */
+    .perfil-grid {
+        display: grid;
+        grid-template-columns: 350px 1fr;
+        gap: 24px;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+    }
+
+    .info-grid-full {
+        grid-column: 1 / -1;
+    }
+
+    .card-spacing {
+        margin-top: 24px;
+    }
+
+    /* Activity Timeline */
+    .timeline-item {
+        display: flex;
+        gap: 16px;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+        .timeline-item:last-child {
+            border-bottom: none;
+        }
+
+    .timeline-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+        .timeline-icon.success {
+            background: rgba(34, 197, 94, 0.1);
+            color: #22c55e;
+        }
+
+        .timeline-icon.info {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+
+        .timeline-icon.warning {
+            background: rgba(249, 115, 22, 0.1);
+            color: #f97316;
+        }
+
+    .timeline-content {
+        flex: 1;
+    }
+
+    .timeline-title {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+    }
+
+    .timeline-time {
+        font-size: 13px;
+        color: var(--text-secondary);
+    }
+
+    /* Quick Actions */
+    .quick-action {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        border-radius: 12px;
+        background: #f9fafb;
+        border: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        color: inherit;
+    }
+
+        .quick-action:hover {
+            background: white;
+            border-color: var(--primary-color);
+            transform: translateX(4px);
+        }
+
+    .quick-action-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: white;
+    }
+
+    .quick-action-content {
+        flex: 1;
+    }
+
+    .quick-action-title {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 2px;
+    }
+
+    .quick-action-desc {
+        font-size: 13px;
+        color: var(--text-secondary);
+    }
+
+    /* Responsive */
+    @@media (max-width: 1200px) {
+        .perfil-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .profile-header {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .stats-row {
+            justify-content: center;
+        }
+
+        .user-bio {
+            text-align: center;
+            margin-left: auto;
+            margin-right: auto;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .profile-banner {
+            height: 150px;
+            margin-bottom: -60px;
+        }
+
+        .avatar-container {
+            width: 120px;
+            height: 120px;
+        }
+
+        .avatar-placeholder {
+            font-size: 3rem;
+        }
+
+        .user-name {
+            font-size: 24px;
+        }
+
+        .stats-row {
+            gap: 20px;
+        }
+
+        .stat-number {
+            font-size: 20px;
+        }
+
+        .perfil-container {
+            padding: 24px 16px;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        .info-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .profile-banner {
+            height: 120px;
+            margin-bottom: -50px;
+        }
+
+        .avatar-container {
+            width: 100px;
+            height: 100px;
+        }
+
+        .avatar-placeholder {
+            font-size: 2.5rem;
+        }
+
+        .user-name {
+            font-size: 20px;
+        }
+
+        .user-username {
+            font-size: 16px;
+        }
+
+        .stats-row {
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .stat-item {
+            flex: 1;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .card-header {
+            padding: 16px 20px;
+        }
+
+        .card-body {
+            padding: 16px;
+        }
+    }
+</style>
+
+<div class="perfil-container">
+    <!-- Logo -->
+    <a href="/" class="brand">
+        <span class="brand-badge">L</span>
+        <span>lado</span>
+    </a>
+
+    <!-- Banner Superior -->
+    <div class="profile-banner"></div>
+
+    <!-- Sección Principal del Perfil -->
+    <div class="profile-main">
+        <div class="card" style="border: none; box-shadow: var(--shadow-lg);">
+            <div class="profile-header">
+                <!-- Avatar -->
+                <div class="avatar-container">
+                    @if (!string.IsNullOrEmpty(Model.FotoPerfil))
+                    {
+                        <img src="@Model.FotoPerfil" class="avatar-image" alt="@Model.UserName">
+                    }
+                    else
+                    {
+                        <div class="avatar-placeholder">
                             @Model.NombreCompleto.Substring(0, 1).ToUpper()
+                        </div>
+                    }
+                    <div class="avatar-status"></div>
+                </div>
+
+                <!-- Información del Usuario -->
+                <div class="profile-info">
+                    <h1 class="user-name">@Model.NombreCompleto</h1>
+                    <p class="user-username">@@@Model.UserName</p>
+
+                    <div class="badges-row">
+                        <span class="badge badge-verified">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" fill="none" />
+                                <polyline points="22 4 12 14.01 9 11.01" fill="none" />
+                            </svg>
+                            Verificado
+                        </span>
+                        <span class="badge badge-premium">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="none" />
+                            </svg>
+                            Premium
                         </span>
                     </div>
-                }
 
-                <h4 class="mb-1">@Model.NombreCompleto</h4>
-                <p class="text-muted mb-3">@@@Model.UserName</p>
+                    @if (!string.IsNullOrEmpty(Model.Biografia))
+                    {
+                        <p class="user-bio">@Model.Biografia</p>
+                    }
 
-                @if (Model.TipoUsuario == 1)
-                {
-                    <span class="badge bg-primary mb-3">
-                        <i class="fas fa-star"></i> Creador
-                    </span>
-                }
-                else
-                {
-                    <span class="badge bg-info mb-3">
-                        <i class="fas fa-heart"></i> Fan
-                    </span>
-                }
-
-                <div class="d-grid gap-2 mt-3">
-                    <a href="/Usuario/EditarPerfil" class="btn btn-primary">
-                        <i class="fas fa-edit"></i> Editar Perfil
-                    </a>
-                    <a href="/Usuario/Configuracion" class="btn btn-outline-secondary">
-                        <i class="fas fa-cog"></i> Configuración
-                    </a>
+                    <!-- Estadísticas -->
+                    <div class="stats-row">
+                        <div class="stat-item">
+                            <span class="stat-number">0</span>
+                            <span class="stat-label">Seguidores</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">0</span>
+                            <span class="stat-label">Siguiendo</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">0</span>
+                            <span class="stat-label">Publicaciones</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <!-- Estadísticas Rápidas -->
-        @if (Model.TipoUsuario == 1)
-        {
-            <div class="card shadow-sm mt-3">
-                <div class="card-body">
-                    <h6 class="text-muted mb-3">Estadísticas</h6>
-                    <div class="d-flex justify-content-between mb-3">
-                        <span class="text-muted">Suscriptores</span>
-                        <strong>@(ViewBag.Suscriptores ?? 0)</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-3">
-                        <span class="text-muted">Publicaciones</span>
-                        <strong>@(ViewBag.Publicaciones ?? 0)</strong>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span class="text-muted">Ingresos Totales</span>
-                        <strong class="text-success">$@(ViewBag.IngresosTotales?.ToString("N2") ?? "0.00")</strong>
-                    </div>
-                </div>
-            </div>
-        }
     </div>
 
-    <div class="col-lg-8">
-        <!-- Información Personal -->
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="fas fa-user me-2"></i>Información Personal</h5>
+    <!-- Grid Principal -->
+    <div class="perfil-grid" style="margin-top: 24px;">
+        <!-- Columna Izquierda -->
+        <div>
+            <!-- Acciones Rápidas -->
+            <div class="card">
+                <div class="card-header">
+                    <h5>
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="1" />
+                            <circle cx="19" cy="12" r="1" />
+                            <circle cx="5" cy="12" r="1" />
+                        </svg>
+                        Acciones Rápidas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <a href="/Usuario/EditarPerfil" class="quick-action">
+                        <div class="quick-action-icon" style="background: rgba(50, 214, 123, 0.1); color: var(--primary-color);">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                        </div>
+                        <div class="quick-action-content">
+                            <div class="quick-action-title">Editar Perfil</div>
+                            <div class="quick-action-desc">Actualiza tu información</div>
+                        </div>
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                    </a>
+
+                    <a href="/Usuario/Configuracion" class="quick-action" style="margin-top: 12px;">
+                        <div class="quick-action-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--accent-blue);">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="3" />
+                                <path d="M12 1v6m0 6v6" />
+                            </svg>
+                        </div>
+                        <div class="quick-action-content">
+                            <div class="quick-action-title">Configuración</div>
+                            <div class="quick-action-desc">Privacidad y preferencias</div>
+                        </div>
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                    </a>
+
+                    <a href="/Billetera" class="quick-action" style="margin-top: 12px;">
+                        <div class="quick-action-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+                                <line x1="1" y1="10" x2="23" y2="10" />
+                            </svg>
+                        </div>
+                        <div class="quick-action-content">
+                            <div class="quick-action-title">Billetera</div>
+                            <div class="quick-action-desc">Gestiona tus fondos</div>
+                        </div>
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                    </a>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="text-muted small">Nombre Completo</label>
-                        <p class="fw-semibold">@Model.NombreCompleto</p>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="text-muted small">Nombre de Usuario</label>
-                        <p class="fw-semibold">@@@Model.UserName</p>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="text-muted small">Correo Electrónico</label>
-                        <p class="fw-semibold">@Model.Email</p>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="text-muted small">Teléfono</label>
-                        <p class="fw-semibold">@(!string.IsNullOrEmpty(Model.PhoneNumber) ? Model.PhoneNumber : "No especificado")</p>
-                    </div>
-                    <div class="col-12">
-                        <label class="text-muted small">Biografía</label>
-                        <p class="fw-semibold">@(!string.IsNullOrEmpty(Model.Biografia) ? Model.Biografia : "Sin biografía")</p>
+
+            <!-- Actividad Reciente -->
+            <div class="card card-spacing">
+                <div class="card-header">
+                    <h5>
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                        </svg>
+                        Actividad Reciente
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline-item">
+                        <div class="timeline-icon success">
+                            <svg class="icon" style="width: 16px; height: 16px;" viewBox="0 0 24 24">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                        </div>
+                        <div class="timeline-content">
+                            <div class="timeline-title">Cuenta creada</div>
+                            <div class="timeline-time">@Model.FechaRegistro.ToString("dd/MM/yyyy")</div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        @if (Model.TipoUsuario == 1)
-        {
-            <!-- Información de Creador -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="fas fa-dollar-sign me-2"></i>Información Financiera</h5>
+        <!-- Columna Derecha -->
+        <div>
+            <!-- Información Personal -->
+            <div class="card">
+                <div class="card-header">
+                    <h5>
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                        </svg>
+                        Información Personal
+                    </h5>
                 </div>
                 <div class="card-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="text-muted small">Precio de Suscripción</label>
-                            <p class="fw-semibold text-success">$@(Model.PrecioSuscripcion.ToString("N2")) / mes</p>
+                    <div class="info-grid">
+                        <div class="info-group">
+                            <label class="info-label">Nombre Completo</label>
+                            <p class="info-value">@Model.NombreCompleto</p>
                         </div>
-                        <div class="col-md-6">
-                            <label class="text-muted small">Saldo Disponible</label>
-                            <p class="fw-semibold text-success">$@Model.Saldo.ToString("N2")</p>
+
+                        <div class="info-group">
+                            <label class="info-label">Nombre de Usuario</label>
+                            <p class="info-value">@@@Model.UserName</p>
                         </div>
-                        <div class="col-md-12">
-                            <a href="/Billetera" class="btn btn-success">
-                                <i class="fas fa-wallet"></i> Ver Billetera
-                            </a>
+
+                        <div class="info-group">
+                            <label class="info-label">Correo Electrónico</label>
+                            <p class="info-value">@Model.Email</p>
+                        </div>
+
+                        <div class="info-group">
+                            <label class="info-label">Teléfono</label>
+                            <p class="info-value">@(!string.IsNullOrEmpty(Model.PhoneNumber) ? Model.PhoneNumber : "No especificado")</p>
+                        </div>
+
+                        <div class="info-group info-grid-full">
+                            <label class="info-label">Biografía</label>
+                            <p class="info-value">@(!string.IsNullOrEmpty(Model.Biografia) ? Model.Biografia : "Sin biografía")</p>
                         </div>
                     </div>
                 </div>
             </div>
-        }
 
-        <!-- Cuenta y Seguridad -->
-        <div class="card shadow-sm">
-            <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Cuenta y Seguridad</h5>
+            <!-- Información Financiera -->
+            <div class="card card-spacing">
+                <div class="card-header">
+                    <h5>
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <line x1="12" y1="1" x2="12" y2="23" />
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                        </svg>
+                        Información Financiera
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-group">
+                            <label class="info-label">Precio de Suscripción</label>
+                            <p class="info-value" style="color: #22c55e;">$@(Model.PrecioSuscripcion.ToString("N2")) / mes</p>
+                        </div>
+
+                        <div class="info-group">
+                            <label class="info-label">Saldo Disponible</label>
+                            <p class="info-value" style="color: #22c55e;">$@Model.Saldo.ToString("N2")</p>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px;">
+                        <a href="/Billetera" class="btn btn-success">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+                                <line x1="1" y1="10" x2="23" y2="10" />
+                            </svg>
+                            Ver Billetera
+                        </a>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="text-muted small">Tipo de Cuenta</label>
-                        <p class="fw-semibold">
-                            @if (Model.TipoUsuario == 1)
-                            {
-                                <text>Creador</text>
-                            }
-                            else if (Model.TipoUsuario == 2)
-                            {
-                                <text>Agencia</text>
-                            }
-                            else
-                            {
-                                <text>Fan</text>
-                            }
-                        </p>
+
+            <!-- Cuenta y Seguridad -->
+            <div class="card card-spacing">
+                <div class="card-header">
+                    <h5>
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        </svg>
+                        Cuenta y Seguridad
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-group">
+                            <label class="info-label">Fecha de Registro</label>
+                            <p class="info-value">@Model.FechaRegistro.ToString("dd/MM/yyyy")</p>
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <label class="text-muted small">Fecha de Registro</label>
-                        <p class="fw-semibold">@Model.FechaRegistro.ToString("dd/MM/yyyy")</p>
-                    </div>
-                    <div class="col-12">
-                        <a href="/Usuario/CambiarContrasena" class="btn btn-outline-primary">
-                            <i class="fas fa-key"></i> Cambiar Contraseña
+
+                    <div style="margin-top: 20px;">
+                        <a href="/Usuario/CambiarContrasena" class="btn btn-outline">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                            </svg>
+                            Cambiar Contraseña
                         </a>
                     </div>
                 </div>
@@ -172,13 +862,3 @@
         </div>
     </div>
 </div>
-
-<style>
-    .card {
-        transition: transform 0.2s;
-    }
-
-        .card:hover {
-            transform: translateY(-2px);
-        }
-</style>

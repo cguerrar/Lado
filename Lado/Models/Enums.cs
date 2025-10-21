@@ -7,6 +7,24 @@
         Agencia = 2
     }
 
+    public enum TipoReaccion
+    {
+        Like = 0,
+        Fire = 1,      // 🔥
+        Heart = 2,     // ❤️
+        Wow = 3,       // 😍
+        Clap = 4       // 👏
+    }
+
+    public enum EstadoTransaccion
+    {
+        Pendiente = 0,
+        Procesando = 1,
+        Completada = 2,
+        Fallida = 3,
+        Cancelada = 4,
+        Reembolsada = 5
+    }
 
     public enum TipoContenido
     {
@@ -50,4 +68,13 @@
         Comision = 40,
         Ajuste = 41
     }
+
+    public enum TipoLado
+    {
+        LadoA = 0,  // Público, gratuito, perfil real
+        LadoB = 1   // Monetizado, seudónimo
+    }
+
+
+
 }

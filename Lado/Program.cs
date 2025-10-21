@@ -143,7 +143,6 @@ try
                 UserName = "admin",
                 Email = adminEmail,
                 NombreCompleto = "Administrador",
-                TipoUsuario = 2,
                 EmailConfirmed = true,
                 EstaActivo = true,
                 FechaRegistro = DateTime.Now,

@@ -30,9 +30,7 @@ namespace Lado.Controllers
         public async Task<IActionResult> Index()
         {
             ViewBag.TotalUsuarios = await _context.Users.CountAsync();
-            ViewBag.TotalCreadores = await _context.Users.CountAsync(u => u.TipoUsuario == 1);
-            ViewBag.TotalFans = await _context.Users.CountAsync(u => u.TipoUsuario == 2);
-            ViewBag.TotalSuscripciones = await _context.Suscripciones.CountAsync(s => s.EstaActiva);
+              ViewBag.TotalSuscripciones = await _context.Suscripciones.CountAsync(s => s.EstaActiva);
             ViewBag.TotalPublicaciones = await _context.Contenidos.CountAsync();
             ViewBag.PublicacionesHoy = await _context.Contenidos
                 .CountAsync(c => c.FechaPublicacion.Date == DateTime.Today);
@@ -411,7 +409,6 @@ namespace Lado.Controllers
         public async Task<IActionResult> Estadisticas()
         {
             ViewBag.TotalUsuarios = await _context.Users.CountAsync();
-            ViewBag.TotalCreadores = await _context.Users.CountAsync(u => u.TipoUsuario == 1);
             ViewBag.TotalSuscripciones = await _context.Suscripciones.CountAsync(s => s.EstaActiva);
             ViewBag.TotalPublicaciones = await _context.Contenidos.CountAsync();
 

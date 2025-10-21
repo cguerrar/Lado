@@ -30,13 +30,7 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-            // Solo creadores pueden acceder a la billetera
-            if (usuario.TipoUsuario != 1) // 1 = Creador
-            {
-                TempData["Error"] = "Solo los creadores tienen acceso a la billetera";
-                return RedirectToAction("Index", "Dashboard");
-            }
-
+          
             // Ingresos este mes (todas las transacciones excepto retiros)
             var inicioMes = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
             ViewBag.IngresosEsteMes = await _context.Transacciones
@@ -123,12 +117,7 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-            if (usuario.TipoUsuario != 1) // 1 = Creador
-            {
-                TempData["Error"] = "Solo los creadores pueden solicitar retiros";
-                return RedirectToAction(nameof(Index));
-            }
-
+          
             // Validaciones
             if (monto <= 0)
             {
@@ -181,15 +170,7 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-            if (usuario.TipoUsuario != 1) // 1 = Creador
-            {
-                TempData["Error"] = "Solo los creadores pueden configurar métodos de pago";
-                return RedirectToAction(nameof(Index));
-            }
-
-            // Aquí deberías crear una tabla MetodosPago para guardar esta información
-            // Por ahora solo mostramos el mensaje de éxito
-
+  
             TempData["Success"] = "Método de pago actualizado correctamente";
             return RedirectToAction(nameof(Index));
         }
@@ -203,12 +184,7 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-            if (usuario.TipoUsuario != 1) // 1 = Creador
-            {
-                TempData["Error"] = "Solo los creadores tienen acceso a esta sección";
-                return RedirectToAction("Index", "Dashboard");
-            }
-
+      
             int itemsPorPagina = 20;
 
             var query = _context.Transacciones

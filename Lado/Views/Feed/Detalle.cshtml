@@ -1,55 +1,59 @@
 ﻿@model Lado.Models.Contenido
 @{
     ViewData["Title"] = "Detalle del Contenido";
-    var estaSuscrito = (bool)ViewBag.EstaSuscrito;
-    var esPropio = (bool)ViewBag.EsPropio;
+    var estaSuscrito = ViewBag.EstaSuscrito ?? false;
 }
 
 @Html.AntiForgeryToken()
 
 <style>
     :root {
-        --primary-color: #00bcd4;
-        --primary-dark: #0288d1;
+        --primary: #32d67b;
+        --primary-dark: #16a34a;
+        --bg: #fafafa;
+        --card-bg: #ffffff;
+        --fg: #111827;
+        --muted: #6b7280;
+        --border: #e5e7eb;
+        --hover: #f3f4f6;
     }
 
-    .detalle-container {
-        max-width: 1000px;
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        background: var(--bg);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    /* LAYOUT PRINCIPAL */
+    .detail-layout {
+        max-width: 1200px;
         margin: 0 auto;
-        padding: 24px 16px;
+        padding: 24px 20px 40px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 24px;
     }
 
-    .back-button {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        color: #6b7280;
-        text-decoration: none;
-        font-size: 14px;
-        font-weight: 600;
-        margin-bottom: 24px;
-        padding: 8px 12px;
-        border-radius: 8px;
-        transition: all 0.2s;
-    }
-
-        .back-button:hover {
-            background: #f3f4f6;
-            color: var(--primary-color);
-        }
-
+    /* CARD DE CONTENIDO */
     .content-card {
-        background: white;
-        border-radius: 16px;
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
         overflow: hidden;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        margin-bottom: 24px;
     }
 
-    /* Header */
+    /* HEADER */
     .content-header {
-        padding: 20px;
-        border-bottom: 1px solid #f3f4f6;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
     }
 
     .creator-info {
@@ -57,6 +61,8 @@
         align-items: center;
         gap: 12px;
         text-decoration: none;
+        flex: 1;
+        min-width: 0;
     }
 
     .creator-avatar {
@@ -64,325 +70,556 @@
         height: 48px;
         border-radius: 50%;
         overflow: hidden;
-        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-        flex-shrink: 0;
-    }
-
-        .creator-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-    .avatar-placeholder {
-        width: 100%;
-        height: 100%;
+        background: var(--primary);
         display: flex;
         align-items: center;
         justify-content: center;
         color: white;
-        font-weight: 700;
-        font-size: 20px;
+        font-weight: 600;
+        flex-shrink: 0;
+    }
+
+    .creator-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .creator-details {
+        flex: 1;
+        min-width: 0;
     }
 
     .creator-details h3 {
         font-size: 16px;
         font-weight: 600;
-        color: #1a1a1a;
-        margin: 0 0 4px 0;
+        color: var(--fg);
+        margin: 0 0 2px 0;
     }
 
-    .creator-details p {
+    .creator-details span {
         font-size: 14px;
-        color: #6b7280;
-        margin: 0;
+        color: var(--muted);
     }
 
-    /* Media */
+    .menu-btn {
+        background: none;
+        border: none;
+        padding: 8px;
+        cursor: pointer;
+        color: var(--fg);
+        border-radius: 4px;
+        transition: background 0.2s;
+    }
+
+    .menu-btn:hover {
+        background: var(--hover);
+    }
+
+    /* MEDIA */
     .content-media {
         background: #000;
-        max-height: 600px;
         display: flex;
         align-items: center;
         justify-content: center;
+        max-height: 600px;
+        position: relative;
     }
 
-        .content-media img,
-        .content-media video {
-            width: 100%;
-            max-height: 600px;
-            object-fit: contain;
-        }
+    .content-media img,
+    .content-media video {
+        width: 100%;
+        max-height: 600px;
+        object-fit: contain;
+        display: block;
+    }
 
-    /* Descripción */
-    .content-description {
+    /* PREMIUM OVERLAY */
+    .premium-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.8) 100%);
+        backdrop-filter: blur(20px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
         padding: 20px;
-        font-size: 15px;
-        line-height: 1.6;
-        color: #1a1a1a;
-        border-bottom: 1px solid #f3f4f6;
+        text-align: center;
     }
 
-    /* Stats */
-    .content-stats {
+    .premium-lock-icon {
+        width: 72px;
+        height: 72px;
+        background: var(--primary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 16px;
+        box-shadow: 0 8px 32px rgba(50, 214, 123, 0.4);
+    }
+
+    .premium-lock-icon svg {
+        width: 32px;
+        height: 32px;
+    }
+
+    .premium-overlay h4 {
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0 0 8px 0;
+    }
+
+    .premium-overlay p {
+        font-size: 14px;
+        opacity: 0.9;
+        margin: 0 0 20px 0;
+    }
+
+    .unlock-btn {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 12px 32px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+
+    .unlock-btn:hover {
+        background: var(--primary-dark);
+        transform: translateY(-1px);
+    }
+
+    /* ACCIONES */
+    .content-actions {
         padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .action-buttons {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 12px;
+    }
+
+    .action-btn {
+        background: none;
+        border: none;
+        padding: 8px;
+        cursor: pointer;
+        color: var(--fg);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.15s;
+    }
+
+    .action-btn:hover {
+        transform: scale(1.1);
+    }
+
+    .action-btn svg {
+        width: 24px;
+        height: 24px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        transition: all 0.2s;
+    }
+
+    /* BOTÓN DE LIKE */
+    .like-btn.liked {
+        color: #ed4956;
+    }
+
+    .like-btn.liked svg {
+        fill: #ed4956;
+        stroke: #ed4956;
+    }
+
+    /* BOTÓN REACCIONAR */
+    .react-btn {
+        background: var(--hover);
+        border: 1px solid var(--border);
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--muted);
+        transition: all 0.2s;
+    }
+
+    .react-btn:hover {
+        background: var(--border);
+        color: var(--fg);
+    }
+
+    .content-stats {
         display: flex;
         gap: 24px;
-        border-bottom: 1px solid #f3f4f6;
+        font-size: 14px;
     }
 
     .stat-item {
         display: flex;
         align-items: center;
         gap: 6px;
-        color: #6b7280;
-        font-size: 14px;
+        color: var(--muted);
     }
 
-        .stat-item svg {
-            width: 18px;
-            height: 18px;
-        }
-
-    /* Actions */
-    .content-actions {
-        padding: 16px 20px;
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-        border-bottom: 1px solid #f3f4f6;
-    }
-
-    .action-btn {
-        background: none;
-        border: none;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 10px 16px;
-        cursor: pointer;
-        color: #374151;
-        font-size: 14px;
+    .stat-item strong {
+        color: var(--fg);
         font-weight: 600;
-        border-radius: 8px;
-        transition: all 0.2s;
     }
 
-        .action-btn:hover {
-            background: #f3f4f6;
-            color: var(--primary-color);
-        }
+    /* REACCIONES MINI */
+    .reacciones-mini {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        font-size: 16px;
+    }
 
-        .action-btn svg {
-            width: 20px;
-            height: 20px;
-        }
+    .reacciones-mini span {
+        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+    }
 
-        .action-btn.liked {
-            color: #ef4444;
-        }
+    /* DESCRIPCIÓN */
+    .content-description {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+    }
 
-            .action-btn.liked svg {
-                fill: #ef4444;
-                stroke: #ef4444;
-            }
+    .content-description p {
+        font-size: 15px;
+        line-height: 1.6;
+        color: var(--fg);
+        margin: 0;
+    }
 
-    /* Comentarios */
+    /* COMENTARIOS */
     .comments-section {
         padding: 20px;
     }
 
-        .comments-section h4 {
-            font-size: 18px;
-            font-weight: 700;
-            color: #1a1a1a;
-            margin-bottom: 20px;
-        }
-
-    .add-comment {
-        margin-bottom: 24px;
-    }
-
-    .comment-form {
+    .comments-header {
         display: flex;
-        gap: 12px;
-        align-items: flex-start;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
     }
 
-    .comment-avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        overflow: hidden;
-        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-        flex-shrink: 0;
+    .comments-header h3 {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--fg);
+        margin: 0;
     }
 
-        .comment-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-    .comment-input-wrapper {
-        flex: 1;
+    /* FORMULARIO */
+    .comment-form {
+        background: var(--hover);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 24px;
     }
 
     .comment-textarea {
         width: 100%;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        padding: 12px 16px;
+        border: none;
+        background: var(--card-bg);
+        border-radius: 8px;
+        padding: 12px;
         font-size: 14px;
-        outline: none;
-        transition: all 0.2s;
         resize: vertical;
         min-height: 80px;
+        margin-bottom: 12px;
+        color: var(--fg);
         font-family: inherit;
     }
 
-        .comment-textarea:focus {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.1);
-        }
+    .comment-textarea:focus {
+        outline: 2px solid var(--primary);
+    }
 
     .comment-actions {
         display: flex;
         gap: 8px;
-        margin-top: 8px;
         justify-content: flex-end;
     }
 
     .btn-comment {
         padding: 10px 20px;
-        border: none;
         border-radius: 8px;
-        font-weight: 600;
         font-size: 14px;
+        font-weight: 600;
         cursor: pointer;
+        border: none;
         transition: all 0.2s;
     }
 
     .btn-cancel {
-        background: #f3f4f6;
-        color: #6b7280;
+        background: none;
+        color: var(--muted);
+        border: 1px solid var(--border);
     }
 
-        .btn-cancel:hover {
-            background: #e5e7eb;
-        }
+    .btn-cancel:hover {
+        background: var(--hover);
+    }
 
     .btn-submit {
-        background: var(--primary-color);
+        background: var(--primary);
         color: white;
     }
 
-        .btn-submit:hover:not(:disabled) {
-            background: var(--primary-dark);
-            transform: translateY(-1px);
-        }
-
-        .btn-submit:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-    /* Lista de comentarios */
-    .comments-list {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
+    .btn-submit:hover:not(:disabled) {
+        background: var(--primary-dark);
     }
 
+    .btn-submit:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* LISTA DE COMENTARIOS */
     .comment-item {
         display: flex;
         gap: 12px;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .comment-item:last-child {
+        border-bottom: none;
     }
 
     .comment-content {
         flex: 1;
-        background: #f8f9fa;
-        padding: 12px 16px;
-        border-radius: 12px;
+        min-width: 0;
     }
 
     .comment-header {
         display: flex;
         align-items: center;
         gap: 8px;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
+        flex-wrap: wrap;
     }
 
-        .comment-header strong {
-            font-size: 14px;
-            font-weight: 600;
-            color: #1a1a1a;
-        }
+    .comment-header strong {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg);
+    }
 
-        .comment-header span {
-            font-size: 13px;
-            color: #6b7280;
-        }
+    .comment-header span {
+        font-size: 13px;
+        color: var(--muted);
+    }
 
     .comment-text {
         font-size: 14px;
         line-height: 1.5;
-        color: #374151;
-        margin: 0;
+        color: var(--fg);
     }
 
-    .empty-comments {
+    /* MODAL REACCIONES */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.65);
+        z-index: 9998;
+    }
+
+    .modal-reacciones {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 24px;
+        max-width: 400px;
+        width: 90%;
+        z-index: 9999;
+        box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
+    }
+
+    .modal-reacciones h3 {
+        font-size: 16px;
+        font-weight: 600;
         text-align: center;
-        padding: 40px 20px;
-        color: #6b7280;
+        margin-bottom: 20px;
+        color: var(--fg);
     }
 
-        .empty-comments svg {
-            width: 48px;
-            height: 48px;
-            margin-bottom: 12px;
-            opacity: 0.5;
-        }
+    .reacciones-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+    }
 
-    /* Responsive */
-    @@media (max-width: 768px) {
-        .detalle-container {
-            padding: 16px 12px;
+    .reaccion-btn {
+        background: var(--hover);
+        border: none;
+        border-radius: 8px;
+        padding: 16px 8px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+    }
+
+    .reaccion-btn:hover {
+        transform: scale(1.05);
+        background: var(--border);
+    }
+
+    .reaccion-btn .emoji {
+        font-size: 32px;
+    }
+
+    .reaccion-btn span:not(.emoji) {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--fg);
+    }
+
+    /* ANIMACIONES DE REACCIONES FLOTANTES */
+    .reaction-float {
+        position: absolute;
+        font-size: 48px;
+        pointer-events: none;
+        z-index: 100;
+        animation: floatUp 2s ease-out forwards;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+    }
+
+    @@keyframes floatUp {
+        0% {
+            opacity: 1;
+            transform: translateY(0) scale(0);
+        }
+        10% {
+            transform: translateY(-10px) scale(1.2);
+        }
+        50% {
+            opacity: 1;
+            transform: translateY(-80px) scale(1);
+        }
+        100% {
+            opacity: 0;
+            transform: translateY(-150px) scale(0.8) rotate(10deg);
+        }
+    }
+
+    .reaction-float.variant-1 {
+        animation-duration: 1.8s;
+    }
+
+    .reaction-float.variant-2 {
+        animation-duration: 2.2s;
+    }
+
+    .reaction-float.left {
+        animation-name: floatUpLeft;
+    }
+
+    .reaction-float.right {
+        animation-name: floatUpRight;
+    }
+
+    @@keyframes floatUpLeft {
+        0% {
+            opacity: 1;
+            transform: translate(0, 0) scale(0);
+        }
+        10% {
+            transform: translate(-5px, -10px) scale(1.2);
+        }
+        50% {
+            opacity: 1;
+            transform: translate(-40px, -80px) scale(1);
+        }
+        100% {
+            opacity: 0;
+            transform: translate(-60px, -150px) scale(0.8) rotate(-15deg);
+        }
+    }
+
+    @@keyframes floatUpRight {
+        0% {
+            opacity: 1;
+            transform: translate(0, 0) scale(0);
+        }
+        10% {
+            transform: translate(5px, -10px) scale(1.2);
+        }
+        50% {
+            opacity: 1;
+            transform: translate(40px, -80px) scale(1);
+        }
+        100% {
+            opacity: 0;
+            transform: translate(60px, -150px) scale(0.8) rotate(15deg);
+        }
+    }
+
+    @@keyframes pulse {
+        0% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.3);
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    /* RESPONSIVE */
+    @@media (max-width: 640px) {
+        .detail-layout {
+            padding: 0 0 40px;
         }
 
         .content-card {
-            border-radius: 12px;
+            border-radius: 0;
+            border-left: none;
+            border-right: none;
         }
 
-        .content-stats {
-            flex-wrap: wrap;
-            gap: 16px;
-        }
-
-        .comment-form {
-            flex-direction: column;
-        }
-
-        .comment-avatar {
-            display: none;
+        .reacciones-grid {
+            grid-template-columns: repeat(2, 1fr);
         }
     }
 </style>
 
-<div class="detalle-container">
-    <!-- Back Button -->
-    <a href="javascript:history.back()" class="back-button">
-        <!-- ✅ SVG DE ALTA CALIDAD -->
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="19" y1="12" x2="5" y2="12" />
-            <polyline points="12 19 5 12 12 5" />
-        </svg>
-        Volver
-    </a>
-
-    <!-- Content Card -->
+<div class="detail-layout">
     <div class="content-card">
-        <!-- Header -->
+        <!-- HEADER -->
         <div class="content-header">
             <a href="/Feed/Perfil/@Model.UsuarioId" class="creator-info">
                 <div class="creator-avatar">
@@ -392,30 +629,62 @@
                     }
                     else
                     {
-                        <div class="avatar-placeholder">
-                            @(Model.Usuario?.NombreCompleto?.Substring(0, 1) ?? "U")
-                        </div>
+                        @(Model.Usuario?.NombreCompleto?.Substring(0, 1) ?? "U")
                     }
                 </div>
                 <div class="creator-details">
                     <h3>@(Model.Usuario?.NombreCompleto ?? "Usuario")</h3>
-                    <p>
-                        @@@(Model.Usuario?.UserName ?? "usuario") · 
+                    <span>
+                        @@@(Model.Usuario?.UserName ?? "usuario") ·
                         @{
                             var tiempo = DateTime.Now - Model.FechaPublicacion;
-                            var tiempoTexto = tiempo.TotalDays >= 1 ? $"{(int)tiempo.TotalDays} días" :
-                                            tiempo.TotalHours >= 1 ? $"{(int)tiempo.TotalHours} horas" : $"{(int)tiempo.TotalMinutes} minutos";
+                            var tiempoTexto = tiempo.TotalDays >= 1 ? $"{(int)tiempo.TotalDays}d" :
+                            tiempo.TotalHours >= 1 ? $"{(int)tiempo.TotalHours}h" : $"{(int)tiempo.TotalMinutes}m";
                         }
-                        hace @tiempoTexto
-                    </p>
+                        Hace @tiempoTexto
+                    </span>
                 </div>
             </a>
+            <button class="menu-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="12" r="1.5" />
+                    <circle cx="6" cy="12" r="1.5" />
+                    <circle cx="18" cy="12" r="1.5" />
+                </svg>
+            </button>
         </div>
 
-        <!-- Media -->
-        @if (!string.IsNullOrEmpty(Model.RutaArchivo))
-        {
-            <div class="content-media">
+        <!-- MEDIA -->
+        <div class="content-media">
+            @if (Model.EsPremium && !estaSuscrito)
+            {
+                @if ((int)Model.TipoContenido == 1)
+                {
+                    <video src="@Model.RutaArchivo" style="filter: blur(20px);" playsinline muted></video>
+                }
+                else
+                {
+                    <img src="@(Model.RutaArchivo ?? "/images/placeholder.jpg")" alt="Premium" style="filter: blur(20px);">
+                }
+                <div class="premium-overlay">
+                    <div class="premium-lock-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                    </div>
+                    <h4>Contenido Premium</h4>
+                    <p>Suscríbete para desbloquear</p>
+                    <button class="unlock-btn" onclick="window.location.href='/Feed/Perfil/@Model.UsuarioId'">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                        </svg>
+                        Suscribirse
+                    </button>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(Model.RutaArchivo))
+            {
                 @if ((int)Model.TipoContenido == 0)
                 {
                     <img src="@Model.RutaArchivo" alt="Contenido">
@@ -424,97 +693,115 @@
                 {
                     <video src="@Model.RutaArchivo" controls></video>
                 }
-            </div>
-        }
+            }
+        </div>
 
-        <!-- Descripción -->
+        <!-- ACCIONES -->
+        <div class="content-actions">
+            <div class="action-buttons">
+                <button class="action-btn like-btn" data-id="@Model.Id">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                    </svg>
+                </button>
+
+                <button class="action-btn share-btn" data-id="@Model.Id" data-username="@Model.Usuario?.UserName">
+                    <svg viewBox="0 0 24 24">
+                        <line x1="22" y1="2" x2="11" y2="13" />
+                        <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                    </svg>
+                    Compartir
+                </button>
+
+                <button class="react-btn" onclick="abrirModalReacciones()">
+                    <span style="font-size: 20px;">😊</span>
+                    Reaccionar
+                </button>
+            </div>
+
+            <!-- STATS -->
+            <div class="content-stats">
+                @{
+                    var reaccionesDict = ViewBag.ReaccionesPorContenido as IDictionary<int, dynamic>;
+                    var reaccionesContenido = reaccionesDict != null && reaccionesDict.ContainsKey(Model.Id)
+                    ? reaccionesDict[Model.Id]
+                    : null;
+                    var totalReacciones = reaccionesContenido?.TotalReacciones ?? 0;
+                }
+
+                <div class="stat-item" id="likes-container">
+                    @if (totalReacciones > 0)
+                    {
+                        <div class="reacciones-mini">
+                            <span>❤️</span>
+                            <span>🔥</span>
+                            <span>😍</span>
+                        </div>
+                        <strong id="likesCount">@totalReacciones</strong>
+                        <span>reacciones</span>
+                    }
+                    else
+                    {
+                        <strong id="likesCount">@Model.NumeroLikes</strong>
+                        <span>likes</span>
+                    }
+                </div>
+
+                <div class="stat-item">
+                    <strong id="commentsCount">@Model.NumeroComentarios</strong>
+                    <span>comentarios</span>
+                </div>
+
+                <div class="stat-item">
+                    <strong>@Model.NumeroVistas</strong>
+                    <span>vistas</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- DESCRIPCIÓN -->
         @if (!string.IsNullOrEmpty(Model.Descripcion))
         {
             <div class="content-description">
-                @Model.Descripcion
+                <p>@Model.Descripcion</p>
             </div>
         }
 
-        <!-- Stats -->
-        <div class="content-stats">
-            <div class="stat-item">
-                <!-- ✅ SVG DE ALTA CALIDAD -->
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                </svg>
-                <strong>@Model.NumeroLikes</strong> likes
-            </div>
-            <div class="stat-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-                <strong>@Model.NumeroComentarios</strong> comentarios
-            </div>
-            <div class="stat-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                </svg>
-                <strong>@Model.NumeroVistas</strong> vistas
-            </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="content-actions">
-            <button class="action-btn like-btn" data-id="@Model.Id">
-                <!-- ✅ SVG DE ALTA CALIDAD -->
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                </svg>
-                <span>Me gusta</span>
-            </button>
-            <button class="action-btn share-btn" data-id="@Model.Id" data-username="@Model.Usuario?.UserName">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13" />
-                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-                <span>Compartir</span>
-            </button>
-        </div>
-
-        <!-- Comentarios -->
+        <!-- COMENTARIOS -->
         <div class="comments-section">
-            <h4>Comentarios (@Model.NumeroComentarios)</h4>
+            <div class="comments-header">
+                <h3>Comentarios (@Model.NumeroComentarios)</h3>
+            </div>
 
-            <!-- Agregar comentario -->
-            <div class="add-comment">
-                <div class="comment-form">
-                    <div class="comment-input-wrapper">
-                        <textarea 
-                            id="commentText" 
-                            class="comment-textarea" 
-                            placeholder="Escribe un comentario..."
-                            rows="3"></textarea>
-                        <div class="comment-actions">
-                            <button type="button" class="btn-comment btn-cancel" onclick="clearComment()">Cancelar</button>
-                            <button type="button" class="btn-comment btn-submit" id="btnSubmitComment" disabled onclick="submitComment(@Model.Id)">Publicar</button>
-                        </div>
-                    </div>
+            <!-- FORMULARIO -->
+            <div class="comment-form">
+                <textarea id="commentText"
+                          class="comment-textarea"
+                          placeholder="Escribe un comentario..."
+                          rows="3"></textarea>
+                <div class="comment-actions">
+                    <button type="button" class="btn-comment btn-cancel" onclick="limpiarComentario()">Cancelar</button>
+                    <button type="button" class="btn-comment btn-submit" id="btnSubmit" disabled onclick="publicarComentario()">
+                        Publicar
+                    </button>
                 </div>
             </div>
 
-            <!-- Lista de comentarios -->
-            <div class="comments-list" id="commentsList">
+            <!-- LISTA -->
+            <div id="commentsList">
                 @if (Model.Comentarios != null && Model.Comentarios.Any())
                 {
                     @foreach (var comentario in Model.Comentarios.OrderByDescending(c => c.FechaCreacion))
                     {
                         <div class="comment-item">
-                            <div class="creator-avatar">
+                            <div class="creator-avatar" style="width: 40px; height: 40px; font-size: 14px;">
                                 @if (!string.IsNullOrEmpty(comentario.Usuario?.FotoPerfil))
                                 {
                                     <img src="@comentario.Usuario.FotoPerfil" alt="@comentario.Usuario.NombreCompleto">
                                 }
                                 else
                                 {
-                                    <div class="avatar-placeholder">
-                                        @(comentario.Usuario?.NombreCompleto?.Substring(0, 1) ?? "U")
-                                    </div>
+                                    @(comentario.Usuario?.NombreCompleto?.Substring(0, 1) ?? "U")
                                 }
                             </div>
                             <div class="comment-content">
@@ -526,9 +813,9 @@
                                         @{
                                             var tiempoComent = DateTime.Now - comentario.FechaCreacion;
                                             var tiempoTextoComent = tiempoComent.TotalDays >= 1 ? $"{(int)tiempoComent.TotalDays}d" :
-                                                                   tiempoComent.TotalHours >= 1 ? $"{(int)tiempoComent.TotalHours}h" : $"{(int)tiempoComent.TotalMinutes}m";
+                                            tiempoComent.TotalHours >= 1 ? $"{(int)tiempoComent.TotalHours}h" : $"{(int)tiempoComent.TotalMinutes}m";
                                         }
-                                        @tiempoTextoComent
+                                        Hace @tiempoTextoComent
                                     </span>
                                 </div>
                                 <p class="comment-text">@comentario.Texto</p>
@@ -538,12 +825,8 @@
                 }
                 else
                 {
-                    <div class="empty-comments">
-                        <!-- ✅ SVG DE ALTA CALIDAD -->
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                        </svg>
-                        <p>Aún no hay comentarios. ¡Sé el primero en comentar!</p>
+                    <div style="text-align: center; padding: 40px 20px; color: var(--muted);">
+                        <p>No hay comentarios aún. ¡Sé el primero en comentar!</p>
                     </div>
                 }
             </div>
@@ -551,81 +834,339 @@
     </div>
 </div>
 
+<!-- MODAL REACCIONES -->
+<div class="modal-overlay" id="modalOverlay" onclick="cerrarModal()"></div>
+<div class="modal-reacciones" id="modalReacciones">
+    <h3>Reacciona a este contenido</h3>
+    <div class="reacciones-grid">
+        <button class="reaccion-btn" onclick="enviarReaccion('fire')">
+            <span class="emoji">🔥</span>
+            <span>Fuego</span>
+        </button>
+        <button class="reaccion-btn" onclick="enviarReaccion('heart')">
+            <span class="emoji">❤️</span>
+            <span>Me encanta</span>
+        </button>
+        <button class="reaccion-btn" onclick="enviarReaccion('wow')">
+            <span class="emoji">😍</span>
+            <span>Wow</span>
+        </button>
+        <button class="reaccion-btn" onclick="enviarReaccion('clap')">
+            <span class="emoji">👏</span>
+            <span>Aplauso</span>
+        </button>
+    </div>
+    <button class="btn-comment btn-cancel" style="width: 100%;" onclick="cerrarModal()">Cancelar</button>
+</div>
+
 <script>
+    // ⭐ VARIABLES GLOBALES - DECLARADAS PRIMERO
+    const contenidoId = @Model.Id;
+    let commentText, btnSubmit;
+
     document.addEventListener('DOMContentLoaded', function() {
-        const commentText = document.getElementById('commentText');
-        const btnSubmit = document.getElementById('btnSubmitComment');
+        console.log('🎬 Vista Detalle iniciada - Contenido ID:', contenidoId);
 
-        // Habilitar/deshabilitar botón de enviar
-        commentText.addEventListener('input', function() {
-            btnSubmit.disabled = this.value.trim() === '';
-        });
+        // Inicializar elementos del DOM
+        commentText = document.getElementById('commentText');
+        btnSubmit = document.getElementById('btnSubmit');
 
-        // Enviar con Ctrl+Enter
-        commentText.addEventListener('keydown', function(e) {
-            if (e.ctrlKey && e.key === 'Enter' && !btnSubmit.disabled) {
-                submitComment(@Model.Id);
-            }
-        });
+        // ========================================
+        // CARGAR ESTADO DE LIKE
+        // ========================================
+        cargarEstadoLike();
 
-        // Like button
-        document.querySelector('.like-btn').addEventListener('click', async function() {
+        async function cargarEstadoLike() {
+            console.log('🔍 Cargando estado de like para contenido:', contenidoId);
+            
             try {
-                const response = await fetch(`/Contenido/Like/@Model.Id`, {
+                const response = await fetch('/Feed/ObtenerMisLikes', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
-                    }
+                    },
+                    body: JSON.stringify({ contenidoIds: [contenidoId] })
                 });
 
                 if (response.ok) {
                     const data = await response.json();
-                    this.classList.toggle('liked');
-                    // Actualizar contador en stats
-                    document.querySelector('.content-stats .stat-item strong').textContent = data.likes;
+                    console.log('📥 Respuesta de likes:', data);
+                    
+                    if (data.success && data.likesUsuario && data.likesUsuario.includes(contenidoId)) {
+                        const likeBtn = document.querySelector('.like-btn');
+                        if (likeBtn) {
+                            likeBtn.classList.add('liked');
+                            console.log('❤️ Like marcado para contenido:', contenidoId);
+                        }
+                    } else {
+                        console.log('🤍 Usuario no tiene like en este contenido');
+                    }
                 }
             } catch (error) {
-                console.error('Error al dar like:', error);
+                console.error('❌ Error al cargar estado de like:', error);
+            }
+        }
+
+        // ========================================
+        // LIKES
+        // ========================================
+        const likeBtn = document.querySelector('.like-btn');
+        if (likeBtn) {
+            likeBtn.addEventListener('click', async function() {
+                try {
+                    const response = await fetch(`/Contenido/Like/${contenidoId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+
+                        if (data.success) {
+                            if (data.liked) {
+                                this.classList.add('liked');
+                            } else {
+                                this.classList.remove('liked');
+                            }
+
+                            document.getElementById('likesCount').textContent = data.likes;
+
+                            this.style.transform = 'scale(1.2)';
+                            setTimeout(() => { this.style.transform = ''; }, 200);
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ Error al dar like:', error);
+                }
+            });
+        }
+
+        // ========================================
+        // COMENTARIOS
+        // ========================================
+        commentText.addEventListener('input', function() {
+            btnSubmit.disabled = this.value.trim() === '';
+        });
+
+        commentText.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (!btnSubmit.disabled) {
+                    publicarComentario();
+                }
             }
         });
 
-        // Share button
-        document.querySelector('.share-btn').addEventListener('click', async function() {
-            const contentId = this.dataset.id;
-            const username = this.dataset.username;
-            const url = `${window.location.origin}/Feed/Detalle/${contentId}`;
-            const title = `Contenido de @@${username}`;
-            const text = `Mira este increíble contenido de @@${username} en Lado`;
+        // ========================================
+        // MODAL REACCIONES
+        // ========================================
+        window.abrirModalReacciones = function() {
+            document.getElementById('modalOverlay').style.display = 'block';
+            document.getElementById('modalReacciones').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        };
+
+        window.cerrarModal = function() {
+            document.getElementById('modalOverlay').style.display = 'none';
+            document.getElementById('modalReacciones').style.display = 'none';
+            document.body.style.overflow = '';
+        };
+
+        window.enviarReaccion = async function(tipo) {
+            try {
+                const formData = new FormData();
+                formData.append('contenidoId', contenidoId);
+                formData.append('tipo', tipo);
+
+                const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                if (token) formData.append('__RequestVerificationToken', token);
+
+                const response = await fetch('/Reacciones/Reaccionar', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.reacciones) {
+                    actualizarVisualizacionReacciones(data.reacciones, data.totalReacciones);
+
+                    const emoji = getEmoji(tipo);
+                    crearAnimacionReaccion(emoji);
+
+                    const reactBtn = document.querySelector('.react-btn');
+                    if (reactBtn) {
+                        reactBtn.style.animation = 'pulse 0.4s ease';
+                        setTimeout(() => { reactBtn.style.animation = ''; }, 400);
+                    }
+
+                    mostrarNotificacion('¡Reacción enviada! ' + emoji, 'success');
+                    cerrarModal();
+                } else {
+                    mostrarNotificacion(data.message || 'Error al reaccionar', 'error');
+                }
+            } catch (error) {
+                console.error('❌ Error:', error);
+                mostrarNotificacion('Error al enviar reacción', 'error');
+            }
+        };
+
+        function actualizarVisualizacionReacciones(reacciones, totalReacciones) {
+            const likesContainer = document.getElementById('likes-container');
+            
+            if (totalReacciones > 0 && reacciones && reacciones.length > 0) {
+                const emojiMap = {
+                    'fire': '🔥',
+                    'heart': '❤️',
+                    'wow': '😍',
+                    'clap': '👏'
+                };
+
+                let html = '<div class="reacciones-mini">';
+                reacciones.forEach(r => {
+                    const emoji = emojiMap[r.tipo.toLowerCase()] || '❓';
+                    html += `<span title="${r.count} ${r.tipo}">${emoji}</span>`;
+                });
+                html += '</div>';
+                html += `<strong id="likesCount">${totalReacciones}</strong>`;
+                html += `<span>reacciones</span>`;
+
+                likesContainer.innerHTML = html;
+            }
+        }
+
+        function getEmoji(tipo) {
+            const emojis = { 'fire': '🔥', 'heart': '❤️', 'wow': '😍', 'clap': '👏' };
+            return emojis[tipo] || '😊';
+        }
+
+        function crearAnimacionReaccion(emoji) {
+            const mediaContainer = document.querySelector('.content-media');
+
+            if (!mediaContainer) return;
+
+            const cantidad = Math.floor(Math.random() * 3) + 3;
+
+            for (let i = 0; i < cantidad; i++) {
+                setTimeout(() => {
+                    const reactionElement = document.createElement('div');
+                    reactionElement.className = 'reaction-float';
+                    reactionElement.textContent = emoji;
+
+                    const variants = ['', 'variant-1', 'variant-2'];
+                    const directions = ['', 'left', 'right'];
+                    reactionElement.classList.add(
+                        variants[Math.floor(Math.random() * variants.length)],
+                        directions[Math.floor(Math.random() * directions.length)]
+                    );
+
+                    const rect = mediaContainer.getBoundingClientRect();
+                    const randomX = Math.random() * (rect.width - 60) + 30;
+                    const randomY = Math.random() * (rect.height - 60) + rect.height * 0.5;
+
+                    reactionElement.style.left = randomX + 'px';
+                    reactionElement.style.top = randomY + 'px';
+
+                    if (getComputedStyle(mediaContainer).position === 'static') {
+                        mediaContainer.style.position = 'relative';
+                    }
+
+                    mediaContainer.appendChild(reactionElement);
+
+                    setTimeout(() => {
+                        reactionElement.remove();
+                    }, 2200);
+                }, i * 150);
+            }
+        }
+
+        // ========================================
+        // COMPARTIR
+        // ========================================
+        document.querySelector('.share-btn')?.addEventListener('click', async function() {
+            const url = window.location.href;
+            const title = 'Contenido de @@@(Model.Usuario?.UserName ?? "Lado")';
+            const text = 'Mira este contenido en Lado';
 
             if (navigator.share) {
                 try {
                     await navigator.share({ title, text, url });
                 } catch (error) {
-                    if (error.name !== 'AbortError') {
-                        copiarAlPortapapeles(url);
-                    }
+                    if (error.name !== 'AbortError') copiarAlPortapapeles(url);
                 }
             } else {
                 copiarAlPortapapeles(url);
             }
         });
+
+        function copiarAlPortapapeles(texto) {
+            navigator.clipboard.writeText(texto).then(() => {
+                mostrarNotificacion('Enlace copiado ✓', 'success');
+            }).catch(() => {
+                mostrarNotificacion('No se pudo copiar', 'error');
+            });
+        }
+
+        // ========================================
+        // NOTIFICACIONES
+        // ========================================
+        function mostrarNotificacion(mensaje, tipo = 'success') {
+            const notif = document.createElement('div');
+            notif.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 14px 20px;
+                background: ${tipo === 'success' ? '#10b981' : '#ef4444'};
+                color: white;
+                border-radius: 8px;
+                font-weight: 600;
+                font-size: 14px;
+                z-index: 10000;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                animation: slideIn 0.3s ease;
+            `;
+            notif.textContent = mensaje;
+            document.body.appendChild(notif);
+
+            setTimeout(() => {
+                notif.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notif.remove(), 300);
+            }, 3000);
+        }
+
+        const style = document.createElement('style');
+        style.textContent = `
+            @@keyframes slideIn {
+                from { transform: translateX(400px); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @@keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(400px); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+
+        console.log('✅ Vista Detalle completamente inicializada');
     });
 
-    function clearComment() {
-        document.getElementById('commentText').value = '';
-        document.getElementById('btnSubmitComment').disabled = true;
+    // ========================================
+    // FUNCIONES GLOBALES
+    // ========================================
+    function limpiarComentario() {
+        commentText.value = '';
+        btnSubmit.disabled = true;
     }
 
-    async function submitComment(contentId) {
-        const textarea = document.getElementById('commentText');
-        const texto = textarea.value.trim();
-        const btnSubmit = document.getElementById('btnSubmitComment');
-
+    async function publicarComentario() {
+        const texto = commentText.value.trim();
         if (!texto) return;
 
-        // Estado de carga
-        const textoOriginal = btnSubmit.textContent;
         btnSubmit.disabled = true;
         btnSubmit.textContent = 'Publicando...';
 
@@ -636,71 +1177,57 @@
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
-                body: `id=${contentId}&texto=${encodeURIComponent(texto)}`
+                body: `id=${contenidoId}&texto=${encodeURIComponent(texto)}`
             });
 
             const data = await response.json();
 
             if (data.success) {
-                // Recargar la página para mostrar el nuevo comentario
-                location.reload();
+                document.getElementById('commentsCount').textContent = data.totalComentarios;
+
+                const commentsList = document.getElementById('commentsList');
+                const emptyMessage = commentsList.querySelector('[style*="text-align: center"]');
+                if (emptyMessage) {
+                    emptyMessage.remove();
+                }
+
+                const newComment = document.createElement('div');
+                newComment.className = 'comment-item';
+                
+                let avatarHtml = '';
+                if (data.comentario.usuario.fotoPerfil) {
+                    avatarHtml = `<img src="${data.comentario.usuario.fotoPerfil}" alt="${data.comentario.usuario.nombre}">`;
+                } else {
+                    avatarHtml = data.comentario.usuario.nombre.substring(0, 1);
+                }
+                
+                newComment.innerHTML = `
+                    <div class="creator-avatar" style="width: 40px; height: 40px; font-size: 14px;">
+                        ${avatarHtml}
+                    </div>
+                    <div class="comment-content">
+                        <div class="comment-header">
+                            <strong>${data.comentario.usuario.nombre}</strong>
+                            <span>@@${data.comentario.usuario.username}</span>
+                            <span>·</span>
+                            <span>Justo ahora</span>
+                        </div>
+                        <p class="comment-text">${texto}</p>
+                    </div>
+                `;
+                
+                commentsList.insertBefore(newComment, commentsList.firstChild);
+
+                limpiarComentario();
+                mostrarNotificacion('Comentario publicado ✓', 'success');
             } else {
-                mostrarNotificacion(data.message || 'Error al publicar comentario', 'error');
-                btnSubmit.textContent = textoOriginal;
-                btnSubmit.disabled = false;
+                mostrarNotificacion(data.message || 'Error al publicar', 'error');
             }
         } catch (error) {
-            console.error('Error al publicar comentario:', error);
-            mostrarNotificacion('Error al publicar el comentario', 'error');
-            btnSubmit.textContent = textoOriginal;
-            btnSubmit.disabled = false;
+            console.error('❌ Error:', error);
+            mostrarNotificacion('Error al publicar comentario', 'error');
+        } finally {
+            btnSubmit.textContent = 'Publicar';
         }
     }
-
-    function copiarAlPortapapeles(texto) {
-        navigator.clipboard.writeText(texto).then(() => {
-            mostrarNotificacion('Enlace copiado al portapapeles ✓', 'success');
-        }).catch(() => {
-            mostrarNotificacion('No se pudo copiar el enlace', 'error');
-        });
-    }
-
-    function mostrarNotificacion(mensaje, tipo = 'success') {
-        const notif = document.createElement('div');
-        notif.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 16px 24px;
-            background: ${tipo === 'success' ? '#10b981' : '#ef4444'};
-            color: white;
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 14px;
-            z-index: 9999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            animation: slideIn 0.3s ease;
-        `;
-        notif.textContent = mensaje;
-        document.body.appendChild(notif);
-
-        setTimeout(() => {
-            notif.style.animation = 'slideOut 0.3s ease';
-            setTimeout(() => notif.remove(), 300);
-        }, 3000);
-    }
-
-    // Animaciones
-    const style = document.createElement('style');
-    style.textContent = `
-        @@keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @@keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
-        }
-    `;
-    document.head.appendChild(style);
 </script>

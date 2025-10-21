@@ -11,7 +11,9 @@ namespace Lado.Data
         {
         }
 
-        // DbSets principales
+        // ========================================
+        // DbSets EXISTENTES
+        // ========================================
         public DbSet<Contenido> Contenidos { get; set; }
         public DbSet<Suscripcion> Suscripciones { get; set; }
         public DbSet<Transaccion> Transacciones { get; set; }
@@ -27,12 +29,22 @@ namespace Lado.Data
         public DbSet<CompraContenido> ComprasContenido { get; set; }
         public DbSet<Tip> Tips { get; set; }
 
+        // ========================================
+        // ⭐ DbSets NUEVOS - FEED PREMIUM
+        // ========================================
+        public DbSet<Story> Stories { get; set; }
+        public DbSet<StoryVista> StoryVistas { get; set; }
+        public DbSet<Reaccion> Reacciones { get; set; }
+        public DbSet<Coleccion> Colecciones { get; set; }
+        public DbSet<ContenidoColeccion> ContenidoColecciones { get; set; }
+        public DbSet<CompraColeccion> ComprasColeccion { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
             // ========================================
-            // CONFIGURACIÓN DE APPLICATION USER
+            // CONFIGURACIÓN DE APPLICATION USER (EXISTENTE)
             // ========================================
             modelBuilder.Entity<ApplicationUser>(entity =>
             {
@@ -49,17 +61,239 @@ namespace Lado.Data
                     .HasDefaultValue(0)
                     .IsRequired();
 
-                entity.HasIndex(e => e.TipoUsuario);
-                entity.HasIndex(e => e.EsCreador);
+                entity.Property(e => e.Seudonimo)
+                    .HasMaxLength(50)
+                    .IsRequired(false);
+
+                entity.Property(e => e.SeudonimoVerificado)
+                    .HasDefaultValue(false)
+                    .IsRequired();
+
+                entity.HasIndex(e => e.TipoUsuario)
+                    .HasDatabaseName("IX_AspNetUsers_TipoUsuario");
+
+                entity.HasIndex(e => e.EsCreador)
+                    .HasDatabaseName("IX_AspNetUsers_EsCreador");
+
+                entity.HasIndex(e => e.Seudonimo)
+                    .HasDatabaseName("IX_AspNetUsers_Seudonimo");
             });
 
             // ========================================
-            // CONFIGURACIÓN DE COMPRA CONTENIDO
+            // ⭐ CONFIGURACIÓN DE STORIES
+            // ========================================
+            modelBuilder.Entity<Story>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+
+                entity.HasOne(s => s.Creador)
+                    .WithMany()
+                    .HasForeignKey(s => s.CreadorId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(s => s.RutaArchivo)
+                    .HasMaxLength(500)
+                    .IsRequired();
+
+                entity.Property(s => s.Texto)
+                    .HasMaxLength(500)
+                    .IsRequired(false);
+
+                entity.Property(s => s.EstaActivo)
+                    .HasDefaultValue(true);
+
+                entity.Property(s => s.NumeroVistas)
+                    .HasDefaultValue(0);
+
+                // Índices para Stories
+                entity.HasIndex(s => s.CreadorId)
+                    .HasDatabaseName("IX_Stories_CreadorId");
+
+                entity.HasIndex(s => s.FechaExpiracion)
+                    .HasDatabaseName("IX_Stories_FechaExpiracion");
+
+                entity.HasIndex(s => new { s.CreadorId, s.FechaExpiracion, s.EstaActivo })
+                    .HasDatabaseName("IX_Stories_Creador_Expiracion_Activo");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE STORY VISTAS
+            // ========================================
+            modelBuilder.Entity<StoryVista>(entity =>
+            {
+                entity.HasKey(sv => sv.Id);
+
+                entity.HasOne(sv => sv.Story)
+                    .WithMany(s => s.Vistas)
+                    .HasForeignKey(sv => sv.StoryId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(sv => sv.Usuario)
+                    .WithMany()
+                    .HasForeignKey(sv => sv.UsuarioId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // Índices para StoryVistas
+                entity.HasIndex(sv => sv.StoryId)
+                    .HasDatabaseName("IX_StoryVistas_StoryId");
+
+                entity.HasIndex(sv => sv.UsuarioId)
+                    .HasDatabaseName("IX_StoryVistas_UsuarioId");
+
+                // Un usuario solo puede ver una story una vez
+                entity.HasIndex(sv => new { sv.StoryId, sv.UsuarioId })
+                    .IsUnique()
+                    .HasDatabaseName("IX_StoryVistas_Story_Usuario_Unique");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE REACCIONES
+            // ========================================
+            modelBuilder.Entity<Reaccion>(entity =>
+            {
+                entity.HasKey(r => r.Id);
+
+                entity.HasOne(r => r.Contenido)
+                    .WithMany(c => c.Reacciones)
+                    .HasForeignKey(r => r.ContenidoId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(r => r.Usuario)
+                    .WithMany()
+                    .HasForeignKey(r => r.UsuarioId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // Índices para Reacciones
+                entity.HasIndex(r => r.ContenidoId)
+                    .HasDatabaseName("IX_Reacciones_ContenidoId");
+
+                entity.HasIndex(r => r.UsuarioId)
+                    .HasDatabaseName("IX_Reacciones_UsuarioId");
+
+                // Un usuario solo puede tener UNA reacción por contenido
+                entity.HasIndex(r => new { r.UsuarioId, r.ContenidoId })
+                    .IsUnique()
+                    .HasDatabaseName("IX_Reacciones_Usuario_Contenido_Unique");
+
+                entity.HasIndex(r => new { r.ContenidoId, r.TipoReaccion })
+                    .HasDatabaseName("IX_Reacciones_Contenido_Tipo");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE COLECCIONES
+            // ========================================
+            modelBuilder.Entity<Coleccion>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+
+                entity.HasOne(c => c.Creador)
+                    .WithMany()
+                    .HasForeignKey(c => c.CreadorId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(c => c.Nombre)
+                    .HasMaxLength(200)
+                    .IsRequired();
+
+                entity.Property(c => c.Descripcion)
+                    .HasMaxLength(1000)
+                    .IsRequired(false);
+
+                entity.Property(c => c.ImagenPortada)
+                    .HasMaxLength(500)
+                    .IsRequired(false);
+
+                entity.Property(c => c.Precio)
+                    .HasColumnType("decimal(18,2)")
+                    .IsRequired();
+
+                entity.Property(c => c.PrecioOriginal)
+                    .HasColumnType("decimal(18,2)")
+                    .IsRequired(false);
+
+                entity.Property(c => c.EstaActiva)
+                    .HasDefaultValue(true);
+
+                // Índices para Colecciones
+                entity.HasIndex(c => c.CreadorId)
+                    .HasDatabaseName("IX_Colecciones_CreadorId");
+
+                entity.HasIndex(c => c.EstaActiva)
+                    .HasDatabaseName("IX_Colecciones_EstaActiva");
+
+                entity.HasIndex(c => new { c.CreadorId, c.EstaActiva })
+                    .HasDatabaseName("IX_Colecciones_Creador_Activa");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE CONTENIDO COLECCIONES (Tabla Intermedia)
+            // ========================================
+            modelBuilder.Entity<ContenidoColeccion>(entity =>
+            {
+                // Clave compuesta
+                entity.HasKey(cc => new { cc.ContenidoId, cc.ColeccionId });
+
+                entity.HasOne(cc => cc.Contenido)
+                    .WithMany(c => c.Colecciones)
+                    .HasForeignKey(cc => cc.ContenidoId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(cc => cc.Coleccion)
+                    .WithMany(col => col.Contenidos)
+                    .HasForeignKey(cc => cc.ColeccionId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.Property(cc => cc.Orden)
+                    .HasDefaultValue(0);
+
+                // Índices para ContenidoColecciones
+                entity.HasIndex(cc => cc.ColeccionId)
+                    .HasDatabaseName("IX_ContenidoColecciones_ColeccionId");
+
+                entity.HasIndex(cc => cc.ContenidoId)
+                    .HasDatabaseName("IX_ContenidoColecciones_ContenidoId");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE COMPRAS COLECCIÓN
+            // ========================================
+            modelBuilder.Entity<CompraColeccion>(entity =>
+            {
+                entity.HasKey(cc => cc.Id);
+
+                entity.HasOne(cc => cc.Coleccion)
+                    .WithMany(c => c.Compras)
+                    .HasForeignKey(cc => cc.ColeccionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(cc => cc.Comprador)
+                    .WithMany()
+                    .HasForeignKey(cc => cc.CompradorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.Property(cc => cc.Precio)
+                    .HasColumnType("decimal(18,2)")
+                    .IsRequired();
+
+                // Índices para ComprasColeccion
+                entity.HasIndex(cc => cc.ColeccionId)
+                    .HasDatabaseName("IX_ComprasColeccion_ColeccionId");
+
+                entity.HasIndex(cc => cc.CompradorId)
+                    .HasDatabaseName("IX_ComprasColeccion_CompradorId");
+
+                entity.HasIndex(cc => new { cc.CompradorId, cc.ColeccionId })
+                    .IsUnique()
+                    .HasDatabaseName("IX_ComprasColeccion_Comprador_Coleccion_Unique");
+            });
+
+            // ========================================
+            // CONFIGURACIÓN DE COMPRA CONTENIDO (EXISTENTE)
             // ========================================
             modelBuilder.Entity<CompraContenido>(entity =>
             {
                 entity.HasOne(cc => cc.Contenido)
-                    .WithMany()
+                    .WithMany(c => c.Compras)
                     .HasForeignKey(cc => cc.ContenidoId)
                     .OnDelete(DeleteBehavior.Restrict);
 
@@ -77,7 +311,7 @@ namespace Lado.Data
             });
 
             // ========================================
-            // CONFIGURACIÓN DE TIP
+            // CONFIGURACIÓN DE TIP (EXISTENTE)
             // ========================================
             modelBuilder.Entity<Tip>(entity =>
             {
@@ -97,7 +331,7 @@ namespace Lado.Data
             });
 
             // ========================================
-            // CONFIGURACIÓN DE DESAFÍOS
+            // CONFIGURACIÓN DE DESAFÍOS (EXISTENTE)
             // ========================================
             modelBuilder.Entity<Desafio>(entity =>
             {
@@ -147,7 +381,7 @@ namespace Lado.Data
             });
 
             // ========================================
-            // CONFIGURACIÓN DE PROPUESTAS
+            // CONFIGURACIÓN DE PROPUESTAS (EXISTENTE)
             // ========================================
             modelBuilder.Entity<PropuestaDesafio>(entity =>
             {
@@ -178,7 +412,7 @@ namespace Lado.Data
             });
 
             // ========================================
-            // CONFIGURACIÓN DE SUSCRIPCIONES
+            // CONFIGURACIÓN DE SUSCRIPCIONES (EXISTENTE)
             // ========================================
             modelBuilder.Entity<Suscripcion>(entity =>
             {
@@ -235,7 +469,7 @@ namespace Lado.Data
             });
 
             // ========================================
-            // CONFIGURACIÓN DE CONTENIDO
+            // CONFIGURACIÓN DE CONTENIDO (EXISTENTE + ACTUALIZADO)
             // ========================================
             modelBuilder.Entity<Contenido>(entity =>
             {
@@ -249,13 +483,22 @@ namespace Lado.Data
                 entity.Property(e => e.PrecioDesbloqueo)
                     .HasColumnType("decimal(18,2)");
 
+                // ⭐ Nuevas propiedades de Preview
+                entity.Property(e => e.TienePreview)
+                    .HasDefaultValue(false);
+
+                entity.Property(e => e.RutaPreview)
+                    .HasMaxLength(500)
+                    .IsRequired(false);
+
                 entity.HasIndex(e => e.UsuarioId);
                 entity.HasIndex(e => e.EstaActivo);
                 entity.HasIndex(e => e.FechaPublicacion);
+                entity.HasIndex(e => e.TipoLado);
             });
 
             // ========================================
-            // CONFIGURACIÓN DE TRANSACCIONES
+            // CONFIGURACIÓN DE TRANSACCIONES (EXISTENTE)
             // ========================================
             modelBuilder.Entity<Transaccion>(entity =>
             {
@@ -277,7 +520,7 @@ namespace Lado.Data
             });
 
             // ========================================
-            // CONFIGURACIÓN DE MENSAJES PRIVADOS
+            // CONFIGURACIÓN DE MENSAJES PRIVADOS (EXISTENTE)
             // ========================================
             modelBuilder.Entity<MensajePrivado>(entity =>
             {
@@ -300,7 +543,7 @@ namespace Lado.Data
             });
 
             // ========================================
-            // CONFIGURACIÓN DE CHAT MENSAJES
+            // CONFIGURACIÓN DE CHAT MENSAJES (EXISTENTE)
             // ========================================
             modelBuilder.Entity<ChatMensaje>(entity =>
             {
@@ -322,7 +565,7 @@ namespace Lado.Data
             });
 
             // ========================================
-            // CONFIGURACIÓN DE REPORTES
+            // CONFIGURACIÓN DE REPORTES (EXISTENTE)
             // ========================================
             modelBuilder.Entity<Reporte>(entity =>
             {
@@ -350,7 +593,7 @@ namespace Lado.Data
             });
 
             // ========================================
-            // CONFIGURACIÓN DE LIKES
+            // CONFIGURACIÓN DE LIKES (EXISTENTE)
             // ========================================
             modelBuilder.Entity<Like>(entity =>
             {
@@ -364,7 +607,7 @@ namespace Lado.Data
             });
 
             // ========================================
-            // CONFIGURACIÓN DE COMENTARIOS
+            // CONFIGURACIÓN DE COMENTARIOS (EXISTENTE)
             // ========================================
             modelBuilder.Entity<Comentario>(entity =>
             {

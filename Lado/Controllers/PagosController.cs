@@ -39,11 +39,7 @@ namespace Lado.Controllers
                 var usuario = await _userManager.FindByIdAsync(usuarioId);
                 var creador = await _userManager.FindByIdAsync(creadorId);
 
-                if (creador == null || creador.TipoUsuario != 1)
-                {
-                    TempData["Error"] = "Creador no encontrado";
-                    return RedirectToAction("Perfil", "Feed", new { id = creadorId });
-                }
+               
 
                 // Verificar si ya está suscrito
                 var suscripcionExistente = await _context.Suscripciones
@@ -322,11 +318,7 @@ namespace Lado.Controllers
                 var usuario = await _userManager.FindByIdAsync(usuarioId);
                 var creador = await _userManager.FindByIdAsync(request.CreadorId);
 
-                if (creador == null || creador.TipoUsuario != 1)
-                {
-                    return Json(new { success = false, message = "Creador no encontrado" });
-                }
-
+         
                 // Validar monto
                 if (request.Monto < 1)
                 {
