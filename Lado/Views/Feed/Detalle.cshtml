@@ -621,21 +621,37 @@
     <div class="content-card">
         <!-- HEADER -->
         <div class="content-header">
-            <a href="/Feed/Perfil/@Model.UsuarioId" class="creator-info">
+            @{
+                // ⭐ Determinar URL según TipoLado
+                var urlPerfil = Model.TipoLado == TipoLado.LadoB
+                ? $"/Feed/Perfil/{Model.UsuarioId}?verSeudonimo=true"
+                : $"/Feed/Perfil/{Model.UsuarioId}";
+            }
+
+            <a href="@urlPerfil" class="creator-info">
                 <div class="creator-avatar">
                     @if (!string.IsNullOrEmpty(Model.Usuario?.FotoPerfil))
                     {
-                        <img src="@Model.Usuario.FotoPerfil" alt="@Model.Usuario.NombreCompleto">
+                        <img src="@Model.Usuario.FotoPerfil" alt="@Model.NombreMostrado">
                     }
                     else
                     {
-                        @(Model.Usuario?.NombreCompleto?.Substring(0, 1) ?? "U")
+                        @(Model.NombreMostrado?.Substring(0, 1) ?? "U")
                     }
                 </div>
                 <div class="creator-details">
-                    <h3>@(Model.Usuario?.NombreCompleto ?? "Usuario")</h3>
+                    <h3>@(Model.NombreMostrado ?? "Usuario")</h3>
                     <span>
-                        @@@(Model.Usuario?.UserName ?? "usuario") ·
+                        @* ⭐ Mostrar @ del usuario correcto *@
+                        @if (Model.TipoLado == TipoLado.LadoB && !string.IsNullOrEmpty(Model.Usuario?.Seudonimo))
+                        {
+                            @:@@@(Model.Usuario.Seudonimo.ToLower())
+                        }
+                        else
+                        {
+                            @:@@@(Model.Usuario?.UserName ?? "usuario")
+                        }
+                        ·
                         @{
                             var tiempo = DateTime.Now - Model.FechaPublicacion;
                             var tiempoTexto = tiempo.TotalDays >= 1 ? $"{(int)tiempo.TotalDays}d" :
@@ -645,7 +661,7 @@
                     </span>
                 </div>
             </a>
-            <button class="menu-btn">
+            <button class="post-menu-btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                     <circle cx="12" cy="12" r="1.5" />
                     <circle cx="6" cy="12" r="1.5" />

@@ -36,7 +36,19 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-    
+            // Calcular estadísticas
+
+            // Total de seguidores (del campo NumeroSeguidores del usuario)
+            ViewBag.TotalSeguidores = usuario.NumeroSeguidores;
+
+            // Total siguiendo (suscripciones activas que tiene el usuario)
+            ViewBag.TotalSiguiendo = await _context.Suscripciones
+                .CountAsync(s => s.FanId == usuario.Id && s.EstaActiva);
+
+            // Total de publicaciones del usuario
+            ViewBag.TotalPublicaciones = await _context.Contenidos
+                .CountAsync(c => c.UsuarioId == usuario.Id && c.EstaActivo && !c.EsBorrador);
+
             return View(usuario);
         }
 
@@ -144,8 +156,6 @@ namespace Lado.Controllers
         }
 
 
-
-
         // POST: /Usuario/EditarPerfil
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -166,8 +176,8 @@ namespace Lado.Controllers
             usuario.Email = model.Email;
             usuario.PhoneNumber = model.PhoneNumber;
             usuario.Biografia = model.Biografia;
+            usuario.Seudonimo = model.Seudonimo; // ⭐ AGREGAR ESTO
 
-     
             // Procesar foto de perfil
             if (fotoPerfil != null && fotoPerfil.Length > 0)
             {
@@ -175,7 +185,6 @@ namespace Lado.Controllers
                 usuario.FotoPerfil = fileName;
             }
 
-      
             var result = await _userManager.UpdateAsync(usuario);
 
             if (result.Succeeded)
@@ -187,6 +196,8 @@ namespace Lado.Controllers
             TempData["Error"] = "Error al actualizar el perfil";
             return View(model);
         }
+
+
 
         // GET: /Usuario/Billetera
         public async Task<IActionResult> Billetera()

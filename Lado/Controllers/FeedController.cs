@@ -25,9 +25,159 @@ namespace Lado.Controllers
             _logger = logger;
         }
 
+
+        public async Task<IActionResult> Perfil(string id, bool verSeudonimo = false)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(id))
+                {
+                    TempData["Error"] = "Usuario no especificado";
+                    return RedirectToAction("Index");
+                }
+
+                var usuario = await _userManager.FindByIdAsync(id);
+
+                if (usuario == null || !usuario.EstaActivo)
+                {
+                    TempData["Error"] = "Usuario no encontrado";
+                    return RedirectToAction("Index");
+                }
+
+                var usuarioActual = await _userManager.GetUserAsync(User);
+                if (usuarioActual == null)
+                {
+                    return RedirectToAction("Login", "Account");
+                }
+
+                var estaSuscrito = await _context.Suscripciones
+                    .AnyAsync(s => s.FanId == usuarioActual.Id &&
+                             s.CreadorId == id &&
+                             s.EstaActiva);
+
+                ViewBag.EstaSuscrito = estaSuscrito;
+
+                // ⭐ NUEVA LÓGICA: Determinar qué perfil mostrar
+                ViewBag.MostrandoSeudonimo = verSeudonimo;
+
+                if (verSeudonimo)
+                {
+                    // 📌 MODO SEUDÓNIMO: Solo contenido LadoB
+                    _logger.LogInformation("Mostrando perfil de seudónimo para {Username}", usuario.UserName);
+
+                    var contenidosComprados = await _context.ComprasContenido
+                        .Where(cc => cc.UsuarioId == usuarioActual.Id)
+                        .Select(cc => cc.ContenidoId)
+                        .ToListAsync();
+
+                    // Solo contenido LadoB
+                    var contenidoLadoB = (estaSuscrito || id == usuarioActual.Id)
+                        ? await _context.Contenidos
+                            .Where(c => c.UsuarioId == id
+                                    && c.EstaActivo
+                                    && !c.EsBorrador
+                                    && !c.Censurado
+                                    && c.TipoLado == TipoLado.LadoB)
+                            .OrderByDescending(c => c.FechaPublicacion)
+                            .ToListAsync()
+                        : await _context.Contenidos
+                            .Where(c => c.UsuarioId == id
+                                    && c.EstaActivo
+                                    && !c.EsBorrador
+                                    && !c.Censurado
+                                    && c.TipoLado == TipoLado.LadoB
+                                    && contenidosComprados.Contains(c.Id))
+                            .OrderByDescending(c => c.FechaPublicacion)
+                            .ToListAsync();
+
+                    ViewBag.Contenidos = contenidoLadoB;
+                    ViewBag.ContenidoLadoA = new List<Contenido>(); // Vacío en modo seudónimo
+                    ViewBag.ContenidoLadoB = contenidoLadoB;
+
+                    // Mostrar nombre del seudónimo
+                    ViewBag.NombreMostrado = usuario.Seudonimo ?? usuario.NombreCompleto;
+                    ViewBag.UsernameMostrado = $"@{usuario.Seudonimo?.ToLower() ?? usuario.UserName}";
+                }
+                else
+                {
+                    // 📌 MODO NORMAL: Todo el contenido (LadoA + LadoB)
+                    _logger.LogInformation("Mostrando perfil completo para {Username}", usuario.UserName);
+
+                    var contenidoLadoA = await _context.Contenidos
+                        .Where(c => c.UsuarioId == id
+                                && c.EstaActivo
+                                && !c.EsBorrador
+                                && !c.Censurado
+                                && c.TipoLado == TipoLado.LadoA)
+                        .OrderByDescending(c => c.FechaPublicacion)
+                        .ToListAsync();
+
+                    var contenidosComprados = await _context.ComprasContenido
+                        .Where(cc => cc.UsuarioId == usuarioActual.Id)
+                        .Select(cc => cc.ContenidoId)
+                        .ToListAsync();
+
+                    var contenidoLadoB = (estaSuscrito || id == usuarioActual.Id)
+                        ? await _context.Contenidos
+                            .Where(c => c.UsuarioId == id
+                                    && c.EstaActivo
+                                    && !c.EsBorrador
+                                    && !c.Censurado
+                                    && c.TipoLado == TipoLado.LadoB)
+                            .OrderByDescending(c => c.FechaPublicacion)
+                            .ToListAsync()
+                        : await _context.Contenidos
+                            .Where(c => c.UsuarioId == id
+                                    && c.EstaActivo
+                                    && !c.EsBorrador
+                                    && !c.Censurado
+                                    && c.TipoLado == TipoLado.LadoB
+                                    && contenidosComprados.Contains(c.Id))
+                            .OrderByDescending(c => c.FechaPublicacion)
+                            .ToListAsync();
+
+                    var contenidos = contenidoLadoA.Union(contenidoLadoB)
+                        .OrderByDescending(c => c.FechaPublicacion)
+                        .ToList();
+
+                    ViewBag.Contenidos = contenidos;
+                    ViewBag.ContenidoLadoA = contenidoLadoA;
+                    ViewBag.ContenidoLadoB = contenidoLadoB;
+
+                    // Mostrar nombre real
+                    ViewBag.NombreMostrado = usuario.NombreCompleto;
+                    ViewBag.UsernameMostrado = $"@{usuario.UserName}";
+                }
+
+                ViewBag.Colecciones = await _context.Colecciones
+                    .Include(c => c.Contenidos)
+                    .Where(c => c.CreadorId == id && c.EstaActiva)
+                    .OrderByDescending(c => c.FechaCreacion)
+                    .ToListAsync();
+
+                ViewBag.NumeroSuscriptores = await _context.Suscripciones
+                    .CountAsync(s => s.CreadorId == id && s.EstaActiva);
+
+                var contenidosTotales = ViewBag.Contenidos as List<Contenido>;
+                ViewBag.TotalLikes = contenidosTotales?.Sum(c => c.NumeroLikes) ?? 0;
+                ViewBag.TotalPublicaciones = contenidosTotales?.Count ?? 0;
+                ViewBag.TotalLadoA = (ViewBag.ContenidoLadoA as List<Contenido>)?.Count ?? 0;
+                ViewBag.TotalLadoB = (ViewBag.ContenidoLadoB as List<Contenido>)?.Count ?? 0;
+
+          
+                return View(usuario);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al cargar perfil {Id}", id);
+                TempData["Error"] = "Error al cargar el perfil";
+                return RedirectToAction("Index");
+            }
+        }
+
+
         // ========================================
         // OBTENER LIKES DEL USUARIO ACTUAL
-        // Agregar este método al FeedController.cs
         // ========================================
 
         [HttpPost]
@@ -47,7 +197,6 @@ namespace Lado.Controllers
                     return Json(new { success = true, likesUsuario = new List<int>() });
                 }
 
-                // Obtener los contenidos que el usuario ha dado like
                 var likesUsuario = await _context.Likes
                     .Where(l => l.UsuarioId == usuarioId && request.ContenidoIds.Contains(l.ContenidoId))
                     .Select(l => l.ContenidoId)
@@ -69,16 +218,13 @@ namespace Lado.Controllers
             }
         }
 
-        // ========================================
-        // CLASE REQUEST (agregar al final del archivo o en Models)
-        // ========================================
         public class ObtenerLikesRequest
         {
             public List<int> ContenidoIds { get; set; } = new List<int>();
         }
 
         // ========================================
-        // INDEX - FEED PRINCIPAL CON STORIES Y COLECCIONES
+        // INDEX - FEED PRINCIPAL CON CREADORES FAVORITOS
         // ========================================
 
         public async Task<IActionResult> Index()
@@ -102,29 +248,37 @@ namespace Lado.Controllers
                 _logger.LogInformation("Usuario {UserId} tiene {Count} suscripciones activas",
                     usuarioId, creadoresIds.Count);
 
-                // 2. STORIES - Obtener stories activas de creadores suscritos
-                var ahoraStories = DateTime.Now;
-                var storiesCreadores = creadoresIds.Any()
-                    ? await _context.Stories
-                        .Include(s => s.Creador)
-                        .Where(s => (creadoresIds.Contains(s.CreadorId) || s.CreadorId == usuarioId)
-                                && s.FechaExpiracion > ahoraStories
-                                && s.EstaActivo)
-                        .ToListAsync()
-                    : await _context.Stories
-                        .Include(s => s.Creador)
-                        .Where(s => s.CreadorId == usuarioId
-                                && s.FechaExpiracion > ahoraStories
-                                && s.EstaActivo)
-                        .ToListAsync();
+                // 2. CREADORES FAVORITOS - Solo suscritos
+                var creadoresFavoritos = await _context.Users
+                    .Where(u => creadoresIds.Contains(u.Id) && u.EstaActivo)
+                    .Select(u => new
+                    {
+                        u.Id,
+                        u.NombreCompleto,
+                        u.UserName,
+                        u.FotoPerfil,
+                        u.CreadorVerificado,
+                        NumeroSuscriptores = _context.Suscripciones.Count(s => s.CreadorId == u.Id && s.EstaActiva)
+                    })
+                    .OrderByDescending(u => u.NumeroSuscriptores)
+                    .ToListAsync();
 
-                // Marcar stories vistas
+                ViewBag.CreadoresFavoritos = creadoresFavoritos;
+
+                // 3. STORIES - Solo de creadores suscritos + propias
+                var ahoraStories = DateTime.Now;
+                var storiesCreadores = await _context.Stories
+                    .Include(s => s.Creador)
+                    .Where(s => (creadoresIds.Contains(s.CreadorId) || s.CreadorId == usuarioId)
+                            && s.FechaExpiracion > ahoraStories
+                            && s.EstaActivo)
+                    .ToListAsync();
+
                 var storiesVistosIds = await _context.StoryVistas
                     .Where(sv => sv.UsuarioId == usuarioId)
                     .Select(sv => sv.StoryId)
                     .ToListAsync();
 
-                // Agrupar stories por creador
                 ViewBag.Stories = storiesCreadores
                     .GroupBy(s => s.CreadorId)
                     .Select(g => new
@@ -139,7 +293,7 @@ namespace Lado.Controllers
                     .ThenByDescending(x => x.UltimaFecha)
                     .ToList();
 
-                // 3. COLECCIONES DESTACADAS
+                // 4. COLECCIONES - Solo de creadores suscritos + propias
                 ViewBag.Colecciones = await _context.Colecciones
                     .Include(c => c.Creador)
                     .Include(c => c.Contenidos)
@@ -167,17 +321,18 @@ namespace Lado.Controllers
                     })
                     .ToListAsync();
 
-                // 4. Contenido público (LadoA) de TODOS los usuarios INCLUYENDO propio
+                // 5. ✅ CORREGIDO: Contenido público SOLO de creadores suscritos + propio
                 var contenidoPublico = await _context.Contenidos
                     .Include(c => c.Usuario)
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
                             && c.TipoLado == TipoLado.LadoA
-                            && c.Usuario != null)
+                            && c.Usuario != null
+                            && (creadoresIds.Contains(c.UsuarioId) || c.UsuarioId == usuarioId)) // ✅ FILTRO AGREGADO
                     .ToListAsync();
 
-                // 5. Contenido premium (LadoB) de suscripciones
+                // 6. Contenido premium (LadoB) de suscripciones
                 var contenidoPremiumSuscripciones = creadoresIds.Any()
                     ? await _context.Contenidos
                         .Include(c => c.Usuario)
@@ -190,7 +345,7 @@ namespace Lado.Controllers
                         .ToListAsync()
                     : new List<Contenido>();
 
-                // 6. Contenido premium (LadoB) PROPIO
+                // 7. Contenido premium (LadoB) PROPIO
                 var contenidoPremiumPropio = await _context.Contenidos
                     .Include(c => c.Usuario)
                     .Where(c => c.UsuarioId == usuarioId
@@ -201,7 +356,7 @@ namespace Lado.Controllers
                             && c.Usuario != null)
                     .ToListAsync();
 
-                // 7. Contenido premium comprado individualmente
+                // 8. Contenido premium comprado individualmente
                 var contenidosCompradosIds = await _context.ComprasContenido
                     .Where(cc => cc.UsuarioId == usuarioId)
                     .Select(cc => cc.ContenidoId)
@@ -216,7 +371,7 @@ namespace Lado.Controllers
                             && c.Usuario != null)
                     .ToListAsync();
 
-                // 8. Combinar todo el contenido
+                // 9. Combinar todo el contenido
                 var todoContenido = contenidoPublico
                     .Union(contenidoPremiumSuscripciones)
                     .Union(contenidoPremiumPropio)
@@ -228,14 +383,14 @@ namespace Lado.Controllers
                     todoContenido.Count, contenidoPublico.Count, contenidoPremiumSuscripciones.Count,
                     contenidoPremiumPropio.Count, contenidoPremiumComprado.Count);
 
-                // 9. Obtener reacciones del usuario para cada contenido
+                // 10. Obtener reacciones del usuario
                 var reaccionesUsuario = await _context.Reacciones
                     .Where(r => r.UsuarioId == usuarioId)
                     .ToDictionaryAsync(r => r.ContenidoId, r => r.TipoReaccion);
 
                 ViewBag.ReaccionesUsuario = reaccionesUsuario;
 
-                // 10. Obtener conteo de reacciones por contenido
+                // 11. Obtener conteo de reacciones
                 var reaccionesPorContenido = await _context.Reacciones
                     .Where(r => todoContenido.Select(c => c.Id).Contains(r.ContenidoId))
                     .GroupBy(r => r.ContenidoId)
@@ -251,7 +406,7 @@ namespace Lado.Controllers
 
                 ViewBag.ReaccionesPorContenido = reaccionesPorContenido.ToDictionary(r => r.ContenidoId);
 
-                // 11. Ordenar con algoritmo mejorado
+                // 12. Ordenar contenido
                 var contenidoOrdenado = todoContenido
                     .Select(c => new
                     {
@@ -264,20 +419,23 @@ namespace Lado.Controllers
                     .Take(50)
                     .ToList();
 
-                // 12. ViewBag data
+                // 13. ViewBag data
                 ViewBag.EstaSuscrito = true;
                 ViewBag.TotalLadoA = contenidoPublico.Count;
                 ViewBag.TotalLadoB = contenidoPremiumSuscripciones.Count + contenidoPremiumPropio.Count;
 
-                // 13. Sugerencias de usuarios
+                // 14. Sugerencias de usuarios NO suscritos
                 ViewBag.CreadoresSugeridos = await _userManager.Users
                     .Where(u => u.Id != usuarioId
                             && u.EstaActivo
-                            && !creadoresIds.Contains(u.Id))
+                            && !creadoresIds.Contains(u.Id)) // ✅ Excluye a los que ya está suscrito
                     .OrderByDescending(u => u.NumeroSeguidores)
                     .ThenBy(u => Guid.NewGuid())
                     .Take(5)
                     .ToListAsync();
+                // Obtener usuario actual para el sidebar
+                var usuarioActual = await _userManager.FindByIdAsync(usuarioId);
+                ViewBag.UsuarioActual = usuarioActual;
 
                 return View(contenidoOrdenado);
             }
@@ -289,6 +447,78 @@ namespace Lado.Controllers
             }
         }
 
+        [HttpGet]
+        public async Task<IActionResult> ObtenerDetalleContenido(int id)
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                var contenido = await _context.Contenidos
+                    .Include(c => c.Usuario)
+                    .Include(c => c.Comentarios)
+                        .ThenInclude(com => com.Usuario)
+                    .FirstOrDefaultAsync(c => c.Id == id && c.EstaActivo);
+
+                if (contenido == null)
+                {
+                    return Json(new { success = false, message = "Contenido no encontrado" });
+                }
+
+                // Verificar acceso
+                var tieneAcceso = await VerificarAccesoContenido(usuarioId, contenido);
+                if (contenido.TipoLado == TipoLado.LadoB && !tieneAcceso)
+                {
+                    return Json(new { success = false, message = "Sin acceso" });
+                }
+
+                // Verificar si el usuario dio like
+                var usuarioLike = await _context.Likes
+                    .AnyAsync(l => l.ContenidoId == id && l.UsuarioId == usuarioId);
+
+                return Json(new
+                {
+                    success = true,
+                    id = contenido.Id,
+                    descripcion = contenido.Descripcion,
+                    rutaArchivo = contenido.RutaArchivo,
+                    tipoContenido = (int)contenido.TipoContenido,
+                    numeroLikes = contenido.NumeroLikes,
+                    numeroComentarios = contenido.NumeroComentarios,
+                    fechaPublicacion = contenido.FechaPublicacion,
+                    usuarioLike = usuarioLike,
+                    usuario = new
+                    {
+                        id = contenido.Usuario.Id,
+                        username = contenido.Usuario.UserName,
+                        nombreCompleto = contenido.Usuario.NombreCompleto,
+                        fotoPerfil = contenido.Usuario.FotoPerfil
+                    },
+                    comentarios = contenido.Comentarios
+                        .OrderBy(c => c.FechaCreacion)
+                        .Select(c => new
+                        {
+                            id = c.Id,
+                            texto = c.Texto,
+                            fechaCreacion = c.FechaCreacion,
+                            usuario = new
+                            {
+                                id = c.Usuario.Id,
+                                username = c.Usuario.UserName,
+                                fotoPerfil = c.Usuario.FotoPerfil
+                            }
+                        })
+                        .ToList()
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener detalle de contenido {Id}", id);
+                return Json(new { success = false, message = "Error al cargar contenido" });
+            }
+        }
+
+
         // ========================================
         // CALCULAR SCORE CON REACCIONES
         // ========================================
@@ -299,10 +529,8 @@ namespace Lado.Controllers
             {
                 var horasDesdePublicacion = (DateTime.Now - contenido.FechaPublicacion).TotalHours;
 
-                // 1. BASE TEMPORAL
                 double baseScore = 100.0 / (1 + horasDesdePublicacion / 24.0);
 
-                // Boost para contenido reciente
                 if (horasDesdePublicacion < 6)
                 {
                     baseScore += 50.0;
@@ -312,30 +540,22 @@ namespace Lado.Controllers
                     baseScore += 25.0;
                 }
 
-                // 2. BOOST POR ENGAGEMENT (incluyendo reacciones)
                 var totalReacciones = _context.Reacciones
                     .Count(r => r.ContenidoId == contenido.Id);
 
                 double totalEngagement = contenido.NumeroLikes
                                        + (contenido.NumeroComentarios * 2.0)
-                                       + (totalReacciones * 1.5) // Reacciones valen más que likes
+                                       + (totalReacciones * 1.5)
                                        + (contenido.NumeroVistas * 0.1)
                                        + (contenido.NumeroCompartidos * 3.0);
 
                 double engagementBoost = Math.Log(1 + totalEngagement) * 10.0;
-
-                // 3. BOOST ADICIONAL PARA CONTENIDO PREMIUM (LadoB)
                 double premiumBoost = contenido.TipoLado == TipoLado.LadoB ? 15.0 : 0.0;
-
-                // 4. BOOST PARA CONTENIDO PROPIO
                 double propioBoost = contenido.UsuarioId == usuarioActualId ? 20.0 : 0.0;
-
-                // 5. BOOST PARA CONTENIDO CON PREVIEW
                 double previewBoost = contenido.TienePreview ? 10.0 : 0.0;
 
-                // 6. PENALIZACIÓN POR ANTIGÜEDAD
                 double edadPenalizacion = 1.0;
-                if (horasDesdePublicacion > 168) // Más de 1 semana
+                if (horasDesdePublicacion > 168)
                 {
                     edadPenalizacion = 0.5;
                 }
@@ -372,7 +592,6 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "Contenido no encontrado" });
                 }
 
-                // Verificar acceso a contenido premium
                 if (contenido.TipoLado == TipoLado.LadoB)
                 {
                     var tieneAcceso = await VerificarAccesoContenido(usuarioId, contenido);
@@ -493,111 +712,6 @@ namespace Lado.Controllers
             }
         }
 
-        // ========================================
-        // PERFIL CON INFO DE COLECCIONES
-        // ========================================
-
-        public async Task<IActionResult> Perfil(string id)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(id))
-                {
-                    TempData["Error"] = "Usuario no especificado";
-                    return RedirectToAction("Index");
-                }
-
-                var usuario = await _userManager.FindByIdAsync(id);
-
-                if (usuario == null || !usuario.EstaActivo)
-                {
-                    TempData["Error"] = "Usuario no encontrado";
-                    return RedirectToAction("Index");
-                }
-
-                var usuarioActual = await _userManager.GetUserAsync(User);
-                if (usuarioActual == null)
-                {
-                    return RedirectToAction("Login", "Account");
-                }
-
-                var estaSuscrito = await _context.Suscripciones
-                    .AnyAsync(s => s.FanId == usuarioActual.Id &&
-                             s.CreadorId == id &&
-                             s.EstaActiva);
-
-                ViewBag.EstaSuscrito = estaSuscrito;
-
-                // Contenido LadoA (siempre visible)
-                var contenidoLadoA = await _context.Contenidos
-                    .Where(c => c.UsuarioId == id
-                            && c.EstaActivo
-                            && !c.EsBorrador
-                            && !c.Censurado
-                            && c.TipoLado == TipoLado.LadoA)
-                    .OrderByDescending(c => c.FechaPublicacion)
-                    .ToListAsync();
-
-                // Contenido LadoB (solo si está suscrito o compró)
-                var contenidosComprados = await _context.ComprasContenido
-                    .Where(cc => cc.UsuarioId == usuarioActual.Id)
-                    .Select(cc => cc.ContenidoId)
-                    .ToListAsync();
-
-                var contenidoLadoB = (estaSuscrito || id == usuarioActual.Id)
-                    ? await _context.Contenidos
-                        .Where(c => c.UsuarioId == id
-                                && c.EstaActivo
-                                && !c.EsBorrador
-                                && !c.Censurado
-                                && c.TipoLado == TipoLado.LadoB)
-                        .OrderByDescending(c => c.FechaPublicacion)
-                        .ToListAsync()
-                    : await _context.Contenidos
-                        .Where(c => c.UsuarioId == id
-                                && c.EstaActivo
-                                && !c.EsBorrador
-                                && !c.Censurado
-                                && c.TipoLado == TipoLado.LadoB
-                                && contenidosComprados.Contains(c.Id))
-                        .OrderByDescending(c => c.FechaPublicacion)
-                        .ToListAsync();
-
-                var contenidos = contenidoLadoA.Union(contenidoLadoB)
-                    .OrderByDescending(c => c.FechaPublicacion)
-                    .ToList();
-
-                ViewBag.Contenidos = contenidos;
-                ViewBag.ContenidoLadoA = contenidoLadoA;
-                ViewBag.ContenidoLadoB = contenidoLadoB;
-
-                // Colecciones del creador
-                ViewBag.Colecciones = await _context.Colecciones
-                    .Include(c => c.Contenidos)
-                    .Where(c => c.CreadorId == id && c.EstaActiva)
-                    .OrderByDescending(c => c.FechaCreacion)
-                    .ToListAsync();
-
-                ViewBag.NumeroSuscriptores = await _context.Suscripciones
-                    .CountAsync(s => s.CreadorId == id && s.EstaActiva);
-
-                ViewBag.TotalLikes = contenidos.Sum(c => c.NumeroLikes);
-                ViewBag.TotalPublicaciones = contenidos.Count;
-                ViewBag.TotalLadoA = contenidoLadoA.Count;
-                ViewBag.TotalLadoB = contenidoLadoB.Count;
-
-                _logger.LogInformation("Perfil cargado: {Username} - LadoA: {LadoA}, LadoB: {LadoB}",
-                    usuario.UserName, contenidoLadoA.Count, contenidoLadoB.Count);
-
-                return View(usuario);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error al cargar perfil {Id}", id);
-                TempData["Error"] = "Error al cargar el perfil";
-                return RedirectToAction("Index");
-            }
-        }
 
         // ========================================
         // DETALLE DE CONTENIDO CON REACCIONES
@@ -637,14 +751,12 @@ namespace Lado.Controllers
                     return RedirectToAction("Perfil", new { id = contenido.UsuarioId });
                 }
 
-                // Incrementar vistas
                 if (!esPropio)
                 {
                     contenido.NumeroVistas++;
                     await _context.SaveChangesAsync();
                 }
 
-                // Obtener reacciones
                 var reacciones = await _context.Reacciones
                     .Where(r => r.ContenidoId == id)
                     .GroupBy(r => r.TipoReaccion)
@@ -658,7 +770,6 @@ namespace Lado.Controllers
                 ViewBag.Reacciones = reacciones;
                 ViewBag.TotalReacciones = reacciones.Sum(r => r.Count);
 
-                // Reacción del usuario actual
                 var miReaccion = await _context.Reacciones
                     .Where(r => r.ContenidoId == id && r.UsuarioId == usuarioActual.Id)
                     .Select(r => r.TipoReaccion.ToString().ToLower())
@@ -682,7 +793,7 @@ namespace Lado.Controllers
         }
 
         // ========================================
-        // LIKE (AJAX) - MANTENER COMPATIBILIDAD
+        // LIKE (AJAX)
         // ========================================
 
         [HttpPost]
@@ -755,15 +866,12 @@ namespace Lado.Controllers
 
         private async Task<bool> VerificarAccesoContenido(string usuarioId, Contenido contenido)
         {
-            // Es el creador del contenido
             if (contenido.UsuarioId == usuarioId)
                 return true;
 
-            // Contenido público
             if (contenido.TipoLado == TipoLado.LadoA)
                 return true;
 
-            // Verificar suscripción
             var estaSuscrito = await _context.Suscripciones
                 .AnyAsync(s => s.FanId == usuarioId
                             && s.CreadorId == contenido.UsuarioId
@@ -772,7 +880,6 @@ namespace Lado.Controllers
             if (estaSuscrito)
                 return true;
 
-            // Verificar compra individual
             var comproContenido = await _context.ComprasContenido
                 .AnyAsync(cc => cc.UsuarioId == usuarioId
                              && cc.ContenidoId == contenido.Id);
@@ -780,7 +887,6 @@ namespace Lado.Controllers
             if (comproContenido)
                 return true;
 
-            // Verificar si está en una colección comprada
             var contenidoEnColeccionComprada = await _context.ContenidoColecciones
                 .Where(cc => cc.ContenidoId == contenido.Id)
                 .Join(_context.ComprasColeccion,

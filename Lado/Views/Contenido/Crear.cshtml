@@ -18,43 +18,43 @@
         </div>
 
         <form asp-action="Crear" method="post" enctype="multipart/form-data" id="formContenido">
+            @Html.AntiForgeryToken()
 
-            <!-- Selección de Lado (Solo si está verificado) -->
-            @if (usuarioVerificado)
-            {
-                <div class="form-section">
-                    <label class="section-label">¿Dónde quieres publicar?</label>
-                    <div class="lado-selector">
-                        <div class="lado-option active" data-lado="ladoa" data-esgratis="true">
-                            <div class="lado-badge ladoa">A</div>
-                            <div class="lado-info">
-                                <h3>LadoA · Público</h3>
-                                <p>Contenido gratuito visible para todos</p>
-                            </div>
-                            <div class="lado-check">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                                </svg>
-                            </div>
+            <!-- Selección de Lado -->
+            <div class="form-section">
+                <label class="section-label">¿Dónde quieres publicar?</label>
+                <div class="lado-selector">
+                    <!-- LADO A - GRATIS CON NOMBRE REAL -->
+                    <div class="lado-option active" data-lado="ladoa" data-esgratis="true">
+                        <div class="lado-badge ladoa">A</div>
+                        <div class="lado-info">
+                            <h3>LadoA · Público</h3>
+                            <p>Contenido gratuito con tu nombre real</p>
                         </div>
+                        <div class="lado-check">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                            </svg>
+                        </div>
+                    </div>
 
-                        <div class="lado-option" data-lado="ladob" data-esgratis="false">
-                            <div class="lado-badge ladob">B</div>
-                            <div class="lado-info">
-                                <h3>LadoB · Premium</h3>
-                                <p>Contenido monetizado con tu seudónimo</p>
-                            </div>
-                            <div class="lado-check">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                                </svg>
-                            </div>
+                    <!-- LADO B - CON SEUDÓNIMO -->
+                    <div class="lado-option" data-lado="ladob" data-esgratis="false">
+                        <div class="lado-badge ladob">B</div>
+                        <div class="lado-info">
+                            <h3>LadoB · Con seudónimo</h3>
+                            <p>Contenido con tu identidad alternativa</p>
+                        </div>
+                        <div class="lado-check">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                            </svg>
                         </div>
                     </div>
                 </div>
-            }
+            </div>
 
-            <!-- Campo hidden que siempre se envía -->
+            <!-- Input hidden para EsGratis -->
             <input type="hidden" name="EsGratis" id="esGratisInput" value="true" />
 
             <!-- Tipo de Contenido -->
@@ -112,7 +112,6 @@
                     <input type="file" name="archivo" id="archivoInput" class="file-input" accept="image/*,video/*" required>
                 </div>
 
-                <!-- Preview -->
                 <div id="previewArea" class="preview-area">
                     <div class="preview-container">
                         <img id="imagePreview" class="preview-media" alt="Preview">
@@ -136,23 +135,39 @@
                 </div>
             </div>
 
-            <!-- Configuración Premium -->
-            @if (usuarioVerificado)
-            {
-                <div class="form-section" id="precioSectionWrapper">
-                    <div class="premium-card">
-                        <!-- Header -->
+            <!-- Configuración Premium (solo para LadoB) -->
+            <div class="form-section" id="precioSectionWrapper" style="display: none;">
+                <div class="premium-card">
+                    @if (!usuarioVerificado)
+                    {
+                        <div class="verification-alert">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                            </svg>
+                            <div>
+                                <h4>Monetización Bloqueada</h4>
+                                <p>Para monetizar contenido en LadoB debes verificar tu identidad. Por ahora, tu contenido se publicará <strong>gratis</strong> con tu seudónimo.</p>
+                                <a href="/CreatorVerification/Request" class="btn-verify">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
+                                    </svg>
+                                    Verificar Identidad
+                                </a>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
                         <div class="premium-info">
                             <h3>
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
                                 </svg>
-                                Precio del contenido premium
+                                Monetizar contenido premium
                             </h3>
                             <p>Este contenido se publicará en tu LadoB con tu seudónimo</p>
                         </div>
 
-                        <!-- Selector de Precio -->
                         <div class="precio-selector">
                             <label class="precio-label">
                                 Precio de desbloqueo
@@ -160,7 +175,7 @@
                             </label>
                             <div class="precio-input-group">
                                 <span class="precio-currency">$</span>
-                                <select name="PrecioDesbloqueo" class="precio-select" id="precioSelect" required>
+                                <select name="PrecioDesbloqueo" class="precio-select" id="precioSelect">
                                     <option value="5">5</option>
                                     <option value="10" selected>10</option>
                                     <option value="15">15</option>
@@ -185,39 +200,9 @@
                                 Los usuarios pagarán este monto para desbloquear tu contenido
                             </small>
                         </div>
-                    </div>
+                    }
                 </div>
-
-                <style>
-                    /* Ocultar precio por defecto, se muestra con JS */
-                    #precioSectionWrapper {
-                        display: none;
-                    }
-
-                        #precioSectionWrapper.show {
-                            display: block;
-                            animation: slideDown 0.3s ease-out;
-                        }
-
-                    @@keyframes slideDown {
-                        from {
-                            opacity: 0;
-                            transform: translateY(-10px);
-                        }
-
-                        to {
-                            opacity: 1;
-                            transform: translateY(0);
-                        }
-                    }
-
-                    .precio-selector {
-                        margin-top: 20px;
-                        padding-top: 20px;
-                        border-top: 1px solid rgba(50, 214, 123, 0.2);
-                    }
-                </style>
-            }
+            </div>
 
             <!-- Botones de Acción -->
             <div class="form-actions">
@@ -257,9 +242,17 @@
             <li>Usa descripciones claras y atractivas</li>
             <li>Sube imágenes de alta calidad (mínimo 1080p)</li>
             <li>El contenido premium genera más ingresos</li>
-            <li>Publica consistentemente para mantener a tu audiencia</li>
-            <li>Interactúa con los comentarios de tus fans</li>
+            <li>Publica en LadoB aunque sea gratis para usar tu seudónimo</li>
+            <li>Verifica tu identidad para desbloquear monetización</li>
         </ul>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner">
+        <div class="spinner"></div>
+        <p>Publicando contenido...</p>
     </div>
 </div>
 
@@ -274,7 +267,6 @@
         padding: 32px 24px;
     }
 
-    /* Card Principal */
     .crear-card {
         background: white;
         border-radius: 16px;
@@ -283,7 +275,6 @@
         margin-bottom: 24px;
     }
 
-    /* Header */
     .crear-header {
         margin-bottom: 40px;
         text-align: center;
@@ -310,7 +301,6 @@
             margin: 0;
         }
 
-    /* Form Sections */
     .form-section {
         margin-bottom: 32px;
     }
@@ -328,7 +318,6 @@
         margin-left: 4px;
     }
 
-    /* Lado Selector */
     .lado-selector {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -373,11 +362,11 @@
     }
 
         .lado-badge.ladoa {
-            background: linear-gradient(135deg, #32d67b 0%, #16a34a 100%);
+            background: #32d67b;
         }
 
         .lado-badge.ladob {
-            background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+            background: #F59E0B;
         }
 
     .lado-info {
@@ -426,7 +415,6 @@
             fill: white;
         }
 
-    /* Tipo de Contenido */
     .tipo-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -475,26 +463,25 @@
         margin: 0;
     }
 
-    /* Upload Zone */
     .upload-zone {
         position: relative;
         border: 3px dashed #32d67b;
         border-radius: 16px;
         padding: 48px 24px;
-        background: linear-gradient(135deg, rgba(50, 214, 123, 0.05) 0%, rgba(50, 214, 123, 0.02) 100%);
+        background: rgba(50, 214, 123, 0.05);
         cursor: pointer;
         transition: all 0.3s ease;
     }
 
         .upload-zone:hover {
             border-color: #16a34a;
-            background: linear-gradient(135deg, rgba(50, 214, 123, 0.1) 0%, rgba(50, 214, 123, 0.05) 100%);
+            background: rgba(50, 214, 123, 0.1);
             transform: scale(1.01);
         }
 
         .upload-zone.dragover {
             border-color: #16a34a;
-            background: linear-gradient(135deg, rgba(50, 214, 123, 0.15) 0%, rgba(50, 214, 123, 0.1) 100%);
+            background: rgba(50, 214, 123, 0.15);
             transform: scale(1.02);
         }
 
@@ -534,7 +521,6 @@
         display: none;
     }
 
-    /* Preview */
     .preview-area {
         display: none;
         margin-top: 20px;
@@ -594,7 +580,6 @@
         text-align: center;
     }
 
-    /* Textarea */
     .form-textarea {
         width: 100%;
         padding: 16px;
@@ -624,59 +609,64 @@
             font-weight: 600;
         }
 
-    /* Premium Card */
     .premium-card {
-        background: linear-gradient(135deg, rgba(50, 214, 123, 0.05) 0%, rgba(50, 214, 123, 0.02) 100%);
+        background: rgba(50, 214, 123, 0.05);
         border: 2px solid rgba(50, 214, 123, 0.2);
         border-radius: 12px;
         padding: 24px;
     }
 
-    .premium-header {
+    .verification-alert {
         display: flex;
         align-items: flex-start;
         gap: 16px;
-        margin-bottom: 20px;
+        padding: 20px;
+        background: #FFF3CD;
+        border: 2px solid #FFE69C;
+        border-radius: 12px;
     }
 
-    /* Toggle Switch */
-    .toggle-wrapper {
-        flex-shrink: 0;
+        .verification-alert svg {
+            flex-shrink: 0;
+            color: #F59E0B;
+        }
+
+        .verification-alert h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #111827;
+            margin: 0 0 8px 0;
+        }
+
+        .verification-alert p {
+            font-size: 14px;
+            color: #6B7280;
+            margin: 0 0 16px 0;
+            line-height: 1.5;
+        }
+
+            .verification-alert p strong {
+                color: #111827;
+            }
+
+    .btn-verify {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #F59E0B;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 14px;
+        transition: all 0.2s;
     }
 
-    .toggle-input {
-        display: none;
-    }
-
-    .toggle-label {
-        display: block;
-        width: 56px;
-        height: 32px;
-        background: #E5E7EB;
-        border-radius: 16px;
-        position: relative;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-
-    .toggle-switch {
-        position: absolute;
-        top: 4px;
-        left: 4px;
-        width: 24px;
-        height: 24px;
-        background: white;
-        border-radius: 50%;
-        transition: all 0.3s ease;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-
-    .toggle-input:checked + .toggle-label {
-        background: #32d67b;
-    }
-
-        .toggle-input:checked + .toggle-label .toggle-switch {
-            left: 28px;
+        .btn-verify:hover {
+            background: #D97706;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
         }
 
     .premium-info h3 {
@@ -697,11 +687,6 @@
         font-size: 14px;
         color: #6B7280;
         margin: 0;
-    }
-
-    /* Precio Content */
-    .precio-content {
-        margin-top: 16px;
     }
 
     .precio-selector {
@@ -759,7 +744,6 @@
         color: #6B7280;
     }
 
-    /* Botones */
     .form-actions {
         display: flex;
         gap: 12px;
@@ -816,7 +800,6 @@
             color: #111827;
         }
 
-    /* Tips Card */
     .tips-card {
         background: white;
         border-radius: 16px;
@@ -877,7 +860,49 @@
                 border-radius: 50%;
             }
 
-    /* Responsive */
+    .loading-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+    }
+
+        .loading-overlay.show {
+            display: flex;
+        }
+
+    .loading-spinner {
+        text-align: center;
+    }
+
+        .loading-spinner p {
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+            margin-top: 20px;
+        }
+
+    .spinner {
+        width: 60px;
+        height: 60px;
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-top: 4px solid #32d67b;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
     @@media (max-width: 768px) {
         .crear-container {
             padding: 16px;
@@ -918,10 +943,6 @@
             height: 48px;
         }
 
-        .premium-header {
-            flex-direction: column;
-        }
-
         .form-actions {
             flex-direction: column;
         }
@@ -933,12 +954,30 @@
         .tips-card {
             padding: 24px;
         }
+
+        .verification-alert {
+            flex-direction: column;
+        }
     }
 </style>
 
 @section Scripts {
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const usuarioVerificado = @(usuarioVerificado ? "true" : "false");
+
+            console.log('🎬 Sistema de creación iniciado');
+            console.log('Usuario verificado:', usuarioVerificado);
+
+            // 🔍 MOSTRAR DEBUG ANTERIOR SI EXISTE
+            const lastDebug = localStorage.getItem('formDebug');
+            if (lastDebug) {
+                console.log('🔍 ÚLTIMO DEBUG GUARDADO:');
+                console.log(lastDebug);
+                alert('DEBUG DEL ÚLTIMO ENVÍO:\n\n' + lastDebug);
+                localStorage.removeItem('formDebug');
+            }
+
             // Elementos
             const ladoOptions = document.querySelectorAll('.lado-option');
             const esGratisInput = document.getElementById('esGratisInput');
@@ -959,42 +998,37 @@
             const btnBorrador = document.getElementById('btnBorrador');
             const formContenido = document.getElementById('formContenido');
             const esBorradorInput = document.getElementById('esBorradorInput');
+            const loadingOverlay = document.getElementById('loadingOverlay');
 
-            // Lado selector (solo si existe)
-            if (ladoOptions.length > 0) {
-                ladoOptions.forEach(option => {
-                    option.addEventListener('click', function() {
-                        ladoOptions.forEach(opt => opt.classList.remove('active'));
-                        this.classList.add('active');
+            // ⭐ SELECTOR DE LADO
+            ladoOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    ladoOptions.forEach(opt => opt.classList.remove('active'));
+                    this.classList.add('active');
 
-                        // Obtener el valor de data-esgratis
-                        const esGratis = this.dataset.esgratis === 'true';
-                        console.log('🔵 Lado seleccionado:', this.dataset.lado, 'EsGratis:', esGratis);
+                    const esGratis = this.dataset.esgratis === 'true';
+                    const lado = this.dataset.lado;
 
-                        // Actualizar campo hidden
-                        esGratisInput.value = esGratis ? 'true' : 'false';
-                        console.log('🔵 esGratisInput.value actualizado a:', esGratisInput.value);
+                    esGratisInput.value = esGratis ? 'true' : 'false';
 
-                        if (esGratis) {
-                            if (precioSectionWrapper) {
-                                precioSectionWrapper.style.display = 'none';
-                            }
-                            if (precioSelect) {
-                                precioSelect.required = false;
-                            }
-                        } else {
-                            if (precioSectionWrapper) {
-                                precioSectionWrapper.style.display = 'block';
-                            }
-                            if (precioSelect) {
-                                precioSelect.required = true;
-                            }
+                    console.log('=============================');
+                    console.log('Lado seleccionado:', lado);
+                    console.log('data-esgratis:', this.dataset.esgratis);
+                    console.log('esGratis (boolean):', esGratis);
+                    console.log('Input hidden value:', esGratisInput.value);
+                    console.log('=============================');
+
+                    if (esGratis) {
+                        precioSectionWrapper.style.display = 'none';
+                        if (precioSelect) precioSelect.removeAttribute('required');
+                    } else {
+                        precioSectionWrapper.style.display = 'block';
+                        if (usuarioVerificado && precioSelect) {
+                            precioSelect.setAttribute('required', 'required');
                         }
-                    });
+                    }
                 });
-            }
-
-            console.log('🔵 Valor inicial de esGratisInput:', esGratisInput ? esGratisInput.value : 'NO EXISTE');
+            });
 
             // Tipo de contenido
             tipoCards.forEach(card => {
@@ -1013,19 +1047,15 @@
                 });
             });
 
-            // Upload area click
+            // Upload
             uploadArea.addEventListener('click', () => archivoInput.click());
-
-            // Drag & drop
             uploadArea.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 uploadArea.classList.add('dragover');
             });
-
             uploadArea.addEventListener('dragleave', () => {
                 uploadArea.classList.remove('dragover');
             });
-
             uploadArea.addEventListener('drop', (e) => {
                 e.preventDefault();
                 uploadArea.classList.remove('dragover');
@@ -1038,14 +1068,12 @@
                 }
             });
 
-            // File input change
             archivoInput.addEventListener('change', (e) => {
                 if (e.target.files.length > 0) {
                     handleFileSelect(e.target.files[0]);
                 }
             });
 
-            // Remove file
             removeFileBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 archivoInput.value = '';
@@ -1054,7 +1082,6 @@
                 videoPreview.classList.remove('show');
             });
 
-            // Handle file select
             function handleFileSelect(file) {
                 const reader = new FileReader();
                 previewArea.classList.add('show');
@@ -1065,16 +1092,12 @@
                 if (file.type.startsWith('image/')) {
                     videoPreview.classList.remove('show');
                     imagePreview.classList.add('show');
-                    reader.onload = (e) => {
-                        imagePreview.src = e.target.result;
-                    };
+                    reader.onload = (e) => imagePreview.src = e.target.result;
                     reader.readAsDataURL(file);
                 } else if (file.type.startsWith('video/')) {
                     imagePreview.classList.remove('show');
                     videoPreview.classList.add('show');
-                    reader.onload = (e) => {
-                        videoPreview.src = e.target.result;
-                    };
+                    reader.onload = (e) => videoPreview.src = e.target.result;
                     reader.readAsDataURL(file);
                 }
             }
@@ -1089,46 +1112,68 @@
                 esBorradorInput.value = 'true';
                 archivoInput.removeAttribute('required');
                 descripcionTextarea.removeAttribute('required');
+                loadingOverlay.classList.add('show');
                 formContenido.submit();
             });
 
-            // Publicar
-            document.getElementById('btnPublicar').addEventListener('click', function(e) {
-                esBorradorInput.value = 'false';
-            });
-
-            // Validación
+            // 🔍 VALIDACIÓN Y DEBUG COMPLETO
             formContenido.addEventListener('submit', function(e) {
                 const tipoContenido = tipoInput.value;
                 const esBorrador = esBorradorInput.value === 'true';
-                const esGratis = esGratisInput ? esGratisInput.value === 'true' : true;
+                const esGratis = esGratisInput.value === 'true';
 
-                console.log('🟢 SUBMIT - Valores:', {
-                    tipoContenido: tipoContenido,
-                    esBorrador: esBorrador,
-                    esGratis: esGratis,
-                    esGratisInputValue: esGratisInput ? esGratisInput.value : 'NO EXISTE'
-                });
+                // 📊 CREAR DEBUG COMPLETO
+                let debugMsg = '========== DEBUG FORMULARIO ==========\n';
+                debugMsg += `Timestamp: ${new Date().toLocaleString()}\n`;
+                debugMsg += `\n--- VALORES DEL DOM ---\n`;
+                debugMsg += `esGratisInput.value: "${esGratisInput.value}"\n`;
+                debugMsg += `esGratis (boolean): ${esGratis}\n`;
+                debugMsg += `Lado activo: ${document.querySelector('.lado-option.active')?.dataset.lado}\n`;
+                debugMsg += `Usuario verificado: ${usuarioVerificado}\n`;
+                debugMsg += `\n--- VALORES QUE SE ENVIARÁN ---\n`;
 
+                const formData = new FormData(formContenido);
+                debugMsg += `EsGratis: ${formData.get('EsGratis')}\n`;
+                debugMsg += `PrecioDesbloqueo: ${formData.get('PrecioDesbloqueo')}\n`;
+                debugMsg += `TipoContenido: ${formData.get('TipoContenido')}\n`;
+                debugMsg += `EsBorrador: ${formData.get('EsBorrador')}\n`;
+                debugMsg += `Descripcion length: ${formData.get('Descripcion')?.length || 0}\n`;
+                debugMsg += `Archivo: ${formData.get('archivo')?.name || 'Sin archivo'}\n`;
+                debugMsg += '======================================\n';
+
+                // 💾 GUARDAR EN LOCALSTORAGE
+                localStorage.setItem('formDebug', debugMsg);
+                console.log(debugMsg);
+
+                // ✅ VALIDACIONES
                 if (!esBorrador && tipoContenido !== '3' && !archivoInput.files.length) {
                     e.preventDefault();
-                    alert('Por favor selecciona un archivo para publicar');
+                    if (typeof showToast === 'function') {
+                        showToast('error', 'Error', 'Por favor selecciona un archivo para publicar');
+                    } else {
+                        alert('Por favor selecciona un archivo para publicar');
+                    }
                     return false;
                 }
 
-                // Validar precio si es LadoB
-                if (!esGratis && precioSelect) {
+                if (!esGratis && usuarioVerificado && precioSelect) {
                     const precio = parseInt(precioSelect.value);
-                    console.log('🟡 Validando precio LadoB:', precio);
                     if (!precio || precio <= 0 || precio % 5 !== 0) {
                         e.preventDefault();
-                        alert('El precio debe ser un múltiplo de 5 (5, 10, 15, 20...)');
+                        if (typeof showToast === 'function') {
+                            showToast('error', 'Error', 'El precio debe ser un múltiplo de 5');
+                        } else {
+                            alert('El precio debe ser un múltiplo de 5');
+                        }
                         return false;
                     }
                 }
 
-                console.log('✅ Validación OK - Enviando formulario...');
+                // Mostrar loading
+                loadingOverlay.classList.add('show');
             });
+
+            console.log('✅ Sistema iniciado correctamente');
         });
     </script>
 }
