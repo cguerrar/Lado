@@ -22,14 +22,23 @@ namespace Lado.Models
         public string? FotoPortada { get; set; }
 
         // ========================================
-        // SISTEMA DE SEUDÓNIMO (LADO B)
+        // SISTEMA DE IDENTIDAD DUAL (LADO A / LADO B)
         // ========================================
+
+        // LADO B - Identidad Premium/Anónima
         [Display(Name = "Seudónimo")]
         [StringLength(50)]
         public string? Seudonimo { get; set; }
 
         [Display(Name = "Seudónimo Verificado")]
         public bool SeudonimoVerificado { get; set; } = false;
+
+        [Display(Name = "Foto de Perfil LadoB")]
+        public string? FotoPerfilLadoB { get; set; }
+
+        [Display(Name = "Biografía LadoB")]
+        [StringLength(500)]
+        public string? BiografiaLadoB { get; set; }
 
         // === TIPO DE USUARIO ===
         [Display(Name = "Tipo de Usuario")]
@@ -101,18 +110,54 @@ namespace Lado.Models
         // ========================================
 
         /// <summary>
-        /// Obtiene el nombre de visualización según el contexto.
-        /// Si tiene seudónimo y se solicita, lo devuelve; de lo contrario, devuelve el nombre completo.
+        /// Obtiene el nombre de visualización según el contexto y el tipo de lado.
         /// </summary>
-        /// <param name="usarSeudonimo">Si true, intenta usar el seudónimo primero</param>
+        /// <param name="usarLadoB">Si true, usa la identidad de LadoB (seudónimo)</param>
         /// <returns>El nombre a mostrar</returns>
-        public string ObtenerNombreDisplay(bool usarSeudonimo = false)
+        public string ObtenerNombreDisplay(bool usarLadoB = false)
         {
-            if (usarSeudonimo && !string.IsNullOrEmpty(Seudonimo))
+            if (usarLadoB && !string.IsNullOrEmpty(Seudonimo))
             {
                 return Seudonimo;
             }
             return NombreCompleto;
+        }
+
+        /// <summary>
+        /// Obtiene la foto de perfil según el contexto.
+        /// </summary>
+        /// <param name="usarLadoB">Si true, usa la foto de LadoB</param>
+        /// <returns>La ruta de la foto o null</returns>
+        public string? ObtenerFotoPerfil(bool usarLadoB = false)
+        {
+            if (usarLadoB && !string.IsNullOrEmpty(FotoPerfilLadoB))
+            {
+                return FotoPerfilLadoB;
+            }
+            return FotoPerfil;
+        }
+
+        /// <summary>
+        /// Obtiene la biografía según el contexto.
+        /// </summary>
+        /// <param name="usarLadoB">Si true, usa la biografía de LadoB</param>
+        /// <returns>La biografía o null</returns>
+        public string? ObtenerBiografia(bool usarLadoB = false)
+        {
+            if (usarLadoB && !string.IsNullOrEmpty(BiografiaLadoB))
+            {
+                return BiografiaLadoB;
+            }
+            return Biografia;
+        }
+
+        /// <summary>
+        /// Verifica si tiene configurada la identidad de LadoB.
+        /// </summary>
+        /// <returns>True si tiene seudónimo configurado</returns>
+        public bool TieneLadoB()
+        {
+            return !string.IsNullOrEmpty(Seudonimo);
         }
 
         /// <summary>
@@ -180,6 +225,20 @@ namespace Lado.Models
                 return CreadorVerificado;
 
             return true;
+        }
+
+        /// <summary>
+        /// Obtiene la inicial del nombre para mostrar en avatares.
+        /// </summary>
+        /// <param name="usarLadoB">Si true, usa la inicial del seudónimo</param>
+        /// <returns>La primera letra del nombre/seudónimo</returns>
+        public string ObtenerInicial(bool usarLadoB = false)
+        {
+            if (usarLadoB && !string.IsNullOrEmpty(Seudonimo))
+            {
+                return Seudonimo.Substring(0, 1).ToUpper();
+            }
+            return NombreCompleto.Substring(0, 1).ToUpper();
         }
     }
 }
