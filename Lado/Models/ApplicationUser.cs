@@ -42,7 +42,7 @@ namespace Lado.Models
 
         // === TIPO DE USUARIO ===
         [Display(Name = "Tipo de Usuario")]
-        public int TipoUsuario { get; set; } = 0; // 0 = Fan, 1 = Creador, 2 = Admin
+        public int TipoUsuario { get; set; } = 0; // 0 = Fan, 1 = Creador, 2 = Agencia (Admin se maneja por Roles)
 
         [Display(Name = "Es Creador")]
         public bool EsCreador { get; set; } = false;
