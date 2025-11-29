@@ -1,28 +1,471 @@
-﻿@model List<Lado.Models.Suscripcion>
+@model List<Lado.Models.Suscripcion>
 
 @{
     ViewData["Title"] = "Mis Suscripciones";
 }
 
-<div class="container py-4">
-    <div class="row mb-4">
-        <div class="col-12">
-            <h2 class="fw-bold mb-2">Mis Suscripciones</h2>
-            <p class="text-muted">Gestiona tus suscripciones activas</p>
-        </div>
+<style>
+    .subs-page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px;
+    }
+
+    .page-header {
+        margin-bottom: 32px;
+    }
+
+    .page-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--fg);
+        margin: 0 0 8px 0;
+    }
+
+    .page-subtitle {
+        color: var(--muted);
+        font-size: 15px;
+        margin: 0;
+    }
+
+    /* Stats Cards */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+
+    .stat-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        text-align: center;
+        transition: all var(--transition-base);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .stat-value {
+        font-size: 32px;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+
+    .stat-value.primary { color: var(--primary); }
+    .stat-value.success { color: var(--success); }
+    .stat-value.warning { color: var(--warning); }
+    .stat-value.info { color: var(--info); }
+
+    .stat-label {
+        font-size: 13px;
+        color: var(--muted);
+        font-weight: 500;
+    }
+
+    /* Subscription Cards */
+    .subs-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 24px;
+    }
+
+    .sub-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        overflow: hidden;
+        transition: all var(--transition-slow);
+    }
+
+    .sub-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-xl);
+        border-color: var(--primary);
+    }
+
+    .sub-cover {
+        position: relative;
+        height: 120px;
+        overflow: hidden;
+    }
+
+    .sub-cover img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .sub-cover-gradient {
+        width: 100%;
+        height: 100%;
+        background: var(--primary-gradient);
+    }
+
+    .sub-status {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .sub-status.active {
+        background: rgba(70, 130, 180, 0.95);
+        color: white;
+    }
+
+    .sub-status.inactive {
+        background: rgba(100, 116, 139, 0.9);
+        color: white;
+    }
+
+    .sub-content {
+        padding: 20px;
+        position: relative;
+    }
+
+    .sub-avatar {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        border: 4px solid var(--surface);
+        position: absolute;
+        top: -40px;
+        left: 20px;
+        object-fit: cover;
+        background: var(--surface);
+    }
+
+    .sub-avatar-placeholder {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        border: 4px solid var(--surface);
+        position: absolute;
+        top: -40px;
+        left: 20px;
+        background: var(--primary-gradient);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .sub-avatar-placeholder svg {
+        width: 32px;
+        height: 32px;
+        stroke: white;
+    }
+
+    .sub-info {
+        margin-top: 40px;
+    }
+
+    .sub-name {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--fg);
+        margin: 0 0 4px 0;
+    }
+
+    .sub-username {
+        font-size: 14px;
+        color: var(--muted);
+        margin: 0 0 16px 0;
+    }
+
+    .sub-details {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 16px;
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-md);
+        margin-bottom: 16px;
+    }
+
+    .sub-detail-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .sub-detail-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--muted);
+    }
+
+    .sub-detail-label svg {
+        width: 16px;
+        height: 16px;
+        stroke: var(--muted);
+    }
+
+    .sub-detail-value {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg);
+    }
+
+    .sub-detail-value.price {
+        font-size: 18px;
+        color: var(--primary);
+    }
+
+    .sub-actions {
+        display: flex;
+        gap: 12px;
+    }
+
+    .btn-profile {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 16px;
+        background: var(--primary-gradient);
+        color: white;
+        border: none;
+        border-radius: var(--radius-md);
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all var(--transition-base);
+        cursor: pointer;
+    }
+
+    .btn-profile:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--primary-glow);
+        color: white;
+    }
+
+    .btn-profile svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .btn-cancel {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        background: transparent;
+        border: 2px solid var(--danger);
+        border-radius: var(--radius-md);
+        color: var(--danger);
+        cursor: pointer;
+        transition: all var(--transition-base);
+    }
+
+    .btn-cancel:hover {
+        background: var(--danger);
+        color: white;
+    }
+
+    .btn-cancel svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+    }
+
+    .empty-icon {
+        width: 100px;
+        height: 100px;
+        margin: 0 auto 24px;
+        background: var(--bg-tertiary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .empty-icon svg {
+        width: 48px;
+        height: 48px;
+        stroke: var(--muted);
+    }
+
+    .empty-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--fg);
+        margin: 0 0 8px 0;
+    }
+
+    .empty-text {
+        font-size: 15px;
+        color: var(--muted);
+        margin: 0 0 24px 0;
+    }
+
+    .btn-explore {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 28px;
+        background: var(--primary-gradient);
+        color: white;
+        border: none;
+        border-radius: var(--radius-md);
+        font-size: 15px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all var(--transition-base);
+    }
+
+    .btn-explore:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--primary-glow);
+        color: white;
+    }
+
+    .btn-explore svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    /* Modal Styles */
+    .modal-cancel .modal-content {
+        border-radius: var(--radius-xl);
+        border: none;
+        overflow: hidden;
+        background: var(--surface);
+    }
+
+    .modal-cancel .modal-header {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        border: none;
+        padding: 20px 24px;
+    }
+
+    .modal-cancel .modal-title {
+        color: white;
+        font-weight: 700;
+        font-size: 18px;
+    }
+
+    .modal-cancel .btn-close {
+        filter: brightness(0) invert(1);
+    }
+
+    .modal-cancel .modal-body {
+        padding: 24px;
+        text-align: center;
+        background: var(--surface);
+    }
+
+    .modal-cancel .modal-body p {
+        margin: 0;
+        font-size: 15px;
+        color: var(--fg);
+    }
+
+    .modal-cancel .modal-body p.text-muted {
+        margin-top: 8px;
+        font-size: 13px;
+        color: var(--muted);
+    }
+
+    .modal-cancel .modal-footer {
+        border: none;
+        padding: 16px 24px 24px;
+        justify-content: center;
+        gap: 12px;
+        background: var(--surface);
+    }
+
+    .modal-cancel .btn-secondary {
+        padding: 12px 24px;
+        border-radius: var(--radius-sm);
+        font-weight: 600;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--line);
+        color: var(--fg);
+    }
+
+    .modal-cancel .btn-secondary:hover {
+        background: var(--line);
+    }
+
+    .modal-cancel .btn-danger {
+        padding: 12px 24px;
+        border-radius: var(--radius-sm);
+        font-weight: 600;
+        background: #ef4444;
+        border: none;
+    }
+
+    .modal-cancel .btn-danger:hover {
+        background: #dc2626;
+    }
+
+    @@media (max-width: 768px) {
+        .subs-page {
+            padding: 16px;
+        }
+
+        .page-title {
+            font-size: 24px;
+        }
+
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .stat-value {
+            font-size: 24px;
+        }
+
+        .subs-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="subs-page">
+    <div class="page-header">
+        <h1 class="page-title">Mis Suscripciones</h1>
+        <p class="page-subtitle">Gestiona tus suscripciones activas a creadores</p>
     </div>
 
     @if (!Model.Any())
     {
-        <div class="text-center py-5">
-            <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-muted mb-3">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-            <h4 class="text-muted">No tienes suscripciones activas</h4>
-            <p class="text-muted mb-4">Explora creadores y encuentra contenido que te interese</p>
-            <a href="@Url.Action("Index", "Feed")" class="btn btn-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
+        <div class="empty-state">
+            <div class="empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+            </div>
+            <h3 class="empty-title">No tienes suscripciones activas</h3>
+            <p class="empty-text">Explora creadores y descubre contenido exclusivo que te interese</p>
+            <a href="@Url.Action("Explorar", "Feed")" class="btn-explore">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="11" cy="11" r="8"></circle>
                     <path d="m21 21-4.35-4.35"></path>
                 </svg>
@@ -32,85 +475,111 @@
     }
     else
     {
-        <div class="row g-4">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value primary">@Model.Count</div>
+                <div class="stat-label">Suscripciones Activas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value success">$@Model.Sum(s => s.PrecioMensual).ToString("N0")</div>
+                <div class="stat-label">Gasto Mensual</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value info">$@((Model.Sum(s => s.PrecioMensual) * 12).ToString("N0"))</div>
+                <div class="stat-label">Gasto Anual Estimado</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value warning">@Model.Count(s => s.RenovacionAutomatica)</div>
+                <div class="stat-label">Renovacion Automatica</div>
+            </div>
+        </div>
+
+        <div class="subs-grid">
             @foreach (var suscripcion in Model)
             {
-                <div class="col-12 col-md-6 col-lg-4">
-                    <div class="card shadow-sm h-100">
-                        <div class="position-relative" style="height: 200px; overflow: hidden;">
-                            @if (!string.IsNullOrEmpty(suscripcion.Creador?.FotoPortada))
-                            {
-                                <img src="@suscripcion.Creador.FotoPortada" alt="Portada" class="w-100 h-100 object-fit-cover">
-                            }
-                            else
-                            {
-                                <div class="w-100 h-100 bg-gradient" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
-                            }
+                <div class="sub-card">
+                    <div class="sub-cover">
+                        @if (!string.IsNullOrEmpty(suscripcion.Creador?.FotoPortada))
+                        {
+                            <img src="@suscripcion.Creador.FotoPortada" alt="Portada">
+                        }
+                        else
+                        {
+                            <div class="sub-cover-gradient"></div>
+                        }
 
-                            @if (suscripcion.EstaActiva)
-                            {
-                                <span class="badge bg-success position-absolute top-0 end-0 m-3">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
-                                        <polyline points="20 6 9 17 4 12"></polyline>
-                                    </svg>
-                                    Activa
-                                </span>
-                            }
-                        </div>
+                        @if (suscripcion.EstaActiva)
+                        {
+                            <span class="sub-status active">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                Activa
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="sub-status inactive">Inactiva</span>
+                        }
+                    </div>
 
-                        <div class="card-body">
-                            <div class="d-flex align-items-center mb-3">
-                                @if (!string.IsNullOrEmpty(suscripcion.Creador?.FotoPerfil))
-                                {
-                                    <img src="@suscripcion.Creador.FotoPerfil" alt="@suscripcion.Creador.NombreCompleto" class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover;">
-                                }
-                                else
-                                {
-                                    <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                            <circle cx="12" cy="7" r="4"></circle>
-                                        </svg>
-                                    </div>
-                                }
-                                <div class="flex-grow-1">
-                                    <h5 class="mb-0">@(suscripcion.Creador?.NombreCompleto ?? "Usuario")</h5>
-                                    <small class="text-muted">@@@(suscripcion.Creador?.UserName ?? "username")</small>
-                                </div>
+                    <div class="sub-content">
+                        @if (!string.IsNullOrEmpty(suscripcion.Creador?.FotoPerfil))
+                        {
+                            <img src="@suscripcion.Creador.FotoPerfil" alt="@suscripcion.Creador.NombreCompleto" class="sub-avatar">
+                        }
+                        else
+                        {
+                            <div class="sub-avatar-placeholder">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="12" cy="7" r="4"></circle>
+                                </svg>
                             </div>
+                        }
 
-                            <div class="mb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="text-muted">Precio mensual</span>
-                                    <strong class="text-primary fs-5">$@suscripcion.PrecioMensual.ToString("N2")</strong>
+                        <div class="sub-info">
+                            <h3 class="sub-name">@(suscripcion.Creador?.NombreCompleto ?? "Usuario")</h3>
+                            <p class="sub-username">@@@(suscripcion.Creador?.UserName ?? "username")</p>
+
+                            <div class="sub-details">
+                                <div class="sub-detail-row">
+                                    <span class="sub-detail-label">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <line x1="12" y1="1" x2="12" y2="23"></line>
+                                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                        </svg>
+                                        Precio mensual
+                                    </span>
+                                    <span class="sub-detail-value price">$@suscripcion.PrecioMensual.ToString("N2")</span>
                                 </div>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="text-muted">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+                                <div class="sub-detail-row">
+                                    <span class="sub-detail-label">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                                             <line x1="16" y1="2" x2="16" y2="6"></line>
                                             <line x1="8" y1="2" x2="8" y2="6"></line>
                                             <line x1="3" y1="10" x2="21" y2="10"></line>
                                         </svg>
-                                        Desde
+                                        Suscrito desde
                                     </span>
-                                    <small>@suscripcion.FechaInicio.ToString("dd/MM/yyyy")</small>
+                                    <span class="sub-detail-value">@suscripcion.FechaInicio.ToString("dd MMM yyyy")</span>
                                 </div>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="text-muted">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+                                <div class="sub-detail-row">
+                                    <span class="sub-detail-label">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <circle cx="12" cy="12" r="10"></circle>
                                             <polyline points="12 6 12 12 16 14"></polyline>
                                         </svg>
-                                        Próxima renovación
+                                        Proxima renovacion
                                     </span>
-                                    <small>@suscripcion.ProximaRenovacion.ToString("dd/MM/yyyy")</small>
+                                    <span class="sub-detail-value">@suscripcion.ProximaRenovacion.ToString("dd MMM yyyy")</span>
                                 </div>
                             </div>
 
-                            <div class="d-flex gap-2">
-                                <a href="@Url.Action("Perfil", "Feed", new { id = suscripcion.CreadorId })" class="btn btn-outline-primary btn-sm flex-grow-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+                            <div class="sub-actions">
+                                <a href="@Url.Action("Perfil", "Feed", new { id = suscripcion.CreadorId })" class="btn-profile">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                                         <circle cx="12" cy="7" r="4"></circle>
                                     </svg>
@@ -118,8 +587,8 @@
                                 </a>
                                 @if (suscripcion.EstaActiva)
                                 {
-                                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="confirmarCancelacion(@suscripcion.Id, '@suscripcion.Creador?.NombreCompleto')">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                                    <button type="button" class="btn-cancel" onclick="confirmarCancelacion(@suscripcion.Id, '@suscripcion.Creador?.NombreCompleto')" title="Cancelar suscripcion">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <line x1="18" y1="6" x2="6" y2="18"></line>
                                             <line x1="6" y1="6" x2="18" y2="18"></line>
                                         </svg>
@@ -131,53 +600,26 @@
                 </div>
             }
         </div>
-
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-body">
-                        <div class="row text-center">
-                            <div class="col-6 col-md-3 mb-3 mb-md-0">
-                                <h3 class="text-primary mb-0">@Model.Count</h3>
-                                <small class="text-muted">Suscripciones activas</small>
-                            </div>
-                            <div class="col-6 col-md-3 mb-3 mb-md-0">
-                                <h3 class="text-success mb-0">$@Model.Sum(s => s.PrecioMensual).ToString("N2")</h3>
-                                <small class="text-muted">Gasto mensual</small>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <h3 class="text-info mb-0">$@((Model.Sum(s => s.PrecioMensual) * 12).ToString("N2"))</h3>
-                                <small class="text-muted">Gasto anual estimado</small>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <h3 class="text-warning mb-0">@Model.Count(s => s.RenovacionAutomatica)</h3>
-                                <small class="text-muted">Renovación automática</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     }
 </div>
 
-<div class="modal fade" id="modalCancelar" tabindex="-1">
+<div class="modal fade modal-cancel" id="modalCancelar" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Cancelar Suscripción</h5>
+                <h5 class="modal-title">Cancelar Suscripcion</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>¿Estás seguro que deseas cancelar tu suscripción a <strong id="nombreCreador"></strong>?</p>
-                <p class="text-muted mb-0">Esta acción no se puede deshacer.</p>
+                <p>Estas seguro que deseas cancelar tu suscripcion a <strong id="nombreCreador"></strong>?</p>
+                <p class="text-muted">Perderas acceso al contenido exclusivo de este creador.</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No, mantener</button>
                 <form id="formCancelar" method="post" asp-action="Cancelar" asp-controller="Suscripciones" style="display: inline;">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="id" id="suscripcionId" />
-                    <button type="submit" class="btn btn-danger">Sí, cancelar</button>
+                    <button type="submit" class="btn btn-danger">Si, cancelar</button>
                 </form>
             </div>
         </div>

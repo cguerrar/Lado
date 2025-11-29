@@ -160,7 +160,7 @@ namespace Lado.Controllers
                     return View();
                 }
 
-                if (!EsBorrador && TipoContenido != 3 && (archivo == null || archivo.Length == 0))
+                if (!EsBorrador && TipoContenido != (int)Models.TipoContenido.Post && (archivo == null || archivo.Length == 0))
                 {
                     TempData["Error"] = "Debes subir un archivo para este tipo de contenido";
                     ViewBag.UsuarioVerificado = usuario.CreadorVerificado;

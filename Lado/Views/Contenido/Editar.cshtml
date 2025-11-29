@@ -1,341 +1,218 @@
-﻿@model Lado.Models.Contenido
+@model Lado.Models.Contenido
 @{
     ViewData["Title"] = "Editar Publicación";
     var usuarioVerificado = ViewBag.UsuarioVerificado ?? false;
 }
 
-<div class="crear-container">
-    <div class="crear-card">
-        <!-- Header -->
-        <div class="crear-header">
-            <h1>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
-                </svg>
-                Editar Publicación
-            </h1>
-            <p>Actualiza tu contenido</p>
-        </div>
-
-        <form asp-action="Editar" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" id="formContenido">
-            @Html.AntiForgeryToken()
-
-            <!-- Estado del contenido -->
-            @if (Model.EsBorrador)
-            {
-                <div class="alert alert-warning">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 8px;">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-                    </svg>
-                    Este contenido es un <strong>borrador</strong> y no está visible para tus suscriptores.
-                </div>
-            }
-
-            <!-- Selección de Lado (Solo si está verificado) -->
-            @if (usuarioVerificado)
-            {
-                <div class="form-section">
-                    <label class="section-label">¿Dónde quieres publicar?</label>
-                    <div class="lado-selector">
-                        <div class="lado-option @(Model.TipoLado == Lado.Models.TipoLado.LadoA ? "active" : "")" data-lado="ladoa" data-esgratis="true">
-                            <div class="lado-badge ladoa">A</div>
-                            <div class="lado-info">
-                                <h3>LadoA · Público</h3>
-                                <p>Contenido gratuito visible para todos</p>
-                            </div>
-                            <div class="lado-check">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                                </svg>
-                            </div>
-                        </div>
-
-                        <div class="lado-option @(Model.TipoLado == Lado.Models.TipoLado.LadoB ? "active" : "")" data-lado="ladob" data-esgratis="false">
-                            <div class="lado-badge ladob">B</div>
-                            <div class="lado-info">
-                                <h3>LadoB · Premium</h3>
-                                <p>Contenido monetizado con tu seudónimo</p>
-                            </div>
-                            <div class="lado-check">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            }
-            else
-            {
-                <!-- Si no está verificado, solo puede publicar en LadoA -->
-                <input type="hidden" name="EsGratis" value="true" />
-            }
-            
-            <!-- Campo hidden que siempre se envía -->
-            <input type="hidden" name="EsGratis" id="esGratisInput" value="@(Model.TipoLado == Lado.Models.TipoLado.LadoA ? "true" : "false")" />
-
-            <!-- Tipo de Contenido -->
-            <div class="form-section">
-                <label class="section-label">Tipo de contenido</label>
-                <div class="tipo-grid">
-                    <div class="tipo-card @(Model.TipoContenido == Lado.Models.TipoContenido.Foto ? "active" : "")" data-tipo="0">
-                        <div class="tipo-icon">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
-                            </svg>
-                        </div>
-                        <h3>Foto</h3>
-                        <p>JPG, PNG, GIF</p>
-                    </div>
-
-                    <div class="tipo-card @(Model.TipoContenido == Lado.Models.TipoContenido.Video ? "active" : "")" data-tipo="1">
-                        <div class="tipo-icon">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
-                            </svg>
-                        </div>
-                        <h3>Video</h3>
-                        <p>MP4, MOV, AVI</p>
-                    </div>
-
-                    <div class="tipo-card @(Model.TipoContenido == Lado.Models.TipoContenido.Post ? "active" : "")" data-tipo="3">
-                        <div class="tipo-icon">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
-                            </svg>
-                        </div>
-                        <h3>Post</h3>
-                        <p>Solo texto</p>
-                    </div>
-                </div>
-                <input type="hidden" name="TipoContenido" id="tipoContenidoInput" value="@((int)Model.TipoContenido)" />
-            </div>
-
-            <!-- Archivo Actual -->
-            @if (!string.IsNullOrEmpty(Model.RutaArchivo))
-            {
-                <div class="form-section">
-                    <label class="section-label">Archivo actual</label>
-                    <div class="archivo-actual">
-                        @if (Model.TipoContenido == Lado.Models.TipoContenido.Foto)
-                        {
-                            <img src="@Model.RutaArchivo" class="archivo-preview" alt="Vista previa">
-                        }
-                        else if (Model.TipoContenido == Lado.Models.TipoContenido.Video)
-                        {
-                            <video src="@Model.RutaArchivo" class="archivo-preview" controls></video>
-                        }
-                        <p class="archivo-info">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;">
-                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-                            </svg>
-                            Puedes subir un nuevo archivo para reemplazar este
-                        </p>
-                    </div>
-                </div>
-            }
-
-            <!-- Subir Nuevo Archivo -->
-            <div class="form-section" id="archivoSection" style="display: @(Model.TipoContenido == Lado.Models.TipoContenido.Post ? "none" : "block")">
-                <label class="section-label">
-                    @if (!string.IsNullOrEmpty(Model.RutaArchivo))
-                    {
-                        <text>Cambiar archivo (opcional)</text>
-                    }
-                    else
-                    {
-                        <text>Subir archivo <span class="required">*</span></text>
-                    }
-                </label>
-                <div class="upload-zone" id="uploadArea">
-                    <div class="upload-content">
-                        <svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor" class="upload-icon">
-                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z" />
-                        </svg>
-                        <h3>Arrastra tu archivo aquí</h3>
-                        <p>o haz clic para seleccionar</p>
-                        <span class="upload-hint">Máximo 100 MB</span>
-                    </div>
-                    <input type="file" name="archivo" id="archivoInput" class="file-input" accept="image/*,video/*">
-                </div>
-
-                <!-- Preview -->
-                <div id="previewArea" class="preview-area">
-                    <div class="preview-container">
-                        <img id="imagePreview" class="preview-media" alt="Preview">
-                        <video id="videoPreview" class="preview-media" controls></video>
-                        <button type="button" class="preview-remove" id="removeFileBtn">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="preview-info" id="fileInfo"></div>
-                </div>
-            </div>
-
-            <!-- Descripción -->
-            <div class="form-section">
-                <label class="section-label">Descripción</label>
-                <textarea name="Descripcion" class="form-textarea" rows="5" placeholder="Escribe una descripción atractiva para tu contenido..." maxlength="500" id="descripcionTextarea">@Model.Descripcion</textarea>
-                <div class="char-counter">
-                    <span id="charCount">@(Model.Descripcion?.Length ?? 0)</span>/500 caracteres
-                </div>
-            </div>
-
-            <!-- Configuración Premium -->
-            @if (usuarioVerificado)
-            {
-                <div class="form-section" id="precioSectionWrapper" style="display: @(Model.TipoLado == Lado.Models.TipoLado.LadoB ? "block" : "none")">
-                    <div class="premium-card">
-                        <!-- Header -->
-                        <div class="premium-info">
-                            <h3>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
-                                </svg>
-                                Precio del contenido premium
-                            </h3>
-                            <p>Este contenido se publicará en tu LadoB con tu seudónimo</p>
-                        </div>
-
-                        <!-- Selector de Precio -->
-                        <div class="precio-selector">
-                            <label class="precio-label">
-                                Precio de desbloqueo 
-                                <span class="required">*</span>
-                            </label>
-                            <div class="precio-input-group">
-                                <span class="precio-currency">$</span>
-                                <select name="PrecioDesbloqueo" class="precio-select" id="precioSelect">
-                                    @{
-                                        var precioActual = Model.PrecioDesbloqueo ?? 10m;
-                                        for (int i = 5; i <= 100; i += 5)
-                                        {
-                                            <option value="@i" @@(precioActual == i ? "selected" : "")>@i</option>
-                                        }
-                                    }
-                                </select>
-                            </div>
-                            <small class="precio-hint">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 4px;">
-                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-                                </svg>
-                                Los usuarios pagarán este monto para desbloquear tu contenido
-                            </small>
-                        </div>
-                    </div>
-                </div>
-            }
-
-            <!-- Botones de Acción -->
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
-                    </svg>
-                    Guardar Cambios
-                </button>
-                <a href="/Contenido" class="btn btn-outline">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                    </svg>
-                    Cancelar
-                </a>
-            </div>
-        </form>
-    </div>
-
-    <!-- Tips Card -->
-    <div class="tips-card">
-        <h3>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z" />
-            </svg>
-            Tips para editar
-        </h3>
-        <ul>
-            <li>Si subes un nuevo archivo, reemplazará el anterior</li>
-            <li>Los cambios se aplicarán inmediatamente</li>
-            <li>Puedes cambiar entre contenido gratuito y premium</li>
-            <li>Las estadísticas (likes, vistas) se mantienen</li>
-        </ul>
-    </div>
-</div>
-
 <style>
-    * {
-        box-sizing: border-box;
-    }
-
-    .crear-container {
+    .edit-page {
         max-width: 900px;
         margin: 0 auto;
-        padding: 32px 24px;
-    }
-
-    /* Card Principal */
-    .crear-card {
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-        padding: 40px;
-        margin-bottom: 24px;
+        padding: 24px;
     }
 
     /* Header */
-    .crear-header {
-        margin-bottom: 40px;
-        text-align: center;
+    .page-header {
+        margin-bottom: 32px;
     }
 
-    .crear-header h1 {
+    .page-title {
         display: flex;
         align-items: center;
-        justify-content: center;
         gap: 12px;
-        font-size: 32px;
+        font-size: 28px;
         font-weight: 700;
-        color: #111827;
-        margin: 0 0 12px 0;
+        color: var(--fg);
+        margin: 0 0 8px 0;
     }
 
-    .crear-header h1 svg {
-        color: #32d67b;
+    .page-title svg {
+        color: var(--primary);
     }
 
-    .crear-header p {
-        color: #6B7280;
-        font-size: 16px;
+    .page-subtitle {
+        color: var(--muted);
+        font-size: 15px;
         margin: 0;
     }
 
-    /* Alert */
-    .alert {
-        padding: 16px;
-        border-radius: 12px;
-        margin-bottom: 32px;
-        display: flex;
-        align-items: center;
+    /* Layout Grid */
+    .edit-layout {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 24px;
+        align-items: start;
     }
 
-    .alert-warning {
-        background: #FFF3CD;
-        border: 1px solid #FFE69C;
-        color: #664D03;
+    /* Main Card */
+    .edit-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        padding: 32px;
+    }
+
+    /* Preview Sidebar */
+    .preview-sidebar {
+        position: sticky;
+        top: 24px;
+    }
+
+    .preview-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        overflow: hidden;
+    }
+
+    .preview-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--line);
+        background: var(--bg);
+    }
+
+    .preview-header h3 {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .preview-header h3 svg {
+        color: var(--primary);
+    }
+
+    .preview-content {
+        padding: 0;
+    }
+
+    .current-media {
+        width: 100%;
+        aspect-ratio: 1;
+        object-fit: cover;
+        display: block;
+    }
+
+    .current-video {
+        width: 100%;
+        max-height: 300px;
+        background: #000;
+    }
+
+    .audio-preview {
+        padding: 30px 20px;
+        text-align: center;
+        background: var(--surface);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .current-audio {
+        width: 100%;
+        max-width: 280px;
+    }
+
+    .post-preview {
+        background: var(--surface);
+    }
+
+    .post-excerpt {
+        display: block;
+        margin-top: 8px;
+        font-size: 12px;
+        color: var(--muted);
+        font-style: italic;
+    }
+
+    .no-media {
+        padding: 48px 20px;
+        text-align: center;
+        color: var(--muted);
+    }
+
+    .no-media svg {
+        opacity: 0.3;
+        margin-bottom: 12px;
+    }
+
+    .no-media p {
+        margin: 0;
+        font-size: 14px;
+    }
+
+    .preview-info {
+        padding: 16px 20px;
+        border-top: 1px solid var(--line);
+    }
+
+    .preview-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .preview-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--muted);
+    }
+
+    .preview-meta-item svg {
+        flex-shrink: 0;
+        opacity: 0.6;
+    }
+
+    .preview-meta-item strong {
+        color: var(--fg);
+        font-weight: 500;
+    }
+
+    /* Status Badge */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-weight: 500;
+        margin-bottom: 24px;
+    }
+
+    .status-badge.draft {
+        background: rgba(245, 158, 11, 0.1);
+        color: #F59E0B;
+        border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    .status-badge.published {
+        background: rgba(70, 130, 180, 0.1);
+        color: var(--primary);
+        border: 1px solid rgba(70, 130, 180, 0.2);
     }
 
     /* Form Sections */
     .form-section {
-        margin-bottom: 32px;
+        margin-bottom: 28px;
+    }
+
+    .form-section:last-child {
+        margin-bottom: 0;
     }
 
     .section-label {
         display: block;
-        font-size: 16px;
+        font-size: 14px;
         font-weight: 600;
-        color: #111827;
-        margin-bottom: 16px;
+        color: var(--fg);
+        margin-bottom: 12px;
     }
 
     .required {
@@ -347,92 +224,91 @@
     .lado-selector {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 16px;
+        gap: 12px;
     }
 
     .lado-option {
         display: flex;
         align-items: center;
-        gap: 16px;
-        padding: 20px;
-        background: white;
-        border: 2px solid #E5E7EB;
-        border-radius: 12px;
+        gap: 12px;
+        padding: 16px;
+        background: var(--surface);
+        border: 2px solid var(--line);
+        border-radius: var(--radius-lg);
         cursor: pointer;
-        transition: all 0.3s ease;
-        position: relative;
+        transition: all var(--transition-base);
     }
 
     .lado-option:hover {
-        border-color: #32d67b;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(50, 214, 123, 0.15);
+        border-color: var(--primary);
+        background: rgba(70, 130, 180, 0.02);
     }
 
     .lado-option.active {
-        border-color: #32d67b;
-        background: rgba(50, 214, 123, 0.05);
+        border-color: var(--primary);
+        background: rgba(70, 130, 180, 0.05);
     }
 
     .lado-badge {
-        width: 48px;
-        height: 48px;
-        border-radius: 12px;
+        width: 40px;
+        height: 40px;
+        border-radius: var(--radius);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 24px;
+        font-size: 18px;
         font-weight: 700;
         color: white;
         flex-shrink: 0;
     }
 
     .lado-badge.ladoa {
-        background: #32d67b;
+        background: var(--primary-gradient);
     }
 
     .lado-badge.ladob {
-        background: #F59E0B;
+        background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
     }
 
     .lado-info {
         flex: 1;
+        min-width: 0;
     }
 
-    .lado-info h3 {
-        font-size: 16px;
+    .lado-info h4 {
+        font-size: 14px;
         font-weight: 600;
-        color: #111827;
-        margin: 0 0 4px 0;
+        color: var(--fg);
+        margin: 0 0 2px 0;
     }
 
     .lado-info p {
-        font-size: 13px;
-        color: #6B7280;
+        font-size: 12px;
+        color: var(--muted);
         margin: 0;
     }
 
     .lado-check {
-        width: 24px;
-        height: 24px;
+        width: 22px;
+        height: 22px;
         border-radius: 50%;
-        border: 2px solid #E5E7EB;
+        border: 2px solid var(--line);
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        transition: all 0.3s ease;
+        transition: all var(--transition-base);
     }
 
     .lado-check svg {
         opacity: 0;
         transform: scale(0);
-        transition: all 0.3s ease;
+        transition: all var(--transition-base);
     }
 
     .lado-option.active .lado-check {
-        background: #32d67b;
-        border-color: #32d67b;
+        background: var(--primary);
+        border-color: var(--primary);
     }
 
     .lado-option.active .lado-check svg {
@@ -441,98 +317,70 @@
         fill: white;
     }
 
-    /* Tipo de Contenido */
+    /* Tipo Grid */
     .tipo-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 16px;
+        gap: 12px;
     }
 
     .tipo-card {
-        background: white;
-        border: 2px solid #E5E7EB;
-        border-radius: 12px;
-        padding: 24px 16px;
+        background: var(--surface);
+        border: 2px solid var(--line);
+        border-radius: var(--radius-lg);
+        padding: 20px 16px;
         text-align: center;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: all var(--transition-base);
     }
 
     .tipo-card:hover {
-        border-color: #32d67b;
-        transform: translateY(-4px);
-        box-shadow: 0 8px 16px rgba(50, 214, 123, 0.15);
+        border-color: var(--primary);
+        transform: translateY(-2px);
     }
 
     .tipo-card.active {
-        border-color: #32d67b;
-        background: rgba(50, 214, 123, 0.05);
+        border-color: var(--primary);
+        background: rgba(70, 130, 180, 0.05);
     }
 
-    .tipo-icon {
-        margin-bottom: 12px;
+    .tipo-card svg {
+        color: var(--primary);
+        margin-bottom: 8px;
     }
 
-    .tipo-icon svg {
-        color: #32d67b;
-    }
-
-    .tipo-card h3 {
-        font-size: 18px;
+    .tipo-card h4 {
+        font-size: 14px;
         font-weight: 600;
-        color: #111827;
+        color: var(--fg);
         margin: 0 0 4px 0;
     }
 
     .tipo-card p {
-        font-size: 13px;
-        color: #6B7280;
-        margin: 0;
-    }
-
-    /* Archivo Actual */
-    .archivo-actual {
-        background: #F9FAFB;
-        border: 2px solid #E5E7EB;
-        border-radius: 12px;
-        padding: 20px;
-        text-align: center;
-    }
-
-    .archivo-preview {
-        max-width: 100%;
-        max-height: 300px;
-        border-radius: 8px;
-        margin-bottom: 12px;
-    }
-
-    .archivo-info {
-        font-size: 14px;
-        color: #6B7280;
+        font-size: 12px;
+        color: var(--muted);
         margin: 0;
     }
 
     /* Upload Zone */
     .upload-zone {
         position: relative;
-        border: 3px dashed #32d67b;
-        border-radius: 16px;
-        padding: 48px 24px;
-        background: rgba(50, 214, 123, 0.05);
+        border: 2px dashed var(--primary);
+        border-radius: var(--radius-lg);
+        padding: 40px 24px;
+        background: rgba(70, 130, 180, 0.03);
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: all var(--transition-base);
     }
 
     .upload-zone:hover {
-        border-color: #16a34a;
-        background: rgba(50, 214, 123, 0.1);
-        transform: scale(1.01);
+        background: rgba(70, 130, 180, 0.06);
+        border-color: var(--primary-dark);
     }
 
     .upload-zone.dragover {
-        border-color: #16a34a;
-        background: rgba(50, 214, 123, 0.15);
-        transform: scale(1.02);
+        background: rgba(70, 130, 180, 0.1);
+        transform: scale(1.01);
     }
 
     .upload-content {
@@ -540,62 +388,61 @@
         pointer-events: none;
     }
 
-    .upload-icon {
-        color: #32d67b;
-        margin-bottom: 16px;
+    .upload-content svg {
+        color: var(--primary);
+        margin-bottom: 12px;
     }
 
-    .upload-content h3 {
-        font-size: 18px;
+    .upload-content h4 {
+        font-size: 16px;
         font-weight: 600;
-        color: #111827;
-        margin: 0 0 8px 0;
+        color: var(--fg);
+        margin: 0 0 4px 0;
     }
 
     .upload-content p {
-        font-size: 15px;
-        color: #6B7280;
-        margin: 0 0 12px 0;
+        font-size: 14px;
+        color: var(--muted);
+        margin: 0 0 8px 0;
     }
 
     .upload-hint {
-        display: inline-block;
-        font-size: 13px;
-        color: #9CA3AF;
-        background: white;
+        font-size: 12px;
+        color: var(--muted);
+        background: var(--bg);
         padding: 4px 12px;
-        border-radius: 12px;
+        border-radius: var(--radius);
     }
 
     .file-input {
         display: none;
     }
 
-    /* Preview */
-    .preview-area {
+    /* New Preview Area */
+    .new-preview-area {
         display: none;
-        margin-top: 20px;
+        margin-top: 16px;
     }
 
-    .preview-area.show {
+    .new-preview-area.show {
         display: block;
     }
 
-    .preview-container {
+    .new-preview-container {
         position: relative;
-        border-radius: 12px;
+        border-radius: var(--radius-lg);
         overflow: hidden;
-        background: #F9FAFB;
+        background: var(--bg);
     }
 
-    .preview-media {
+    .new-preview-media {
         display: none;
         width: 100%;
-        max-height: 400px;
+        max-height: 300px;
         object-fit: contain;
     }
 
-    .preview-media.show {
+    .new-preview-media.show {
         display: block;
     }
 
@@ -603,16 +450,16 @@
         position: absolute;
         top: 12px;
         right: 12px;
-        width: 36px;
-        height: 36px;
-        background: rgba(239, 68, 68, 0.95);
+        width: 32px;
+        height: 32px;
+        background: rgba(239, 68, 68, 0.9);
         border: none;
         border-radius: 50%;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: all 0.2s ease;
+        transition: all var(--transition-base);
     }
 
     .preview-remove:hover {
@@ -624,113 +471,104 @@
         fill: white;
     }
 
-    .preview-info {
-        margin-top: 12px;
-        font-size: 14px;
-        color: #6B7280;
+    .new-file-info {
+        margin-top: 8px;
+        font-size: 13px;
+        color: var(--muted);
         text-align: center;
     }
 
     /* Textarea */
     .form-textarea {
         width: 100%;
-        padding: 16px;
-        border: 2px solid #E5E7EB;
-        border-radius: 12px;
-        font-size: 15px;
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        font-size: 14px;
         font-family: inherit;
         resize: vertical;
-        transition: all 0.2s ease;
+        background: var(--surface);
+        color: var(--fg);
+        transition: all var(--transition-base);
     }
 
     .form-textarea:focus {
         outline: none;
-        border-color: #32d67b;
-        box-shadow: 0 0 0 4px rgba(50, 214, 123, 0.1);
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(70, 130, 180, 0.1);
     }
 
     .char-counter {
-        margin-top: 8px;
-        font-size: 13px;
-        color: #9CA3AF;
+        margin-top: 6px;
+        font-size: 12px;
+        color: var(--muted);
         text-align: right;
     }
 
     .char-counter span {
-        color: #32d67b;
+        color: var(--primary);
         font-weight: 600;
     }
 
     /* Premium Card */
     .premium-card {
-        background: rgba(50, 214, 123, 0.05);
-        border: 2px solid rgba(50, 214, 123, 0.2);
-        border-radius: 12px;
-        padding: 24px;
+        background: rgba(70, 130, 180, 0.03);
+        border: 1px solid rgba(70, 130, 180, 0.15);
+        border-radius: var(--radius-lg);
+        padding: 20px;
     }
 
-    .premium-info h3 {
+    .premium-header {
         display: flex;
         align-items: center;
-        gap: 8px;
-        font-size: 18px;
-        font-weight: 600;
-        color: #111827;
-        margin: 0 0 4px 0;
+        gap: 10px;
+        margin-bottom: 16px;
     }
 
-    .premium-info h3 svg {
+    .premium-header svg {
         color: #F59E0B;
     }
 
-    .premium-info p {
-        font-size: 14px;
-        color: #6B7280;
+    .premium-header h4 {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--fg);
         margin: 0;
     }
 
-    /* Precio Selector */
-    .precio-selector {
-        margin-top: 20px;
-        padding-top: 20px;
-        border-top: 1px solid rgba(50, 214, 123, 0.2);
-    }
-
-    .precio-label {
-        display: block;
-        font-size: 15px;
-        font-weight: 600;
-        color: #111827;
-        margin-bottom: 12px;
+    .premium-desc {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 0 0 16px 0;
     }
 
     .precio-input-group {
         display: flex;
         align-items: center;
-        gap: 0;
-        background: white;
-        border: 2px solid #E5E7EB;
-        border-radius: 10px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
         overflow: hidden;
-        max-width: 200px;
+        max-width: 180px;
     }
 
     .precio-currency {
-        padding: 12px 16px;
-        background: #F9FAFB;
-        font-size: 16px;
+        padding: 10px 14px;
+        background: var(--bg);
+        font-size: 15px;
         font-weight: 600;
-        color: #6B7280;
+        color: var(--muted);
+        border-right: 1px solid var(--line);
     }
 
     .precio-select {
         flex: 1;
-        padding: 12px 16px;
+        padding: 10px 14px;
         border: none;
-        font-size: 16px;
+        font-size: 15px;
         font-weight: 600;
-        color: #111827;
-        background: white;
+        color: var(--fg);
+        background: var(--surface);
         cursor: pointer;
     }
 
@@ -741,76 +579,77 @@
     .precio-hint {
         display: block;
         margin-top: 8px;
-        font-size: 13px;
-        color: #6B7280;
+        font-size: 12px;
+        color: var(--muted);
     }
 
-    /* Botones */
+    /* Form Actions */
     .form-actions {
         display: flex;
         gap: 12px;
-        flex-wrap: wrap;
+        margin-top: 32px;
+        padding-top: 24px;
+        border-top: 1px solid var(--line);
     }
 
     .btn {
-        flex: 1;
-        min-width: 180px;
-        display: flex;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 8px;
-        padding: 14px 24px;
-        border-radius: 10px;
-        font-size: 15px;
+        padding: 12px 24px;
+        border-radius: var(--radius);
+        font-size: 14px;
         font-weight: 600;
         text-decoration: none;
         border: none;
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all var(--transition-base);
     }
 
     .btn-primary {
-        background: #32d67b;
+        background: var(--primary-gradient);
         color: white;
+        flex: 1;
     }
 
     .btn-primary:hover {
-        background: #16a34a;
         transform: translateY(-2px);
-        box-shadow: 0 8px 16px rgba(50, 214, 123, 0.25);
+        box-shadow: var(--shadow-lg);
     }
 
     .btn-outline {
-        background: white;
-        color: #6B7280;
-        border: 2px solid #E5E7EB;
+        background: var(--surface);
+        color: var(--muted);
+        border: 1px solid var(--line);
     }
 
     .btn-outline:hover {
-        background: #F9FAFB;
-        border-color: #6B7280;
-        color: #111827;
+        background: var(--bg);
+        color: var(--fg);
+        border-color: var(--fg-muted);
     }
 
     /* Tips Card */
     .tips-card {
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-        padding: 32px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        padding: 20px;
+        margin-top: 16px;
     }
 
-    .tips-card h3 {
+    .tips-card h4 {
         display: flex;
         align-items: center;
-        gap: 12px;
-        font-size: 20px;
-        font-weight: 700;
-        color: #111827;
-        margin: 0 0 20px 0;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg);
+        margin: 0 0 12px 0;
     }
 
-    .tips-card h3 svg {
+    .tips-card h4 svg {
         color: #F59E0B;
     }
 
@@ -821,10 +660,10 @@
     }
 
     .tips-card li {
-        padding: 12px 0 12px 32px;
-        color: #6B7280;
-        font-size: 15px;
-        line-height: 1.6;
+        padding: 8px 0;
+        padding-left: 20px;
+        color: var(--muted);
+        font-size: 13px;
         position: relative;
     }
 
@@ -832,39 +671,22 @@
         content: '';
         position: absolute;
         left: 0;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 20px;
-        height: 20px;
-        background: rgba(50, 214, 123, 0.1);
-        border-radius: 50%;
-        border: 2px solid #32d67b;
-    }
-
-    .tips-card li::after {
-        content: '';
-        position: absolute;
-        left: 6px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 8px;
-        height: 8px;
-        background: #32d67b;
+        top: 14px;
+        width: 6px;
+        height: 6px;
+        background: var(--primary);
         border-radius: 50%;
     }
 
     /* Responsive */
-    @@media (max-width: 768px) {
-        .crear-container {
-            padding: 16px;
+    @@media (max-width: 900px) {
+        .edit-layout {
+            grid-template-columns: 1fr;
         }
 
-        .crear-card {
-            padding: 24px;
-        }
-
-        .crear-header h1 {
-            font-size: 24px;
+        .preview-sidebar {
+            position: static;
+            order: -1;
         }
 
         .lado-selector {
@@ -873,25 +695,6 @@
 
         .tipo-grid {
             grid-template-columns: 1fr;
-            gap: 12px;
-        }
-
-        .tipo-card {
-            padding: 20px;
-        }
-
-        .tipo-icon svg {
-            width: 40px;
-            height: 40px;
-        }
-
-        .upload-zone {
-            padding: 32px 16px;
-        }
-
-        .upload-icon {
-            width: 48px;
-            height: 48px;
         }
 
         .form-actions {
@@ -899,19 +702,376 @@
         }
 
         .btn {
-            min-width: 100%;
-        }
-
-        .tips-card {
-            padding: 24px;
+            width: 100%;
         }
     }
 </style>
 
+<div class="edit-page">
+    <!-- Header -->
+    <div class="page-header">
+        <h1 class="page-title">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+            </svg>
+            Editar Publicación
+        </h1>
+        <p class="page-subtitle">Actualiza el contenido de tu publicación</p>
+    </div>
+
+    <div class="edit-layout">
+        <!-- Main Form -->
+        <div class="edit-card">
+            <!-- Status Badge -->
+            @if (Model.EsBorrador)
+            {
+                <div class="status-badge draft">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                    </svg>
+                    Borrador - No visible para suscriptores
+                </div>
+            }
+            else
+            {
+                <div class="status-badge published">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                    Publicado
+                </div>
+            }
+
+            <form asp-action="Editar" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" id="formContenido">
+                @Html.AntiForgeryToken()
+
+                <!-- Selección de Lado -->
+                @if (usuarioVerificado)
+                {
+                    <div class="form-section">
+                        <label class="section-label">¿Dónde publicar?</label>
+                        <div class="lado-selector">
+                            <div class="lado-option @(Model.TipoLado == Lado.Models.TipoLado.LadoA ? "active" : "")" data-lado="ladoa" data-esgratis="true">
+                                <div class="lado-badge ladoa">A</div>
+                                <div class="lado-info">
+                                    <h4>LadoA · Público</h4>
+                                    <p>Contenido gratuito</p>
+                                </div>
+                                <div class="lado-check">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <div class="lado-option @(Model.TipoLado == Lado.Models.TipoLado.LadoB ? "active" : "")" data-lado="ladob" data-esgratis="false">
+                                <div class="lado-badge ladob">B</div>
+                                <div class="lado-info">
+                                    <h4>LadoB · Premium</h4>
+                                    <p>Contenido monetizado</p>
+                                </div>
+                                <div class="lado-check">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <input type="hidden" name="EsGratis" value="true" />
+                }
+
+                <input type="hidden" name="EsGratis" id="esGratisInput" value="@(Model.TipoLado == Lado.Models.TipoLado.LadoA ? "true" : "false")" />
+
+                <!-- Tipo de Contenido -->
+                <div class="form-section">
+                    <label class="section-label">Tipo de contenido</label>
+                    <div class="tipo-grid">
+                        <div class="tipo-card @(Model.TipoContenido == Lado.Models.TipoContenido.Foto ? "active" : "")" data-tipo="0">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                            </svg>
+                            <h4>Foto</h4>
+                            <p>JPG, PNG, GIF</p>
+                        </div>
+
+                        <div class="tipo-card @(Model.TipoContenido == Lado.Models.TipoContenido.Video ? "active" : "")" data-tipo="1">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+                            </svg>
+                            <h4>Video</h4>
+                            <p>MP4, MOV, AVI</p>
+                        </div>
+
+                        <div class="tipo-card @(Model.TipoContenido == Lado.Models.TipoContenido.Post ? "active" : "")" data-tipo="3">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                            </svg>
+                            <h4>Post</h4>
+                            <p>Solo texto</p>
+                        </div>
+                    </div>
+                    <input type="hidden" name="TipoContenido" id="tipoContenidoInput" value="@((int)Model.TipoContenido)" />
+                </div>
+
+                <!-- Subir Nuevo Archivo -->
+                <div class="form-section" id="archivoSection" style="display: @(Model.TipoContenido == Lado.Models.TipoContenido.Post ? "none" : "block")">
+                    <label class="section-label">
+                        @if (!string.IsNullOrEmpty(Model.RutaArchivo))
+                        {
+                            <text>Cambiar archivo (opcional)</text>
+                        }
+                        else
+                        {
+                            <text>Subir archivo <span class="required">*</span></text>
+                        }
+                    </label>
+                    <div class="upload-zone" id="uploadArea">
+                        <div class="upload-content">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                            </svg>
+                            <h4>Arrastra tu archivo aquí</h4>
+                            <p>o haz clic para seleccionar</p>
+                            <span class="upload-hint">Máximo 100 MB</span>
+                        </div>
+                        <input type="file" name="archivo" id="archivoInput" class="file-input" accept="image/*,video/*">
+                    </div>
+
+                    <!-- Preview del nuevo archivo -->
+                    <div id="newPreviewArea" class="new-preview-area">
+                        <div class="new-preview-container">
+                            <img id="newImagePreview" class="new-preview-media" alt="Preview">
+                            <video id="newVideoPreview" class="new-preview-media" controls></video>
+                            <button type="button" class="preview-remove" id="removeFileBtn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="new-file-info" id="newFileInfo"></div>
+                    </div>
+                </div>
+
+                <!-- Descripción -->
+                <div class="form-section">
+                    <label class="section-label">Descripción</label>
+                    <textarea name="Descripcion" class="form-textarea" rows="4" placeholder="Escribe una descripción atractiva..." maxlength="500" id="descripcionTextarea">@Model.Descripcion</textarea>
+                    <div class="char-counter">
+                        <span id="charCount">@(Model.Descripcion?.Length ?? 0)</span>/500
+                    </div>
+                </div>
+
+                <!-- Configuración Premium -->
+                @if (usuarioVerificado)
+                {
+                    <div class="form-section" id="precioSectionWrapper" style="display: @(Model.TipoLado == Lado.Models.TipoLado.LadoB ? "block" : "none")">
+                        <div class="premium-card">
+                            <div class="premium-header">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                                </svg>
+                                <h4>Precio Premium</h4>
+                            </div>
+                            <p class="premium-desc">Este contenido se publicará en tu LadoB</p>
+                            <div class="precio-input-group">
+                                <span class="precio-currency">$</span>
+                                <select name="PrecioDesbloqueo" class="precio-select" id="precioSelect">
+                                    @{
+                                        var precioActual = Model.PrecioDesbloqueo ?? 10m;
+                                        for (int i = 5; i <= 100; i += 5)
+                                        {
+                                            if (precioActual == i)
+                                            {
+                                                <option value="@i" selected>@i</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@i">@i</option>
+                                            }
+                                        }
+                                    }
+                                </select>
+                            </div>
+                            <small class="precio-hint">Los usuarios pagarán este monto para desbloquear</small>
+                        </div>
+                    </div>
+                }
+
+                <!-- Botones -->
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
+                        </svg>
+                        Guardar Cambios
+                    </button>
+                    <a href="/Contenido" class="btn btn-outline">Cancelar</a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Preview Sidebar -->
+        <div class="preview-sidebar">
+            <div class="preview-card">
+                <div class="preview-header">
+                    <h3>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                        </svg>
+                        Vista previa actual
+                    </h3>
+                </div>
+                <div class="preview-content">
+                    @{
+                        var rutaArchivo = Model.RutaArchivo;
+                        var thumbnail = Model.Thumbnail;
+                        var tieneArchivo = !string.IsNullOrEmpty(rutaArchivo);
+                        var tieneThumbnail = !string.IsNullOrEmpty(thumbnail);
+                        var tipoContenido = Model.TipoContenido;
+
+                        // Usar el tipo de contenido de la base de datos
+                        var esFoto = tipoContenido == Lado.Models.TipoContenido.Foto || tipoContenido == Lado.Models.TipoContenido.Imagen;
+                        var esVideo = tipoContenido == Lado.Models.TipoContenido.Video;
+                        var esAudio = tipoContenido == Lado.Models.TipoContenido.Audio;
+                        var esPost = tipoContenido == Lado.Models.TipoContenido.Post;
+                    }
+
+                    @if (esFoto && tieneArchivo)
+                    {
+                        <!-- Contenido tipo Foto/Imagen -->
+                        <img src="@rutaArchivo" class="current-media" alt="Contenido actual" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="no-media" style="display: none;">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                            </svg>
+                            <p>Error al cargar imagen</p>
+                        </div>
+                    }
+                    else if (esVideo && tieneArchivo)
+                    {
+                        <!-- Contenido tipo Video -->
+                        <video src="@rutaArchivo" class="current-video" controls preload="metadata">
+                            Tu navegador no soporta video HTML5.
+                        </video>
+                    }
+                    else if (esAudio && tieneArchivo)
+                    {
+                        <!-- Contenido tipo Audio -->
+                        <div class="audio-preview">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="var(--primary)">
+                                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                            </svg>
+                            <audio src="@rutaArchivo" class="current-audio" controls preload="metadata">
+                                Tu navegador no soporta audio HTML5.
+                            </audio>
+                        </div>
+                    }
+                    else if (esPost)
+                    {
+                        <!-- Contenido tipo Post (texto) -->
+                        @if (tieneThumbnail)
+                        {
+                            <img src="@thumbnail" class="current-media" alt="Miniatura del post" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div class="no-media" style="display: none;">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="var(--primary)">
+                                    <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                                </svg>
+                                <p>Post de texto</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="no-media post-preview">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="var(--primary)">
+                                    <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                                </svg>
+                                <p>Post de texto</p>
+                                @if (!string.IsNullOrEmpty(Model.Descripcion))
+                                {
+                                    <span class="post-excerpt">@(Model.Descripcion.Length > 50 ? Model.Descripcion.Substring(0, 50) + "..." : Model.Descripcion)</span>
+                                }
+                            </div>
+                        }
+                    }
+                    else if (tieneArchivo)
+                    {
+                        <!-- Archivo existe pero tipo no reconocido - intentar mostrar como imagen -->
+                        <img src="@rutaArchivo" class="current-media" alt="Contenido actual" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="no-media" style="display: none;">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+                            </svg>
+                            <p>Archivo: @System.IO.Path.GetFileName(rutaArchivo)</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="no-media">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                            </svg>
+                            <p>Sin contenido multimedia</p>
+                        </div>
+                    }
+                </div>
+                <div class="preview-info">
+                    <div class="preview-meta">
+                        <div class="preview-meta-item">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+                            </svg>
+                            <span>Creado: <strong>@Model.FechaPublicacion.ToString("dd/MM/yyyy")</strong></span>
+                        </div>
+                        <div class="preview-meta-item">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                            </svg>
+                            <span>Vistas: <strong>@Model.NumeroVistas</strong></span>
+                        </div>
+                        <div class="preview-meta-item">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                            </svg>
+                            <span>Likes: <strong>@Model.NumeroLikes</strong></span>
+                        </div>
+                        @if (Model.TipoLado == Lado.Models.TipoLado.LadoB && Model.PrecioDesbloqueo.HasValue)
+                        {
+                            <div class="preview-meta-item">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+                                </svg>
+                                <span>Precio: <strong>$@Model.PrecioDesbloqueo</strong></span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tips -->
+            <div class="tips-card">
+                <h4>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/>
+                    </svg>
+                    Tips
+                </h4>
+                <ul>
+                    <li>Si subes un nuevo archivo, reemplazará el anterior</li>
+                    <li>Los cambios se aplican inmediatamente</li>
+                    <li>Las estadísticas se mantienen</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Elementos
             const ladoOptions = document.querySelectorAll('.lado-option');
             const esGratisInput = document.getElementById('esGratisInput');
             const precioSectionWrapper = document.getElementById('precioSectionWrapper');
@@ -920,50 +1080,35 @@
             const archivoSection = document.getElementById('archivoSection');
             const uploadArea = document.getElementById('uploadArea');
             const archivoInput = document.getElementById('archivoInput');
-            const previewArea = document.getElementById('previewArea');
-            const imagePreview = document.getElementById('imagePreview');
-            const videoPreview = document.getElementById('videoPreview');
-            const fileInfo = document.getElementById('fileInfo');
+            const newPreviewArea = document.getElementById('newPreviewArea');
+            const newImagePreview = document.getElementById('newImagePreview');
+            const newVideoPreview = document.getElementById('newVideoPreview');
+            const newFileInfo = document.getElementById('newFileInfo');
             const removeFileBtn = document.getElementById('removeFileBtn');
             const precioSelect = document.getElementById('precioSelect');
             const descripcionTextarea = document.getElementById('descripcionTextarea');
             const charCount = document.getElementById('charCount');
 
-            console.log('🔵 Página cargada - Estado inicial:', {
-                tipoContenido: tipoInput ? tipoInput.value : 'N/A',
-                esGratis: esGratisInput ? esGratisInput.value : 'N/A',
-                precioVisible: precioSectionWrapper ? precioSectionWrapper.style.display : 'N/A'
-            });
-
-            // Lado selector (solo si existe)
+            // Lado selector
             if (ladoOptions.length > 0) {
                 ladoOptions.forEach(option => {
                     option.addEventListener('click', function() {
                         ladoOptions.forEach(opt => opt.classList.remove('active'));
                         this.classList.add('active');
-                        
+
                         const esGratis = this.dataset.esgratis === 'true';
-                        console.log('🔵 Lado seleccionado:', this.dataset.lado, 'EsGratis:', esGratis);
-                        
                         if (esGratisInput) {
                             esGratisInput.value = esGratis ? 'true' : 'false';
-                            console.log('🔵 esGratisInput.value actualizado a:', esGratisInput.value);
                         }
-                        
-                        if (esGratis) {
-                            if (precioSectionWrapper) {
-                                precioSectionWrapper.style.display = 'none';
-                                console.log('🔵 Ocultando sección de precio (LadoA)');
-                            }
-                            if (precioSelect) {
+
+                        if (precioSectionWrapper) {
+                            precioSectionWrapper.style.display = esGratis ? 'none' : 'block';
+                        }
+
+                        if (precioSelect) {
+                            if (esGratis) {
                                 precioSelect.removeAttribute('required');
-                            }
-                        } else {
-                            if (precioSectionWrapper) {
-                                precioSectionWrapper.style.display = 'block';
-                                console.log('🟢 Mostrando sección de precio (LadoB)');
-                            }
-                            if (precioSelect) {
+                            } else {
                                 precioSelect.setAttribute('required', 'required');
                             }
                         }
@@ -977,16 +1122,7 @@
                     tipoCards.forEach(c => c.classList.remove('active'));
                     this.classList.add('active');
                     tipoInput.value = this.dataset.tipo;
-
-                    console.log('🔵 Tipo de contenido cambiado a:', this.dataset.tipo);
-
-                    if (this.dataset.tipo === '3') {
-                        archivoSection.style.display = 'none';
-                        console.log('🔵 Ocultando sección de archivo (Post)');
-                    } else {
-                        archivoSection.style.display = 'block';
-                        console.log('🔵 Mostrando sección de archivo');
-                    }
+                    archivoSection.style.display = this.dataset.tipo === '3' ? 'none' : 'block';
                 });
             });
 
@@ -1028,31 +1164,31 @@
                 removeFileBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     archivoInput.value = '';
-                    previewArea.classList.remove('show');
-                    imagePreview.classList.remove('show');
-                    videoPreview.classList.remove('show');
+                    newPreviewArea.classList.remove('show');
+                    newImagePreview.classList.remove('show');
+                    newVideoPreview.classList.remove('show');
                 });
             }
 
             function handleFileSelect(file) {
                 const reader = new FileReader();
-                previewArea.classList.add('show');
+                newPreviewArea.classList.add('show');
 
                 const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
-                fileInfo.textContent = `${file.name} (${sizeMB} MB)`;
+                newFileInfo.textContent = `Nuevo archivo: ${file.name} (${sizeMB} MB)`;
 
                 if (file.type.startsWith('image/')) {
-                    videoPreview.classList.remove('show');
-                    imagePreview.classList.add('show');
+                    newVideoPreview.classList.remove('show');
+                    newImagePreview.classList.add('show');
                     reader.onload = (e) => {
-                        imagePreview.src = e.target.result;
+                        newImagePreview.src = e.target.result;
                     };
                     reader.readAsDataURL(file);
                 } else if (file.type.startsWith('video/')) {
-                    imagePreview.classList.remove('show');
-                    videoPreview.classList.add('show');
+                    newImagePreview.classList.remove('show');
+                    newVideoPreview.classList.add('show');
                     reader.onload = (e) => {
-                        videoPreview.src = e.target.result;
+                        newVideoPreview.src = e.target.result;
                     };
                     reader.readAsDataURL(file);
                 }
@@ -1065,13 +1201,8 @@
                 });
             }
 
-            // Validación del formulario
+            // Form validation
             document.getElementById('formContenido').addEventListener('submit', function(e) {
-                console.log('🔵 Enviando formulario:', {
-                    esGratis: esGratisInput ? esGratisInput.value : 'N/A',
-                    tipoContenido: tipoInput.value
-                });
-
                 if (esGratisInput && esGratisInput.value === 'false' && precioSelect) {
                     const precio = parseInt(precioSelect.value);
                     if (!precio || precio <= 0 || precio % 5 !== 0) {

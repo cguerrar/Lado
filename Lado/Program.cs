@@ -24,6 +24,14 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
+// Configurar Google Authentication
+builder.Services.AddAuthentication()
+    .AddGoogle(options =>
+    {
+        options.ClientId = "985201886726-um2rscj5od9eanu3neutnmjmfur2ng7p.apps.googleusercontent.com";
+        options.ClientSecret = "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";
+    });
+
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.Cookie.HttpOnly = true;

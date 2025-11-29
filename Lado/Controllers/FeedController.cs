@@ -324,6 +324,8 @@ namespace Lado.Controllers
                 // 5. ✅ CORREGIDO: Contenido público SOLO de creadores suscritos + propio
                 var contenidoPublico = await _context.Contenidos
                     .Include(c => c.Usuario)
+                    .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
+                        .ThenInclude(com => com.Usuario)
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
@@ -336,6 +338,8 @@ namespace Lado.Controllers
                 var contenidoPremiumSuscripciones = creadoresIds.Any()
                     ? await _context.Contenidos
                         .Include(c => c.Usuario)
+                        .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
+                            .ThenInclude(com => com.Usuario)
                         .Where(c => creadoresIds.Contains(c.UsuarioId)
                                 && c.EstaActivo
                                 && !c.EsBorrador
@@ -348,6 +352,8 @@ namespace Lado.Controllers
                 // 7. Contenido premium (LadoB) PROPIO
                 var contenidoPremiumPropio = await _context.Contenidos
                     .Include(c => c.Usuario)
+                    .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
+                        .ThenInclude(com => com.Usuario)
                     .Where(c => c.UsuarioId == usuarioId
                             && c.EstaActivo
                             && !c.EsBorrador
@@ -364,6 +370,8 @@ namespace Lado.Controllers
 
                 var contenidoPremiumComprado = await _context.Contenidos
                     .Include(c => c.Usuario)
+                    .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
+                        .ThenInclude(com => com.Usuario)
                     .Where(c => contenidosCompradosIds.Contains(c.Id)
                             && c.EstaActivo
                             && !c.EsBorrador
@@ -436,6 +444,14 @@ namespace Lado.Controllers
                 // Obtener usuario actual para el sidebar
                 var usuarioActual = await _userManager.FindByIdAsync(usuarioId);
                 ViewBag.UsuarioActual = usuarioActual;
+
+                // Obtener los likes del usuario para marcarlos en el feed
+                var contenidoIds = contenidoOrdenado.Select(c => c.Id).ToList();
+                var likesUsuario = await _context.Likes
+                    .Where(l => l.UsuarioId == usuarioId && contenidoIds.Contains(l.ContenidoId))
+                    .Select(l => l.ContenidoId)
+                    .ToListAsync();
+                ViewBag.LikesUsuario = likesUsuario;
 
                 return View(contenidoOrdenado);
             }
@@ -574,7 +590,6 @@ namespace Lado.Controllers
         // ========================================
 
         [HttpPost]
-        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Comentar(int id, string texto)
         {
             try
@@ -650,7 +665,6 @@ namespace Lado.Controllers
         // ========================================
 
         [HttpPost]
-        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Compartir(int id)
         {
             try
@@ -676,6 +690,80 @@ namespace Lado.Controllers
             {
                 _logger.LogError(ex, "Error al compartir contenido {ContenidoId}", id);
                 return Json(new { success = false, message = "Error al compartir" });
+            }
+        }
+
+        // ========================================
+        // SEGUIR / DEJAR DE SEGUIR
+        // ========================================
+
+        [HttpPost]
+        public async Task<IActionResult> Seguir(string id)
+        {
+            try
+            {
+                var usuarioActual = await _userManager.GetUserAsync(User);
+                if (usuarioActual == null)
+                {
+                    return Json(new { success = false, message = "Debes iniciar sesión" });
+                }
+
+                if (usuarioActual.Id == id)
+                {
+                    return Json(new { success = false, message = "No puedes seguirte a ti mismo" });
+                }
+
+                var creador = await _userManager.FindByIdAsync(id);
+                if (creador == null)
+                {
+                    return Json(new { success = false, message = "Usuario no encontrado" });
+                }
+
+                // Verificar si ya existe una suscripción activa
+                var suscripcionExistente = await _context.Suscripciones
+                    .FirstOrDefaultAsync(s => s.FanId == usuarioActual.Id && s.CreadorId == id && s.EstaActiva);
+
+                bool siguiendo;
+                if (suscripcionExistente != null)
+                {
+                    // Dejar de seguir
+                    suscripcionExistente.EstaActiva = false;
+                    suscripcionExistente.FechaCancelacion = DateTime.Now;
+                    creador.NumeroSeguidores = Math.Max(0, creador.NumeroSeguidores - 1);
+                    siguiendo = false;
+                }
+                else
+                {
+                    // Seguir (crear suscripción gratuita)
+                    var nuevaSuscripcion = new Suscripcion
+                    {
+                        FanId = usuarioActual.Id,
+                        CreadorId = id,
+                        PrecioMensual = 0,
+                        Precio = 0,
+                        FechaInicio = DateTime.Now,
+                        ProximaRenovacion = DateTime.Now.AddMonths(1),
+                        EstaActiva = true,
+                        RenovacionAutomatica = false
+                    };
+                    _context.Suscripciones.Add(nuevaSuscripcion);
+                    creador.NumeroSeguidores++;
+                    siguiendo = true;
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Json(new
+                {
+                    success = true,
+                    siguiendo,
+                    seguidores = creador.NumeroSeguidores
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al seguir usuario {UserId}", id);
+                return Json(new { success = false, message = "Error al procesar la solicitud" });
             }
         }
 

@@ -3,6 +3,7 @@ using Lado.ViewModels;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Lado.Controllers
 {
@@ -366,6 +367,137 @@ namespace Lado.Controllers
                 available = available,
                 message = available ? "Disponible" : "Ya está en uso"
             });
+        }
+
+        // ========================================
+        // LOGIN EXTERNO (GOOGLE)
+        // ========================================
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult ExternalLogin(string provider, string returnUrl = null)
+        {
+            var redirectUrl = Url.Action("ExternalLoginCallback", "Account", new { returnUrl });
+            var properties = _signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
+            return Challenge(properties, provider);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ExternalLoginCallback(string returnUrl = null, string remoteError = null)
+        {
+            returnUrl ??= Url.Content("~/");
+
+            if (remoteError != null)
+            {
+                _logger.LogError("Error de proveedor externo: {Error}", remoteError);
+                TempData["Error"] = $"Error del proveedor externo: {remoteError}";
+                return RedirectToAction(nameof(Login));
+            }
+
+            var info = await _signInManager.GetExternalLoginInfoAsync();
+            if (info == null)
+            {
+                _logger.LogError("No se pudo cargar información de login externo");
+                TempData["Error"] = "Error al obtener información de login externo.";
+                return RedirectToAction(nameof(Login));
+            }
+
+            _logger.LogInformation("Login externo con {Provider}", info.LoginProvider);
+
+            // Intentar login con el proveedor externo
+            var result = await _signInManager.ExternalLoginSignInAsync(
+                info.LoginProvider,
+                info.ProviderKey,
+                isPersistent: true,
+                bypassTwoFactor: true);
+
+            if (result.Succeeded)
+            {
+                _logger.LogInformation("Usuario logueado con {Provider}", info.LoginProvider);
+
+                // Obtener el usuario para redirigir correctamente
+                var user = await _userManager.FindByLoginAsync(info.LoginProvider, info.ProviderKey);
+                if (user != null)
+                {
+                    var roles = await _userManager.GetRolesAsync(user);
+                    if (roles.Contains("Admin"))
+                    {
+                        return RedirectToAction("Index", "Admin");
+                    }
+                }
+
+                return LocalRedirect(returnUrl);
+            }
+
+            if (result.IsLockedOut)
+            {
+                return View("Lockout");
+            }
+
+            // Si el usuario no existe, crear cuenta
+            var email = info.Principal.FindFirstValue(System.Security.Claims.ClaimTypes.Email);
+            var name = info.Principal.FindFirstValue(System.Security.Claims.ClaimTypes.Name);
+
+            if (string.IsNullOrEmpty(email))
+            {
+                _logger.LogError("No se pudo obtener email del proveedor externo");
+                TempData["Error"] = "No se pudo obtener tu email de Google. Asegúrate de dar permiso.";
+                return RedirectToAction(nameof(Login));
+            }
+
+            // Verificar si ya existe usuario con ese email
+            var existingUser = await _userManager.FindByEmailAsync(email);
+            if (existingUser != null)
+            {
+                // Vincular el login externo a la cuenta existente
+                var addLoginResult = await _userManager.AddLoginAsync(existingUser, info);
+                if (addLoginResult.Succeeded)
+                {
+                    await _signInManager.SignInAsync(existingUser, isPersistent: true);
+                    _logger.LogInformation("Login externo vinculado a usuario existente: {Email}", email);
+                    return LocalRedirect(returnUrl);
+                }
+            }
+
+            // Crear nuevo usuario
+            var newUser = new ApplicationUser
+            {
+                UserName = email.Split('@')[0] + "_" + Guid.NewGuid().ToString("N").Substring(0, 6),
+                Email = email,
+                NombreCompleto = name ?? email.Split('@')[0],
+                Seudonimo = email.Split('@')[0] + "_" + Guid.NewGuid().ToString("N").Substring(0, 4),
+                FechaRegistro = DateTime.Now,
+                EstaActivo = true,
+                EmailConfirmed = true, // Email verificado por Google
+                AgeVerified = false,
+                PrecioSuscripcion = 9.99m,
+                NumeroSeguidores = 0,
+                Saldo = 0,
+                TotalGanancias = 0,
+                EsVerificado = false,
+                SeudonimoVerificado = false
+            };
+
+            var createResult = await _userManager.CreateAsync(newUser);
+            if (createResult.Succeeded)
+            {
+                var addLoginResult = await _userManager.AddLoginAsync(newUser, info);
+                if (addLoginResult.Succeeded)
+                {
+                    await _signInManager.SignInAsync(newUser, isPersistent: true);
+                    _logger.LogInformation("Nuevo usuario creado con Google: {Email}", email);
+                    TempData["Success"] = "¡Bienvenido a LADO! Tu cuenta ha sido creada con Google.";
+                    return RedirectToAction("Index", "Dashboard");
+                }
+            }
+
+            foreach (var error in createResult.Errors)
+            {
+                _logger.LogError("Error creando usuario: {Error}", error.Description);
+            }
+
+            TempData["Error"] = "Error al crear la cuenta. Por favor intenta nuevamente.";
+            return RedirectToAction(nameof(Login));
         }
     }
 }

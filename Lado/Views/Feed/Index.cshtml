@@ -1,39 +1,27 @@
-﻿@model IEnumerable<Lado.Models.Contenido>
+@model IEnumerable<Lado.Models.Contenido>
+@using Lado.Models
 @{
     ViewData["Title"] = "Feed";
+    var likesUsuario = ViewBag.LikesUsuario as List<int> ?? new List<int>();
+    var stories = ViewBag.Stories as IEnumerable<dynamic>;
+    var usuarioActual = ViewBag.UsuarioActual as ApplicationUser;
+    var creadoresSugeridos = ViewBag.CreadoresSugeridos as List<ApplicationUser> ?? new List<ApplicationUser>();
 }
 
-@Html.AntiForgeryToken()
-
 <style>
-    :root {
-        --primary: #32d67b;
-        --primary-dark: #16a34a;
-        --bg: #fafafa;
-        --card-bg: #ffffff;
-        --fg: #000000;
-        --muted: #737373;
-        --border: #dbdbdb;
-    }
+    /* ========================================
+       FEED INSTAGRAM-STYLE - REDISEÑO COMPLETO
+       ======================================== */
 
-    * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-    }
-
-    body {
-        background: var(--bg);
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-
-    .feed-layout {
-        max-width: 935px;
-        margin: 0 auto;
-        padding: 30px 20px 0;
+    /* MAIN LAYOUT */
+    .feed-page-layout {
         display: grid;
-        grid-template-columns: minmax(0, 614px) 1fr;
-        gap: 28px;
+        grid-template-columns: minmax(0, 630px) 320px;
+        gap: 32px;
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px 16px;
+        justify-content: center;
     }
 
     .feed-main {
@@ -46,36 +34,41 @@
         height: fit-content;
     }
 
-    /* STORIES */
-    .stories-wrapper {
-        background: var(--card-bg);
-        border: 1px solid var(--border);
+    .feed-container {
+        max-width: 630px;
+        margin: 0 auto;
+    }
+
+    /* ========================================
+       STORIES BAR
+       ======================================== */
+    .stories-bar {
+        background: var(--surface);
+        border: 1px solid var(--line);
         border-radius: 8px;
-        padding: 16px 0;
+        padding: 16px;
         margin-bottom: 24px;
+        overflow: hidden;
     }
 
-    .stories-container {
-        overflow-x: auto;
-        overflow-y: hidden;
-        scrollbar-width: none;
-    }
-
-        .stories-container::-webkit-scrollbar {
-            display: none;
-        }
-
-    .stories-list {
+    .stories-scroll {
         display: flex;
         gap: 16px;
-        padding: 0 18px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding: 4px 0;
+    }
+
+    .stories-scroll::-webkit-scrollbar {
+        display: none;
     }
 
     .story-item {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
         cursor: pointer;
         flex-shrink: 0;
     }
@@ -84,26 +77,20 @@
         width: 66px;
         height: 66px;
         border-radius: 50%;
-        padding: 2px;
-        background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        padding: 3px;
+        background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
     }
 
-        .story-ring.visto {
-            background: var(--border);
-        }
+    .story-ring.seen {
+        background: var(--line);
+    }
 
     .story-ring-inner {
         width: 100%;
         height: 100%;
         border-radius: 50%;
-        background: var(--card-bg);
+        background: var(--surface);
         padding: 2px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
     }
 
     .story-avatar {
@@ -117,12 +104,12 @@
         width: 100%;
         height: 100%;
         border-radius: 50%;
-        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        background: var(--primary);
         display: flex;
         align-items: center;
         justify-content: center;
         color: white;
-        font-weight: 600;
+        font-weight: 700;
         font-size: 18px;
     }
 
@@ -136,10 +123,12 @@
         white-space: nowrap;
     }
 
-    /* POST CARD */
-    .post-card {
-        background: var(--card-bg);
-        border: 1px solid var(--border);
+    /* ========================================
+       POST CARD
+       ======================================== */
+    .post {
+        background: var(--surface);
+        border: 1px solid var(--line);
         border-radius: 8px;
         margin-bottom: 24px;
     }
@@ -147,35 +136,29 @@
     .post-header {
         display: flex;
         align-items: center;
-        justify-content: space-between;
         padding: 14px 16px;
     }
 
-    .post-user-info {
+    .post-header-left {
         display: flex;
         align-items: center;
         gap: 12px;
-        text-decoration: none;
         flex: 1;
+        text-decoration: none;
     }
 
     .post-avatar {
         width: 32px;
         height: 32px;
         border-radius: 50%;
-        overflow: hidden;
-        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        object-fit: cover;
     }
 
-        .post-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-    .avatar-placeholder {
-        width: 100%;
-        height: 100%;
+    .post-avatar-placeholder {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--primary);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -184,364 +167,609 @@
         font-size: 14px;
     }
 
-    .post-user-details h6 {
+    .post-user-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .post-username {
         font-size: 14px;
         font-weight: 600;
         color: var(--fg);
-        margin: 0;
     }
 
-    .post-user-details small {
+    .post-header-left:hover .post-username {
+        color: var(--primary);
+    }
+
+    .post-time {
         font-size: 12px;
         color: var(--muted);
     }
 
-    .post-menu-btn {
+    .post-badge {
+        font-size: 10px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 4px;
+        margin-left: 8px;
+    }
+
+    .badge-ladob {
+        background: linear-gradient(135deg, #a855f7, #7c3aed);
+        color: white;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        box-shadow: 0 2px 4px rgba(168, 85, 247, 0.3);
+    }
+
+    .post-menu {
+        padding: 8px;
         background: none;
         border: none;
-        padding: 8px;
         cursor: pointer;
         color: var(--fg);
     }
 
+    /* POST MEDIA */
     .post-media {
+        width: 100%;
+        background: var(--bg-tertiary);
+        position: relative;
+    }
+
+    .post-media img {
+        width: 100%;
+        display: block;
+    }
+
+    .post-media video {
+        width: 100%;
+        display: block;
         background: #000;
-        max-height: 600px;
+    }
+
+    .post-media-audio {
+        padding: 48px 24px;
         display: flex;
+        flex-direction: column;
         align-items: center;
-        justify-content: center;
+        gap: 16px;
+        background: linear-gradient(135deg, var(--primary-light) 0%, var(--surface) 100%);
     }
 
-        .post-media img,
-        .post-media video {
-            width: 100%;
-            max-height: 600px;
-            object-fit: contain;
-        }
+    .post-media-audio audio {
+        width: 100%;
+        max-width: 400px;
+    }
 
+    .post-text-content {
+        padding: 32px 24px;
+        background: linear-gradient(135deg, var(--primary-light) 0%, var(--surface) 100%);
+        font-size: 18px;
+        line-height: 1.6;
+        color: var(--fg);
+        text-align: center;
+    }
+
+    /* POST ACTIONS */
     .post-actions {
-        padding: 4px 16px 0;
-    }
-
-    .action-buttons {
+        padding: 12px 16px 0;
         display: flex;
         align-items: center;
         gap: 16px;
-        padding: 8px 0;
     }
 
     .action-btn {
         background: none;
         border: none;
-        padding: 8px 0;
         cursor: pointer;
-        color: var(--fg);
+        padding: 8px;
+        margin: -8px;
         display: flex;
         align-items: center;
+        justify-content: center;
+        color: var(--fg);
+        transition: transform 0.1s ease;
     }
 
-        .action-btn:hover {
-            opacity: 0.5;
-        }
-
-        .action-btn svg {
-            width: 24px;
-            height: 24px;
-            fill: none;
-            stroke: currentColor;
-            stroke-width: 2;
-        }
-
-    .like-btn.liked {
-        color: #ed4956;
+    .action-btn:hover {
+        opacity: 0.7;
     }
 
-        .like-btn.liked svg {
-            fill: #ed4956;
-            stroke: #ed4956;
-        }
+    .action-btn:active {
+        transform: scale(0.9);
+    }
 
+    .action-btn svg {
+        width: 24px;
+        height: 24px;
+    }
+
+    .action-btn.liked svg {
+        fill: #ed4956;
+        stroke: #ed4956;
+    }
+
+    .action-spacer {
+        flex: 1;
+    }
+
+    /* LIKES COUNT */
     .post-likes {
+        padding: 0 16px;
+        margin-top: 8px;
+    }
+
+    .post-likes-count {
         font-size: 14px;
         font-weight: 600;
         color: var(--fg);
-        padding: 0 0 8px;
     }
 
+    /* CAPTION */
     .post-caption {
+        padding: 8px 16px;
+    }
+
+    .post-caption-text {
         font-size: 14px;
+        line-height: 1.4;
         color: var(--fg);
-        padding: 0 0 8px;
     }
 
-        .post-caption .username {
-            font-weight: 600;
-            margin-right: 6px;
-        }
+    .post-caption-username {
+        font-weight: 600;
+        margin-right: 6px;
+    }
 
-    .post-timestamp {
-        font-size: 10px;
+    /* COMMENTS PREVIEW */
+    .post-comments-preview {
+        padding: 0 16px 8px;
+    }
+
+    .view-all-comments {
+        font-size: 14px;
         color: var(--muted);
-        text-transform: uppercase;
-        padding: 0 0 16px;
+        cursor: pointer;
+        margin-bottom: 4px;
     }
 
-    .add-comment {
-        border-top: 1px solid var(--border);
-        padding: 16px;
+    .view-all-comments:hover {
+        text-decoration: underline;
+    }
+
+    .comment-preview {
+        font-size: 14px;
+        line-height: 1.4;
+        margin-bottom: 4px;
+    }
+
+    .comment-preview-username {
+        font-weight: 600;
+        color: var(--fg);
+        margin-right: 6px;
+    }
+
+    .comment-preview-text {
+        color: var(--fg);
+    }
+
+    /* ADD COMMENT */
+    .post-add-comment {
+        border-top: 1px solid var(--line);
+        padding: 12px 16px;
         display: flex;
+        align-items: center;
         gap: 12px;
     }
 
     .comment-input {
         flex: 1;
         border: none;
-        outline: none;
+        background: none;
         font-size: 14px;
+        color: var(--fg);
+        outline: none;
     }
 
-        .comment-input::placeholder {
-            color: var(--muted);
-        }
+    .comment-input::placeholder {
+        color: var(--muted);
+    }
 
-    .post-comment-btn {
+    .comment-post-btn {
         background: none;
         border: none;
-        color: #0095f6;
+        color: var(--primary);
         font-weight: 600;
-        cursor: pointer;
         font-size: 14px;
+        cursor: pointer;
+        opacity: 0.5;
+        transition: opacity 0.2s;
     }
 
-        .post-comment-btn:disabled {
-            opacity: 0.3;
-            cursor: default;
-        }
+    .comment-post-btn:not(:disabled) {
+        opacity: 1;
+    }
 
-    /* SIDEBAR */
-    .user-profile-card {
+    .comment-post-btn:disabled {
+        cursor: not-allowed;
+    }
+
+    /* POST TIMESTAMP */
+    .post-timestamp {
+        padding: 0 16px 12px;
+        font-size: 10px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.2px;
+    }
+
+    /* SHARE MODAL */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.65);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-overlay.active {
+        display: flex;
+    }
+
+    .share-modal {
+        background: var(--surface);
+        border-radius: 12px;
+        width: 90%;
+        max-width: 400px;
+        overflow: hidden;
+    }
+
+    .share-modal-header {
+        padding: 16px;
+        text-align: center;
+        border-bottom: 1px solid var(--line);
+        font-weight: 600;
+        font-size: 16px;
+        position: relative;
+    }
+
+    .share-modal-close {
+        position: absolute;
+        right: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--fg);
+        font-size: 20px;
+    }
+
+    .share-options {
+        padding: 16px;
+        display: flex;
+        justify-content: center;
+        gap: 24px;
+    }
+
+    .share-option {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+    .share-option-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+
+    .share-option-icon.whatsapp { background: #25D366; }
+    .share-option-icon.telegram { background: #0088cc; }
+    .share-option-icon.twitter { background: #1DA1F2; }
+    .share-option-icon.copy { background: var(--fg); }
+
+    .share-option-label {
+        font-size: 12px;
+        color: var(--fg);
+    }
+
+    .share-url-section {
+        padding: 0 16px 16px;
+    }
+
+    .share-url-input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 13px;
+        background: var(--bg-tertiary);
+        color: var(--fg);
+    }
+
+    /* TOAST */
+    .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: #1a1a1a;
+        color: #ffffff;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 2000;
+        opacity: 0;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+
+    /* EMPTY STATE */
+    .empty-feed {
+        text-align: center;
+        padding: 60px 20px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+    }
+
+    .empty-feed h3 {
+        font-size: 20px;
+        margin-bottom: 8px;
+    }
+
+    .empty-feed p {
+        color: var(--muted);
+        margin-bottom: 20px;
+    }
+
+    .empty-feed-btn {
+        display: inline-block;
+        background: var(--primary);
+        color: white;
+        padding: 10px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    /* ========================================
+       SIDEBAR
+       ======================================== */
+    .sidebar-section {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+    }
+
+    .sidebar-user {
         display: flex;
         align-items: center;
         gap: 12px;
-        padding: 20px 0 10px;
+        margin-bottom: 20px;
     }
 
-    .user-profile-avatar {
+    .sidebar-user-avatar {
         width: 56px;
         height: 56px;
         border-radius: 50%;
-        overflow: hidden;
-        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        object-fit: cover;
     }
 
-        .user-profile-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+    .sidebar-user-avatar-placeholder {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 20px;
+    }
 
-    .user-profile-info h6 {
-        font-size: 14px;
+    .sidebar-user-info {
+        flex: 1;
+    }
+
+    .sidebar-user-name {
         font-weight: 600;
+        font-size: 14px;
         color: var(--fg);
-        margin: 0 0 2px 0;
     }
 
-    .user-profile-info p {
+    .sidebar-user-username {
         font-size: 14px;
         color: var(--muted);
-        margin: 0;
     }
 
-    .suggestions-header {
+    .sidebar-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 24px 0 16px;
+        margin-bottom: 16px;
     }
 
-        .suggestions-header h5 {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--muted);
-            margin: 0;
-        }
+    .sidebar-title {
+        font-size: 14px;
+        color: var(--muted);
+        font-weight: 600;
+    }
 
-        .suggestions-header a {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--fg);
-            text-decoration: none;
-        }
+    .sidebar-see-all {
+        font-size: 12px;
+        color: var(--fg);
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sidebar-see-all:hover {
+        text-decoration: underline;
+    }
 
     .suggestion-item {
         display: flex;
         align-items: center;
         gap: 12px;
-        margin-bottom: 16px;
+        margin-bottom: 12px;
     }
 
-    .suggestion-link {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        flex: 1;
-        text-decoration: none;
-        min-width: 0;
+    .suggestion-item:last-child {
+        margin-bottom: 0;
     }
 
     .suggestion-avatar {
-        width: 44px;
-        height: 44px;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
-        overflow: hidden;
-        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-        flex-shrink: 0;
+        object-fit: cover;
     }
 
-        .suggestion-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+    .suggestion-avatar-placeholder {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 12px;
+    }
 
     .suggestion-info {
         flex: 1;
         min-width: 0;
     }
 
-        .suggestion-info h6 {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--fg);
-            margin: 0 0 2px 0;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
+    .suggestion-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 
-        .suggestion-info p {
-            font-size: 12px;
-            color: var(--muted);
-            margin: 0;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
+    .suggestion-name:hover {
+        color: var(--primary);
+    }
 
-    .btn-follow {
+    .suggestion-reason {
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .suggestion-follow-btn {
         background: none;
         border: none;
-        color: #0095f6;
+        color: var(--primary);
         font-size: 12px;
         font-weight: 600;
         cursor: pointer;
-        white-space: nowrap;
+        padding: 0;
     }
 
-        .btn-follow:hover {
-            color: var(--fg);
-        }
+    .suggestion-follow-btn:hover {
+        opacity: 0.7;
+    }
 
-    .footer-links {
+    .sidebar-footer {
+        margin-top: 24px;
         font-size: 11px;
-        color: #c7c7c7;
-        padding: 24px 0;
+        color: var(--muted);
     }
 
-        .footer-links a {
-            color: #c7c7c7;
-            text-decoration: none;
-            margin-right: 8px;
-        }
-
-    .empty-feed {
-        text-align: center;
-        padding: 60px 20px;
-        background: var(--card-bg);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-    }
-
-        .empty-feed h3 {
-            font-size: 22px;
-            font-weight: 700;
-            color: var(--fg);
-            margin: 0 0 10px 0;
-        }
-
-        .empty-feed p {
-            font-size: 14px;
-            color: var(--muted);
-            margin: 0 0 20px 0;
-        }
-
-    .explore-btn {
-        background: #0095f6;
-        color: white;
-        border: none;
-        padding: 8px 24px;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
+    .sidebar-footer a {
+        color: var(--muted);
         text-decoration: none;
-        display: inline-block;
     }
 
-    @@media (max-width: 1024px) {
-        .feed-layout {
+    .sidebar-footer a:hover {
+        text-decoration: underline;
+    }
+
+    /* RESPONSIVE */
+    @@media (max-width: 960px) {
+        .feed-page-layout {
             grid-template-columns: 1fr;
-            padding: 0;
+            max-width: 630px;
         }
 
         .feed-sidebar {
             display: none;
         }
+    }
 
-        .stories-wrapper,
-        .post-card {
+    @@media (max-width: 640px) {
+        .feed-page-layout {
+            padding: 0;
+        }
+
+        .stories-bar,
+        .post {
             border-radius: 0;
             border-left: none;
             border-right: none;
         }
 
-        .stories-wrapper {
-            margin-bottom: 0;
-            border-bottom: 8px solid var(--bg);
-        }
-
-        .post-card {
-            margin-bottom: 0;
-            border-bottom: 8px solid var(--bg);
+        .post {
+            margin-bottom: 8px;
         }
     }
 </style>
 
-<div class="feed-layout">
+<div class="feed-page-layout">
     <!-- MAIN FEED -->
     <div class="feed-main">
-        <!-- STORIES -->
-        @{
-            var stories = ViewBag.Stories as IEnumerable<dynamic>;
-        }
-        @if (stories != null && stories.Any())
-        {
-            <div class="stories-wrapper">
-                <div class="stories-container">
-                    <div class="stories-list">
+        <div class="feed-container">
+            <!-- STORIES BAR -->
+            @if (stories != null && stories.Any())
+            {
+                <div class="stories-bar">
+                    <div class="stories-scroll">
                         @foreach (var storyGroup in stories)
                         {
                             <div class="story-item" onclick="window.location.href='/Feed/Perfil/@storyGroup.CreadorId'">
-                                <div class="story-ring @(storyGroup.TieneStorysSinVer ? "" : "visto")">
+                                <div class="story-ring @(storyGroup.TieneStorysSinVer ? "" : "seen")">
                                     <div class="story-ring-inner">
                                         @if (!string.IsNullOrEmpty(storyGroup.Creador.FotoPerfil))
                                         {
-                                            <img src="@storyGroup.Creador.FotoPerfil" alt="@storyGroup.Creador.NombreCompleto" class="story-avatar">
+                                            <img src="@storyGroup.Creador.FotoPerfil" alt="" class="story-avatar">
                                         }
                                         else
                                         {
                                             <div class="story-avatar-placeholder">
-                                                @storyGroup.Creador.NombreCompleto.Substring(0, 1)
+                                                @storyGroup.Creador.NombreCompleto.Substring(0, 1).ToUpper()
                                             </div>
                                         }
                                     </div>
@@ -551,292 +779,506 @@
                         }
                     </div>
                 </div>
-            </div>
-        }
-
-        <!-- POSTS -->
-        @if (Model.Any())
-        {
-            @foreach (var contenido in Model)
-            {
-                <div class="post-card" data-content-id="@contenido.Id">
-                    <div class="post-header">
-                        @* ⭐ LÓGICA NUEVA: Determinar URL según TipoLado *@
-                        @{
-                            var urlPerfil = contenido.TipoLado == TipoLado.LadoB
-                            ? $"/Feed/Perfil/{contenido.UsuarioId}?verSeudonimo=true"
-                            : $"/Feed/Perfil/{contenido.UsuarioId}";
-                        }
-
-                        <a href="@urlPerfil" class="post-user-info">
-                            <div class="post-avatar">
-                                @if (!string.IsNullOrEmpty(contenido.Usuario?.FotoPerfil))
-                                {
-                                    <img src="@contenido.Usuario.FotoPerfil" alt="@contenido.NombreMostrado">
-                                }
-                                else
-                                {
-                                    <div class="avatar-placeholder">
-                                        @(contenido.NombreMostrado?.Substring(0, 1) ?? "U")
-                                    </div>
-                                }
-                            </div>
-                            <div class="post-user-details">
-                                <h6>@(contenido.NombreMostrado ?? "Usuario")</h6>
-                                <small>
-                                    @{
-                                        var tiempo = DateTime.Now - contenido.FechaPublicacion;
-                                        var tiempoTexto = tiempo.TotalDays >= 1 ? $"{(int)tiempo.TotalDays}d" :
-                                        tiempo.TotalHours >= 1 ? $"{(int)tiempo.TotalHours}h" : $"{(int)tiempo.TotalMinutes}m";
-                                    }
-                                    Hace @tiempoTexto
-                                </small>
-                            </div>
-                        </a>
-                        <button class="post-menu-btn">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                <circle cx="12" cy="12" r="1.5" />
-                                <circle cx="6" cy="12" r="1.5" />
-                                <circle cx="18" cy="12" r="1.5" />
-                            </svg>
-                        </button>
-                    </div>
-
-                    @if (!string.IsNullOrEmpty(contenido.RutaArchivo))
-                    {
-                        <div class="post-media">
-                            @if ((int)contenido.TipoContenido == 0)
-                            {
-                                <img src="@contenido.RutaArchivo" alt="Post">
-                            }
-                            else
-                            {
-                                <video src="@contenido.RutaArchivo" controls></video>
-                            }
-                        </div>
-                    }
-
-                    <div class="post-actions">
-                        <div class="action-buttons">
-                            <button class="action-btn like-btn" data-id="@contenido.Id">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                                </svg>
-                            </button>
-                            <button class="action-btn" onclick="window.location.href='/Feed/Detalle/@contenido.Id'">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                                </svg>
-                            </button>
-                            <button class="action-btn">
-                                <svg viewBox="0 0 24 24">
-                                    <line x1="22" y1="2" x2="11" y2="13" />
-                                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        @if (contenido.NumeroLikes > 0)
-                        {
-                            <div class="post-likes">
-                                <span id="likes-count-@contenido.Id">@contenido.NumeroLikes</span> Me gusta
-                            </div>
-                        }
-
-                        @if (!string.IsNullOrEmpty(contenido.Descripcion))
-                        {
-                            <div class="post-caption">
-                                <span class="username">@(contenido.NombreMostrado ?? "Usuario")</span>
-                                @contenido.Descripcion
-                            </div>
-                        }
-
-                        <div class="post-timestamp">
-                            Hace @tiempoTexto
-                        </div>
-                    </div>
-
-                    <div class="add-comment">
-                        <input type="text" class="comment-input" placeholder="Añade un comentario..." data-content-id="@contenido.Id">
-                        <button class="post-comment-btn" disabled data-content-id="@contenido.Id">Publicar</button>
-                    </div>
-                </div>
             }
-        }
-        else
+
+    <!-- POSTS -->
+    @if (Model.Any())
+    {
+        @foreach (var post in Model)
         {
-            <div class="empty-feed">
-                <h3>¡Bienvenido a tu Feed!</h3>
-                <p>Sigue a creadores para ver su contenido aquí</p>
-                <a href="/Feed/Explorar" class="explore-btn">Explorar</a>
-            </div>
+            var tiempoTexto = GetTimeAgo(post.FechaPublicacion);
+            var urlPerfil = post.TipoLado == TipoLado.LadoB
+                ? $"/Feed/Perfil/{post.UsuarioId}?verSeudonimo=true"
+                : $"/Feed/Perfil/{post.UsuarioId}";
+            var nombreUsuario = post.NombreMostrado ?? post.Usuario?.NombreCompleto ?? "Usuario";
+            var usernameMostrado = post.TipoLado == TipoLado.LadoB
+                ? (post.Usuario?.Seudonimo ?? post.Usuario?.UserName ?? "usuario")
+                : (post.Usuario?.UserName ?? "usuario");
+            var tipoMedia = post.TipoContenido;
+            var esImagen = tipoMedia == TipoContenido.Foto || tipoMedia == TipoContenido.Imagen;
+            var esVideo = tipoMedia == TipoContenido.Video;
+            var esAudio = tipoMedia == TipoContenido.Audio;
+            var esPost = tipoMedia == TipoContenido.Post;
+            var tieneArchivo = !string.IsNullOrEmpty(post.RutaArchivo);
+            var yaLeDioLike = likesUsuario.Contains(post.Id);
+
+            // Determinar la foto de perfil según el tipo de contenido
+            var fotoPerfilMostrar = post.TipoLado == TipoLado.LadoB
+                ? (post.Usuario?.FotoPerfilLadoB ?? post.Usuario?.FotoPerfil)
+                : post.Usuario?.FotoPerfil;
+            <article class="post" data-post-id="@post.Id">
+                <!-- Header -->
+                <header class="post-header">
+                    <a href="@urlPerfil" class="post-header-left">
+                        @if (!string.IsNullOrEmpty(fotoPerfilMostrar))
+                        {
+                            <img src="@fotoPerfilMostrar" alt="" class="post-avatar">
+                        }
+                        else
+                        {
+                            <div class="post-avatar-placeholder">
+                                @nombreUsuario.Substring(0, 1).ToUpper()
+                            </div>
+                        }
+                        <div class="post-user-info">
+                            <span class="post-username">
+                                @usernameMostrado
+                                @if (post.TipoLado == TipoLado.LadoB)
+                                {
+                                    <span class="post-badge badge-ladob">Lado B</span>
+                                }
+                            </span>
+                            <span class="post-time">@tiempoTexto</span>
+                        </div>
+                    </a>
+                    <button class="post-menu" onclick="window.location.href='/Feed/Detalle/@post.Id'">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="12" r="1.5"></circle>
+                            <circle cx="6" cy="12" r="1.5"></circle>
+                            <circle cx="18" cy="12" r="1.5"></circle>
+                        </svg>
+                    </button>
+                </header>
+
+                <!-- Media -->
+                @if (tieneArchivo)
+                {
+                    <div class="post-media">
+                        @if (esImagen)
+                        {
+                            <img src="@post.RutaArchivo" alt="" loading="lazy">
+                        }
+                        else if (esVideo)
+                        {
+                            <video src="@post.RutaArchivo" controls preload="metadata"></video>
+                        }
+                        else if (esAudio)
+                        {
+                            <div class="post-media-audio">
+                                <svg width="64" height="64" viewBox="0 0 24 24" fill="var(--primary)">
+                                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                                </svg>
+                                <audio src="@post.RutaArchivo" controls preload="metadata"></audio>
+                            </div>
+                        }
+                        else
+                        {
+                            <img src="@post.RutaArchivo" alt="" loading="lazy" onerror="this.style.display='none'">
+                        }
+                    </div>
+                }
+                else if (esPost && !string.IsNullOrEmpty(post.Descripcion))
+                {
+                    <div class="post-text-content">
+                        @post.Descripcion
+                    </div>
+                }
+
+                <!-- Actions -->
+                <div class="post-actions">
+                    <button class="action-btn like-btn @(yaLeDioLike ? "liked" : "")" data-id="@post.Id">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                        </svg>
+                    </button>
+                    <button class="action-btn comment-btn" data-id="@post.Id">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                        </svg>
+                    </button>
+                    <button class="action-btn share-btn" data-id="@post.Id">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                    <div class="action-spacer"></div>
+                    <button class="action-btn" onclick="window.location.href='/Feed/Detalle/@post.Id'">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="9" y1="3" x2="9" y2="21"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Likes -->
+                <div class="post-likes">
+                    <span class="post-likes-count" id="likes-@post.Id">@post.NumeroLikes Me gusta</span>
+                </div>
+
+                <!-- Caption -->
+                @if (!string.IsNullOrEmpty(post.Descripcion) && tieneArchivo)
+                {
+                    <div class="post-caption">
+                        <p class="post-caption-text">
+                            <span class="post-caption-username">@usernameMostrado</span>@post.Descripcion
+                        </p>
+                    </div>
+                }
+
+                <!-- Comments Preview -->
+                @if (post.Comentarios != null && post.Comentarios.Any())
+                {
+                    <div class="post-comments-preview">
+                        @if (post.NumeroComentarios > 3)
+                        {
+                            <div class="view-all-comments" onclick="window.location.href='/Feed/Detalle/@post.Id'">
+                                Ver los @post.NumeroComentarios comentarios
+                            </div>
+                        }
+                        @foreach (var comment in post.Comentarios.Take(2))
+                        {
+                            <div class="comment-preview">
+                                <span class="comment-preview-username">@(comment.Usuario?.UserName ?? "usuario")</span>
+                                <span class="comment-preview-text">@comment.Texto</span>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <!-- Add Comment -->
+                <div class="post-add-comment">
+                    <input type="text" class="comment-input" placeholder="Agrega un comentario..." data-post-id="@post.Id">
+                    <button class="comment-post-btn" data-post-id="@post.Id" disabled>Publicar</button>
+                </div>
+
+                <!-- Timestamp -->
+                <div class="post-timestamp">
+                    @post.FechaPublicacion.ToString("dd MMMM yyyy").ToUpper()
+                </div>
+            </article>
         }
-    </div>
+    }
+    else
+    {
+        <div class="empty-feed">
+            <h3>Tu feed esta vacio</h3>
+            <p>Sigue a creadores para ver su contenido aqui</p>
+            <a href="/Feed/Explorar" class="empty-feed-btn">Explorar creadores</a>
+        </div>
+    }
+        </div><!-- /.feed-container -->
+    </div><!-- /.feed-main -->
 
     <!-- SIDEBAR -->
-    <div class="feed-sidebar">
-        <!-- USER PROFILE -->
-        @{
-            var usuarioActual = ViewBag.UsuarioActual as Lado.Models.ApplicationUser;
-        }
+    <aside class="feed-sidebar">
+        <!-- Usuario actual -->
         @if (usuarioActual != null)
         {
-            <div class="user-profile-card">
-                <div class="user-profile-avatar">
+            <div class="sidebar-section">
+                <a href="/Feed/Perfil/@usuarioActual.Id" class="sidebar-user" style="text-decoration: none;">
                     @if (!string.IsNullOrEmpty(usuarioActual.FotoPerfil))
                     {
-                        <img src="@usuarioActual.FotoPerfil" alt="@usuarioActual.NombreCompleto">
+                        <img src="@usuarioActual.FotoPerfil" alt="" class="sidebar-user-avatar">
                     }
                     else
                     {
-                        <div class="avatar-placeholder">@usuarioActual.NombreCompleto.Substring(0, 1)</div>
+                        <div class="sidebar-user-avatar-placeholder">
+                            @usuarioActual.NombreCompleto.Substring(0, 1).ToUpper()
+                        </div>
                     }
-                </div>
-                <div class="user-profile-info">
-                    <h6>@usuarioActual.UserName</h6>
-                    <p>@usuarioActual.NombreCompleto</p>
-                </div>
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-user-name">@usuarioActual.UserName</div>
+                        <div class="sidebar-user-username">@usuarioActual.NombreCompleto</div>
+                    </div>
+                </a>
             </div>
         }
 
-        <!-- SUGGESTIONS -->
-        <div class="suggestions-header">
-            <h5>Sugerencias para ti</h5>
-            <a href="/Feed/Explorar">Ver todo</a>
-        </div>
-
-        @if (ViewBag.CreadoresSugeridos != null && ((List<Lado.Models.ApplicationUser>)ViewBag.CreadoresSugeridos).Any())
+        <!-- Sugerencias -->
+        @if (creadoresSugeridos.Any())
         {
-            @foreach (var creador in (List<Lado.Models.ApplicationUser>)ViewBag.CreadoresSugeridos)
-            {
-                <div class="suggestion-item">
-                    <a href="/Feed/Perfil/@creador.Id" class="suggestion-link">
-                        <div class="suggestion-avatar">
-                            @if (!string.IsNullOrEmpty(creador.FotoPerfil))
-                            {
-                                <img src="@creador.FotoPerfil" alt="@creador.NombreCompleto">
-                            }
-                            else
-                            {
-                                <div class="avatar-placeholder">@creador.NombreCompleto.Substring(0, 1)</div>
-                            }
-                        </div>
-                        <div class="suggestion-info">
-                            <h6>@creador.UserName</h6>
-                            <p>@creador.NombreCompleto</p>
-                        </div>
-                    </a>
-                    <button class="btn-follow" onclick="window.location.href='/Feed/Perfil/@creador.Id'">Seguir</button>
+            <div class="sidebar-section">
+                <div class="sidebar-header">
+                    <span class="sidebar-title">Sugerencias para ti</span>
+                    <a href="/Feed/Explorar" class="sidebar-see-all">Ver todo</a>
                 </div>
-            }
+                @foreach (var creador in creadoresSugeridos.Take(5))
+                {
+                    <div class="suggestion-item">
+                        @if (!string.IsNullOrEmpty(creador.FotoPerfil))
+                        {
+                            <img src="@creador.FotoPerfil" alt="" class="suggestion-avatar">
+                        }
+                        else
+                        {
+                            <div class="suggestion-avatar-placeholder">
+                                @creador.NombreCompleto.Substring(0, 1).ToUpper()
+                            </div>
+                        }
+                        <div class="suggestion-info">
+                            <a href="/Feed/Perfil/@creador.Id" class="suggestion-name">@creador.UserName</a>
+                            <div class="suggestion-reason">
+                                @if (creador.CreadorVerificado)
+                                {
+                                    <text>Creador verificado</text>
+                                }
+                                else if (creador.NumeroSeguidores > 0)
+                                {
+                                    <text>@creador.NumeroSeguidores seguidores</text>
+                                }
+                                else
+                                {
+                                    <text>Sugerido para ti</text>
+                                }
+                            </div>
+                        </div>
+                        <button class="suggestion-follow-btn" onclick="seguirUsuario('@creador.Id', this)">Seguir</button>
+                    </div>
+                }
+            </div>
         }
 
-        <!-- FOOTER -->
-        <div class="footer-links">
-            <div>© 2025 LADO</div>
+        <div class="sidebar-footer">
+            <a href="#">Acerca de</a> ·
+            <a href="#">Ayuda</a> ·
+            <a href="#">Privacidad</a> ·
+            <a href="#">Terminos</a>
+            <br>
+            © 2024 Lado
+        </div>
+    </aside>
+</div><!-- /.feed-page-layout -->
+
+<!-- Share Modal -->
+<div class="modal-overlay" id="shareModal">
+    <div class="share-modal">
+        <div class="share-modal-header">
+            Compartir
+            <button class="share-modal-close" onclick="closeShareModal()">&times;</button>
+        </div>
+        <div class="share-options">
+            <a class="share-option" id="shareWhatsApp" target="_blank">
+                <div class="share-option-icon whatsapp">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                    </svg>
+                </div>
+                <span class="share-option-label">WhatsApp</span>
+            </a>
+            <a class="share-option" id="shareTelegram" target="_blank">
+                <div class="share-option-icon telegram">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                    </svg>
+                </div>
+                <span class="share-option-label">Telegram</span>
+            </a>
+            <a class="share-option" id="shareTwitter" target="_blank">
+                <div class="share-option-icon twitter">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
+                    </svg>
+                </div>
+                <span class="share-option-label">Twitter</span>
+            </a>
+            <div class="share-option" id="shareCopy" onclick="copyShareUrl()">
+                <div class="share-option-icon copy">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </div>
+                <span class="share-option-label">Copiar</span>
+            </div>
+        </div>
+        <div class="share-url-section">
+            <input type="text" class="share-url-input" id="shareUrlInput" readonly>
         </div>
     </div>
 </div>
 
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+@functions {
+    string GetTimeAgo(DateTime fecha)
+    {
+        var diff = DateTime.Now - fecha;
+        if (diff.TotalDays >= 7) return fecha.ToString("dd MMM");
+        if (diff.TotalDays >= 1) return $"Hace {(int)diff.TotalDays}d";
+        if (diff.TotalHours >= 1) return $"Hace {(int)diff.TotalHours}h";
+        if (diff.TotalMinutes >= 1) return $"Hace {(int)diff.TotalMinutes}m";
+        return "Ahora";
+    }
+}
+
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        cargarEstadoLikes();
+    let currentShareUrl = '';
 
-        async function cargarEstadoLikes() {
-            const contenidos = document.querySelectorAll('.post-card[data-content-id]');
-            const contentIds = Array.from(contenidos).map(c => c.dataset.contentId);
+    // Toast
+    function showToast(msg) {
+        const toast = document.getElementById('toast');
+        toast.textContent = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2500);
+    }
 
-            if (contentIds.length === 0) return;
+    // Like
+    document.querySelectorAll('.like-btn').forEach(btn => {
+        btn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            const postId = this.dataset.id;
 
             try {
-                const response = await fetch('/Feed/ObtenerMisLikes', {
+                const res = await fetch('/Feed/Like', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
-                    },
-                    body: JSON.stringify({ contenidoIds: contentIds })
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `id=${postId}`
                 });
+                const data = await res.json();
 
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.success && data.likesUsuario) {
-                        data.likesUsuario.forEach(contenidoId => {
-                            const likeBtn = document.querySelector(`.like-btn[data-id="${contenidoId}"]`);
-                            if (likeBtn) likeBtn.classList.add('liked');
-                        });
-                    }
+                if (data.success) {
+                    this.classList.toggle('liked', data.liked);
+                    document.getElementById(`likes-${postId}`).textContent = `${data.likes} Me gusta`;
                 }
-            } catch (error) {
-                console.error('Error:', error);
+            } catch (err) {
+                console.error('Error:', err);
             }
-        }
-
-        document.querySelectorAll('.like-btn').forEach(btn => {
-            btn.addEventListener('click', async function() {
-                const contentId = this.dataset.id;
-
-                try {
-                    const response = await fetch('/Feed/Like', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
-                        },
-                        body: `id=${contentId}`
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.success) {
-                            this.classList.toggle('liked', data.liked);
-                            const likesCount = document.getElementById(`likes-count-${contentId}`);
-                            if (likesCount) likesCount.textContent = data.likes;
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                }
-            });
-        });
-
-        document.querySelectorAll('.comment-input').forEach(input => {
-            const btn = document.querySelector(`.post-comment-btn[data-content-id="${input.dataset.contentId}"]`);
-
-            input.addEventListener('input', function() {
-                btn.disabled = !this.value.trim();
-            });
-        });
-
-        document.querySelectorAll('.post-comment-btn').forEach(btn => {
-            btn.addEventListener('click', async function() {
-                const contentId = this.dataset.contentId;
-                const input = document.querySelector(`.comment-input[data-content-id="${contentId}"]`);
-                const texto = input.value.trim();
-
-                if (!texto) return;
-
-                try {
-                    const response = await fetch('/Feed/Comentar', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
-                        },
-                        body: `id=${contentId}&texto=${encodeURIComponent(texto)}`
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.success) {
-                            input.value = '';
-                            this.disabled = true;
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                }
-            });
         });
     });
+
+    // Comment input enable/disable
+    document.querySelectorAll('.comment-input').forEach(input => {
+        const postId = input.dataset.postId;
+        const btn = document.querySelector(`.comment-post-btn[data-post-id="${postId}"]`);
+
+        input.addEventListener('input', function() {
+            btn.disabled = !this.value.trim();
+        });
+
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !btn.disabled) {
+                btn.click();
+            }
+        });
+    });
+
+    // Post Comment
+    document.querySelectorAll('.comment-post-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const postId = this.dataset.postId;
+            const input = document.querySelector(`.comment-input[data-post-id="${postId}"]`);
+            const texto = input.value.trim();
+
+            if (!texto) return;
+
+            this.disabled = true;
+
+            try {
+                const res = await fetch('/Feed/Comentar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `id=${postId}&texto=${encodeURIComponent(texto)}`
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    input.value = '';
+                    showToast('Comentario publicado');
+
+                    // Add comment to preview
+                    const post = document.querySelector(`[data-post-id="${postId}"]`);
+                    let preview = post.querySelector('.post-comments-preview');
+                    if (!preview) {
+                        preview = document.createElement('div');
+                        preview.className = 'post-comments-preview';
+                        post.querySelector('.post-add-comment').before(preview);
+                    }
+
+                    const newComment = document.createElement('div');
+                    newComment.className = 'comment-preview';
+                    newComment.innerHTML = `<span class="comment-preview-username">${data.comentario.username}</span><span class="comment-preview-text">${data.comentario.texto}</span>`;
+                    preview.appendChild(newComment);
+                } else {
+                    showToast(data.message || 'Error al comentar');
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                showToast('Error al publicar comentario');
+            }
+
+            this.disabled = !input.value.trim();
+        });
+    });
+
+    // Focus comment input
+    document.querySelectorAll('.comment-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const postId = this.dataset.id;
+            const input = document.querySelector(`.comment-input[data-post-id="${postId}"]`);
+            input.focus();
+        });
+    });
+
+    // Share
+    document.querySelectorAll('.share-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const postId = this.dataset.id;
+
+            try {
+                const res = await fetch('/Feed/Compartir', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `id=${postId}`
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    currentShareUrl = data.url;
+                    document.getElementById('shareUrlInput').value = data.url;
+                    document.getElementById('shareWhatsApp').href = `https://wa.me/?text=${encodeURIComponent('Mira esto: ' + data.url)}`;
+                    document.getElementById('shareTelegram').href = `https://t.me/share/url?url=${encodeURIComponent(data.url)}`;
+                    document.getElementById('shareTwitter').href = `https://twitter.com/intent/tweet?url=${encodeURIComponent(data.url)}`;
+                    document.getElementById('shareModal').classList.add('active');
+                }
+            } catch (err) {
+                console.error('Error:', err);
+            }
+        });
+    });
+
+    function closeShareModal() {
+        document.getElementById('shareModal').classList.remove('active');
+    }
+
+    function copyShareUrl() {
+        const input = document.getElementById('shareUrlInput');
+        input.select();
+        document.execCommand('copy');
+        showToast('URL copiada');
+    }
+
+    // Close modal on background click
+    document.getElementById('shareModal').addEventListener('click', function(e) {
+        if (e.target === this) closeShareModal();
+    });
+
+    // Seguir usuario desde sidebar
+    async function seguirUsuario(userId, btn) {
+        try {
+            const res = await fetch('/Feed/Seguir', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `id=${userId}`
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                if (data.siguiendo) {
+                    btn.textContent = 'Siguiendo';
+                    btn.style.color = 'var(--muted)';
+                } else {
+                    btn.textContent = 'Seguir';
+                    btn.style.color = 'var(--primary)';
+                }
+                showToast(data.siguiendo ? 'Ahora sigues a este usuario' : 'Has dejado de seguir');
+            } else {
+                showToast(data.message || 'Error al seguir');
+            }
+        } catch (err) {
+            console.error('Error:', err);
+            showToast('Error al seguir usuario');
+        }
+    }
 </script>
