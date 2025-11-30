@@ -18,6 +18,9 @@
         public bool EstaActiva { get; set; } = true;
         public bool RenovacionAutomatica { get; set; } = true;
 
+        // TipoLado al que se suscribe (LadoA o LadoB)
+        public TipoLado TipoLado { get; set; } = TipoLado.LadoA;
+
         public ApplicationUser Fan { get; set; } = null!;
         public ApplicationUser Creador { get; set; } = null!;
     }

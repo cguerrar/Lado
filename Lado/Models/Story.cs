@@ -36,6 +36,9 @@ namespace Lado.Models
         [MaxLength(500)]
         public string? Texto { get; set; } // Texto opcional sobre la imagen/video
 
+        // Sistema LadoA / LadoB para stories
+        public TipoLado TipoLado { get; set; } = TipoLado.LadoA;
+
         // Navegación
         [ForeignKey("CreadorId")]
         public virtual ApplicationUser Creador { get; set; }

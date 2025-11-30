@@ -31,7 +31,7 @@ namespace Lado.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Suscribirse(string creadorId, decimal precio)
+        public async Task<IActionResult> Suscribirse(string creadorId, decimal precio, int? tipoLado = null)
         {
             try
             {
@@ -39,11 +39,12 @@ namespace Lado.Controllers
                 var usuario = await _userManager.FindByIdAsync(usuarioId);
                 var creador = await _userManager.FindByIdAsync(creadorId);
 
-               
+                // Determinar TipoLado (default LadoA)
+                var tipo = tipoLado.HasValue ? (TipoLado)tipoLado.Value : TipoLado.LadoA;
 
-                // Verificar si ya está suscrito
+                // Verificar si ya está suscrito a este TipoLado específico
                 var suscripcionExistente = await _context.Suscripciones
-                    .FirstOrDefaultAsync(s => s.FanId == usuarioId && s.CreadorId == creadorId && s.EstaActiva);
+                    .FirstOrDefaultAsync(s => s.FanId == usuarioId && s.CreadorId == creadorId && s.TipoLado == tipo && s.EstaActiva);
 
                 if (suscripcionExistente != null)
                 {
@@ -81,7 +82,8 @@ namespace Lado.Controllers
                         CreadorId = creadorId,
                         FechaInicio = DateTime.Now,
                         PrecioMensual = precio,
-                        EstaActiva = true
+                        EstaActiva = true,
+                        TipoLado = tipo
                     };
 
                     _context.Suscripciones.Add(suscripcion);
@@ -134,15 +136,18 @@ namespace Lado.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CancelarDesdeCreador(string creadorId)
+        public async Task<IActionResult> CancelarDesdeCreador(string creadorId, int? tipoLado = null)
         {
             try
             {
                 var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
+                // Determinar TipoLado (default LadoA)
+                var tipo = tipoLado.HasValue ? (TipoLado)tipoLado.Value : TipoLado.LadoA;
+
                 var suscripcion = await _context.Suscripciones
                     .Include(s => s.Creador)
-                    .FirstOrDefaultAsync(s => s.FanId == usuarioId && s.CreadorId == creadorId && s.EstaActiva);
+                    .FirstOrDefaultAsync(s => s.FanId == usuarioId && s.CreadorId == creadorId && s.TipoLado == tipo && s.EstaActiva);
 
                 if (suscripcion == null)
                 {

@@ -286,6 +286,185 @@ namespace Lado.Controllers
             return View("~/Views/Billetera/Index.cshtml", usuario);
         }
 
+        // GET: /Usuario/Estadisticas
+        public async Task<IActionResult> Estadisticas()
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            var hoy = DateTime.Now;
+            var inicioMes = new DateTime(hoy.Year, hoy.Month, 1);
+            var inicioMesAnterior = inicioMes.AddMonths(-1);
+
+            // === INGRESOS ===
+            ViewBag.IngresosEsteMes = await _context.Transacciones
+                .Where(t => t.UsuarioId == usuario.Id &&
+                            t.TipoTransaccion != TipoTransaccion.Retiro &&
+                            t.EstadoPago == "Completado" &&
+                            t.FechaTransaccion >= inicioMes)
+                .SumAsync(t => (decimal?)t.Monto) ?? 0;
+
+            var ingresosMesAnterior = await _context.Transacciones
+                .Where(t => t.UsuarioId == usuario.Id &&
+                            t.TipoTransaccion != TipoTransaccion.Retiro &&
+                            t.EstadoPago == "Completado" &&
+                            t.FechaTransaccion >= inicioMesAnterior &&
+                            t.FechaTransaccion < inicioMes)
+                .SumAsync(t => (decimal?)t.Monto) ?? 0;
+
+            ViewBag.IngresosMesAnterior = ingresosMesAnterior;
+
+            if (ingresosMesAnterior > 0)
+            {
+                ViewBag.CrecimientoIngresos = Math.Round((((decimal)ViewBag.IngresosEsteMes - ingresosMesAnterior) / ingresosMesAnterior) * 100, 1);
+            }
+            else
+            {
+                ViewBag.CrecimientoIngresos = (decimal)ViewBag.IngresosEsteMes > 0 ? 100 : 0;
+            }
+
+            ViewBag.TotalGanancias = usuario.TotalGanancias;
+
+            // === SUSCRIPTORES ===
+            ViewBag.SuscriptoresActivos = await _context.Suscripciones
+                .CountAsync(s => s.CreadorId == usuario.Id && s.EstaActiva);
+
+            ViewBag.NuevosSuscriptoresMes = await _context.Suscripciones
+                .CountAsync(s => s.CreadorId == usuario.Id &&
+                                s.FechaInicio >= inicioMes);
+
+            ViewBag.SuscriptoresMesAnterior = await _context.Suscripciones
+                .CountAsync(s => s.CreadorId == usuario.Id &&
+                                s.FechaInicio >= inicioMesAnterior &&
+                                s.FechaInicio < inicioMes);
+
+            var suscriptoresBajaMes = await _context.Suscripciones
+                .CountAsync(s => s.CreadorId == usuario.Id &&
+                                !s.EstaActiva &&
+                                s.FechaFin != null &&
+                                s.FechaFin >= inicioMes);
+            ViewBag.SuscriptoresBajaMes = suscriptoresBajaMes;
+
+            // Tasa de retencion
+            var totalSuscriptoresAlInicioMes = await _context.Suscripciones
+                .CountAsync(s => s.CreadorId == usuario.Id && s.FechaInicio < inicioMes);
+            if (totalSuscriptoresAlInicioMes > 0)
+            {
+                ViewBag.TasaRetencion = Math.Round(((totalSuscriptoresAlInicioMes - suscriptoresBajaMes) / (decimal)totalSuscriptoresAlInicioMes) * 100, 1);
+            }
+            else
+            {
+                ViewBag.TasaRetencion = 100;
+            }
+
+            // === CONTENIDO ===
+            ViewBag.TotalContenidos = await _context.Contenidos
+                .CountAsync(c => c.UsuarioId == usuario.Id && c.EstaActivo && !c.EsBorrador);
+
+            ViewBag.ContenidosLadoA = await _context.Contenidos
+                .CountAsync(c => c.UsuarioId == usuario.Id && c.EstaActivo && !c.EsBorrador && c.TipoLado == TipoLado.LadoA);
+
+            ViewBag.ContenidosLadoB = await _context.Contenidos
+                .CountAsync(c => c.UsuarioId == usuario.Id && c.EstaActivo && !c.EsBorrador && c.TipoLado == TipoLado.LadoB);
+
+            ViewBag.ContenidosEsteMes = await _context.Contenidos
+                .CountAsync(c => c.UsuarioId == usuario.Id && c.FechaPublicacion >= inicioMes);
+
+            // === INTERACCIONES ===
+            ViewBag.TotalLikes = await _context.Likes
+                .CountAsync(l => l.Contenido.UsuarioId == usuario.Id);
+
+            ViewBag.LikesEsteMes = await _context.Likes
+                .CountAsync(l => l.Contenido.UsuarioId == usuario.Id &&
+                                l.FechaLike >= inicioMes);
+
+            ViewBag.TotalComentarios = await _context.Comentarios
+                .CountAsync(c => c.Contenido.UsuarioId == usuario.Id);
+
+            ViewBag.ComentariosEsteMes = await _context.Comentarios
+                .CountAsync(c => c.Contenido.UsuarioId == usuario.Id &&
+                                c.FechaCreacion >= inicioMes);
+
+            // Engagement rate
+            var totalSuscriptores = (int)ViewBag.SuscriptoresActivos;
+            var totalContenidos = (int)ViewBag.TotalContenidos;
+            if (totalSuscriptores > 0 && totalContenidos > 0)
+            {
+                var totalInteracciones = (int)ViewBag.TotalLikes + (int)ViewBag.TotalComentarios;
+                var posiblesInteracciones = totalSuscriptores * totalContenidos;
+                ViewBag.Engagement = Math.Round((double)totalInteracciones / posiblesInteracciones * 100, 1);
+            }
+            else
+            {
+                ViewBag.Engagement = 0;
+            }
+
+            // === DATOS PARA GRAFICOS ===
+            // Ingresos ultimos 6 meses
+            var ingresosPorMes = new List<decimal>();
+            var nombresMeses = new List<string>();
+            for (int i = 5; i >= 0; i--)
+            {
+                var fecha = hoy.AddMonths(-i);
+                var inicioMesGrafico = new DateTime(fecha.Year, fecha.Month, 1);
+                var finMesGrafico = inicioMesGrafico.AddMonths(1);
+
+                var ingresos = await _context.Transacciones
+                    .Where(t => t.UsuarioId == usuario.Id &&
+                               t.TipoTransaccion != TipoTransaccion.Retiro &&
+                               t.EstadoPago == "Completado" &&
+                               t.FechaTransaccion >= inicioMesGrafico &&
+                               t.FechaTransaccion < finMesGrafico)
+                    .SumAsync(t => (decimal?)t.Monto) ?? 0;
+
+                ingresosPorMes.Add(ingresos);
+                nombresMeses.Add(fecha.ToString("MMM", new System.Globalization.CultureInfo("es-ES")));
+            }
+            ViewBag.IngresosMeses = string.Join(",", ingresosPorMes);
+            ViewBag.NombresMeses = string.Join(",", nombresMeses.Select(n => $"'{n}'"));
+
+            // Suscriptores ultimos 6 meses
+            var suscriptoresPorMes = new List<int>();
+            for (int i = 5; i >= 0; i--)
+            {
+                var fecha = hoy.AddMonths(-i);
+                var finMesGrafico = new DateTime(fecha.Year, fecha.Month, 1).AddMonths(1);
+
+                var subs = await _context.Suscripciones
+                    .CountAsync(s => s.CreadorId == usuario.Id &&
+                                    s.FechaInicio < finMesGrafico &&
+                                    (s.EstaActiva || (s.FechaFin != null && s.FechaFin >= finMesGrafico)));
+
+                suscriptoresPorMes.Add(subs);
+            }
+            ViewBag.SuscriptoresMeses = string.Join(",", suscriptoresPorMes);
+
+            // Top contenidos mas populares
+            ViewBag.TopContenidos = await _context.Contenidos
+                .Where(c => c.UsuarioId == usuario.Id && c.EstaActivo)
+                .OrderByDescending(c => c.Likes.Count)
+                .Take(5)
+                .Select(c => new {
+                    c.Id,
+                    c.Descripcion,
+                    c.TipoContenido,
+                    EsLadoB = c.TipoLado == TipoLado.LadoB,
+                    c.FechaPublicacion,
+                    TotalLikes = c.Likes.Count,
+                    TotalComentarios = c.Comentarios.Count
+                })
+                .ToListAsync();
+
+            // Proximo pago estimado
+            ViewBag.ProximoPago = inicioMes.AddMonths(1);
+            ViewBag.MontoEstimado = (int)ViewBag.SuscriptoresActivos * usuario.PrecioSuscripcion;
+
+            return View(usuario);
+        }
+
         // GET: /Usuario/Configuracion
         public async Task<IActionResult> Configuracion()
         {

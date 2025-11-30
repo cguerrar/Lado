@@ -1,276 +1,673 @@
-﻿@model Lado.Models.ApplicationUser
+@model Lado.Models.ApplicationUser
 @using Lado.Controllers
 @{
     ViewData["Title"] = "Mensajes";
     var conversaciones = ViewBag.Conversaciones as List<ConversacionViewModel>;
 }
 
-<div class="row">
-    <div class="col-12">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white border-0 d-flex align-items-center py-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary me-3">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                </svg>
-                <div>
-                    <h2 class="mb-0 fs-4">Mensajes</h2>
-                    <p class="text-muted mb-0 small">Tus conversaciones</p>
-                </div>
-            </div>
-
-            <div class="card-body p-0">
-                @if (conversaciones != null && conversaciones.Any())
-                {
-                    <div class="list-group list-group-flush">
-                        @foreach (var conv in conversaciones)
-                        {
-                            <a href="/Mensajes/Chat/@conv.Contacto.Id"
-                               class="list-group-item list-group-item-action conversacion-item @(conv.MensajesNoLeidos > 0 ? "no-leido" : "")">
-                                <div class="d-flex align-items-center">
-                                    <!-- Avatar -->
-                                    <div class="position-relative me-3 flex-shrink-0">
-                                        @if (!string.IsNullOrEmpty(conv.Contacto.FotoPerfil))
-                                        {
-                                            <img src="@conv.Contacto.FotoPerfil"
-                                                 alt="@conv.Contacto.NombreCompleto"
-                                                 class="rounded-circle avatar-img"
-                                                 style="width: 60px; height: 60px; object-fit: cover;">
-                                        }
-                                        else
-                                        {
-                                            <div class="rounded-circle bg-gradient-primary d-flex align-items-center justify-content-center text-white fw-bold avatar-placeholder"
-                                                 style="width: 60px; height: 60px; font-size: 24px;">
-                                                @conv.Contacto.NombreCompleto?.Substring(0, 1).ToUpper()
-                                            </div>
-                                        }
-
-                                        @if (conv.MensajesNoLeidos > 0)
-                                        {
-                                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                                                  style="font-size: 11px;">
-                                                @conv.MensajesNoLeidos
-                                            </span>
-                                        }
-                                    </div>
-
-                                    <!-- Información del contacto y último mensaje -->
-                                    <div class="flex-grow-1 min-width-0">
-                                        <div class="d-flex justify-content-between align-items-start mb-1">
-                                            <div class="min-width-0 flex-grow-1">
-                                                <h6 class="mb-0 @(conv.MensajesNoLeidos > 0 ? "fw-bold" : "") text-truncate">
-                                                    @conv.Contacto.NombreCompleto
-                                                    @if (conv.Contacto.EsVerificado)
-                                                    {
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-primary ms-1">
-                                                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                                                        </svg>
-                                                    }
-                                                </h6>
-                                                <small class="text-muted text-truncate d-block">@@@conv.Contacto.UserName</small>
-                                            </div>
-                                            @if (conv.UltimoMensaje != null)
-                                            {
-                                                <small class="text-muted flex-shrink-0 ms-2">
-                                                    @if (conv.UltimoMensaje.FechaEnvio.Date == DateTime.Today)
-                                                    {
-                                                        @conv.UltimoMensaje.FechaEnvio.ToString("HH:mm")
-                                                    }
-                                                    else if (conv.UltimoMensaje.FechaEnvio.Date == DateTime.Today.AddDays(-1))
-                                                    {
-                                                        <text>Ayer</text>
-                                                    }
-                                                    else
-                                                    {
-                                                        @conv.UltimoMensaje.FechaEnvio.ToString("dd/MM/yyyy")
-                                                    }
-                                                </small>
-                                            }
-                                        </div>
-
-                                        @if (conv.TieneConversacion && conv.UltimoMensaje != null)
-                                        {
-                                            <p class="mb-0 text-muted small text-truncate @(conv.MensajesNoLeidos > 0 ? "fw-semibold" : "")"
-                                               style="max-width: 100%;">
-                                                @if (conv.UltimoMensaje.RemitenteId == Model.Id)
-                                                {
-                                                    <span class="me-1">Tú:</span>
-                                                }
-                                                @conv.UltimoMensaje.Contenido
-                                            </p>
-                                        }
-                                        else
-                                        {
-                                            <p class="mb-0 text-muted small fst-italic">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
-                                                    <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
-                                                    <path d="m9 12 2 2 4-4"></path>
-                                                </svg>
-                                               
-                                                {
-                                                    <text>Sin mensajes aún</text>
-                                                }
-                                            </p>
-                                        }
-                                    </div>
-
-                                    <!-- Indicador visual -->
-                                    <div class="flex-shrink-0 ms-2 d-none d-md-block">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted">
-                                            <polyline points="9 18 15 12 9 6"></polyline>
-                                        </svg>
-                                    </div>
-                                </div>
-                            </a>
-                        }
-                    </div>
-                }
-                else
-                {
-                    <div class="text-center py-5 px-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-muted mb-3">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                        </svg>
-                        <h5 class="text-muted mb-2">
-                            
-                            {
-                                <text>No tienes mensajes</text>
-                            }
-                        </h5>
-                        <p class="text-muted mb-4">
-                           
-                            {
-                                <text>Cuando alguien te escriba, verás tus conversaciones aquí</text>
-                            }
-                        </p>
-                        <a href="/Explorar" class="btn btn-primary">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-2">
-                                <circle cx="11" cy="11" r="8"></circle>
-                                <path d="m21 21-4.35-4.35"></path>
-                            </svg>
-                            Explorar Creadores
-                        </a>
-                    </div>
-                }
-            </div>
-        </div>
-    </div>
-</div>
-
 <style>
-    .conversacion-item {
-        transition: all 0.2s ease;
-        border-left: 3px solid transparent;
-        padding: 1rem 1.5rem;
+    :root {
+        --primary: #4682B4;
+        --primary-dark: #36648B;
+        --primary-light: #B0C4DE;
+        --bg-light: #f8fafc;
+        --border: #e2e8f0;
+        --text-dark: #1e293b;
+        --text-muted: #64748b;
     }
 
-        .conversacion-item:hover {
-            background-color: #f8f9fa;
-            border-left-color: #0d6efd;
-            text-decoration: none;
-        }
-
-        .conversacion-item.no-leido {
-            background-color: #f0f8ff;
-        }
-
-            .conversacion-item.no-leido:hover {
-                background-color: #e6f2ff;
-            }
-
-    .text-truncate {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+    .mensajes-container {
+        max-width: 800px;
+        margin: 0 auto;
     }
 
-    .bg-gradient-primary {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    .mensajes-header {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 16px 16px 0 0;
+        margin-bottom: 0;
     }
 
-    .min-width-0 {
-        min-width: 0;
+    .mensajes-header h1 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        margin: 0 0 0.5rem 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
     }
 
-    /* Estilos para avatares */
-    .avatar-img {
-        transition: transform 0.2s;
-    }
-
-    .conversacion-item:hover .avatar-img {
-        transform: scale(1.05);
-    }
-
-    /* Responsive Design */
-    @@media (max-width: 768px) {
-        .conversacion-item
-
-    {
-        padding: 0.875rem 1rem;
-    }
-
-    .avatar-img,
-    .avatar-placeholder {
-        width: 50px !important;
-        height: 50px !important;
-        font-size: 20px !important;
-    }
-
-    .card-header h2 {
-        font-size: 1.25rem !important;
-    }
-
-    .card-header svg {
-        width: 24px;
-        height: 24px;
-    }
-
-    }
-
-    @@media (max-width: 576px) {
-        .conversacion-item
-
-    {
-        padding: 0.75rem;
-    }
-
-    .avatar-img,
-    .avatar-placeholder {
-        width: 45px !important;
-        height: 45px !important;
-        font-size: 18px !important;
-    }
-
-    .conversacion-item h6 {
+    .mensajes-header p {
+        margin: 0;
+        opacity: 0.9;
         font-size: 0.95rem;
     }
 
-    .conversacion-item small {
-        font-size: 0.75rem;
+    .mensajes-body {
+        background: white;
+        border-radius: 0 0 16px 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        overflow: hidden;
     }
 
-    .conversacion-item p {
-        font-size: 0.85rem;
+    .conversacion-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
     }
 
-    .card-header {
-        padding: 0.75rem 1rem !important;
+    .conversacion-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border);
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.2s ease;
+        gap: 1rem;
     }
 
+    .conversacion-item:last-child {
+        border-bottom: none;
     }
 
-    @@media (max-width: 400px) {
-        .conversacion-item
-
-    {
-        padding: 0.625rem 0.75rem;
+    .conversacion-item:hover {
+        background: var(--bg-light);
     }
 
-    .avatar-img,
+    .conversacion-item.no-leido {
+        background: linear-gradient(90deg, rgba(70,130,180,0.08) 0%, transparent 100%);
+        border-left: 4px solid var(--primary);
+    }
+
+    .conversacion-item.no-leido:hover {
+        background: linear-gradient(90deg, rgba(70,130,180,0.12) 0%, rgba(70,130,180,0.04) 100%);
+    }
+
+    .avatar-container {
+        position: relative;
+        flex-shrink: 0;
+    }
+
+    .avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid var(--primary-light);
+    }
+
     .avatar-placeholder {
-        width: 40px !important;
-        height: 40px !important;
-        font-size: 16px !important;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 1.25rem;
+        border: 3px solid var(--primary-light);
     }
 
+    .unread-badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        background: #ef4444;
+        color: white;
+        font-size: 0.7rem;
+        font-weight: 700;
+        min-width: 20px;
+        height: 20px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 6px;
+        border: 2px solid white;
+    }
+
+    .conversacion-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .conversacion-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 4px;
+    }
+
+    .conversacion-nombre {
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--text-dark);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .no-leido .conversacion-nombre {
+        color: var(--primary-dark);
+    }
+
+    .verificado-icon {
+        color: var(--primary);
+    }
+
+    .conversacion-username {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .conversacion-fecha {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        flex-shrink: 0;
+    }
+
+    .no-leido .conversacion-fecha {
+        color: var(--primary);
+        font-weight: 600;
+    }
+
+    .conversacion-preview {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+
+    .no-leido .conversacion-preview {
+        color: var(--text-dark);
+        font-weight: 500;
+    }
+
+    .conversacion-arrow {
+        color: var(--text-muted);
+        flex-shrink: 0;
+    }
+
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+    }
+
+    .empty-icon {
+        width: 80px;
+        height: 80px;
+        background: var(--primary-light);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+    }
+
+    .empty-icon svg {
+        width: 40px;
+        height: 40px;
+        color: var(--primary-dark);
+    }
+
+    .empty-state h3 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+        color: var(--text-muted);
+        margin-bottom: 1.5rem;
+    }
+
+    .btn-explore {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 24px;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        color: white;
+        border-radius: 12px;
+        font-weight: 700;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(70,130,180,0.3);
+    }
+
+    .btn-explore:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(70,130,180,0.4);
+        color: white;
+    }
+
+    /* Nueva conversación */
+    .nueva-conversacion-section {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-light);
+    }
+
+    .btn-nueva-conv {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        padding: 12px 20px;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-nueva-conv:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(70,130,180,0.4);
+    }
+
+    /* Buscador de usuarios */
+    .search-section {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border);
+        display: none;
+    }
+
+    .search-section.active {
+        display: block;
+    }
+
+    .search-input-container {
+        position: relative;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 12px 16px 12px 44px;
+        border: 2px solid var(--border);
+        border-radius: 10px;
+        font-size: 0.95rem;
+        transition: all 0.2s;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(70,130,180,0.15);
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+    }
+
+    .search-results {
+        margin-top: 1rem;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .search-result-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .search-result-item:hover {
+        background: var(--bg-light);
+    }
+
+    .search-result-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .search-result-avatar-placeholder {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    .search-result-info {
+        flex: 1;
+    }
+
+    .search-result-name {
+        font-weight: 600;
+        color: var(--text-dark);
+        font-size: 0.95rem;
+    }
+
+    .search-result-username {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .search-no-results {
+        text-align: center;
+        padding: 1.5rem;
+        color: var(--text-muted);
+    }
+
+    .search-loading {
+        text-align: center;
+        padding: 1.5rem;
+        color: var(--text-muted);
+    }
+
+    .cancel-search-btn {
+        display: block;
+        width: 100%;
+        margin-top: 12px;
+        padding: 8px;
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        cursor: pointer;
+    }
+
+    .cancel-search-btn:hover {
+        background: var(--bg-light);
+    }
+
+    /* Responsive */
+    @@media (max-width: 640px) {
+        .mensajes-header {
+            padding: 1.5rem;
+            border-radius: 0;
+        }
+
+        .mensajes-body {
+            border-radius: 0;
+        }
+
+        .conversacion-item {
+            padding: 1rem;
+        }
+
+        .avatar, .avatar-placeholder {
+            width: 48px;
+            height: 48px;
+            font-size: 1rem;
+        }
+
+        .mensajes-container {
+            margin: 0;
+        }
     }
 </style>
+
+<div class="mensajes-container">
+    <div class="mensajes-header">
+        <h1>
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            Mensajes
+        </h1>
+        <p>Tus conversaciones privadas</p>
+    </div>
+
+    <div class="mensajes-body">
+        <!-- Sección Nueva Conversación -->
+        <div class="nueva-conversacion-section" id="nuevaConvSection">
+            <button class="btn-nueva-conv" onclick="toggleSearchSection()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Nueva Conversación
+            </button>
+        </div>
+
+        <!-- Sección de búsqueda -->
+        <div class="search-section" id="searchSection">
+            <div class="search-input-container">
+                <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text"
+                       class="search-input"
+                       id="searchUsuarios"
+                       placeholder="Buscar usuarios que sigues..."
+                       oninput="buscarUsuarios(this.value)"
+                       autocomplete="off">
+            </div>
+            <div id="searchResults" class="search-results"></div>
+            <button class="cancel-search-btn" onclick="toggleSearchSection()">Cancelar</button>
+        </div>
+
+        @if (conversaciones != null && conversaciones.Any())
+        {
+            <ul class="conversacion-list">
+                @foreach (var conv in conversaciones)
+                {
+                    <li>
+                        <a href="/Mensajes/Chat/@conv.Contacto.Id" class="conversacion-item @(conv.MensajesNoLeidos > 0 ? "no-leido" : "")">
+                            <div class="avatar-container">
+                                @if (!string.IsNullOrEmpty(conv.Contacto.FotoPerfil))
+                                {
+                                    <img src="@conv.Contacto.FotoPerfil" alt="@conv.Contacto.NombreCompleto" class="avatar">
+                                }
+                                else
+                                {
+                                    <div class="avatar-placeholder">
+                                        @conv.Contacto.NombreCompleto?.Substring(0, 1).ToUpper()
+                                    </div>
+                                }
+                                @if (conv.MensajesNoLeidos > 0)
+                                {
+                                    <span class="unread-badge">@(conv.MensajesNoLeidos > 9 ? "9+" : conv.MensajesNoLeidos.ToString())</span>
+                                }
+                            </div>
+
+                            <div class="conversacion-info">
+                                <div class="conversacion-header">
+                                    <div>
+                                        <span class="conversacion-nombre">
+                                            @conv.Contacto.NombreCompleto
+                                            @if (conv.Contacto.EsVerificado)
+                                            {
+                                                <svg class="verificado-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                                </svg>
+                                            }
+                                        </span>
+                                        <div class="conversacion-username">@@@conv.Contacto.UserName</div>
+                                    </div>
+                                    @if (conv.UltimoMensaje != null)
+                                    {
+                                        <span class="conversacion-fecha">
+                                            @if (conv.UltimoMensaje.FechaEnvio.Date == DateTime.Today)
+                                            {
+                                                @conv.UltimoMensaje.FechaEnvio.ToString("HH:mm")
+                                            }
+                                            else if (conv.UltimoMensaje.FechaEnvio.Date == DateTime.Today.AddDays(-1))
+                                            {
+                                                <text>Ayer</text>
+                                            }
+                                            else if (conv.UltimoMensaje.FechaEnvio.Date > DateTime.Today.AddDays(-7))
+                                            {
+                                                @conv.UltimoMensaje.FechaEnvio.ToString("dddd", new System.Globalization.CultureInfo("es-ES"))
+                                            }
+                                            else
+                                            {
+                                                @conv.UltimoMensaje.FechaEnvio.ToString("dd/MM/yy")
+                                            }
+                                        </span>
+                                    }
+                                </div>
+                                @if (conv.UltimoMensaje != null)
+                                {
+                                    <p class="conversacion-preview">
+                                        @if (conv.UltimoMensaje.RemitenteId == Model.Id)
+                                        {
+                                            <span>Tu: </span>
+                                        }
+                                        @conv.UltimoMensaje.Contenido
+                                    </p>
+                                }
+                            </div>
+
+                            <div class="conversacion-arrow">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </div>
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </div>
+                <h3>No tienes conversaciones</h3>
+                <p>Cuando inicies o recibas mensajes, apareceran aqui</p>
+                <a href="/Explorar" class="btn-explore">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    Explorar Creadores
+                </a>
+            </div>
+        }
+    </div>
+</div>
+
+<script>
+    let searchTimeout = null;
+
+    function toggleSearchSection() {
+        const searchSection = document.getElementById('searchSection');
+        const nuevaConvSection = document.getElementById('nuevaConvSection');
+
+        if (searchSection.classList.contains('active')) {
+            searchSection.classList.remove('active');
+            nuevaConvSection.style.display = 'block';
+            document.getElementById('searchUsuarios').value = '';
+            document.getElementById('searchResults').innerHTML = '';
+        } else {
+            searchSection.classList.add('active');
+            nuevaConvSection.style.display = 'none';
+            document.getElementById('searchUsuarios').focus();
+        }
+    }
+
+    async function buscarUsuarios(query) {
+        const resultsContainer = document.getElementById('searchResults');
+
+        // Limpiar timeout anterior
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+        }
+
+        if (!query || query.length < 2) {
+            resultsContainer.innerHTML = '<div class="search-no-results">Escribe al menos 2 caracteres para buscar</div>';
+            return;
+        }
+
+        // Mostrar loading
+        resultsContainer.innerHTML = '<div class="search-loading"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Buscando...</div>';
+
+        // Debounce de 300ms
+        searchTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch('/api/mensajes/buscar-usuarios?query=' + encodeURIComponent(query));
+
+                if (!response.ok) throw new Error('Error en la búsqueda');
+
+                const usuarios = await response.json();
+
+                if (!usuarios || usuarios.length === 0) {
+                    resultsContainer.innerHTML = '<div class="search-no-results">No se encontraron usuarios. Solo puedes enviar mensajes a usuarios que sigues.</div>';
+                    return;
+                }
+
+                let html = '';
+                usuarios.forEach(user => {
+                    const initial = (user.nombre || 'U').charAt(0).toUpperCase();
+                    const avatarHtml = user.fotoPerfil
+                        ? `<img src="${user.fotoPerfil}" alt="${user.nombre}" class="search-result-avatar">`
+                        : `<div class="search-result-avatar-placeholder">${initial}</div>`;
+
+                    html += `
+                        <div class="search-result-item" onclick="iniciarConversacion('${user.id}')">
+                            ${avatarHtml}
+                            <div class="search-result-info">
+                                <div class="search-result-name">${escapeHtml(user.nombre)}</div>
+                                <div class="search-result-username">@@${escapeHtml(user.seudonimo)}</div>
+                            </div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </div>
+                    `;
+                });
+
+                resultsContainer.innerHTML = html;
+            } catch (error) {
+                console.error('Error buscando usuarios:', error);
+                resultsContainer.innerHTML = '<div class="search-no-results">Error al buscar. Intenta nuevamente.</div>';
+            }
+        }, 300);
+    }
+
+    function iniciarConversacion(userId) {
+        window.location.href = '/Mensajes/Chat/' + userId;
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Verificar si hay un userId en la URL para abrir chat directo
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('userId');
+        if (userId) {
+            window.location.href = '/Mensajes/Chat/' + userId;
+        }
+    });
+</script>

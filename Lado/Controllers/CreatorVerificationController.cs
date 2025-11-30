@@ -404,6 +404,7 @@ namespace Lado.Controllers
 
                     solicitud.User.CreadorVerificado = true;
                     solicitud.User.FechaVerificacion = DateTime.Now;
+                    solicitud.User.EsCreador = true;
 
                     await _userManager.UpdateAsync(solicitud.User);
 

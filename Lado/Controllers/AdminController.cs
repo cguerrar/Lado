@@ -1,4 +1,4 @@
-﻿using Lado.Data;
+using Lado.Data;
 using Lado.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Lado.Controllers
 {
     [Authorize(Roles = "Admin")]
-    public class AdminController : Controller
+    public partial class AdminController : Controller
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
@@ -195,7 +195,7 @@ namespace Lado.Controllers
                     // Si no existe la propiedad UsuarioReportadoId, continuar
                 }
 
-                // 9. Eliminar solicitud de verificación si existe
+                // 9. Eliminar solicitud de verificaci�n si existe
                 try
                 {
                     var verificacion = await _context.CreatorVerificationRequests
@@ -404,65 +404,265 @@ namespace Lado.Controllers
         }
 
         // ========================================
-        // ESTADÍSTICAS
+        // ESTADISTICAS COMPLETAS
         // ========================================
         public async Task<IActionResult> Estadisticas()
         {
-            ViewBag.TotalUsuarios = await _context.Users.CountAsync();
-            ViewBag.TotalSuscripciones = await _context.Suscripciones.CountAsync(s => s.EstaActiva);
-            ViewBag.TotalPublicaciones = await _context.Contenidos.CountAsync();
+            var hoy = DateTime.Today;
+            var inicioMes = new DateTime(hoy.Year, hoy.Month, 1);
+            var inicioMesAnterior = inicioMes.AddMonths(-1);
+            var hace7Dias = hoy.AddDays(-7);
+            var hace30Dias = hoy.AddDays(-30);
 
+            // ========================================
+            // KPIs PRINCIPALES
+            // ========================================
+
+            // Usuarios
+            var totalUsuarios = await _context.Users.CountAsync();
+            var usuariosMesActual = await _context.Users.CountAsync(u => u.FechaRegistro >= inicioMes);
+            var usuariosMesAnterior = await _context.Users.CountAsync(u => u.FechaRegistro >= inicioMesAnterior && u.FechaRegistro < inicioMes);
+            var crecimientoUsuarios = usuariosMesAnterior > 0 ? ((double)(usuariosMesActual - usuariosMesAnterior) / usuariosMesAnterior * 100) : 100;
+
+            ViewBag.TotalUsuarios = totalUsuarios;
+            ViewBag.UsuariosNuevosMes = usuariosMesActual;
+            ViewBag.CrecimientoUsuarios = Math.Round(crecimientoUsuarios, 1);
+
+            // Usuarios activos (que han publicado o interactuado en los ultimos 7 dias)
+            var usuariosActivosIds = await _context.Contenidos
+                .Where(c => c.FechaPublicacion >= hace7Dias)
+                .Select(c => c.UsuarioId)
+                .Union(_context.Likes.Where(l => l.FechaLike >= hace7Dias).Select(l => l.UsuarioId))
+                .Union(_context.Comentarios.Where(c => c.FechaCreacion >= hace7Dias).Select(c => c.UsuarioId))
+                .Distinct()
+                .CountAsync();
+            ViewBag.UsuariosActivos7Dias = usuariosActivosIds;
+
+            // Creadores
+            var totalCreadores = await _context.Users.CountAsync(u => u.EsCreador);
+            var creadoresVerificados = await _context.Users.CountAsync(u => u.EsCreador && u.CreadorVerificado);
+            ViewBag.TotalCreadores = totalCreadores;
+            ViewBag.CreadoresVerificados = creadoresVerificados;
+
+            // Suscripciones
+            var suscripcionesActivas = await _context.Suscripciones.CountAsync(s => s.EstaActiva);
+            var suscripcionesMesActual = await _context.Suscripciones.CountAsync(s => s.FechaInicio >= inicioMes);
+            var suscripcionesCanceladas = await _context.Suscripciones.CountAsync(s => s.FechaCancelacion != null && s.FechaCancelacion >= inicioMes);
+            ViewBag.SuscripcionesActivas = suscripcionesActivas;
+            ViewBag.SuscripcionesNuevasMes = suscripcionesMesActual;
+            ViewBag.SuscripcionesCanceladas = suscripcionesCanceladas;
+
+            // Contenido
+            var totalContenido = await _context.Contenidos.CountAsync();
+            var contenidoHoy = await _context.Contenidos.CountAsync(c => c.FechaPublicacion.Date == hoy);
+            var contenidoMes = await _context.Contenidos.CountAsync(c => c.FechaPublicacion >= inicioMes);
+            var contenidoCensurado = await _context.Contenidos.CountAsync(c => c.Censurado);
+            ViewBag.TotalContenido = totalContenido;
+            ViewBag.ContenidoHoy = contenidoHoy;
+            ViewBag.ContenidoMes = contenidoMes;
+            ViewBag.ContenidoCensurado = contenidoCensurado;
+
+            // ========================================
+            // METRICAS FINANCIERAS
+            // ========================================
+            var ingresosTotales = await _context.Transacciones
+                .Where(t => t.EstadoTransaccion == EstadoTransaccion.Completada)
+                .SumAsync(t => (decimal?)t.Monto) ?? 0;
+
+            var ingresosMes = await _context.Transacciones
+                .Where(t => t.EstadoTransaccion == EstadoTransaccion.Completada && t.FechaTransaccion >= inicioMes)
+                .SumAsync(t => (decimal?)t.Monto) ?? 0;
+
+            var ingresosMesAnterior = await _context.Transacciones
+                .Where(t => t.EstadoTransaccion == EstadoTransaccion.Completada &&
+                       t.FechaTransaccion >= inicioMesAnterior && t.FechaTransaccion < inicioMes)
+                .SumAsync(t => (decimal?)t.Monto) ?? 0;
+
+            var crecimientoIngresos = ingresosMesAnterior > 0 ? ((double)(ingresosMes - ingresosMesAnterior) / (double)ingresosMesAnterior * 100) : 100;
+
+            var comisionesTotales = await _context.Transacciones
+                .Where(t => t.EstadoTransaccion == EstadoTransaccion.Completada && t.Comision != null)
+                .SumAsync(t => (decimal?)t.Comision) ?? 0;
+
+            ViewBag.IngresosTotales = ingresosTotales;
+            ViewBag.IngresosMes = ingresosMes;
+            ViewBag.CrecimientoIngresos = Math.Round(crecimientoIngresos, 1);
+            ViewBag.ComisionesPlataforma = comisionesTotales;
+
+            // ========================================
+            // METRICAS DE ENGAGEMENT
+            // ========================================
+            var totalLikes = await _context.Likes.CountAsync();
+            var totalComentarios = await _context.Comentarios.CountAsync();
+            var promedioLikesPorPost = totalContenido > 0 ? (double)totalLikes / totalContenido : 0;
+            var promedioComentariosPorPost = totalContenido > 0 ? (double)totalComentarios / totalContenido : 0;
+
+            ViewBag.TotalLikes = totalLikes;
+            ViewBag.TotalComentarios = totalComentarios;
+            ViewBag.PromedioLikes = Math.Round(promedioLikesPorPost, 1);
+            ViewBag.PromedioComentarios = Math.Round(promedioComentariosPorPost, 1);
+
+            // ========================================
+            // DATOS PARA GRAFICOS
+            // ========================================
+
+            // Registros por mes (ultimos 12 meses)
+            var hace12Meses = hoy.AddMonths(-12);
             var registrosPorMes = await _context.Users
+                .Where(u => u.FechaRegistro >= hace12Meses)
                 .GroupBy(u => new { u.FechaRegistro.Year, u.FechaRegistro.Month })
                 .Select(g => new
                 {
-                    año = g.Key.Year,
-                    mes = g.Key.Month,
-                    total = g.Count()
+                    Anio = g.Key.Year,
+                    Mes = g.Key.Month,
+                    Total = g.Count()
                 })
-                .OrderBy(x => x.año).ThenBy(x => x.mes)
+                .OrderBy(x => x.Anio).ThenBy(x => x.Mes)
                 .ToListAsync();
+            ViewBag.RegistrosPorMes = registrosPorMes;
 
-            var contenidosPorTipo = await _context.Contenidos
+            // Contenido por tipo
+            var contenidoPorTipo = await _context.Contenidos
                 .GroupBy(c => c.TipoContenido)
                 .Select(g => new
                 {
-                    tipo = g.Key.ToString(),
-                    total = g.Count()
+                    Tipo = g.Key.ToString(),
+                    Total = g.Count()
                 })
                 .ToListAsync();
+            ViewBag.ContenidoPorTipo = contenidoPorTipo;
 
-            var topCreadores = await _context.Contenidos
-                .GroupBy(c => c.UsuarioId)
+            // Ingresos por dia (ultimos 30 dias)
+            var ingresosPorDia = await _context.Transacciones
+                .Where(t => t.EstadoTransaccion == EstadoTransaccion.Completada && t.FechaTransaccion >= hace30Dias)
+                .GroupBy(t => t.FechaTransaccion.Date)
                 .Select(g => new
                 {
-                    UsuarioId = g.Key,
+                    Fecha = g.Key,
+                    Total = g.Sum(t => t.Monto)
+                })
+                .OrderBy(x => x.Fecha)
+                .ToListAsync();
+            ViewBag.IngresosPorDia = ingresosPorDia;
+
+            // Usuarios por pais
+            var usuariosPorPais = await _context.Users
+                .Where(u => !string.IsNullOrEmpty(u.Pais))
+                .GroupBy(u => u.Pais)
+                .Select(g => new
+                {
+                    Pais = g.Key,
                     Total = g.Count()
                 })
                 .OrderByDescending(x => x.Total)
                 .Take(10)
                 .ToListAsync();
+            ViewBag.UsuariosPorPais = usuariosPorPais;
 
-            var topCreadoresConNombres = new List<object>();
-            foreach (var item in topCreadores)
-            {
-                var usuario = await _context.Users.FindAsync(item.UsuarioId);
-                topCreadoresConNombres.Add(new
+            // ========================================
+            // TOP RANKINGS
+            // ========================================
+
+            // Top 10 creadores con mas suscriptores
+            var topCreadoresSuscriptores = await _context.Suscripciones
+                .Where(s => s.EstaActiva)
+                .GroupBy(s => s.CreadorId)
+                .Select(g => new
                 {
-                    nombre = usuario?.UserName ?? "Desconocido",
-                    total = item.Total
+                    CreadorId = g.Key,
+                    TotalSuscriptores = g.Count()
+                })
+                .OrderByDescending(x => x.TotalSuscriptores)
+                .Take(10)
+                .ToListAsync();
+
+            var topSuscriptoresConNombres = new List<object>();
+            foreach (var item in topCreadoresSuscriptores)
+            {
+                var usuario = await _context.Users.FindAsync(item.CreadorId);
+                topSuscriptoresConNombres.Add(new
+                {
+                    Nombre = usuario?.UserName ?? "Desconocido",
+                    FotoPerfil = usuario?.FotoPerfil,
+                    Total = item.TotalSuscriptores
                 });
             }
+            ViewBag.TopCreadoresSuscriptores = topSuscriptoresConNombres;
 
-            ViewBag.RegistrosPorMes = registrosPorMes;
-            ViewBag.ContenidosPorTipo = contenidosPorTipo;
-            ViewBag.TopCreadores = topCreadoresConNombres;
+            // Top 10 creadores con mas contenido
+            var topCreadoresContenido = await _context.Contenidos
+                .GroupBy(c => c.UsuarioId)
+                .Select(g => new
+                {
+                    CreadorId = g.Key,
+                    TotalContenido = g.Count()
+                })
+                .OrderByDescending(x => x.TotalContenido)
+                .Take(10)
+                .ToListAsync();
+
+            var topContenidoConNombres = new List<object>();
+            foreach (var item in topCreadoresContenido)
+            {
+                var usuario = await _context.Users.FindAsync(item.CreadorId);
+                topContenidoConNombres.Add(new
+                {
+                    Nombre = usuario?.UserName ?? "Desconocido",
+                    FotoPerfil = usuario?.FotoPerfil,
+                    Total = item.TotalContenido
+                });
+            }
+            ViewBag.TopCreadoresContenido = topContenidoConNombres;
+
+            // Top 10 contenidos mas populares (likes + comentarios)
+            var topContenidos = await _context.Contenidos
+                .Include(c => c.Usuario)
+                .Include(c => c.Likes)
+                .Include(c => c.Comentarios)
+                .OrderByDescending(c => c.Likes.Count + c.Comentarios.Count)
+                .Take(10)
+                .Select(c => new
+                {
+                    c.Id,
+                    c.Descripcion,
+                    c.TipoContenido,
+                    c.Thumbnail,
+                    c.RutaArchivo,
+                    CreadorNombre = c.Usuario != null ? c.Usuario.UserName : "Desconocido",
+                    TotalLikes = c.Likes.Count,
+                    TotalComentarios = c.Comentarios.Count
+                })
+                .ToListAsync();
+            ViewBag.TopContenidos = topContenidos;
+
+            // ========================================
+            // ALERTAS Y TENDENCIAS
+            // ========================================
+
+            // Creadores sin publicar hace 7 dias (que tenian actividad antes)
+            var creadoresInactivos = await _context.Users
+                .Where(u => u.EsCreador)
+                .Where(u => !_context.Contenidos.Any(c => c.UsuarioId == u.Id && c.FechaPublicacion >= hace7Dias))
+                .Where(u => _context.Contenidos.Any(c => c.UsuarioId == u.Id))
+                .Take(10)
+                .Select(u => new { u.Id, u.UserName, u.FotoPerfil })
+                .ToListAsync();
+            ViewBag.CreadoresInactivos = creadoresInactivos;
+
+            // Reportes pendientes
+            var reportesPendientes = await _context.Reportes.CountAsync(r => r.Estado == "Pendiente");
+            ViewBag.ReportesPendientesTotal = reportesPendientes;
+
+            // Verificaciones pendientes
+            var verificacionesPendientes = await _context.CreatorVerificationRequests
+                .CountAsync(v => v.Estado == "Pendiente");
+            ViewBag.VerificacionesPendientes = verificacionesPendientes;
 
             return View();
         }
 
         // ========================================
-        // CONFIGURACIÓN
+        // CONFIGURACI�N
         // ========================================
         public IActionResult Configuracion()
         {
@@ -472,7 +672,7 @@ namespace Lado.Controllers
         [HttpPost]
         public async Task<IActionResult> ActualizarComision(decimal comision)
         {
-            TempData["Success"] = $"Comisión actualizada a {comision}%";
+            TempData["Success"] = $"Comisi�n actualizada a {comision}%";
             return RedirectToAction(nameof(Configuracion));
         }
     }

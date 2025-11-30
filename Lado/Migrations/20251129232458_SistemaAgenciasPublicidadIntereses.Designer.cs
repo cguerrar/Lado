@@ -4,6 +4,7 @@ using Lado.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Lado.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251129232458_SistemaAgenciasPublicidadIntereses")]
+    partial class SistemaAgenciasPublicidadIntereses
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1074,36 +1077,6 @@ namespace Lado.Migrations
                     b.ToTable("Desafios");
                 });
 
-            modelBuilder.Entity("Lado.Models.Favorito", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ContenidoId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("FechaAgregado")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("UsuarioId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ContenidoId")
-                        .HasDatabaseName("IX_Favoritos_ContenidoId");
-
-                    b.HasIndex("UsuarioId", "ContenidoId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_Favoritos_Usuario_Contenido_Unique");
-
-                    b.ToTable("Favoritos");
-                });
-
             modelBuilder.Entity("Lado.Models.ImpresionAnuncio", b =>
                 {
                     b.Property<long>("Id")
@@ -1667,9 +1640,6 @@ namespace Lado.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
 
-                    b.Property<int>("TipoLado")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
                     b.HasIndex("CreadorId")
@@ -2183,25 +2153,6 @@ namespace Lado.Migrations
                     b.Navigation("CreadorObjetivo");
 
                     b.Navigation("Fan");
-                });
-
-            modelBuilder.Entity("Lado.Models.Favorito", b =>
-                {
-                    b.HasOne("Lado.Models.Contenido", "Contenido")
-                        .WithMany()
-                        .HasForeignKey("ContenidoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Lado.Models.ApplicationUser", "Usuario")
-                        .WithMany()
-                        .HasForeignKey("UsuarioId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Contenido");
-
-                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("Lado.Models.ImpresionAnuncio", b =>

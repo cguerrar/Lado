@@ -1,0 +1,501 @@
+@model IEnumerable<Lado.Models.Contenido>
+@using Lado.Models
+@{
+    ViewData["Title"] = "Mis Favoritos";
+    var favoritosIds = ViewBag.FavoritosIds as List<int> ?? new List<int>();
+}
+
+<style>
+    .favorites-page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .favorites-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 32px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .favorites-header h1 {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--fg);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .favorites-header h1 svg {
+        width: 32px;
+        height: 32px;
+        color: var(--primary);
+    }
+
+    .favorites-count {
+        font-size: 14px;
+        color: var(--muted);
+        background: var(--bg-tertiary);
+        padding: 6px 12px;
+        border-radius: 20px;
+    }
+
+    .favorites-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 24px;
+    }
+
+    .favorite-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .favorite-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .favorite-media {
+        position: relative;
+        aspect-ratio: 1;
+        background: var(--bg-tertiary);
+        overflow: hidden;
+    }
+
+    .favorite-media img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .favorite-media video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .favorite-media-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.3);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .favorite-card:hover .favorite-media-overlay {
+        opacity: 1;
+    }
+
+    .favorite-media-overlay a {
+        padding: 12px 24px;
+        background: var(--primary);
+        color: white;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: transform 0.2s ease;
+    }
+
+    .favorite-media-overlay a:hover {
+        transform: scale(1.05);
+    }
+
+    .favorite-type-badge {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        background: rgba(0,0,0,0.6);
+        color: white;
+    }
+
+    .favorite-type-badge.video {
+        background: rgba(239, 68, 68, 0.9);
+    }
+
+    .favorite-type-badge.audio {
+        background: rgba(139, 92, 246, 0.9);
+    }
+
+    .favorite-remove-btn {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.6);
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        opacity: 0;
+        transition: opacity 0.2s ease, background 0.2s ease;
+    }
+
+    .favorite-card:hover .favorite-remove-btn {
+        opacity: 1;
+    }
+
+    .favorite-remove-btn:hover {
+        background: rgba(239, 68, 68, 0.9);
+    }
+
+    .favorite-remove-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .favorite-info {
+        padding: 16px;
+    }
+
+    .favorite-user {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .favorite-user-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .favorite-user-avatar-placeholder {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .favorite-user-info {
+        flex: 1;
+    }
+
+    .favorite-user-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg);
+    }
+
+    .favorite-user-name:hover {
+        color: var(--primary);
+    }
+
+    .favorite-date {
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .favorite-description {
+        font-size: 14px;
+        color: var(--fg-secondary);
+        line-height: 1.5;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .favorite-text-content {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        text-align: center;
+        font-size: 16px;
+        line-height: 1.5;
+        color: var(--fg);
+        background: linear-gradient(135deg, var(--primary-light) 0%, var(--surface) 100%);
+    }
+
+    .favorite-audio-content {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: linear-gradient(135deg, var(--accent-light) 0%, var(--surface) 100%);
+    }
+
+    .favorite-audio-content svg {
+        width: 64px;
+        height: 64px;
+        color: var(--accent);
+    }
+
+    .empty-favorites {
+        text-align: center;
+        padding: 80px 20px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+    }
+
+    .empty-favorites svg {
+        width: 80px;
+        height: 80px;
+        color: var(--muted);
+        margin-bottom: 20px;
+    }
+
+    .empty-favorites h3 {
+        font-size: 20px;
+        color: var(--fg);
+        margin-bottom: 8px;
+    }
+
+    .empty-favorites p {
+        color: var(--muted);
+        margin-bottom: 24px;
+    }
+
+    .empty-favorites a {
+        display: inline-block;
+        padding: 12px 28px;
+        background: var(--primary);
+        color: white;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: background 0.2s ease;
+    }
+
+    .empty-favorites a:hover {
+        background: var(--primary-dark);
+    }
+
+    /* Toast */
+    #favoritosToast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background-color: #262626;
+        color: #fff;
+        padding: 14px 28px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 999999;
+        opacity: 0;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    #favoritosToast.visible {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+
+    @@media (max-width: 768px) {
+        .favorites-grid {
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 16px;
+        }
+
+        .favorites-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+        }
+    }
+</style>
+
+<div class="favorites-page">
+    <div class="favorites-header">
+        <h1>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+            </svg>
+            Mis Favoritos
+        </h1>
+        <span class="favorites-count">@Model.Count() publicaciones guardadas</span>
+    </div>
+
+    @if (Model.Any())
+    {
+        <div class="favorites-grid">
+            @foreach (var item in Model)
+            {
+                var tipoMedia = item.TipoContenido;
+                var esImagen = tipoMedia == TipoContenido.Foto || tipoMedia == TipoContenido.Imagen;
+                var esVideo = tipoMedia == TipoContenido.Video;
+                var esAudio = tipoMedia == TipoContenido.Audio;
+                var esPost = tipoMedia == TipoContenido.Post;
+                var tieneArchivo = !string.IsNullOrEmpty(item.RutaArchivo);
+
+                <div class="favorite-card" data-id="@item.Id">
+                    <div class="favorite-media">
+                        @if (tieneArchivo && esImagen)
+                        {
+                            <img src="@item.RutaArchivo" alt="" loading="lazy">
+                        }
+                        else if (tieneArchivo && esVideo)
+                        {
+                            <video src="@item.RutaArchivo" muted preload="metadata"></video>
+                            <span class="favorite-type-badge video">Video</span>
+                        }
+                        else if (tieneArchivo && esAudio)
+                        {
+                            <div class="favorite-audio-content">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                                </svg>
+                            </div>
+                            <span class="favorite-type-badge audio">Audio</span>
+                        }
+                        else if (esPost || !tieneArchivo)
+                        {
+                            <div class="favorite-text-content">
+                                @(item.Descripcion?.Length > 150 ? item.Descripcion.Substring(0, 150) + "..." : item.Descripcion)
+                            </div>
+                        }
+                        else
+                        {
+                            <img src="@item.RutaArchivo" alt="" loading="lazy" onerror="this.style.display='none'">
+                        }
+
+                        <div class="favorite-media-overlay">
+                            <a href="/Feed/Detalle/@item.Id">Ver publicacion</a>
+                        </div>
+
+                        <button class="favorite-remove-btn" onclick="removeFavorite(@item.Id, this)" title="Quitar de favoritos">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="favorite-info">
+                        <a href="/Feed/Perfil/@item.UsuarioId" class="favorite-user">
+                            @if (!string.IsNullOrEmpty(item.Usuario?.FotoPerfil))
+                            {
+                                <img src="@item.Usuario.FotoPerfil" alt="" class="favorite-user-avatar">
+                            }
+                            else
+                            {
+                                <div class="favorite-user-avatar-placeholder">
+                                    @(item.Usuario?.NombreCompleto?.Substring(0, 1).ToUpper() ?? "U")
+                                </div>
+                            }
+                            <div class="favorite-user-info">
+                                <span class="favorite-user-name">@(item.Usuario?.UserName ?? "usuario")</span>
+                                <span class="favorite-date">@item.FechaPublicacion.ToString("dd MMM yyyy")</span>
+                            </div>
+                        </a>
+
+                        @if (!string.IsNullOrEmpty(item.Descripcion) && tieneArchivo)
+                        {
+                            <p class="favorite-description">@item.Descripcion</p>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="empty-favorites">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <h3>No tienes favoritos guardados</h3>
+            <p>Guarda publicaciones que te gusten para verlas mas tarde</p>
+            <a href="/Feed">Explorar Feed</a>
+        </div>
+    }
+</div>
+
+<div id="favoritosToast"></div>
+
+<script>
+    function showToast(msg) {
+        const toast = document.getElementById('favoritosToast');
+        toast.textContent = msg;
+        toast.classList.add('visible');
+        setTimeout(() => toast.classList.remove('visible'), 2500);
+    }
+
+    async function removeFavorite(id, btn) {
+        try {
+            const res = await fetch('/Feed/ToggleFavorito', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `id=${id}`
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                const card = btn.closest('.favorite-card');
+                card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.9)';
+
+                setTimeout(() => {
+                    card.remove();
+
+                    // Actualizar contador
+                    const countEl = document.querySelector('.favorites-count');
+                    const currentCount = document.querySelectorAll('.favorite-card').length;
+                    countEl.textContent = `${currentCount} publicaciones guardadas`;
+
+                    // Si no hay mas favoritos, mostrar estado vacio
+                    if (currentCount === 0) {
+                        document.querySelector('.favorites-grid').innerHTML = `
+                            <div class="empty-favorites" style="grid-column: 1 / -1;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                                </svg>
+                                <h3>No tienes favoritos guardados</h3>
+                                <p>Guarda publicaciones que te gusten para verlas mas tarde</p>
+                                <a href="/Feed">Explorar Feed</a>
+                            </div>
+                        `;
+                    }
+                }, 300);
+
+                showToast('Eliminado de favoritos');
+            } else {
+                showToast(data.message || 'Error al procesar');
+            }
+        } catch (err) {
+            console.error('Error:', err);
+            showToast('Error al procesar');
+        }
+    }
+</script>

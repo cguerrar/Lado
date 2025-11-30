@@ -1,657 +1,595 @@
-﻿@model IEnumerable<Lado.Models.ApplicationUser>
+@model IEnumerable<Lado.Models.ApplicationUser>
 @{
     ViewData["Title"] = "Explorar Creadores";
+    var creadoresLadoA = Model.Where(c => !c.TieneLadoB()).ToList();
+    var creadoresLadoB = Model.Where(c => c.TieneLadoB()).ToList();
 }
 
 <style>
-    :root {
-        --primary: #4682B4;
-        --primary-dark: #36648B;
-        --primary-light: #B0C4DE;
-        --bg: #ffffff;
-        --fg: #111827;
-        --muted: #6b7280;
-        --light-bg: #f9fafb;
-        --card-bg: #fafafa;
-        --line: #e5e7eb;
-        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
-        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-        --radius-sm: 10px;
-        --radius-md: 16px;
-        --radius-lg: 20px;
-    }
-
-    /* Container principal */
     .explorar-container {
         padding: 24px 16px;
-        max-width: 1400px;
+        max-width: 1200px;
         margin: 0 auto;
     }
 
-    /* Header */
     .explorar-header {
-        margin-bottom: 32px;
+        margin-bottom: 24px;
     }
 
-        .explorar-header h2 {
-            font-size: 28px;
-            font-weight: 700;
-            color: #1a1a1a;
-            margin-bottom: 4px;
-        }
-
-        .explorar-header p {
-            color: #6b7280;
-            font-size: 15px;
-            margin: 0;
-        }
-
-    /* Filtros Card */
-    .filtros-card {
-        background: white;
-        border-radius: 16px;
-        padding: 24px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        margin-bottom: 32px;
+    .explorar-header h2 {
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--fg);
+        margin-bottom: 4px;
     }
 
-    .filtros-row {
-        display: grid;
-        grid-template-columns: 2fr 1fr 1fr;
-        gap: 16px;
+    .explorar-header p {
+        color: var(--muted);
+        font-size: 14px;
+        margin: 0;
     }
 
-    .search-wrapper {
+    /* Tabs */
+    .explorar-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 0;
+    }
+
+    .explorar-tab {
+        padding: 12px 20px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--muted);
+        background: transparent;
+        border: none;
+        cursor: pointer;
         position: relative;
+        transition: all 0.2s ease;
     }
 
-    .search-icon {
+    .explorar-tab:hover {
+        color: var(--fg);
+    }
+
+    .explorar-tab.active {
+        color: var(--primary);
+    }
+
+    .explorar-tab.active::after {
+        content: '';
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--primary);
+        border-radius: 2px 2px 0 0;
+    }
+
+    .explorar-tab .tab-count {
+        margin-left: 8px;
+        padding: 2px 8px;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: 10px;
+        background: var(--bg-tertiary);
+        color: var(--muted);
+    }
+
+    .explorar-tab.active .tab-count {
+        background: var(--primary);
+        color: white;
+    }
+
+    /* Tab content */
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    /* Search */
+    .search-box {
+        position: relative;
+        margin-bottom: 24px;
+    }
+
+    .search-box input {
+        width: 100%;
+        padding: 12px 16px 12px 44px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        font-size: 14px;
+        background: var(--surface);
+        color: var(--fg);
+        transition: all 0.2s ease;
+    }
+
+    .search-box input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(70, 130, 180, 0.1);
+    }
+
+    .search-box i {
         position: absolute;
         left: 16px;
         top: 50%;
         transform: translateY(-50%);
-        color: #6b7280;
-        pointer-events: none;
+        color: var(--muted);
     }
 
-    .search-input {
-        width: 100%;
-        padding: 12px 16px 12px 48px;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        font-size: 15px;
-        outline: none;
-        transition: all 0.2s;
-    }
-
-        .search-input:focus {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.1);
-        }
-
-        .search-input::placeholder {
-            color: #9ca3af;
-        }
-
-    .filter-select {
-        width: 100%;
-        padding: 12px 16px;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        font-size: 15px;
-        outline: none;
-        background: white;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-        .filter-select:focus {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.1);
-        }
-
-    /* Grid de Creadores */
+    /* Grid de creadores */
     .creators-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 24px;
+        gap: 20px;
     }
 
-    /* Creator Card */
+    /* Card de creador */
     .creator-card {
-        background: white;
-        border-radius: 16px;
+        background: var(--surface);
+        border-radius: var(--radius-lg);
         overflow: hidden;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        transition: all 0.3s ease;
-        cursor: pointer;
-        display: flex;
-        flex-direction: column;
+        border: 1px solid var(--line);
+        transition: all 0.2s ease;
+        position: relative;
     }
 
-        .creator-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 12px 24px rgba(0,0,0,0.15);
-        }
+    .creator-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+        border-color: var(--primary-light);
+    }
 
-    /* Cover */
     .creator-cover {
-        height: 120px;
+        height: 100px;
+        background: var(--primary-gradient);
         position: relative;
-        overflow: hidden;
-        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
     }
 
-        .creator-cover img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+    .creator-cover img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
 
-    /* Avatar */
     .creator-avatar-wrapper {
-        position: relative;
+        display: flex;
+        justify-content: center;
         margin-top: -40px;
-        text-align: center;
-        z-index: 10;
+        position: relative;
+        z-index: 2;
     }
 
     .creator-avatar {
         width: 80px;
         height: 80px;
         border-radius: 50%;
-        border: 4px solid white;
-        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
+        border: 4px solid var(--surface);
         overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        background: var(--bg-tertiary);
     }
 
-        .creator-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+    .creator-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
 
-    .avatar-placeholder {
+    .creator-avatar-placeholder {
         width: 100%;
         height: 100%;
         display: flex;
         align-items: center;
         justify-content: center;
-        color: white;
-        font-size: 32px;
+        font-size: 28px;
         font-weight: 700;
+        color: var(--primary);
+        background: var(--primary-light);
     }
 
-    /* Info */
     .creator-info {
-        padding: 16px 20px;
+        padding: 12px 16px 16px;
         text-align: center;
-        flex: 1;
-        display: flex;
-        flex-direction: column;
     }
 
     .creator-name {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 700;
-        color: #1a1a1a;
-        margin: 0 0 4px 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        color: var(--fg);
+        margin: 0 0 4px;
     }
 
     .creator-username {
-        font-size: 14px;
-        color: #6b7280;
-        margin: 0 0 12px 0;
+        font-size: 13px;
+        color: var(--muted);
+        margin: 0 0 8px;
     }
 
     .creator-bio {
-        font-size: 14px;
-        color: #374151;
-        line-height: 1.5;
-        margin: 0 0 16px 0;
+        font-size: 13px;
+        color: var(--fg-secondary);
+        margin: 0 0 12px;
         display: -webkit-box;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
-        flex: 1;
+        line-height: 1.4;
     }
 
-    /* Stats */
     .creator-stats {
         display: flex;
-        justify-content: space-around;
-        padding: 16px 0;
-        border-top: 1px solid #f3f4f6;
-        border-bottom: 1px solid #f3f4f6;
-        margin-bottom: 16px;
-    }
-
-    .stat-item {
-        text-align: center;
-    }
-
-    .stat-value {
-        display: block;
-        font-size: 18px;
-        font-weight: 700;
-        color: var(--primary-color);
-        line-height: 1;
-        margin-bottom: 4px;
-    }
-
-    .stat-label {
-        font-size: 12px;
-        color: #6b7280;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    /* Actions */
-    .creator-actions {
-        padding: 0 20px 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .btn-view-profile {
-        background: var(--primary-color);
-        color: white;
-        border: none;
-        padding: 12px 24px;
-        border-radius: 10px;
-        font-weight: 600;
-        font-size: 14px;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
         justify-content: center;
-        gap: 8px;
-        transition: all 0.2s;
-        cursor: pointer;
-    }
-
-        .btn-view-profile:hover {
-            background: var(--primary-dark);
-            transform: translateY(-1px);
-            color: white;
-        }
-
-    .price-tag {
-        font-size: 13px;
-        color: #6b7280;
-        text-align: center;
-        font-weight: 600;
-    }
-
-        .price-tag strong {
-            color: var(--primary-color);
-        }
-
-    /* Estado vacío */
-    .empty-state {
-        text-align: center;
-        padding: 80px 20px;
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    }
-
-    .empty-icon {
-        width: 120px;
-        height: 120px;
-        margin: 0 auto 24px;
-        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .empty-state h3 {
-        font-size: 24px;
-        font-weight: 700;
-        color: #1a1a1a;
+        gap: 20px;
+        padding: 10px 0;
+        border-top: 1px solid var(--line);
         margin-bottom: 12px;
     }
 
+    .creator-stat {
+        text-align: center;
+    }
+
+    .creator-stat-value {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--fg);
+    }
+
+    .creator-stat-label {
+        font-size: 11px;
+        color: var(--muted);
+        text-transform: uppercase;
+    }
+
+    .creator-action {
+        display: block;
+        width: calc(100% - 32px);
+        margin: 0 16px 16px;
+        padding: 10px 16px;
+        text-align: center;
+        text-decoration: none;
+        border-radius: var(--radius-sm);
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+
+    /* Card LadoA - Gratuito */
+    .creator-card.ladoA .creator-action {
+        background: var(--primary);
+        color: white;
+    }
+
+    .creator-card.ladoA .creator-action:hover {
+        background: var(--primary-dark);
+    }
+
+    /* Card LadoB - Premium */
+    .creator-card.ladoB {
+        border-color: var(--accent);
+    }
+
+    .creator-card.ladoB:hover {
+        border-color: var(--accent);
+        box-shadow: 0 8px 24px rgba(139, 92, 246, 0.15);
+    }
+
+    .creator-card.ladoB .creator-cover {
+        background: var(--accent-gradient);
+    }
+
+    .premium-badge {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        background: rgba(139, 92, 246, 0.95);
+        color: white;
+        font-size: 11px;
+        font-weight: 700;
+        border-radius: 20px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        z-index: 3;
+    }
+
+    .premium-badge i {
+        font-size: 10px;
+    }
+
+    .creator-price {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 12px;
+        background: var(--accent-light);
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 700;
+        border-radius: 20px;
+        margin-bottom: 12px;
+    }
+
+    .creator-card.ladoB .creator-action {
+        background: var(--accent);
+        color: white;
+    }
+
+    .creator-card.ladoB .creator-action:hover {
+        background: #7c3aed;
+    }
+
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--muted);
+    }
+
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+
+    .empty-state h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--fg);
+        margin-bottom: 8px;
+    }
+
     .empty-state p {
-        font-size: 16px;
-        color: #6b7280;
+        font-size: 14px;
         margin: 0;
     }
 
-    /* Responsive */
     @@media (max-width: 768px) {
         .explorar-container {
             padding: 16px 12px;
         }
 
-        .explorar-header h2 {
-            font-size: 24px;
-        }
-
-        .filtros-card {
-            padding: 20px;
-        }
-
-        .filtros-row {
-            grid-template-columns: 1fr;
-            gap: 12px;
-        }
-
         .creators-grid {
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
             gap: 16px;
         }
 
-        .creator-cover {
-            height: 100px;
+        .explorar-tabs {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
-        .creator-avatar {
-            width: 60px;
-            height: 60px;
-        }
-
-        .avatar-placeholder {
-            font-size: 24px;
-        }
-
-        .creator-name {
-            font-size: 16px;
-        }
-
-        .creator-stats {
-            padding: 12px 0;
-        }
-
-        .stat-value {
-            font-size: 16px;
-        }
-
-        .stat-label {
-            font-size: 11px;
-        }
-    }
-
-    @@media (max-width: 480px) {
-        .creators-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-        }
-
-        .creator-bio {
-            display: none;
+        .explorar-tab {
+            white-space: nowrap;
         }
     }
 </style>
 
 <div class="explorar-container">
-    <!-- Header -->
     <div class="explorar-header">
         <h2>Explorar Creadores</h2>
-        <p>Descubre creadores increíbles y su contenido exclusivo</p>
+        <p>Descubre nuevos creadores y su contenido</p>
     </div>
 
-    <!-- Filtros -->
-    <div class="filtros-card">
-        <div class="filtros-row">
-            <div class="search-wrapper">
-                <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="11" cy="11" r="8" />
-                    <path d="m21 21-4.35-4.35" />
-                </svg>
-                <input type="text" class="search-input" id="searchInput" placeholder="Buscar creadores...">
-            </div>
+    <!-- Tabs -->
+    <div class="explorar-tabs">
+        <button class="explorar-tab active" onclick="switchTab('creadores')">
+            <i class="fas fa-users"></i> Creadores
+            <span class="tab-count">@creadoresLadoA.Count</span>
+        </button>
+        <button class="explorar-tab" onclick="switchTab('premium')">
+            <i class="fas fa-crown"></i> Premium
+            <span class="tab-count">@creadoresLadoB.Count</span>
+        </button>
+    </div>
 
-            <select class="filter-select" id="categoryFilter">
-                <option value="">Todas las categorías</option>
-                <option value="fitness">Fitness</option>
-                <option value="cocina">Cocina</option>
-                <option value="gaming">Gaming</option>
-                <option value="arte">Arte</option>
-                <option value="musica">Música</option>
-                <option value="educacion">Educación</option>
-            </select>
-
-            <select class="filter-select" id="sortFilter">
-                <option value="popular">Más populares</option>
-                <option value="nuevos">Más recientes</option>
-                <option value="precio-asc">Precio: menor a mayor</option>
-                <option value="precio-desc">Precio: mayor a menor</option>
-            </select>
+    <!-- Tab: Creadores LadoA -->
+    <div id="tab-creadores" class="tab-content active">
+        <!-- Buscador -->
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchLadoA" placeholder="Buscar creadores..." onkeyup="filterCreators('ladoA')">
         </div>
-    </div>
 
-    <!-- Grid de Creadores -->
-    @if (Model.Any())
-    {
-        <div class="creators-grid" id="creatorsGrid">
-            @foreach (var creador in Model)
-            {
-                <div class="creator-card" data-creator-name="@creador.NombreCompleto.ToLower()" data-creator-username="@creador.UserName.ToLower()">
-                    <!-- Cover -->
-                    <div class="creator-cover">
-                        @if (!string.IsNullOrEmpty(creador.FotoPortada))
-                        {
-                            <img src="@creador.FotoPortada" alt="Portada de @creador.NombreCompleto">
-                        }
-                    </div>
-
-                    <!-- Avatar -->
-                    <div class="creator-avatar-wrapper">
-                        <div class="creator-avatar">
-                            @if (!string.IsNullOrEmpty(creador.FotoPerfil))
+        @if (creadoresLadoA.Any())
+        {
+            <div class="creators-grid" id="gridLadoA">
+                @foreach (var creador in creadoresLadoA)
+                {
+                    <div class="creator-card ladoA" data-name="@creador.NombreCompleto?.ToLower()" data-username="@creador.UserName?.ToLower()">
+                        <div class="creator-cover">
+                            @if (!string.IsNullOrEmpty(creador.FotoPortada))
                             {
-                                <img src="@creador.FotoPerfil" alt="@creador.NombreCompleto">
+                                <img src="@creador.FotoPortada" alt="Portada">
                             }
-                            else
+                        </div>
+
+                        <div class="creator-avatar-wrapper">
+                            <div class="creator-avatar">
+                                @if (!string.IsNullOrEmpty(creador.FotoPerfil))
+                                {
+                                    <img src="@creador.FotoPerfil" alt="@creador.NombreCompleto">
+                                }
+                                else
+                                {
+                                    <div class="creator-avatar-placeholder">
+                                        @(creador.NombreCompleto?.Substring(0, 1).ToUpper() ?? "?")
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="creator-info">
+                            <h3 class="creator-name">@creador.NombreCompleto</h3>
+                            <p class="creator-username">@@@creador.UserName</p>
+
+                            @if (!string.IsNullOrEmpty(creador.Biografia))
                             {
-                                <div class="avatar-placeholder">
-                                    @creador.NombreCompleto.Substring(0, 1)
+                                <p class="creator-bio">@creador.Biografia</p>
+                            }
+
+                            <div class="creator-stats">
+                                <div class="creator-stat">
+                                    <div class="creator-stat-value">@creador.NumeroSeguidores</div>
+                                    <div class="creator-stat-label">Seguidores</div>
                                 </div>
-                            }
-                        </div>
-                    </div>
-
-                    <!-- Info -->
-                    <div class="creator-info">
-                        <h3 class="creator-name">@creador.NombreCompleto</h3>
-                        <p class="creator-username">@@@creador.UserName</p>
-
-                        @if (!string.IsNullOrEmpty(creador.Biografia))
-                        {
-                            <p class="creator-bio">@creador.Biografia</p>
-                        }
-
-                        <!-- Stats -->
-                        <div class="creator-stats">
-                            <div class="stat-item">
-                                <span class="stat-value">1.2K</span>
-                                <span class="stat-label">Seguidores</span>
                             </div>
-                            <div class="stat-item">
-                                <span class="stat-value">145</span>
-                                <span class="stat-label">Posts</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-value">15.7K</span>
-                                <span class="stat-label">Likes</span>
-                            </div>
-                        </div>
 
-                        <!-- Actions -->
-                        <div class="creator-actions">
-                            <a href="/Feed/Perfil/@creador.Id" class="btn-view-profile">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                    <circle cx="12" cy="7" r="4" />
-                                </svg>
+                            <a href="/Feed/Perfil/@creador.Id" class="creator-action">
                                 Ver Perfil
                             </a>
-                            <div class="price-tag">
-                                Desde <strong>$@creador.PrecioSuscripcion.ToString("N2")/mes</strong>
-                            </div>
                         </div>
                     </div>
-                </div>
-            }
-        </div>
-    }
-    else
-    {
-        <div class="empty-state">
-            <div class="empty-icon">
-                <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
+                }
             </div>
-            <h3>No se encontraron creadores</h3>
-            <p>Intenta ajustar los filtros de búsqueda</p>
+        }
+        else
+        {
+            <div class="empty-state">
+                <i class="fas fa-users"></i>
+                <h3>No hay creadores disponibles</h3>
+                <p>Vuelve pronto para descubrir nuevo contenido</p>
+            </div>
+        }
+    </div>
+
+    <!-- Tab: Creadores LadoB (Premium) -->
+    <div id="tab-premium" class="tab-content">
+        <!-- Buscador -->
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchLadoB" placeholder="Buscar creadores premium..." onkeyup="filterCreators('ladoB')">
         </div>
-    }
+
+        @if (creadoresLadoB.Any())
+        {
+            <div class="creators-grid" id="gridLadoB">
+                @foreach (var creador in creadoresLadoB)
+                {
+                    <div class="creator-card ladoB" data-name="@(creador.Seudonimo ?? creador.NombreCompleto)?.ToLower()" data-username="@creador.UserName?.ToLower()">
+                        <span class="premium-badge">
+                            <i class="fas fa-crown"></i> Premium
+                        </span>
+
+                        <div class="creator-cover">
+                            @if (!string.IsNullOrEmpty(creador.FotoPortada))
+                            {
+                                <img src="@creador.FotoPortada" alt="Portada">
+                            }
+                        </div>
+
+                        <div class="creator-avatar-wrapper">
+                            <div class="creator-avatar">
+                                @if (!string.IsNullOrEmpty(creador.FotoPerfilLadoB))
+                                {
+                                    <img src="@creador.FotoPerfilLadoB" alt="@creador.Seudonimo">
+                                }
+                                else if (!string.IsNullOrEmpty(creador.FotoPerfil))
+                                {
+                                    <img src="@creador.FotoPerfil" alt="@creador.Seudonimo">
+                                }
+                                else
+                                {
+                                    <div class="creator-avatar-placeholder">
+                                        @((creador.Seudonimo ?? creador.NombreCompleto)?.Substring(0, 1).ToUpper() ?? "?")
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="creator-info">
+                            <h3 class="creator-name">@(creador.Seudonimo ?? creador.NombreCompleto)</h3>
+                            <p class="creator-username">@@@creador.UserName</p>
+
+                            @if (!string.IsNullOrEmpty(creador.BiografiaLadoB))
+                            {
+                                <p class="creator-bio">@creador.BiografiaLadoB</p>
+                            }
+                            else if (!string.IsNullOrEmpty(creador.Biografia))
+                            {
+                                <p class="creator-bio">@creador.Biografia</p>
+                            }
+
+                            <div class="creator-price">
+                                <i class="fas fa-tag"></i>
+                                $@creador.PrecioSuscripcion.ToString("N2")/mes
+                            </div>
+
+                            <div class="creator-stats">
+                                <div class="creator-stat">
+                                    <div class="creator-stat-value">@creador.NumeroSeguidores</div>
+                                    <div class="creator-stat-label">Seguidores</div>
+                                </div>
+                            </div>
+
+                            <a href="/Feed/Perfil/@creador.Id?lado=1" class="creator-action">
+                                Ver Contenido Premium
+                            </a>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="empty-state">
+                <i class="fas fa-crown"></i>
+                <h3>No hay creadores premium</h3>
+                <p>Vuelve pronto para descubrir contenido exclusivo</p>
+            </div>
+        }
+    </div>
 </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('🔍 Explorar iniciado');
+@section Scripts {
+    <script>
+        function switchTab(tabName) {
+            // Ocultar todos los contenidos
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
 
-        const searchInput = document.getElementById('searchInput');
-        const categoryFilter = document.getElementById('categoryFilter');
-        const sortFilter = document.getElementById('sortFilter');
-        const creatorsGrid = document.getElementById('creatorsGrid');
+            // Desactivar todos los tabs
+            document.querySelectorAll('.explorar-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
 
-        if (!creatorsGrid) return;
+            // Mostrar contenido seleccionado
+            document.getElementById('tab-' + tabName).classList.add('active');
 
-        const cards = Array.from(creatorsGrid.querySelectorAll('.creator-card'));
+            // Activar tab seleccionado
+            event.target.closest('.explorar-tab').classList.add('active');
+        }
 
-        // Búsqueda en tiempo real
-        searchInput.addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase().trim();
+        function filterCreators(tipo) {
+            const searchInput = tipo === 'ladoA' ? document.getElementById('searchLadoA') : document.getElementById('searchLadoB');
+            const grid = tipo === 'ladoA' ? document.getElementById('gridLadoA') : document.getElementById('gridLadoB');
+
+            if (!searchInput || !grid) return;
+
+            const filter = searchInput.value.toLowerCase();
+            const cards = grid.querySelectorAll('.creator-card');
 
             cards.forEach(card => {
-                const name = card.dataset.creatorName;
-                const username = card.dataset.creatorUsername;
+                const name = card.getAttribute('data-name') || '';
+                const username = card.getAttribute('data-username') || '';
 
-                if (name.includes(searchTerm) || username.includes(searchTerm)) {
+                if (name.includes(filter) || username.includes(filter)) {
                     card.style.display = '';
                 } else {
                     card.style.display = 'none';
                 }
             });
-
-            mostrarEstadoVacio();
-        });
-
-        // Filtro por categoría (placeholder - requiere backend)
-        categoryFilter.addEventListener('change', function() {
-            const category = this.value;
-
-            if (category === '') {
-                cards.forEach(card => card.style.display = '');
-            } else {
-                // Aquí se implementaría el filtrado real
-                console.log('Filtrar por categoría:', category);
-            }
-
-            mostrarEstadoVacio();
-        });
-
-        // Ordenamiento
-        sortFilter.addEventListener('change', function() {
-            const sortValue = this.value;
-
-            let sortedCards = [...cards];
-
-            switch(sortValue) {
-                case 'popular':
-                    // Ordenar por popularidad (requiere datos del backend)
-                    console.log('Ordenar por popularidad');
-                    break;
-
-                case 'nuevos':
-                    // Ordenar por fecha (requiere datos del backend)
-                    console.log('Ordenar por más recientes');
-                    sortedCards.reverse();
-                    break;
-
-                case 'precio-asc':
-                    sortedCards.sort((a, b) => {
-                        const priceA = parseFloat(a.querySelector('.price-tag strong').textContent.replace(/[^0-9.]/g, ''));
-                        const priceB = parseFloat(b.querySelector('.price-tag strong').textContent.replace(/[^0-9.]/g, ''));
-                        return priceA - priceB;
-                    });
-                    break;
-
-                case 'precio-desc':
-                    sortedCards.sort((a, b) => {
-                        const priceA = parseFloat(a.querySelector('.price-tag strong').textContent.replace(/[^0-9.]/g, ''));
-                        const priceB = parseFloat(b.querySelector('.price-tag strong').textContent.replace(/[^0-9.]/g, ''));
-                        return priceB - priceA;
-                    });
-                    break;
-            }
-
-            // Reordenar en el DOM
-            sortedCards.forEach(card => creatorsGrid.appendChild(card));
-        });
-
-        // Click en cards
-        cards.forEach(card => {
-            card.addEventListener('click', function(e) {
-                // Si no clickeó el botón, ir al perfil
-                if (!e.target.closest('.btn-view-profile')) {
-                    const profileBtn = this.querySelector('.btn-view-profile');
-                    if (profileBtn) {
-                        window.location.href = profileBtn.href;
-                    }
-                }
-            });
-        });
-
-        function mostrarEstadoVacio() {
-            const visibleCards = cards.filter(card => card.style.display !== 'none');
-
-            let emptyState = document.querySelector('.empty-state-dynamic');
-
-            if (visibleCards.length === 0) {
-                if (!emptyState) {
-                    emptyState = document.createElement('div');
-                    emptyState.className = 'empty-state empty-state-dynamic';
-                    emptyState.innerHTML = `
-                        <div class="empty-icon">
-                            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="11" cy="11" r="8" />
-                                <path d="m21 21-4.35-4.35" />
-                            </svg>
-                        </div>
-                        <h3>No se encontraron resultados</h3>
-                        <p>Intenta con otros términos de búsqueda</p>
-                    `;
-                    creatorsGrid.parentElement.appendChild(emptyState);
-                }
-                creatorsGrid.style.display = 'none';
-                emptyState.style.display = 'block';
-            } else {
-                creatorsGrid.style.display = 'grid';
-                if (emptyState) {
-                    emptyState.style.display = 'none';
-                }
-            }
         }
-
-        console.log('✅ Explorar completamente inicializado');
-        console.log(`📊 ${cards.length} creadores cargados`);
-    });
-</script>
+    </script>
+}

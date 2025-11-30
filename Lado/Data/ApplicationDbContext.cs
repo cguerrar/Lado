@@ -28,6 +28,7 @@ namespace Lado.Data
         public DbSet<PropuestaDesafio> PropuestasDesafios { get; set; }
         public DbSet<CompraContenido> ComprasContenido { get; set; }
         public DbSet<Tip> Tips { get; set; }
+        public DbSet<Favorito> Favoritos { get; set; }
 
         // ========================================
         // ⭐ DbSets NUEVOS - FEED PREMIUM
@@ -38,6 +39,23 @@ namespace Lado.Data
         public DbSet<Coleccion> Colecciones { get; set; }
         public DbSet<ContenidoColeccion> ContenidoColecciones { get; set; }
         public DbSet<CompraColeccion> ComprasColeccion { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - SISTEMA DE AGENCIAS Y PUBLICIDAD
+        // ========================================
+        public DbSet<Agencia> Agencias { get; set; }
+        public DbSet<Anuncio> Anuncios { get; set; }
+        public DbSet<SegmentacionAnuncio> SegmentacionesAnuncios { get; set; }
+        public DbSet<ImpresionAnuncio> ImpresionesAnuncios { get; set; }
+        public DbSet<ClicAnuncio> ClicsAnuncios { get; set; }
+        public DbSet<TransaccionAgencia> TransaccionesAgencias { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - SISTEMA DE INTERESES
+        // ========================================
+        public DbSet<CategoriaInteres> CategoriasIntereses { get; set; }
+        public DbSet<InteresUsuario> InteresesUsuarios { get; set; }
+        public DbSet<InteraccionContenido> InteraccionesContenidos { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -616,6 +634,215 @@ namespace Lado.Data
                 entity.HasIndex(e => e.ContenidoId);
                 entity.HasIndex(e => e.UsuarioId);
                 entity.HasIndex(e => e.FechaCreacion);
+            });
+
+            // ========================================
+            // CONFIGURACIÓN DE FAVORITOS
+            // ========================================
+            modelBuilder.Entity<Favorito>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.HasOne(e => e.Contenido)
+                    .WithMany()
+                    .HasForeignKey(e => e.ContenidoId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.Usuario)
+                    .WithMany()
+                    .HasForeignKey(e => e.UsuarioId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => new { e.UsuarioId, e.ContenidoId })
+                    .IsUnique()
+                    .HasDatabaseName("IX_Favoritos_Usuario_Contenido_Unique");
+
+                entity.HasIndex(e => e.ContenidoId)
+                    .HasDatabaseName("IX_Favoritos_ContenidoId");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE AGENCIAS
+            // ========================================
+            modelBuilder.Entity<Agencia>(entity =>
+            {
+                entity.HasKey(a => a.Id);
+
+                entity.HasOne(a => a.Usuario)
+                    .WithOne(u => u.Agencia)
+                    .HasForeignKey<Agencia>(a => a.UsuarioId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.Property(a => a.SaldoPublicitario)
+                    .HasColumnType("decimal(18,2)")
+                    .HasDefaultValue(0);
+
+                entity.Property(a => a.TotalGastado)
+                    .HasColumnType("decimal(18,2)")
+                    .HasDefaultValue(0);
+
+                entity.Property(a => a.TotalRecargado)
+                    .HasColumnType("decimal(18,2)")
+                    .HasDefaultValue(0);
+
+                entity.HasIndex(a => a.UsuarioId)
+                    .IsUnique()
+                    .HasDatabaseName("IX_Agencias_UsuarioId");
+
+                entity.HasIndex(a => a.Estado)
+                    .HasDatabaseName("IX_Agencias_Estado");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE ANUNCIOS
+            // ========================================
+            modelBuilder.Entity<Anuncio>(entity =>
+            {
+                entity.HasKey(a => a.Id);
+
+                entity.HasOne(a => a.Agencia)
+                    .WithMany(ag => ag.Anuncios)
+                    .HasForeignKey(a => a.AgenciaId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(a => a.PresupuestoDiario)
+                    .HasColumnType("decimal(18,2)");
+
+                entity.Property(a => a.PresupuestoTotal)
+                    .HasColumnType("decimal(18,2)");
+
+                entity.Property(a => a.CostoPorMilImpresiones)
+                    .HasColumnType("decimal(18,4)");
+
+                entity.Property(a => a.CostoPorClic)
+                    .HasColumnType("decimal(18,4)");
+
+                entity.Property(a => a.GastoTotal)
+                    .HasColumnType("decimal(18,2)")
+                    .HasDefaultValue(0);
+
+                entity.Property(a => a.GastoHoy)
+                    .HasColumnType("decimal(18,2)")
+                    .HasDefaultValue(0);
+
+                entity.HasIndex(a => a.AgenciaId)
+                    .HasDatabaseName("IX_Anuncios_AgenciaId");
+
+                entity.HasIndex(a => a.Estado)
+                    .HasDatabaseName("IX_Anuncios_Estado");
+
+                entity.HasIndex(a => new { a.Estado, a.FechaInicio, a.FechaFin })
+                    .HasDatabaseName("IX_Anuncios_Estado_Fechas");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE SEGMENTACION ANUNCIO
+            // ========================================
+            modelBuilder.Entity<SegmentacionAnuncio>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+
+                entity.HasOne(s => s.Anuncio)
+                    .WithOne(a => a.Segmentacion)
+                    .HasForeignKey<SegmentacionAnuncio>(s => s.AnuncioId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE TRANSACCIONES AGENCIA
+            // ========================================
+            modelBuilder.Entity<TransaccionAgencia>(entity =>
+            {
+                entity.HasKey(t => t.Id);
+
+                entity.HasOne(t => t.Agencia)
+                    .WithMany(a => a.Transacciones)
+                    .HasForeignKey(t => t.AgenciaId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(t => t.Anuncio)
+                    .WithMany()
+                    .HasForeignKey(t => t.AnuncioId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                entity.Property(t => t.Monto)
+                    .HasColumnType("decimal(18,2)");
+
+                entity.Property(t => t.SaldoAnterior)
+                    .HasColumnType("decimal(18,2)");
+
+                entity.Property(t => t.SaldoPosterior)
+                    .HasColumnType("decimal(18,2)");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE CATEGORIAS DE INTERES
+            // ========================================
+            modelBuilder.Entity<CategoriaInteres>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+
+                entity.HasOne(c => c.CategoriaPadre)
+                    .WithMany(c => c.Subcategorias)
+                    .HasForeignKey(c => c.CategoriaPadreId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(c => c.Nombre)
+                    .HasDatabaseName("IX_CategoriasIntereses_Nombre");
+
+                entity.HasIndex(c => c.EstaActiva)
+                    .HasDatabaseName("IX_CategoriasIntereses_EstaActiva");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE INTERESES USUARIO
+            // ========================================
+            modelBuilder.Entity<InteresUsuario>(entity =>
+            {
+                entity.HasKey(i => i.Id);
+
+                entity.HasOne(i => i.Usuario)
+                    .WithMany(u => u.Intereses)
+                    .HasForeignKey(i => i.UsuarioId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(i => i.CategoriaInteres)
+                    .WithMany(c => c.UsuariosInteresados)
+                    .HasForeignKey(i => i.CategoriaInteresId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(i => i.PesoInteres)
+                    .HasColumnType("decimal(5,2)")
+                    .HasDefaultValue(1.0m);
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE INTERACCIONES CONTENIDO
+            // ========================================
+            modelBuilder.Entity<InteraccionContenido>(entity =>
+            {
+                entity.HasKey(i => i.Id);
+
+                entity.HasOne(i => i.Usuario)
+                    .WithMany()
+                    .HasForeignKey(i => i.UsuarioId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(i => i.Contenido)
+                    .WithMany()
+                    .HasForeignKey(i => i.ContenidoId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE CONTENIDO - CATEGORIA INTERES
+            // ========================================
+            modelBuilder.Entity<Contenido>(entity =>
+            {
+                entity.HasOne(c => c.CategoriaInteres)
+                    .WithMany()
+                    .HasForeignKey(c => c.CategoriaInteresId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
         }
     }

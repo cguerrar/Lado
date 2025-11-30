@@ -152,14 +152,7 @@ namespace Lado.Controllers
                     TempData["Warning"] = "Para monetizar contenido debes verificar tu identidad. Tu contenido se ha publicado gratis en LadoB.";
                 }
 
-                // Validaciones básicas
-                if (!EsBorrador && string.IsNullOrWhiteSpace(Descripcion))
-                {
-                    TempData["Error"] = "La descripción es requerida para publicar";
-                    ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
-                    return View();
-                }
-
+                // Validaciones básicas - archivo requerido para fotos/videos
                 if (!EsBorrador && TipoContenido != (int)Models.TipoContenido.Post && (archivo == null || archivo.Length == 0))
                 {
                     TempData["Error"] = "Debes subir un archivo para este tipo de contenido";

@@ -75,6 +75,81 @@
         LadoB = 1   // Monetizado, seudónimo
     }
 
+    // ====================================
+    // ENUMS PARA SISTEMA DE AGENCIAS
+    // ====================================
 
+    public enum EstadoAgencia
+    {
+        Pendiente = 0,
+        Activa = 1,
+        Suspendida = 2,
+        Rechazada = 3,
+        Cancelada = 4
+    }
 
+    public enum EstadoAnuncio
+    {
+        Borrador = 0,
+        EnRevision = 1,
+        Activo = 2,
+        Pausado = 3,
+        Finalizado = 4,
+        Rechazado = 5
+    }
+
+    public enum TipoCreativo
+    {
+        Imagen = 0,
+        Video = 1,
+        Carousel = 2
+    }
+
+    public enum TipoTransaccionAgencia
+    {
+        RecargaSaldo = 0,
+        CobroCPM = 1,
+        CobroCPC = 2,
+        Reembolso = 3,
+        Ajuste = 4
+    }
+
+    // ====================================
+    // ENUMS PARA SISTEMA DE INTERESES
+    // ====================================
+
+    public enum TipoInteres
+    {
+        Explicito = 0,  // Seleccionado por el usuario
+        Implicito = 1   // Inferido por comportamiento
+    }
+
+    public enum GeneroUsuario
+    {
+        NoEspecificado = 0,
+        Masculino = 1,
+        Femenino = 2,
+        Otro = 3
+    }
+
+    public enum TipoInteraccion
+    {
+        Vista = 0,
+        Like = 1,
+        Comentario = 2,
+        Compartir = 3,
+        Guardar = 4,
+        VistaCompleta = 5,
+        ClicPerfil = 6
+    }
+
+    public enum TextoBotonAnuncio
+    {
+        VerMas = 0,
+        Suscribirse = 1,
+        Comprar = 2,
+        Descargar = 3,
+        Registrarse = 4,
+        MasInformacion = 5
+    }
 }

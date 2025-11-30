@@ -32,8 +32,8 @@ namespace Lado.Controllers
         {
             if (User.Identity.IsAuthenticated)
             {
-                _logger.LogInformation("Usuario ya autenticado, redirigiendo a Dashboard");
-                return RedirectToAction("Index", "Dashboard");
+                _logger.LogInformation("Usuario ya autenticado, redirigiendo a Feed");
+                return RedirectToAction("Index", "Feed");
             }
 
             return View();
@@ -114,7 +114,7 @@ namespace Lado.Controllers
                     _logger.LogInformation("✅ Sesión iniciada para: {Username}", usuario.UserName);
 
                     TempData["Success"] = "¡Bienvenido a LADO! Tu cuenta ha sido creada exitosamente.";
-                    return RedirectToAction("Index", "Dashboard");
+                    return RedirectToAction("Index", "Feed");
                 }
 
                 // Si hay errores, mostrarlos
@@ -143,8 +143,8 @@ namespace Lado.Controllers
         {
             if (User.Identity.IsAuthenticated)
             {
-                _logger.LogInformation("Usuario ya autenticado, redirigiendo a Dashboard");
-                return RedirectToAction("Index", "Dashboard");
+                _logger.LogInformation("Usuario ya autenticado, redirigiendo a Feed");
+                return RedirectToAction("Index", "Feed");
             }
 
             ViewData["ReturnUrl"] = returnUrl;
@@ -229,9 +229,8 @@ namespace Lado.Controllers
                         return RedirectToAction("Index", "Admin");
                     }
 
-                    // ✅ CAMBIO: Ya no hay diferenciación por tipo de usuario
-                    // Todos van al Dashboard (ya que todos son creadores)
-                    _logger.LogInformation("Redirigiendo a Dashboard");
+                    // ✅ CAMBIO: Feed es la página principal ahora
+                    _logger.LogInformation("Redirigiendo a Feed");
 
                     TempData["Success"] = $"¡Bienvenido de nuevo, {user.NombreCompleto}!";
 
@@ -241,7 +240,7 @@ namespace Lado.Controllers
                         return Redirect(returnUrl);
                     }
 
-                    return RedirectToAction("Index", "Dashboard");
+                    return RedirectToAction("Index", "Feed");
                 }
 
                 if (result.IsLockedOut)
@@ -487,7 +486,7 @@ namespace Lado.Controllers
                     await _signInManager.SignInAsync(newUser, isPersistent: true);
                     _logger.LogInformation("Nuevo usuario creado con Google: {Email}", email);
                     TempData["Success"] = "¡Bienvenido a LADO! Tu cuenta ha sido creada con Google.";
-                    return RedirectToAction("Index", "Dashboard");
+                    return RedirectToAction("Index", "Feed");
                 }
             }
 

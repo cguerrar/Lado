@@ -1,272 +1,692 @@
-﻿using Lado.Data;
-using Lado.Models;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+@{
+    ViewData["Title"] = "Estadisticas";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
 
-namespace Lado.Controllers
-{
-    [Authorize(Roles = "Admin")]
-    public class AdminController : Controller
+    var meses = new[] { "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic" };
+}
+
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1"><i class="fas fa-chart-line text-primary"></i> Estadisticas</h2>
+            <p class="text-muted mb-0">Dashboard completo de metricas de la plataforma</p>
+        </div>
+        <div>
+            <button class="btn btn-outline-primary me-2" onclick="window.print()">
+                <i class="fas fa-print"></i> Imprimir
+            </button>
+            <a href="@Url.Action("Index")" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </div>
+    </div>
+
+    <!-- Alertas -->
+    @if (ViewBag.ReportesPendientesTotal > 0 || ViewBag.VerificacionesPendientes > 0)
     {
-        private readonly ApplicationDbContext _context;
-        private readonly UserManager<ApplicationUser>
-    _userManager;
-
-    public AdminController(
-    ApplicationDbContext context,
-    UserManager<ApplicationUser>
-        userManager)
-        {
-        _context = context;
-        _userManager = userManager;
-        }
-
-        // Método que se ejecuta antes de cada acción para pasar reportes pendientes
-        public override void OnActionExecuting(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext context)
-        {
-        base.OnActionExecuting(context);
-        ViewBag.ReportesPendientes = _context.Reportes.Count(r => r.Estado == "Pendiente");
-        }
-
-        public async Task<IActionResult>
-            Index()
+        <div class="row mb-4">
+            @if (ViewBag.ReportesPendientesTotal > 0)
             {
-            ViewBag.TotalUsuarios = await _context.Users.CountAsync();
-            ViewBag.TotalCreadores = await _context.Users.CountAsync(u => u.TipoUsuario == 1);
-            ViewBag.TotalFans = await _context.Users.CountAsync(u => u.TipoUsuario == 2);
-            ViewBag.TotalSuscripciones = await _context.Suscripciones.CountAsync(s => s.EstaActiva);
-            ViewBag.TotalPublicaciones = await _context.Contenidos.CountAsync();
-            ViewBag.PublicacionesHoy = await _context.Contenidos
-            .CountAsync(c => c.FechaPublicacion.Date == DateTime.Today);
-            ViewBag.UsuariosBloqueados = await _context.Users.CountAsync(u => !u.EstaActivo);
-
-            return View();
+                <div class="col-md-6">
+                    <div class="alert alert-warning d-flex align-items-center">
+                        <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                        <div>
+                            <strong>@ViewBag.ReportesPendientesTotal reportes pendientes</strong>
+                            <br><small>Requieren revision</small>
+                        </div>
+                        <a href="@Url.Action("Reportes")" class="btn btn-warning btn-sm ms-auto">Ver Reportes</a>
+                    </div>
+                </div>
             }
+            @if (ViewBag.VerificacionesPendientes > 0)
+            {
+                <div class="col-md-6">
+                    <div class="alert alert-info d-flex align-items-center">
+                        <i class="fas fa-user-check fa-2x me-3"></i>
+                        <div>
+                            <strong>@ViewBag.VerificacionesPendientes verificaciones pendientes</strong>
+                            <br><small>Creadores esperando aprobacion</small>
+                        </div>
+                        <a href="@Url.Action("Usuarios")" class="btn btn-info btn-sm ms-auto">Ver Solicitudes</a>
+                    </div>
+                </div>
+            }
+        </div>
+    }
 
-            // Resto de métodos...
-            public async Task<IActionResult>
-                Usuarios()
-                {
-                var usuarios = await _context.Users
-                .OrderByDescending(u => u.FechaRegistro)
-                .ToListAsync();
+    <!-- KPIs Principales -->
+    <div class="row g-3 mb-4">
+        <!-- Usuarios -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted mb-1 small text-uppercase">Total Usuarios</p>
+                            <h3 class="mb-0 fw-bold">@ViewBag.TotalUsuarios?.ToString("N0")</h3>
+                            <small class="text-success">
+                                <i class="fas fa-arrow-up"></i> +@ViewBag.UsuariosNuevosMes este mes
+                            </small>
+                        </div>
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-3">
+                            <i class="fas fa-users fa-lg text-primary"></i>
+                        </div>
+                    </div>
+                    <div class="progress mt-3" style="height: 4px;">
+                        <div class="progress-bar bg-primary" style="width: @(ViewBag.CrecimientoUsuarios > 0 ? Math.Min(ViewBag.CrecimientoUsuarios, 100) : 0)%"></div>
+                    </div>
+                    <small class="text-muted">@ViewBag.CrecimientoUsuarios% vs mes anterior</small>
+                </div>
+            </div>
+        </div>
 
-                // Crear lista de tuplas con usuario y rol
-                var usuariosConRoles = new List<(ApplicationUser, string)>
-                    ();
-
-                    foreach (var usuario in usuarios)
-                    {
-                    var roles = await _userManager.GetRolesAsync(usuario);
-                    var rol = roles.FirstOrDefault() ?? "Sin Rol";
-                    usuariosConRoles.Add((usuario, rol));
-                    }
-
-                    return View(usuariosConRoles);
-                    }
-
-                    [HttpPost]
-                    public async Task<IActionResult>
-                        BloquearUsuario(string id)
-                        {
-                        var usuario = await _context.Users.FindAsync(id);
-                        if (usuario != null)
-                        {
-                        usuario.EstaActivo = false;
-                        await _context.SaveChangesAsync();
-                        TempData["Success"] = $"Usuario {usuario.NombreCompleto} bloqueado exitosamente.";
+        <!-- Creadores -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted mb-1 small text-uppercase">Creadores</p>
+                            <h3 class="mb-0 fw-bold">@ViewBag.TotalCreadores?.ToString("N0")</h3>
+                            <small class="text-info">
+                                <i class="fas fa-check-circle"></i> @ViewBag.CreadoresVerificados verificados
+                            </small>
+                        </div>
+                        <div class="rounded-circle bg-success bg-opacity-10 p-3">
+                            <i class="fas fa-star fa-lg text-success"></i>
+                        </div>
+                    </div>
+                    <div class="progress mt-3" style="height: 4px;">
+                        @{
+                            int totalCreadores = ViewBag.TotalCreadores ?? 0;
+                            int creadoresVerificados = ViewBag.CreadoresVerificados ?? 0;
+                            double porcentajeVerificados = totalCreadores > 0 ? (creadoresVerificados * 100.0 / totalCreadores) : 0.0;
                         }
+                        <div class="progress-bar bg-success" style="width: @porcentajeVerificados%"></div>
+                    </div>
+                    <small class="text-muted">@(porcentajeVerificados.ToString("F1"))% verificados</small>
+                </div>
+            </div>
+        </div>
 
-                        return RedirectToAction(nameof(Usuarios));
-                        }
+        <!-- Suscripciones -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted mb-1 small text-uppercase">Suscripciones Activas</p>
+                            <h3 class="mb-0 fw-bold">@ViewBag.SuscripcionesActivas?.ToString("N0")</h3>
+                            <small class="text-success">
+                                <i class="fas fa-plus"></i> +@ViewBag.SuscripcionesNuevasMes nuevas
+                            </small>
+                        </div>
+                        <div class="rounded-circle bg-warning bg-opacity-10 p-3">
+                            <i class="fas fa-heart fa-lg text-warning"></i>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-danger">
+                            <i class="fas fa-times"></i> @ViewBag.SuscripcionesCanceladas canceladas este mes
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                        [HttpPost]
-                        public async Task<IActionResult>
-                            DesbloquearUsuario(string id)
-                            {
-                            var usuario = await _context.Users.FindAsync(id);
-                            if (usuario != null)
-                            {
-                            usuario.EstaActivo = true;
-                            await _context.SaveChangesAsync();
-                            TempData["Success"] = $"Usuario {usuario.NombreCompleto} desbloqueado exitosamente.";
-                            }
-
-                            return RedirectToAction(nameof(Usuarios));
-                            }
-
-                            public async Task<IActionResult>
-                                Contenido()
+        <!-- Ingresos -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100 bg-gradient" style="background: linear-gradient(135deg, #4682B4 0%, #5a9fd4 100%);">
+                <div class="card-body text-white">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="mb-1 small text-uppercase opacity-75">Ingresos del Mes</p>
+                            <h3 class="mb-0 fw-bold">$@ViewBag.IngresosMes?.ToString("N2")</h3>
+                            <small class="opacity-75">
+                                @if (ViewBag.CrecimientoIngresos >= 0)
                                 {
-                                var contenidos = await _context.Contenidos
-                                .Include(c => c.Usuario)
-                                .Include(c => c.Likes)
-                                .Include(c => c.Comentarios)
-                                .OrderByDescending(c => c.FechaPublicacion)
-                                .Take(100) // Limitar a 100 para mejor rendimiento
-                                .ToListAsync();
-
-                                return View(contenidos);
+                                    <i class="fas fa-arrow-up"></i>
                                 }
+                                else
+                                {
+                                    <i class="fas fa-arrow-down"></i>
+                                }
+                                @ViewBag.CrecimientoIngresos% vs mes anterior
+                            </small>
+                        </div>
+                        <div class="rounded-circle bg-white bg-opacity-25 p-3">
+                            <i class="fas fa-dollar-sign fa-lg"></i>
+                        </div>
+                    </div>
+                    <hr class="opacity-25">
+                    <div class="d-flex justify-content-between small">
+                        <span>Total historico: $@ViewBag.IngresosTotales?.ToString("N2")</span>
+                        <span>Comisiones: $@ViewBag.ComisionesPlataforma?.ToString("N2")</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                                [HttpPost]
-                                public async Task<IActionResult>
-                                    CensurarContenido(int id, string razon)
-                                    {
-                                    var contenido = await _context.Contenidos.FindAsync(id);
-                                    if (contenido != null)
-                                    {
-                                    contenido.Censurado = true;
-                                    contenido.RazonCensura = razon;
-                                    await _context.SaveChangesAsync();
-                                    TempData["Success"] = "Contenido censurado exitosamente.";
+    <!-- Segunda fila de KPIs -->
+    <div class="row g-3 mb-4">
+        <!-- Contenido -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-info bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-photo-video fa-lg text-info"></i>
+                        </div>
+                        <div>
+                            <p class="text-muted mb-0 small">Total Contenido</p>
+                            <h4 class="mb-0 fw-bold">@ViewBag.TotalContenido?.ToString("N0")</h4>
+                        </div>
+                    </div>
+                    <div class="row mt-3 text-center border-top pt-2">
+                        <div class="col-4">
+                            <small class="text-muted d-block">Hoy</small>
+                            <strong>@ViewBag.ContenidoHoy</strong>
+                        </div>
+                        <div class="col-4">
+                            <small class="text-muted d-block">Mes</small>
+                            <strong>@ViewBag.ContenidoMes</strong>
+                        </div>
+                        <div class="col-4">
+                            <small class="text-muted d-block">Censurado</small>
+                            <strong class="text-danger">@ViewBag.ContenidoCensurado</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Usuarios Activos -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-user-clock fa-lg text-success"></i>
+                        </div>
+                        <div>
+                            <p class="text-muted mb-0 small">Usuarios Activos (7 dias)</p>
+                            <h4 class="mb-0 fw-bold">@ViewBag.UsuariosActivos7Dias?.ToString("N0")</h4>
+                        </div>
+                    </div>
+                    @{
+                        int totalUsuariosAct = ViewBag.TotalUsuarios ?? 0;
+                        int usuariosActivos = ViewBag.UsuariosActivos7Dias ?? 0;
+                        double tasaActividad = totalUsuariosAct > 0 ? (usuariosActivos * 100.0 / totalUsuariosAct) : 0.0;
+                    }
+                    <div class="progress mt-3" style="height: 8px;">
+                        <div class="progress-bar bg-success" style="width: @tasaActividad%"></div>
+                    </div>
+                    <small class="text-muted">@(tasaActividad.ToString("F1"))% de usuarios activos</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Engagement -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-danger bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-heart fa-lg text-danger"></i>
+                        </div>
+                        <div>
+                            <p class="text-muted mb-0 small">Total Likes</p>
+                            <h4 class="mb-0 fw-bold">@ViewBag.TotalLikes?.ToString("N0")</h4>
+                        </div>
+                    </div>
+                    <div class="mt-3 d-flex justify-content-between">
+                        <small class="text-muted">Promedio por post: <strong>@ViewBag.PromedioLikes</strong></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comentarios -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-comments fa-lg text-primary"></i>
+                        </div>
+                        <div>
+                            <p class="text-muted mb-0 small">Total Comentarios</p>
+                            <h4 class="mb-0 fw-bold">@ViewBag.TotalComentarios?.ToString("N0")</h4>
+                        </div>
+                    </div>
+                    <div class="mt-3 d-flex justify-content-between">
+                        <small class="text-muted">Promedio por post: <strong>@ViewBag.PromedioComentarios</strong></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Graficos -->
+    <div class="row g-4 mb-4">
+        <!-- Grafico de Registros -->
+        <div class="col-xl-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="mb-0"><i class="fas fa-chart-area text-primary me-2"></i>Registros de Usuarios (Ultimos 12 meses)</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartRegistros" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grafico de Contenido por Tipo -->
+        <div class="col-xl-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie text-success me-2"></i>Contenido por Tipo</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartContenido" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Segunda fila de graficos -->
+    <div class="row g-4 mb-4">
+        <!-- Grafico de Ingresos -->
+        <div class="col-xl-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="mb-0"><i class="fas fa-chart-line text-success me-2"></i>Ingresos (Ultimos 30 dias)</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartIngresos" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Usuarios por Pais -->
+        <div class="col-xl-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="mb-0"><i class="fas fa-globe text-info me-2"></i>Usuarios por Pais</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartPaises" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rankings -->
+    <div class="row g-4 mb-4">
+        <!-- Top Creadores por Suscriptores -->
+        <div class="col-xl-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="mb-0"><i class="fas fa-trophy text-warning me-2"></i>Top Creadores (Suscriptores)</h5>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        @if (ViewBag.TopCreadoresSuscriptores != null)
+                        {
+                            var index = 1;
+                            foreach (dynamic creador in ViewBag.TopCreadoresSuscriptores)
+                            {
+                                <li class="list-group-item d-flex align-items-center py-3">
+                                    <span class="badge @(index <= 3 ? "bg-warning" : "bg-secondary") me-3">@index</span>
+                                    @{
+                                        string foto1 = creador.FotoPerfil?.ToString() ?? "";
+                                        string nombre1 = creador.Nombre?.ToString() ?? "?";
                                     }
+                                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                        @if (!string.IsNullOrEmpty(foto1))
+                                        {
+                                            <img src="@foto1" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
+                                        }
+                                        else
+                                        {
+                                            <span>@(nombre1.Length > 0 ? nombre1.Substring(0, 1).ToUpper() : "?")</span>
+                                        }
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <strong>@creador.Nombre</strong>
+                                    </div>
+                                    <span class="badge bg-primary rounded-pill">@creador.Total subs</span>
+                                </li>
+                                index++;
+                            }
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
 
-                                    return RedirectToAction(nameof(Contenido));
+        <!-- Top Creadores por Contenido -->
+        <div class="col-xl-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="mb-0"><i class="fas fa-medal text-info me-2"></i>Top Creadores (Contenido)</h5>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        @if (ViewBag.TopCreadoresContenido != null)
+                        {
+                            var index = 1;
+                            foreach (dynamic creador in ViewBag.TopCreadoresContenido)
+                            {
+                                <li class="list-group-item d-flex align-items-center py-3">
+                                    <span class="badge @(index <= 3 ? "bg-info" : "bg-secondary") me-3">@index</span>
+                                    @{
+                                        string foto2 = creador.FotoPerfil?.ToString() ?? "";
+                                        string nombre2 = creador.Nombre?.ToString() ?? "?";
                                     }
-
-                                    [HttpPost]
-                                    public async Task<IActionResult>
-                                        DescensurarContenido(int id)
+                                    <div class="rounded-circle bg-info text-white d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                        @if (!string.IsNullOrEmpty(foto2))
                                         {
-                                        var contenido = await _context.Contenidos.FindAsync(id);
-                                        if (contenido != null)
+                                            <img src="@foto2" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
+                                        }
+                                        else
                                         {
-                                        contenido.Censurado = false;
-                                        contenido.RazonCensura = null;
-                                        await _context.SaveChangesAsync();
-                                        TempData["Success"] = "Contenido descensurado exitosamente.";
+                                            <span>@(nombre2.Length > 0 ? nombre2.Substring(0, 1).ToUpper() : "?")</span>
                                         }
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <strong>@creador.Nombre</strong>
+                                    </div>
+                                    <span class="badge bg-info rounded-pill">@creador.Total posts</span>
+                                </li>
+                                index++;
+                            }
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
 
-                                        return RedirectToAction(nameof(Contenido));
+        <!-- Creadores Inactivos -->
+        <div class="col-xl-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="mb-0"><i class="fas fa-user-clock text-danger me-2"></i>Creadores Inactivos (+7 dias)</h5>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        @if (ViewBag.CreadoresInactivos != null && ((IEnumerable<dynamic>)ViewBag.CreadoresInactivos).Any())
+                        {
+                            foreach (dynamic creador in ViewBag.CreadoresInactivos)
+                            {
+                                <li class="list-group-item d-flex align-items-center py-3">
+                                    @{
+                                        string foto3 = creador.FotoPerfil?.ToString() ?? "";
+                                        string userName3 = creador.UserName?.ToString() ?? "?";
+                                    }
+                                    <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                        @if (!string.IsNullOrEmpty(foto3))
+                                        {
+                                            <img src="@foto3" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
                                         }
+                                        else
+                                        {
+                                            <span>@(userName3.Length > 0 ? userName3.Substring(0, 1).ToUpper() : "?")</span>
+                                        }
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <strong>@creador.UserName</strong>
+                                        <br><small class="text-muted">Sin publicar hace +7 dias</small>
+                                    </div>
+                                    <a href="@Url.Action("DetalleUsuario", new { id = creador.Id })" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </li>
+                            }
+                        }
+                        else
+                        {
+                            <li class="list-group-item text-center py-4 text-muted">
+                                <i class="fas fa-check-circle fa-2x mb-2 text-success"></i>
+                                <br>Todos los creadores estan activos
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                                        [HttpPost]
-                                        public async Task<IActionResult>
-                                            EliminarContenido(int id)
+    <!-- Top Contenidos -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent border-0 py-3">
+            <h5 class="mb-0"><i class="fas fa-fire text-danger me-2"></i>Contenido Mas Popular</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Preview</th>
+                            <th>Descripcion</th>
+                            <th>Creador</th>
+                            <th>Tipo</th>
+                            <th class="text-center">Likes</th>
+                            <th class="text-center">Comentarios</th>
+                            <th class="text-center">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (ViewBag.TopContenidos != null)
+                        {
+                            var pos = 1;
+                            foreach (dynamic contenido in ViewBag.TopContenidos)
+                            {
+                                <tr>
+                                    <td><span class="badge @(pos <= 3 ? "bg-warning" : "bg-secondary")">@pos</span></td>
+                                    <td>
+                                        @{
+                                            string thumb = contenido.Thumbnail?.ToString() ?? "";
+                                            string ruta = contenido.RutaArchivo?.ToString() ?? "";
+                                            string tipo = contenido.TipoContenido?.ToString() ?? "";
+                                        }
+                                        <div style="width: 60px; height: 60px; background: #f0f0f0; border-radius: 8px; overflow: hidden;">
+                                            @if (!string.IsNullOrEmpty(thumb))
                                             {
-                                            var contenido = await _context.Contenidos.FindAsync(id);
-                                            if (contenido != null)
+                                                <img src="@thumb" style="width: 100%; height: 100%; object-fit: cover;">
+                                            }
+                                            else if (!string.IsNullOrEmpty(ruta) && tipo.Contains("Imagen"))
                                             {
-                                            _context.Contenidos.Remove(contenido);
-                                            await _context.SaveChangesAsync();
-                                            TempData["Success"] = "Contenido eliminado permanentemente.";
+                                                <img src="@ruta" style="width: 100%; height: 100%; object-fit: cover;">
                                             }
-
-                                            return RedirectToAction(nameof(Contenido));
+                                            else
+                                            {
+                                                <div class="d-flex align-items-center justify-content-center h-100">
+                                                    <i class="fas fa-photo-video text-muted"></i>
+                                                </div>
                                             }
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @{
+                                            string desc = contenido.Descripcion?.ToString() ?? "Sin descripcion";
+                                            if (desc.Length > 50) desc = desc.Substring(0, 50) + "...";
+                                        }
+                                        @desc
+                                    </td>
+                                    <td><strong>@contenido.CreadorNombre</strong></td>
+                                    <td><span class="badge bg-secondary">@contenido.TipoContenido</span></td>
+                                    <td class="text-center"><i class="fas fa-heart text-danger"></i> @contenido.TotalLikes</td>
+                                    <td class="text-center"><i class="fas fa-comment text-primary"></i> @contenido.TotalComentarios</td>
+                                    <td class="text-center"><strong>@(contenido.TotalLikes + contenido.TotalComentarios)</strong></td>
+                                </tr>
+                                pos++;
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
 
-                                            public async Task<IActionResult>
-                                                Reportes()
-                                                {
-                                                var reportes = await _context.Reportes
-                                                .Include(r => r.UsuarioReportador)
-                                                .Include(r => r.ContenidoReportado)
-                                                .ThenInclude(c => c.Usuario)
-                                                .OrderByDescending(r => r.FechaReporte)
-                                                .ToListAsync();
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Colores consistentes
+        var primaryColor = '#4682B4';
+        var successColor = '#28a745';
+        var warningColor = '#ffc107';
+        var dangerColor = '#dc3545';
+        var infoColor = '#17a2b8';
 
-                                                return View(reportes);
-                                                }
+        // Datos de registros por mes
+        var registrosData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.RegistrosPorMes ?? new List<object>()));
+        var mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-                                                [HttpPost]
-                                                public async Task<IActionResult>
-                                                    ResolverReporte(int id, string accion)
-                                                    {
-                                                    var reporte = await _context.Reportes
-                                                    .Include(r => r.ContenidoReportado)
-                                                    .FirstOrDefaultAsync(r => r.Id == id);
+        var registrosLabels = registrosData.map(function(item) {
+            return mesesNombres[item.Mes - 1] + ' ' + item.Anio;
+        });
+        var registrosValues = registrosData.map(function(item) {
+            return item.Total;
+        });
 
-                                                    if (reporte != null)
-                                                    {
-                                                    reporte.Estado = "Resuelto";
-                                                    reporte.FechaResolucion = DateTime.Now;
+        // Grafico de Registros
+        new Chart(document.getElementById('chartRegistros'), {
+            type: 'line',
+            data: {
+                labels: registrosLabels,
+                datasets: [{
+                    label: 'Usuarios registrados',
+                    data: registrosValues,
+                    borderColor: primaryColor,
+                    backgroundColor: 'rgba(70, 130, 180, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: primaryColor,
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
 
-                                                    if (accion == "censurar" && reporte.ContenidoReportado != null)
-                                                    {
-                                                    reporte.ContenidoReportado.Censurado = true;
-                                                    reporte.ContenidoReportado.RazonCensura = $"Reporte: {reporte.Motivo}";
-                                                    }
+        // Datos de contenido por tipo
+        var contenidoData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.ContenidoPorTipo ?? new List<object>()));
+        var contenidoLabels = contenidoData.map(function(item) { return item.Tipo; });
+        var contenidoValues = contenidoData.map(function(item) { return item.Total; });
 
-                                                    await _context.SaveChangesAsync();
-                                                    TempData["Success"] = "Reporte resuelto exitosamente.";
-                                                    }
+        // Grafico de Contenido
+        new Chart(document.getElementById('chartContenido'), {
+            type: 'doughnut',
+            data: {
+                labels: contenidoLabels,
+                datasets: [{
+                    data: contenidoValues,
+                    backgroundColor: [primaryColor, successColor, warningColor, dangerColor, infoColor],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
 
-                                                    return RedirectToAction(nameof(Reportes));
-                                                    }
+        // Datos de ingresos por dia
+        var ingresosData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.IngresosPorDia ?? new List<object>()));
+        var ingresosLabels = ingresosData.map(function(item) {
+            var fecha = new Date(item.Fecha);
+            return fecha.getDate() + '/' + (fecha.getMonth() + 1);
+        });
+        var ingresosValues = ingresosData.map(function(item) { return item.Total; });
 
-                                                    public async Task<IActionResult>
-                                                        Estadisticas()
-                                                        {
-                                                        // Stats generales
-                                                        ViewBag.TotalUsuarios = await _context.Users.CountAsync();
-                                                        ViewBag.TotalCreadores = await _context.Users.CountAsync(u => u.TipoUsuario == 1);
-                                                        ViewBag.TotalSuscripciones = await _context.Suscripciones.CountAsync(s => s.EstaActiva);
-                                                        ViewBag.TotalPublicaciones = await _context.Contenidos.CountAsync();
+        // Grafico de Ingresos
+        new Chart(document.getElementById('chartIngresos'), {
+            type: 'bar',
+            data: {
+                labels: ingresosLabels,
+                datasets: [{
+                    label: 'Ingresos ($)',
+                    data: ingresosValues,
+                    backgroundColor: successColor,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
 
-                                                        // Datos para gráficos
-                                                        var registrosPorMes = await _context.Users
-                                                        .GroupBy(u => new { u.FechaRegistro.Year, u.FechaRegistro.Month })
-                                                        .Select(g => new {
-                                                        año = g.Key.Year,
-                                                        mes = g.Key.Month,
-                                                        total = g.Count()
-                                                        })
-                                                        .OrderBy(x => x.año).ThenBy(x => x.mes)
-                                                        .ToListAsync();
+        // Datos de usuarios por pais
+        var paisesData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.UsuariosPorPais ?? new List<object>()));
+        var paisesLabels = paisesData.map(function(item) { return item.Pais || 'Sin especificar'; });
+        var paisesValues = paisesData.map(function(item) { return item.Total; });
 
-                                                        var contenidosPorTipo = await _context.Contenidos
-                                                        .GroupBy(c => c.TipoContenido)
-                                                        .Select(g => new {
-                                                        tipo = g.Key.ToString(),
-                                                        total = g.Count()
-                                                        })
-                                                        .ToListAsync();
+        // Grafico de Paises
+        new Chart(document.getElementById('chartPaises'), {
+            type: 'polarArea',
+            data: {
+                labels: paisesLabels,
+                datasets: [{
+                    data: paisesValues,
+                    backgroundColor: [
+                        'rgba(70, 130, 180, 0.7)',
+                        'rgba(40, 167, 69, 0.7)',
+                        'rgba(255, 193, 7, 0.7)',
+                        'rgba(220, 53, 69, 0.7)',
+                        'rgba(23, 162, 184, 0.7)',
+                        'rgba(108, 117, 125, 0.7)',
+                        'rgba(111, 66, 193, 0.7)',
+                        'rgba(253, 126, 20, 0.7)',
+                        'rgba(32, 201, 151, 0.7)',
+                        'rgba(232, 62, 140, 0.7)'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12 } }
+                }
+            }
+        });
+    </script>
+}
 
-                                                        var topCreadores = await _context.Contenidos
-                                                        .GroupBy(c => c.UsuarioId)
-                                                        .Select(g => new {
-                                                        UsuarioId = g.Key,
-                                                        Total = g.Count()
-                                                        })
-                                                        .OrderByDescending(x => x.Total)
-                                                        .Take(10)
-                                                        .ToListAsync();
-
-                                                        // Obtener nombres de los top creadores
-                                                        var topCreadoresConNombres = new List
-                                                        <object>
-                                                            ();
-                                                            foreach (var item in topCreadores)
-                                                            {
-                                                            var usuario = await _context.Users.FindAsync(item.UsuarioId);
-                                                            topCreadoresConNombres.Add(new {
-                                                            nombre = usuario?.UserName ?? "Desconocido",
-                                                            total = item.Total
-                                                            });
-                                                            }
-
-                                                            ViewBag.RegistrosPorMes = registrosPorMes;
-                                                            ViewBag.ContenidosPorTipo = contenidosPorTipo;
-                                                            ViewBag.TopCreadores = topCreadoresConNombres;
-
-                                                            return View();
-                                                            }
-
-                                                            public IActionResult Configuracion()
-                                                            {
-                                                            return View();
-                                                            }
-
-                                                            [HttpPost]
-                                                            public async Task
-                                                            <IActionResult>
-                                                                ActualizarComision(decimal comision)
-                                                                {
-                                                                TempData["Success"] = $"Comisión actualizada a {comision}%";
-                                                                return RedirectToAction(nameof(Configuracion));
-                                                                }
-                                                                }
-                                                                }
+<style>
+    .card {
+        transition: transform 0.2s;
+    }
+    .card:hover {
+        transform: translateY(-2px);
+    }
+    .progress {
+        border-radius: 10px;
+    }
+    .progress-bar {
+        border-radius: 10px;
+    }
+    @@media print {
+        .btn { display: none !important; }
+        .card { break-inside: avoid; }
+    }
+</style>

@@ -60,10 +60,9 @@ namespace Lado.Controllers
                 .Distinct()
                 .ToListAsync();
 
-            // Combinar todos los contactos únicos
-            var contactosIds = creadoresSuscritos
-                .Union(suscriptoresPropios)
-                .Union(conversacionesExistentes)
+            // CAMBIO: Solo mostrar conversaciones que ya tienen mensajes
+            // Eliminar contactos sin conversación iniciada
+            var contactosIds = conversacionesExistentes
                 .Distinct()
                 .ToList();
 

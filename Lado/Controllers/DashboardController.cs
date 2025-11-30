@@ -29,7 +29,9 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-        
+            // Cargar datos del usuario (todos son creadores ahora)
+            await CargarDatosCreador(usuario);
+            await CargarDatosFan(usuario);
 
             return View(usuario);
         }

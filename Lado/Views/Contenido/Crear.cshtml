@@ -38,19 +38,22 @@
                         </div>
                     </div>
 
-                    <!-- LADO B - CON SEUDÓNIMO -->
-                    <div class="lado-option" data-lado="ladob" data-esgratis="false">
-                        <div class="lado-badge ladob">B</div>
-                        <div class="lado-info">
-                            <h3>LadoB · Con seudónimo</h3>
-                            <p>Contenido con tu identidad alternativa</p>
+                    <!-- LADO B - CON SEUDÓNIMO (solo visible si verificado) -->
+                    @if (usuarioVerificado)
+                    {
+                        <div class="lado-option" data-lado="ladob" data-esgratis="false">
+                            <div class="lado-badge ladob">B</div>
+                            <div class="lado-info">
+                                <h3>LadoB · Con seudónimo</h3>
+                                <p>Contenido con tu identidad alternativa</p>
+                            </div>
+                            <div class="lado-check">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                </svg>
+                            </div>
                         </div>
-                        <div class="lado-check">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                            </svg>
-                        </div>
-                    </div>
+                    }
                 </div>
             </div>
 
@@ -966,18 +969,6 @@
         document.addEventListener('DOMContentLoaded', function() {
             const usuarioVerificado = @(usuarioVerificado ? "true" : "false");
 
-            console.log('🎬 Sistema de creación iniciado');
-            console.log('Usuario verificado:', usuarioVerificado);
-
-            // 🔍 MOSTRAR DEBUG ANTERIOR SI EXISTE
-            const lastDebug = localStorage.getItem('formDebug');
-            if (lastDebug) {
-                console.log('🔍 ÚLTIMO DEBUG GUARDADO:');
-                console.log(lastDebug);
-                alert('DEBUG DEL ÚLTIMO ENVÍO:\n\n' + lastDebug);
-                localStorage.removeItem('formDebug');
-            }
-
             // Elementos
             const ladoOptions = document.querySelectorAll('.lado-option');
             const esGratisInput = document.getElementById('esGratisInput');
@@ -1000,23 +991,14 @@
             const esBorradorInput = document.getElementById('esBorradorInput');
             const loadingOverlay = document.getElementById('loadingOverlay');
 
-            // ⭐ SELECTOR DE LADO
+            // Selector de Lado
             ladoOptions.forEach(option => {
                 option.addEventListener('click', function() {
                     ladoOptions.forEach(opt => opt.classList.remove('active'));
                     this.classList.add('active');
 
                     const esGratis = this.dataset.esgratis === 'true';
-                    const lado = this.dataset.lado;
-
                     esGratisInput.value = esGratis ? 'true' : 'false';
-
-                    console.log('=============================');
-                    console.log('Lado seleccionado:', lado);
-                    console.log('data-esgratis:', this.dataset.esgratis);
-                    console.log('esGratis (boolean):', esGratis);
-                    console.log('Input hidden value:', esGratisInput.value);
-                    console.log('=============================');
 
                     if (esGratis) {
                         precioSectionWrapper.style.display = 'none';
@@ -1116,37 +1098,14 @@
                 formContenido.submit();
             });
 
-            // 🔍 VALIDACIÓN Y DEBUG COMPLETO
+            // Validación del formulario
             formContenido.addEventListener('submit', function(e) {
                 const tipoContenido = tipoInput.value;
                 const esBorrador = esBorradorInput.value === 'true';
                 const esGratis = esGratisInput.value === 'true';
 
-                // 📊 CREAR DEBUG COMPLETO
-                let debugMsg = '========== DEBUG FORMULARIO ==========\n';
-                debugMsg += `Timestamp: ${new Date().toLocaleString()}\n`;
-                debugMsg += `\n--- VALORES DEL DOM ---\n`;
-                debugMsg += `esGratisInput.value: "${esGratisInput.value}"\n`;
-                debugMsg += `esGratis (boolean): ${esGratis}\n`;
-                debugMsg += `Lado activo: ${document.querySelector('.lado-option.active')?.dataset.lado}\n`;
-                debugMsg += `Usuario verificado: ${usuarioVerificado}\n`;
-                debugMsg += `\n--- VALORES QUE SE ENVIARÁN ---\n`;
-
-                const formData = new FormData(formContenido);
-                debugMsg += `EsGratis: ${formData.get('EsGratis')}\n`;
-                debugMsg += `PrecioDesbloqueo: ${formData.get('PrecioDesbloqueo')}\n`;
-                debugMsg += `TipoContenido: ${formData.get('TipoContenido')}\n`;
-                debugMsg += `EsBorrador: ${formData.get('EsBorrador')}\n`;
-                debugMsg += `Descripcion length: ${formData.get('Descripcion')?.length || 0}\n`;
-                debugMsg += `Archivo: ${formData.get('archivo')?.name || 'Sin archivo'}\n`;
-                debugMsg += '======================================\n';
-
-                // 💾 GUARDAR EN LOCALSTORAGE
-                localStorage.setItem('formDebug', debugMsg);
-                console.log(debugMsg);
-
-                // ✅ VALIDACIONES
-                if (!esBorrador && tipoContenido !== '3' && !archivoInput.files.length) {
+                // Validar archivo requerido (excepto para posts de solo texto o borradores)
+                if (!esBorrador && tipoContenido !== '0' && !archivoInput.files.length) {
                     e.preventDefault();
                     if (typeof showToast === 'function') {
                         showToast('error', 'Error', 'Por favor selecciona un archivo para publicar');
@@ -1156,6 +1115,7 @@
                     return false;
                 }
 
+                // Validar precio para contenido premium
                 if (!esGratis && usuarioVerificado && precioSelect) {
                     const precio = parseInt(precioSelect.value);
                     if (!precio || precio <= 0 || precio % 5 !== 0) {
@@ -1172,8 +1132,6 @@
                 // Mostrar loading
                 loadingOverlay.classList.add('show');
             });
-
-            console.log('✅ Sistema iniciado correctamente');
         });
     </script>
 }

@@ -1,20 +1,44 @@
-﻿@model List<Lado.Models.Contenido>
+@model List<Lado.Models.Contenido>
 @using Lado.Models
 @{
-    ViewData["Title"] = "Moderación de Contenido";
+    ViewData["Title"] = "Moderacion de Contenido";
 }
 
 <div class="container-fluid py-4">
     <!-- Header -->
     <div class="row mb-4">
         <div class="col-md-6">
-            <h2><i class="fas fa-eye text-success"></i> Moderación de Contenido</h2>
+            <h2><i class="fas fa-eye text-success"></i> Moderacion de Contenido</h2>
             <p class="text-muted">Total: @Model.Count contenidos</p>
         </div>
         <div class="col-md-6 text-end">
             <a href="@Url.Action("Index", "Admin")" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left"></i> Volver al Dashboard
             </a>
+        </div>
+    </div>
+
+    <!-- Barra de Acciones Masivas -->
+    <div id="bulkActionBar" class="card border-0 shadow-sm mb-4" style="display: none;">
+        <div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="d-flex align-items-center">
+                <input type="checkbox" id="selectAll" class="form-check-input me-3" style="width: 20px; height: 20px;" onchange="toggleSelectAll(this)">
+                <span id="selectedCount" class="fw-bold me-3">0 seleccionados</span>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAll()">
+                    <i class="fas fa-times"></i> Deseleccionar
+                </button>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-warning" onclick="openBulkCensorModal()">
+                    <i class="fas fa-ban"></i> Censurar
+                </button>
+                <button type="button" class="btn btn-success" onclick="bulkUncensor()">
+                    <i class="fas fa-check"></i> Descensurar
+                </button>
+                <button type="button" class="btn btn-danger" onclick="openBulkDeleteModal()">
+                    <i class="fas fa-trash"></i> Eliminar
+                </button>
+            </div>
         </div>
     </div>
 
@@ -25,11 +49,16 @@
             @foreach (var contenido in Model)
             {
                 <div class="col-md-4 col-lg-3">
-                    <div class="card border-0 shadow-sm h-100 position-relative">
+                    <div class="card border-0 shadow-sm h-100 position-relative content-card" data-id="@contenido.Id">
+                        <!-- Checkbox de seleccion -->
+                        <div class="position-absolute top-0 end-0 p-2" style="z-index: 15;">
+                            <input type="checkbox" class="form-check-input content-checkbox" value="@contenido.Id"
+                                   style="width: 22px; height: 22px; cursor: pointer;" onchange="updateSelection()">
+                        </div>
                         <!-- Badge de estado -->
                         @if (contenido.Censurado)
                         {
-                            <div class="position-absolute top-0 start-0 w-100 p-2" style="z-index: 10;">
+                            <div class="position-absolute top-0 start-0 p-2" style="z-index: 10;">
                                 <span class="badge bg-danger">
                                     <i class="fas fa-ban"></i> CENSURADO
                                 </span>
@@ -57,7 +86,6 @@
                             }
                             else if ((int)contenido.TipoContenido == 3)
                             {
-                                <!-- Audio -->
                                 <div class="d-flex align-items-center justify-content-center h-100" style="background: #4682B4;">
                                     <i class="fas fa-music fa-4x text-white"></i>
                                 </div>
@@ -71,7 +99,6 @@
                         </div>
 
                         <div class="card-body">
-                            <!-- Info del creador -->
                             @if (contenido.Usuario != null)
                             {
                                 <div class="d-flex align-items-center mb-2">
@@ -91,15 +118,12 @@
                                 </div>
                             }
 
-                            <!-- Descripción -->
                             <p class="card-text small mb-2">
                                 @if (!string.IsNullOrEmpty(contenido.Descripcion))
                                 {
                                     if (contenido.Descripcion.Length > 60)
                                     {
-                                        @contenido.Descripcion.Substring(0, 60)
-
-                                        <text>...</text>
+                                        @contenido.Descripcion.Substring(0, 60)<text>...</text>
                                     }
                                     else
                                     {
@@ -108,28 +132,25 @@
                                 }
                                 else
                                 {
-                                    <span class="text-muted fst-italic">Sin descripción</span>
+                                    <span class="text-muted fst-italic">Sin descripcion</span>
                                 }
                             </p>
 
-                            <!-- Tipo y Fecha -->
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="badge bg-secondary">@contenido.TipoContenido</span>
                                 <small class="text-muted">@contenido.FechaPublicacion.ToString("dd/MM/yy")</small>
                             </div>
 
-                            <!-- Stats -->
                             <div class="d-flex justify-content-between text-muted small mb-3">
                                 <span><i class="fas fa-heart"></i> @(contenido.Likes?.Count ?? 0)</span>
                                 <span><i class="fas fa-comment"></i> @(contenido.Comentarios?.Count ?? 0)</span>
                             </div>
 
-                            <!-- Acciones -->
                             <div class="d-grid gap-2">
                                 @if (contenido.Censurado)
                                 {
                                     <form method="post" action="@Url.Action("DescensurarContenido", new { id = contenido.Id })"
-                                          onsubmit="return confirm('¿Descensurar este contenido?')">
+                                          onsubmit="return confirm('Descensurar este contenido?')">
                                         @Html.AntiForgeryToken()
                                         <button type="submit" class="btn btn-sm btn-success w-100">
                                             <i class="fas fa-check"></i> Descensurar
@@ -159,13 +180,13 @@
         <div class="card border-0 shadow-sm">
             <div class="card-body text-center py-5">
                 <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
-                <h5 class="text-muted">No se encontró contenido</h5>
+                <h5 class="text-muted">No se encontro contenido</h5>
             </div>
         </div>
     }
 </div>
 
-<!-- Modal Censurar -->
+<!-- Modal Censurar Individual -->
 <div class="modal fade" id="censurarModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -176,14 +197,14 @@
             <form method="post" id="formCensurar">
                 @Html.AntiForgeryToken()
                 <div class="modal-body">
-                    <p>Especifica la razón de la censura:</p>
+                    <p>Especifica la razon de la censura:</p>
                     <select name="razon" class="form-select mb-3" required>
-                        <option value="">Selecciona una razón...</option>
+                        <option value="">Selecciona una razon...</option>
                         <option value="Contenido inapropiado">Contenido inapropiado</option>
-                        <option value="Violación de términos de uso">Violación de términos de uso</option>
+                        <option value="Violacion de terminos de uso">Violacion de terminos de uso</option>
                         <option value="Contenido ofensivo">Contenido ofensivo</option>
                         <option value="Spam o publicidad no autorizada">Spam o publicidad</option>
-                        <option value="Violación de derechos de autor">Derechos de autor</option>
+                        <option value="Violacion de derechos de autor">Derechos de autor</option>
                         <option value="Contenido violento">Contenido violento</option>
                         <option value="Otro">Otro</option>
                     </select>
@@ -199,7 +220,7 @@
     </div>
 </div>
 
-<!-- Modal Eliminar -->
+<!-- Modal Eliminar Individual -->
 <div class="modal fade" id="eliminarModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -212,10 +233,10 @@
                 <div class="modal-body">
                     <div class="alert alert-danger">
                         <i class="fas fa-exclamation-triangle"></i>
-                        <strong>¡ADVERTENCIA!</strong> Esta acción es permanente.
+                        <strong>ADVERTENCIA!</strong> Esta accion es permanente.
                     </div>
-                    <p>¿Estás seguro de eliminar este contenido?</p>
-                    <p class="text-muted small">Se eliminarán también todos sus likes y comentarios.</p>
+                    <p>Estas seguro de eliminar este contenido?</p>
+                    <p class="text-muted small">Se eliminaran tambien todos sus likes y comentarios.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -226,20 +247,204 @@
     </div>
 </div>
 
+<!-- Modal Censurar Masivo -->
+<div class="modal fade" id="bulkCensorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="fas fa-ban"></i> Censurar Contenidos Seleccionados</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="@Url.Action("CensurarMasivo", "Admin")" id="formBulkCensor">
+                @Html.AntiForgeryToken()
+                <div id="bulkCensorIds"></div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-info-circle"></i> Se censuraran <strong id="bulkCensorCount">0</strong> contenidos.
+                    </div>
+                    <p>Especifica la razon de la censura masiva:</p>
+                    <select name="razon" class="form-select mb-3" required>
+                        <option value="">Selecciona una razon...</option>
+                        <option value="Contenido inapropiado">Contenido inapropiado</option>
+                        <option value="Violacion de terminos de uso">Violacion de terminos de uso</option>
+                        <option value="Contenido ofensivo">Contenido ofensivo</option>
+                        <option value="Spam o publicidad no autorizada">Spam o publicidad</option>
+                        <option value="Violacion de derechos de autor">Derechos de autor</option>
+                        <option value="Contenido violento">Contenido violento</option>
+                        <option value="Censura masiva por administrador">Otro</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">Censurar Todos</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Eliminar Masivo -->
+<div class="modal fade" id="bulkDeleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-trash"></i> Eliminar Contenidos Seleccionados</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="@Url.Action("EliminarMasivo", "Admin")" id="formBulkDelete">
+                @Html.AntiForgeryToken()
+                <div id="bulkDeleteIds"></div>
+                <div class="modal-body">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>ADVERTENCIA!</strong> Esta accion es IRREVERSIBLE.
+                    </div>
+                    <p>Se eliminaran permanentemente <strong id="bulkDeleteCount">0</strong> contenidos junto con todos sus likes y comentarios.</p>
+                    <p class="text-muted">Esta accion no se puede deshacer.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Eliminar Permanentemente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Form oculto para Descensurar Masivo -->
+<form method="post" action="@Url.Action("DescensurarMasivo", "Admin")" id="formBulkUncensor" style="display: none;">
+    @Html.AntiForgeryToken()
+    <div id="bulkUncensorIds"></div>
+</form>
+
 <script>
-    // Modal Censurar
+    // Modal Censurar Individual
     document.getElementById('censurarModal').addEventListener('show.bs.modal', function (event) {
         var button = event.relatedTarget;
         var contentId = button.getAttribute('data-contentid');
         document.getElementById('formCensurar').action = '/Admin/CensurarContenido/' + contentId;
     });
 
-    // Modal Eliminar
+    // Modal Eliminar Individual
     document.getElementById('eliminarModal').addEventListener('show.bs.modal', function (event) {
         var button = event.relatedTarget;
         var contentId = button.getAttribute('data-contentid');
         document.getElementById('formEliminar').action = '/Admin/EliminarContenido/' + contentId;
     });
+
+    // Funciones para acciones masivas
+    function getSelectedIds() {
+        var checkboxes = document.querySelectorAll('.content-checkbox:checked');
+        var ids = [];
+        checkboxes.forEach(function(cb) {
+            ids.push(cb.value);
+        });
+        return ids;
+    }
+
+    function updateSelection() {
+        var ids = getSelectedIds();
+        var count = ids.length;
+        var bar = document.getElementById('bulkActionBar');
+        var countSpan = document.getElementById('selectedCount');
+
+        if (count > 0) {
+            bar.style.display = 'block';
+            countSpan.textContent = count + ' seleccionado' + (count > 1 ? 's' : '');
+        } else {
+            bar.style.display = 'none';
+        }
+
+        var allCheckboxes = document.querySelectorAll('.content-checkbox');
+        var selectAll = document.getElementById('selectAll');
+        selectAll.checked = (count === allCheckboxes.length && count > 0);
+        selectAll.indeterminate = (count > 0 && count < allCheckboxes.length);
+    }
+
+    function toggleSelectAll(checkbox) {
+        var checkboxes = document.querySelectorAll('.content-checkbox');
+        checkboxes.forEach(function(cb) {
+            cb.checked = checkbox.checked;
+        });
+        updateSelection();
+    }
+
+    function deselectAll() {
+        var checkboxes = document.querySelectorAll('.content-checkbox');
+        checkboxes.forEach(function(cb) {
+            cb.checked = false;
+        });
+        document.getElementById('selectAll').checked = false;
+        updateSelection();
+    }
+
+    function openBulkCensorModal() {
+        var ids = getSelectedIds();
+        if (ids.length === 0) {
+            alert('Selecciona al menos un contenido');
+            return;
+        }
+
+        document.getElementById('bulkCensorCount').textContent = ids.length;
+        var container = document.getElementById('bulkCensorIds');
+        container.innerHTML = '';
+        ids.forEach(function(id) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'ids';
+            input.value = id;
+            container.appendChild(input);
+        });
+
+        var modal = new bootstrap.Modal(document.getElementById('bulkCensorModal'));
+        modal.show();
+    }
+
+    function openBulkDeleteModal() {
+        var ids = getSelectedIds();
+        if (ids.length === 0) {
+            alert('Selecciona al menos un contenido');
+            return;
+        }
+
+        document.getElementById('bulkDeleteCount').textContent = ids.length;
+        var container = document.getElementById('bulkDeleteIds');
+        container.innerHTML = '';
+        ids.forEach(function(id) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'ids';
+            input.value = id;
+            container.appendChild(input);
+        });
+
+        var modal = new bootstrap.Modal(document.getElementById('bulkDeleteModal'));
+        modal.show();
+    }
+
+    function bulkUncensor() {
+        var ids = getSelectedIds();
+        if (ids.length === 0) {
+            alert('Selecciona al menos un contenido');
+            return;
+        }
+
+        if (!confirm('Descensurar ' + ids.length + ' contenido(s) seleccionado(s)?')) {
+            return;
+        }
+
+        var container = document.getElementById('bulkUncensorIds');
+        container.innerHTML = '';
+        ids.forEach(function(id) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'ids';
+            input.value = id;
+            container.appendChild(input);
+        });
+
+        document.getElementById('formBulkUncensor').submit();
+    }
 </script>
 
 <style>
@@ -247,9 +452,25 @@
         transition: transform 0.2s, box-shadow 0.2s;
     }
 
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15) !important;
-        }
-</style>
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15) !important;
+    }
 
+    .content-checkbox {
+        background-color: white;
+        border: 2px solid #dee2e6;
+    }
+
+    .content-checkbox:checked {
+        background-color: #4682B4;
+        border-color: #4682B4;
+    }
+
+    #bulkActionBar {
+        position: sticky;
+        top: 70px;
+        z-index: 100;
+        background: white;
+    }
+</style>

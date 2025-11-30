@@ -90,6 +90,13 @@ namespace Lado.Models
         [StringLength(5)]
         public string? Pais { get; set; }
 
+        [Display(Name = "Ciudad")]
+        [StringLength(100)]
+        public string? Ciudad { get; set; }
+
+        [Display(Name = "Genero")]
+        public GeneroUsuario Genero { get; set; } = GeneroUsuario.NoEspecificado;
+
         [Display(Name = "Edad Verificada")]
         public bool AgeVerified { get; set; } = false;
 
@@ -104,6 +111,18 @@ namespace Lado.Models
 
         [Display(Name = "Fecha de Verificación de Identidad")]
         public DateTime? FechaVerificacion { get; set; }
+
+        // ========================================
+        // PUBLICIDAD Y AGENCIA
+        // ========================================
+        [Display(Name = "Permite Publicidad Personalizada")]
+        public bool PermitePublicidadPersonalizada { get; set; } = true;
+
+        // Relacion con Agencia (si TipoUsuario == 2)
+        public virtual Agencia? Agencia { get; set; }
+
+        // Relacion con Intereses
+        public virtual ICollection<InteresUsuario> Intereses { get; set; } = new List<InteresUsuario>();
 
         // ========================================
         // MÉTODOS HELPER
@@ -152,12 +171,13 @@ namespace Lado.Models
         }
 
         /// <summary>
-        /// Verifica si tiene configurada la identidad de LadoB.
+        /// Verifica si tiene configurada la identidad de LadoB (creador premium).
+        /// Un usuario es Premium (LadoB) si EsCreador es true.
         /// </summary>
-        /// <returns>True si tiene seudónimo configurado</returns>
+        /// <returns>True si es creador premium</returns>
         public bool TieneLadoB()
         {
-            return !string.IsNullOrEmpty(Seudonimo);
+            return EsCreador;
         }
 
         /// <summary>

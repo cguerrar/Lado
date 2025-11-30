@@ -50,12 +50,18 @@ namespace Lado.Controllers
                     return RedirectToAction("Login", "Account");
                 }
 
+                // ⭐ Determinar TipoLado según modo de visualización
+                var tipoLadoActual = verSeudonimo ? TipoLado.LadoB : TipoLado.LadoA;
+
+                // Verificar suscripción específica al TipoLado que se está viendo
                 var estaSuscrito = await _context.Suscripciones
                     .AnyAsync(s => s.FanId == usuarioActual.Id &&
                              s.CreadorId == id &&
+                             s.TipoLado == tipoLadoActual &&
                              s.EstaActiva);
 
                 ViewBag.EstaSuscrito = estaSuscrito;
+                ViewBag.TipoLadoActual = (int)tipoLadoActual;
 
                 // ⭐ NUEVA LÓGICA: Determinar qué perfil mostrar
                 ViewBag.MostrandoSeudonimo = verSeudonimo;
@@ -239,11 +245,28 @@ namespace Lado.Controllers
                     return RedirectToAction("Login", "Account");
                 }
 
-                // 1. Obtener usuarios a los que está suscrito
-                var creadoresIds = await _context.Suscripciones
+                // 1. Obtener usuarios a los que está suscrito (separados por TipoLado)
+                var suscripcionesActivas = await _context.Suscripciones
                     .Where(s => s.FanId == usuarioId && s.EstaActiva)
-                    .Select(s => s.CreadorId)
                     .ToListAsync();
+
+                // IDs de creadores suscritos en LadoA (contenido público)
+                var creadoresLadoAIds = suscripcionesActivas
+                    .Where(s => s.TipoLado == TipoLado.LadoA)
+                    .Select(s => s.CreadorId)
+                    .ToList();
+
+                // IDs de creadores suscritos en LadoB (contenido premium)
+                var creadoresLadoBIds = suscripcionesActivas
+                    .Where(s => s.TipoLado == TipoLado.LadoB)
+                    .Select(s => s.CreadorId)
+                    .ToList();
+
+                // Lista completa para otros usos (stories, colecciones, etc.)
+                var creadoresIds = suscripcionesActivas
+                    .Select(s => s.CreadorId)
+                    .Distinct()
+                    .ToList();
 
                 _logger.LogInformation("Usuario {UserId} tiene {Count} suscripciones activas",
                     usuarioId, creadoresIds.Count);
@@ -321,7 +344,7 @@ namespace Lado.Controllers
                     })
                     .ToListAsync();
 
-                // 5. ✅ CORREGIDO: Contenido público SOLO de creadores suscritos + propio
+                // 5. ✅ CORREGIDO: Contenido público (LadoA) SOLO de creadores suscritos en LadoA + propio
                 var contenidoPublico = await _context.Contenidos
                     .Include(c => c.Usuario)
                     .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
@@ -331,16 +354,16 @@ namespace Lado.Controllers
                             && !c.Censurado
                             && c.TipoLado == TipoLado.LadoA
                             && c.Usuario != null
-                            && (creadoresIds.Contains(c.UsuarioId) || c.UsuarioId == usuarioId)) // ✅ FILTRO AGREGADO
+                            && (creadoresLadoAIds.Contains(c.UsuarioId) || c.UsuarioId == usuarioId)) // ✅ Solo LadoA
                     .ToListAsync();
 
-                // 6. Contenido premium (LadoB) de suscripciones
-                var contenidoPremiumSuscripciones = creadoresIds.Any()
+                // 6. ✅ CORREGIDO: Contenido premium (LadoB) SOLO de creadores suscritos en LadoB
+                var contenidoPremiumSuscripciones = creadoresLadoBIds.Any()
                     ? await _context.Contenidos
                         .Include(c => c.Usuario)
                         .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
                             .ThenInclude(com => com.Usuario)
-                        .Where(c => creadoresIds.Contains(c.UsuarioId)
+                        .Where(c => creadoresLadoBIds.Contains(c.UsuarioId) // ✅ Solo LadoB
                                 && c.EstaActivo
                                 && !c.EsBorrador
                                 && !c.Censurado
@@ -452,6 +475,13 @@ namespace Lado.Controllers
                     .Select(l => l.ContenidoId)
                     .ToListAsync();
                 ViewBag.LikesUsuario = likesUsuario;
+
+                // Obtener los favoritos del usuario para marcarlos en el feed
+                var favoritosUsuario = await _context.Favoritos
+                    .Where(f => f.UsuarioId == usuarioId && contenidoIds.Contains(f.ContenidoId))
+                    .Select(f => f.ContenidoId)
+                    .ToListAsync();
+                ViewBag.FavoritosIds = favoritosUsuario;
 
                 return View(contenidoOrdenado);
             }
@@ -698,7 +728,7 @@ namespace Lado.Controllers
         // ========================================
 
         [HttpPost]
-        public async Task<IActionResult> Seguir(string id)
+        public async Task<IActionResult> Seguir(string id, int? tipoLado = null)
         {
             try
             {
@@ -719,9 +749,12 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "Usuario no encontrado" });
                 }
 
-                // Verificar si ya existe una suscripción activa
+                // Determinar el TipoLado (por defecto LadoA si no se especifica)
+                var tipo = tipoLado.HasValue ? (TipoLado)tipoLado.Value : TipoLado.LadoA;
+
+                // Verificar si ya existe una suscripción activa para este TipoLado específico
                 var suscripcionExistente = await _context.Suscripciones
-                    .FirstOrDefaultAsync(s => s.FanId == usuarioActual.Id && s.CreadorId == id && s.EstaActiva);
+                    .FirstOrDefaultAsync(s => s.FanId == usuarioActual.Id && s.CreadorId == id && s.TipoLado == tipo && s.EstaActiva);
 
                 bool siguiendo;
                 if (suscripcionExistente != null)
@@ -734,7 +767,7 @@ namespace Lado.Controllers
                 }
                 else
                 {
-                    // Seguir (crear suscripción gratuita)
+                    // Seguir (crear suscripción gratuita para el TipoLado específico)
                     var nuevaSuscripcion = new Suscripcion
                     {
                         FanId = usuarioActual.Id,
@@ -744,7 +777,8 @@ namespace Lado.Controllers
                         FechaInicio = DateTime.Now,
                         ProximaRenovacion = DateTime.Now.AddMonths(1),
                         EstaActiva = true,
-                        RenovacionAutomatica = false
+                        RenovacionAutomatica = false,
+                        TipoLado = tipo
                     };
                     _context.Suscripciones.Add(nuevaSuscripcion);
                     creador.NumeroSeguidores++;
@@ -757,13 +791,168 @@ namespace Lado.Controllers
                 {
                     success = true,
                     siguiendo,
-                    seguidores = creador.NumeroSeguidores
+                    seguidores = creador.NumeroSeguidores,
+                    tipoLado = (int)tipo
                 });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al seguir usuario {UserId}", id);
                 return Json(new { success = false, message = "Error al procesar la solicitud" });
+            }
+        }
+
+        // Endpoint para dejar de seguir (para el menú)
+        [HttpPost]
+        public async Task<IActionResult> DejarDeSeguir(string id, int? tipoLado = null)
+        {
+            try
+            {
+                var usuarioActual = await _userManager.GetUserAsync(User);
+                if (usuarioActual == null)
+                {
+                    return Json(new { success = false, message = "Debes iniciar sesión" });
+                }
+
+                var creador = await _userManager.FindByIdAsync(id);
+                if (creador == null)
+                {
+                    return Json(new { success = false, message = "Usuario no encontrado" });
+                }
+
+                // Si se especifica tipoLado, dejar de seguir solo ese lado, sino todos
+                var query = _context.Suscripciones
+                    .Where(s => s.FanId == usuarioActual.Id && s.CreadorId == id && s.EstaActiva);
+
+                if (tipoLado.HasValue)
+                {
+                    query = query.Where(s => s.TipoLado == (TipoLado)tipoLado.Value);
+                }
+
+                var suscripciones = await query.ToListAsync();
+
+                foreach (var suscripcion in suscripciones)
+                {
+                    suscripcion.EstaActiva = false;
+                    suscripcion.FechaCancelacion = DateTime.Now;
+                    creador.NumeroSeguidores = Math.Max(0, creador.NumeroSeguidores - 1);
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Has dejado de seguir a este usuario" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al dejar de seguir usuario {UserId}", id);
+                return Json(new { success = false, message = "Error al procesar la solicitud" });
+            }
+        }
+
+        // Endpoint para reportar contenido
+        [HttpPost]
+        public async Task<IActionResult> Reportar(int id, string motivo)
+        {
+            try
+            {
+                var usuarioActual = await _userManager.GetUserAsync(User);
+                if (usuarioActual == null)
+                {
+                    return Json(new { success = false, message = "Debes iniciar sesión" });
+                }
+
+                var contenido = await _context.Contenidos.FindAsync(id);
+                if (contenido == null)
+                {
+                    return Json(new { success = false, message = "Contenido no encontrado" });
+                }
+
+                // Verificar si ya existe un reporte del mismo usuario
+                var reporteExistente = await _context.Reportes
+                    .AnyAsync(r => r.ContenidoId == id && r.UsuarioReportadorId == usuarioActual.Id && r.Estado == "Pendiente");
+
+                if (reporteExistente)
+                {
+                    return Json(new { success = false, message = "Ya has reportado este contenido" });
+                }
+
+                var reporte = new Reporte
+                {
+                    ContenidoId = id,
+                    UsuarioReportadorId = usuarioActual.Id,
+                    Motivo = motivo ?? "Sin especificar",
+                    TipoReporte = "Contenido",
+                    FechaReporte = DateTime.Now,
+                    Estado = "Pendiente"
+                };
+
+                _context.Reportes.Add(reporte);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Reporte enviado correctamente" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al reportar contenido {ContenidoId}", id);
+                return Json(new { success = false, message = "Error al procesar el reporte" });
+            }
+        }
+
+        // Endpoint para agregar a favoritos
+        [HttpPost]
+        public async Task<IActionResult> AgregarFavorito(int id)
+        {
+            try
+            {
+                var usuarioActual = await _userManager.GetUserAsync(User);
+                if (usuarioActual == null)
+                {
+                    return Json(new { success = false, message = "Debes iniciar sesión" });
+                }
+
+                var contenido = await _context.Contenidos.FindAsync(id);
+                if (contenido == null)
+                {
+                    return Json(new { success = false, message = "Contenido no encontrado" });
+                }
+
+                // Verificar si ya existe en favoritos
+                var favoritoExistente = await _context.Favoritos
+                    .FirstOrDefaultAsync(f => f.ContenidoId == id && f.UsuarioId == usuarioActual.Id);
+
+                bool esFavorito;
+                if (favoritoExistente != null)
+                {
+                    // Quitar de favoritos
+                    _context.Favoritos.Remove(favoritoExistente);
+                    esFavorito = false;
+                }
+                else
+                {
+                    // Agregar a favoritos
+                    var favorito = new Favorito
+                    {
+                        ContenidoId = id,
+                        UsuarioId = usuarioActual.Id,
+                        FechaAgregado = DateTime.Now
+                    };
+                    _context.Favoritos.Add(favorito);
+                    esFavorito = true;
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Json(new
+                {
+                    success = true,
+                    esFavorito,
+                    message = esFavorito ? "Agregado a favoritos" : "Eliminado de favoritos"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al manejar favorito {ContenidoId}", id);
+                return Json(new { success = false, message = "Error al procesar" });
             }
         }
 
@@ -866,6 +1055,11 @@ namespace Lado.Controllers
                 ViewBag.MiReaccion = miReaccion;
                 ViewBag.EstaSuscrito = tieneAcceso;
                 ViewBag.EsPropio = esPropio;
+
+                // Verificar si el contenido está en favoritos del usuario
+                var esFavorito = await _context.Favoritos
+                    .AnyAsync(f => f.ContenidoId == id && f.UsuarioId == usuarioActual.Id);
+                ViewBag.EsFavorito = esFavorito;
 
                 _logger.LogInformation("Detalle visto: Contenido {Id} ({TipoLado}) por Usuario {UserId}",
                     id, contenido.TipoLado, usuarioActual.Id);
@@ -984,6 +1178,75 @@ namespace Lado.Controllers
                 .AnyAsync(coc => coc.CompradorId == usuarioId);
 
             return contenidoEnColeccionComprada;
+        }
+
+        // ========================================
+        // FAVORITOS
+        // ========================================
+
+        [HttpPost]
+        public async Task<IActionResult> ToggleFavorito(int id)
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var contenido = await _context.Contenidos.FindAsync(id);
+
+                if (contenido == null)
+                {
+                    return Json(new { success = false, message = "Contenido no encontrado" });
+                }
+
+                var favoritoExistente = await _context.Favoritos
+                    .FirstOrDefaultAsync(f => f.ContenidoId == id && f.UsuarioId == usuarioId);
+
+                if (favoritoExistente != null)
+                {
+                    _context.Favoritos.Remove(favoritoExistente);
+                    await _context.SaveChangesAsync();
+                    return Json(new { success = true, esFavorito = false, message = "Eliminado de favoritos" });
+                }
+                else
+                {
+                    var nuevoFavorito = new Favorito
+                    {
+                        ContenidoId = id,
+                        UsuarioId = usuarioId,
+                        FechaAgregado = DateTime.Now
+                    };
+                    _context.Favoritos.Add(nuevoFavorito);
+                    await _context.SaveChangesAsync();
+                    return Json(new { success = true, esFavorito = true, message = "Agregado a favoritos" });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al toggle favorito para contenido {Id}", id);
+                return Json(new { success = false, message = "Error al procesar favorito" });
+            }
+        }
+
+        public async Task<IActionResult> MisFavoritos()
+        {
+            var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            var favoritos = await _context.Favoritos
+                .Where(f => f.UsuarioId == usuarioId)
+                .Include(f => f.Contenido)
+                    .ThenInclude(c => c.Usuario)
+                .OrderByDescending(f => f.FechaAgregado)
+                .Select(f => f.Contenido)
+                .Where(c => c.EstaActivo && !c.EsBorrador && !c.Censurado)
+                .ToListAsync();
+
+            var favoritosIds = await _context.Favoritos
+                .Where(f => f.UsuarioId == usuarioId)
+                .Select(f => f.ContenidoId)
+                .ToListAsync();
+
+            ViewBag.FavoritosIds = favoritosIds;
+
+            return View(favoritos);
         }
     }
 }
