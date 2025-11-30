@@ -67,6 +67,7 @@ namespace Lado.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> BloquearUsuario(string id)
         {
             var usuario = await _context.Users.FindAsync(id);
@@ -81,6 +82,7 @@ namespace Lado.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> DesbloquearUsuario(string id)
         {
             var usuario = await _context.Users.FindAsync(id);

@@ -583,6 +583,96 @@
         color: var(--muted);
     }
 
+    /* Feed Publico Card */
+    .publico-card {
+        background: rgba(16, 185, 129, 0.03);
+        border: 1px solid rgba(16, 185, 129, 0.15);
+        border-radius: var(--radius-lg);
+        padding: 20px;
+    }
+
+    .publico-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+
+    .publico-header svg {
+        color: #10B981;
+    }
+
+    .publico-header h4 {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--fg);
+        margin: 0;
+    }
+
+    .publico-desc {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 0 0 16px 0;
+    }
+
+    .toggle-container {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .publico-toggle {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 26px;
+    }
+
+    .publico-toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--line);
+        transition: 0.3s;
+        border-radius: 26px;
+    }
+
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 20px;
+        width: 20px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.3s;
+        border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .publico-toggle input:checked + .toggle-slider {
+        background-color: #10B981;
+    }
+
+    .publico-toggle input:checked + .toggle-slider:before {
+        transform: translateX(24px);
+    }
+
+    .toggle-label {
+        font-size: 14px;
+        color: var(--fg);
+        font-weight: 500;
+    }
+
     /* Form Actions */
     .form-actions {
         display: flex;
@@ -785,6 +875,26 @@
                 }
 
                 <input type="hidden" name="EsGratis" id="esGratisInput" value="@(Model.TipoLado == Lado.Models.TipoLado.LadoA ? "true" : "false")" />
+
+                <!-- Opción Feed Público (solo para LadoA) -->
+                <div class="form-section" id="feedPublicoSection" style="display: @(Model.TipoLado == Lado.Models.TipoLado.LadoA ? "block" : "none")">
+                    <div class="publico-card">
+                        <div class="publico-header">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                            </svg>
+                            <h4>Mostrar en Feed Publico</h4>
+                        </div>
+                        <p class="publico-desc">Contenido visible para usuarios no registrados</p>
+                        <div class="toggle-container">
+                            <label class="publico-toggle">
+                                <input type="checkbox" name="EsPublicoGeneral" id="esPublicoGeneralInput" value="true" @(Model.EsPublicoGeneral ? "checked" : "") />
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="toggle-label" id="toggleLabel">@(Model.EsPublicoGeneral ? "Visible en feed publico" : "Solo para seguidores")</span>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Tipo de Contenido -->
                 <div class="form-section">
@@ -1088,6 +1198,16 @@
             const precioSelect = document.getElementById('precioSelect');
             const descripcionTextarea = document.getElementById('descripcionTextarea');
             const charCount = document.getElementById('charCount');
+            const feedPublicoSection = document.getElementById('feedPublicoSection');
+            const esPublicoGeneralInput = document.getElementById('esPublicoGeneralInput');
+            const toggleLabel = document.getElementById('toggleLabel');
+
+            // Toggle de feed publico
+            if (esPublicoGeneralInput && toggleLabel) {
+                esPublicoGeneralInput.addEventListener('change', function() {
+                    toggleLabel.textContent = this.checked ? 'Visible en feed publico' : 'Solo para seguidores';
+                });
+            }
 
             // Lado selector
             if (ladoOptions.length > 0) {
@@ -1110,6 +1230,18 @@
                                 precioSelect.removeAttribute('required');
                             } else {
                                 precioSelect.setAttribute('required', 'required');
+                            }
+                        }
+
+                        // Mostrar/ocultar sección de feed público
+                        if (feedPublicoSection) {
+                            feedPublicoSection.style.display = esGratis ? 'block' : 'none';
+                            // Si es LadoB, desmarcar el checkbox
+                            if (!esGratis && esPublicoGeneralInput) {
+                                esPublicoGeneralInput.checked = false;
+                                if (toggleLabel) {
+                                    toggleLabel.textContent = 'Solo para seguidores';
+                                }
                             }
                         }
                     });

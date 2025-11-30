@@ -45,6 +45,16 @@ namespace Lado.Models
 
         public bool EsGratis { get; set; } = true;
 
+        // ========================================
+        // VISIBILIDAD PÚBLICA PARA FEED GENERAL
+        // ========================================
+
+        /// <summary>
+        /// Si es true, este contenido se mostrará en el feed público para usuarios anónimos.
+        /// Solo aplica para contenido LadoA (el contenido LadoB siempre requiere suscripción).
+        /// </summary>
+        public bool EsPublicoGeneral { get; set; } = false;
+
         public string? NombreMostrado { get; set; }
 
         // ========================================

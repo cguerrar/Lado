@@ -117,7 +117,8 @@ namespace Lado.Controllers
             int TipoContenido,
             bool EsGratis,
             decimal? PrecioDesbloqueo = null,
-            bool EsBorrador = false)
+            bool EsBorrador = false,
+            bool EsPublicoGeneral = false)
         {
             try
             {
@@ -199,7 +200,9 @@ namespace Lado.Controllers
                     EstaActivo = true,
                     NumeroLikes = 0,
                     NumeroComentarios = 0,
-                    NumeroVistas = 0
+                    NumeroVistas = 0,
+                    // Solo contenido LadoA puede ser publico general
+                    EsPublicoGeneral = tipoLado == TipoLado.LadoA && EsPublicoGeneral
                 };
 
                 // ✅ Procesar archivo
@@ -371,7 +374,8 @@ namespace Lado.Controllers
             string Descripcion,
             int TipoContenido,
             bool EsGratis,
-            decimal? PrecioDesbloqueo)
+            decimal? PrecioDesbloqueo,
+            bool EsPublicoGeneral = false)
         {
             try
             {
@@ -410,14 +414,6 @@ namespace Lado.Controllers
                     TempData["Warning"] = "Para monetizar contenido debes verificar tu identidad. El contenido se mantendrá gratis.";
                 }
 
-                // Validaciones
-                if (!contenido.EsBorrador && string.IsNullOrWhiteSpace(Descripcion))
-                {
-                    TempData["Error"] = "La descripción es requerida para contenido publicado";
-                    ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
-                    return View(contenido);
-                }
-
                 // ✅ Validar precio SOLO si es contenido de pago Y está verificado
                 if (!EsGratis && usuario.CreadorVerificado)
                 {
@@ -441,6 +437,9 @@ namespace Lado.Controllers
                 contenido.PrecioDesbloqueo = EsGratis ? 0m : (PrecioDesbloqueo ?? 10m);
                 contenido.NombreMostrado = contenido.TipoLado == TipoLado.LadoA ?
                                           usuario.NombreCompleto : usuario.Seudonimo;
+
+                // EsPublicoGeneral solo aplica para LadoA
+                contenido.EsPublicoGeneral = contenido.TipoLado == TipoLado.LadoA ? EsPublicoGeneral : false;
 
                 _logger.LogInformation("Tipo anterior: {TipoAnterior}, Nuevo tipo: {TipoNuevo}",
                     tipoAnterior, contenido.TipoLado);

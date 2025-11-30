@@ -7,9 +7,9 @@ using System.Security.Principal;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configurar SQL Server
+// Configurar SQL Server - usa ConnectionStrings:DefaultConnection desde appsettings
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer("Data Source=200.50.127.117\\MSSQLSERVER2022;Initial Catalog=Lado;User ID=sa;Password=Password123..*;TrustServerCertificate=True"));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Configurar Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -24,32 +24,28 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-// Configurar Google Authentication
+// Configurar Google Authentication - usa Authentication:Google desde appsettings
 builder.Services.AddAuthentication()
     .AddGoogle(options =>
     {
-        options.ClientId = "985201886726-um2rscj5od9eanu3neutnmjmfur2ng7p.apps.googleusercontent.com";
-        options.ClientSecret = "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";
+        options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? "";
+        options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? "";
     });
 
+// ========================================
+// CONFIGURACION SEGURA DE COOKIES
+// ========================================
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.Cookie.HttpOnly = true;
-    options.ExpireTimeSpan = TimeSpan.FromDays(30); // Cookie dura 30 días si "Recordarme" está activo
-    options.SlidingExpiration = true; // Renueva la cookie en cada request
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Solo HTTPS
+    options.Cookie.SameSite = SameSiteMode.Strict; // Proteccion CSRF
+    options.Cookie.Name = ".Lado.Auth"; // Nombre personalizado
+    options.ExpireTimeSpan = TimeSpan.FromDays(30);
+    options.SlidingExpiration = true;
     options.LoginPath = "/Account/Login";
     options.LogoutPath = "/Account/Logout";
     options.AccessDeniedPath = "/Account/AccessDenied";
-});
-
-// Configurar cookies
-builder.Services.ConfigureApplicationCookie(options =>
-{
-    options.LoginPath = "/Account/Login";
-    options.LogoutPath = "/Home/Index";
-    options.AccessDeniedPath = "/Account/AccessDenied";
-    options.ExpireTimeSpan = TimeSpan.FromDays(30);
-    options.SlidingExpiration = true;
 });
 
 builder.Services.AddControllersWithViews();
@@ -89,6 +85,19 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// ========================================
+// HEADERS DE SEGURIDAD
+// ========================================
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Append("X-Frame-Options", "SAMEORIGIN");
+    context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
+    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.Response.Headers.Append("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    await next();
+});
 
 // ⭐ CRÍTICO: UseStaticFiles DEBE estar ANTES de UseRouting
 app.UseStaticFiles(); // Sirve archivos desde wwwroot
@@ -165,7 +174,7 @@ try
                 await userManager.AddToRoleAsync(admin, "Admin");
                 logger.LogInformation("✅ Usuario Admin creado exitosamente");
                 logger.LogInformation("   📧 Email: {Email}", adminEmail);
-                logger.LogInformation("   🔑 Password: Admin123!");
+                // NOTA: Password no se loguea por seguridad
             }
             else
             {

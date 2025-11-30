@@ -31,7 +31,7 @@ namespace Lado.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Suscribirse(string creadorId, decimal precio, int? tipoLado = null)
+        public async Task<IActionResult> Suscribirse(string creadorId, int? tipoLado = null)
         {
             try
             {
@@ -39,8 +39,17 @@ namespace Lado.Controllers
                 var usuario = await _userManager.FindByIdAsync(usuarioId);
                 var creador = await _userManager.FindByIdAsync(creadorId);
 
-                // Determinar TipoLado (default LadoA)
+                if (creador == null)
+                {
+                    TempData["Error"] = "Creador no encontrado";
+                    return RedirectToAction("Index", "Feed");
+                }
+
+                // SEGURIDAD: Obtener precio desde el servidor, NO del cliente
                 var tipo = tipoLado.HasValue ? (TipoLado)tipoLado.Value : TipoLado.LadoA;
+                var precio = tipo == TipoLado.LadoB
+                    ? (creador.PrecioSuscripcionLadoB ?? creador.PrecioSuscripcion)
+                    : creador.PrecioSuscripcion;
 
                 // Verificar si ya está suscrito a este TipoLado específico
                 var suscripcionExistente = await _context.Suscripciones
