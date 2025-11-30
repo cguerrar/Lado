@@ -209,6 +209,33 @@
     .modal-content {
         border-radius: 24px;
         border: none;
+        position: relative;
+        z-index: 1060;
+    }
+
+    .modal {
+        z-index: 1055 !important;
+    }
+
+    .modal-backdrop {
+        z-index: 1050 !important;
+    }
+
+    .modal-dialog {
+        z-index: 1060;
+    }
+
+    /* Asegurar que el modal sea interactivo */
+    #modalCargarSaldo .modal-body {
+        pointer-events: auto;
+    }
+
+    #modalCargarSaldo input,
+    #modalCargarSaldo select,
+    #modalCargarSaldo button {
+        pointer-events: auto;
+        position: relative;
+        z-index: 1;
     }
 
     .quick-amount-btn {
@@ -558,20 +585,20 @@
 </div>
 
 <!-- Modal Cargar Saldo -->
-<div class="modal fade" id="modalCargarSaldo" tabindex="-1">
+<div class="modal fade" id="modalCargarSaldo" tabindex="-1" aria-labelledby="modalCargarSaldoLabel" aria-hidden="true" data-bs-backdrop="true" data-bs-keyboard="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header border-0" style="padding: 32px 32px 0 32px;">
                 <div>
-                    <h4 class="modal-title mb-2" style="font-weight: 800;">
-                        💳 Cargar Saldo
+                    <h4 class="modal-title mb-2" id="modalCargarSaldoLabel" style="font-weight: 800;">
+                        Cargar Saldo
                     </h4>
                     <p class="text-muted mb-0">Añade fondos a tu billetera de forma segura</p>
                 </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body" style="padding: 32px;">
-                <form asp-action="CargarSaldo" asp-controller="FanBilletera" method="post">
+                <form asp-action="CargarSaldo" asp-controller="FanBilletera" method="post" id="formCargarSaldo">
                     <div class="alert" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border: 2px solid #93c5fd; border-radius: 16px; padding: 16px;">
                         <div class="d-flex align-items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1e40af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -587,7 +614,7 @@
                         <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 12px;">Monto a Cargar</label>
                         <div class="input-group" style="height: 56px;">
                             <span class="input-group-text" style="background: #f9fafb; border: 2px solid #e5e7eb; border-right: none; font-weight: 700; font-size: 1.2rem;">$</span>
-                            <input type="number" class="form-control" name="Monto" step="0.01" min="5" max="1000" placeholder="0.00" required style="border: 2px solid #e5e7eb; border-left: none; font-size: 1.2rem; font-weight: 600;">
+                            <input type="number" class="form-control" name="Monto" id="inputMonto" step="0.01" min="5" max="1000" placeholder="0.00" required style="border: 2px solid #e5e7eb; border-left: none; font-size: 1.2rem; font-weight: 600;">
                         </div>
                         <small class="text-muted">Mínimo: $5.00 | Máximo: $1,000.00</small>
                     </div>
@@ -597,33 +624,33 @@
                         <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 12px;">Montos Rápidos</label>
                         <div class="row g-2">
                             <div class="col-3">
-                                <button type="button" class="quick-amount-btn w-100" onclick="document.querySelector('input[name=Monto]').value = 10">$10</button>
+                                <button type="button" class="quick-amount-btn w-100" data-amount="10">$10</button>
                             </div>
                             <div class="col-3">
-                                <button type="button" class="quick-amount-btn w-100" onclick="document.querySelector('input[name=Monto]').value = 25">$25</button>
+                                <button type="button" class="quick-amount-btn w-100" data-amount="25">$25</button>
                             </div>
                             <div class="col-3">
-                                <button type="button" class="quick-amount-btn w-100" onclick="document.querySelector('input[name=Monto]').value = 50">$50</button>
+                                <button type="button" class="quick-amount-btn w-100" data-amount="50">$50</button>
                             </div>
                             <div class="col-3">
-                                <button type="button" class="quick-amount-btn w-100" onclick="document.querySelector('input[name=Monto]').value = 100">$100</button>
+                                <button type="button" class="quick-amount-btn w-100" data-amount="100">$100</button>
                             </div>
                         </div>
                     </div>
 
                     <div class="mb-4">
                         <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 12px;">Método de Pago</label>
-                        <select class="form-select" name="MetodoPago" required style="height: 56px; border: 2px solid #e5e7eb; border-radius: 12px; font-weight: 600;">
+                        <select class="form-select" name="MetodoPago" id="selectMetodoPago" required style="height: 56px; border: 2px solid #e5e7eb; border-radius: 12px; font-weight: 600;">
                             <option value="">Selecciona un método</option>
-                            <option value="Tarjeta">💳 Tarjeta de Crédito/Débito</option>
-                            <option value="PayPal">🅿️ PayPal</option>
-                            <option value="Stripe">💳 Stripe</option>
+                            <option value="Tarjeta">Tarjeta de Crédito/Débito</option>
+                            <option value="PayPal">PayPal</option>
+                            <option value="Stripe">Stripe</option>
                         </select>
                     </div>
 
                     <div class="alert alert-warning" style="border-radius: 16px; border: 2px solid #fbbf24; background: #fef3c7;">
                         <small style="font-weight: 600; color: #92400e;">
-                            ⚙️ <strong>Modo Simulado:</strong> Los pagos son procesados de forma simulada para desarrollo.
+                            <strong>Modo Simulado:</strong> Los pagos son procesados de forma simulada para desarrollo.
                         </small>
                     </div>
 
@@ -641,3 +668,29 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Manejar botones de montos rápidos
+    document.querySelectorAll('.quick-amount-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var amount = this.getAttribute('data-amount');
+            document.getElementById('inputMonto').value = amount;
+        });
+    });
+
+    // Asegurar que el modal se mueva al body cuando se abra
+    var modalEl = document.getElementById('modalCargarSaldo');
+    if (modalEl) {
+        modalEl.addEventListener('show.bs.modal', function() {
+            // Mover el modal al body si no está ya ahí
+            if (this.parentElement !== document.body) {
+                document.body.appendChild(this);
+            }
+        });
+    }
+});
+</script>
+}

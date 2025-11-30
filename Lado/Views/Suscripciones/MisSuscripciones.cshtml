@@ -129,6 +129,42 @@
         color: white;
     }
 
+    /* Etiqueta de tipo de lado */
+    .sub-tipo-lado {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .sub-tipo-lado.lado-a {
+        background: rgba(70, 130, 180, 0.95);
+        color: white;
+    }
+
+    .sub-tipo-lado.lado-b {
+        background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%);
+        color: white;
+    }
+
+    /* Badge LadoB en username */
+    .badge-ladob {
+        display: inline-block;
+        background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%);
+        color: white;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 10px;
+        margin-left: 8px;
+        vertical-align: middle;
+    }
+
     .sub-content {
         padding: 20px;
         position: relative;
@@ -347,6 +383,38 @@
         height: 20px;
     }
 
+    /* FIX MODAL Z-INDEX - Must be higher than sidebar and other elements */
+    #modalCancelar {
+        z-index: 99999 !important;
+        position: fixed !important;
+    }
+    #modalCancelar.show {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+    }
+    .modal-backdrop {
+        z-index: 99998 !important;
+    }
+    #modalCancelar .modal-dialog {
+        z-index: 100000 !important;
+        position: relative !important;
+        pointer-events: auto !important;
+    }
+    #modalCancelar .modal-content {
+        pointer-events: auto !important;
+        position: relative !important;
+    }
+    #modalCancelar .btn,
+    #modalCancelar button,
+    #modalCancelar .btn-danger,
+    #modalCancelar .btn-secondary {
+        pointer-events: auto !important;
+        position: relative !important;
+        z-index: 100001 !important;
+        cursor: pointer !important;
+    }
+
     /* Modal Styles */
     .modal-cancel .modal-content {
         border-radius: var(--radius-xl);
@@ -497,6 +565,16 @@
         <div class="subs-grid">
             @foreach (var suscripcion in Model)
             {
+                @* Determinar si es suscripcion LadoB para mostrar seudonimo/foto correcta *@
+                var esLadoB = suscripcion.TipoLado == Lado.Models.TipoLado.LadoB;
+                var nombreMostrar = esLadoB
+                    ? (suscripcion.Creador?.Seudonimo ?? "Usuario")
+                    : (suscripcion.Creador?.NombreCompleto ?? "Usuario");
+                var fotoMostrar = esLadoB
+                    ? suscripcion.Creador?.FotoPerfilLadoB
+                    : suscripcion.Creador?.FotoPerfil;
+                var tipoEtiqueta = esLadoB ? "Lado B" : "Lado A";
+
                 <div class="sub-card">
                     <div class="sub-cover">
                         @if (!string.IsNullOrEmpty(suscripcion.Creador?.FotoPortada))
@@ -521,12 +599,17 @@
                         {
                             <span class="sub-status inactive">Inactiva</span>
                         }
+
+                        @* Etiqueta de tipo de lado *@
+                        <span class="sub-tipo-lado @(esLadoB ? "lado-b" : "lado-a")">
+                            @tipoEtiqueta
+                        </span>
                     </div>
 
                     <div class="sub-content">
-                        @if (!string.IsNullOrEmpty(suscripcion.Creador?.FotoPerfil))
+                        @if (!string.IsNullOrEmpty(fotoMostrar))
                         {
-                            <img src="@suscripcion.Creador.FotoPerfil" alt="@suscripcion.Creador.NombreCompleto" class="sub-avatar">
+                            <img src="@fotoMostrar" alt="@nombreMostrar" class="sub-avatar">
                         }
                         else
                         {
@@ -539,8 +622,8 @@
                         }
 
                         <div class="sub-info">
-                            <h3 class="sub-name">@(suscripcion.Creador?.NombreCompleto ?? "Usuario")</h3>
-                            <p class="sub-username">@@@(suscripcion.Creador?.UserName ?? "username")</p>
+                            <h3 class="sub-name">@nombreMostrar</h3>
+                            <p class="sub-username">@@@(suscripcion.Creador?.UserName ?? "username") @if(esLadoB){<span class="badge-ladob">LadoB</span>}</p>
 
                             <div class="sub-details">
                                 <div class="sub-detail-row">
@@ -578,7 +661,7 @@
                             </div>
 
                             <div class="sub-actions">
-                                <a href="@Url.Action("Perfil", "Feed", new { id = suscripcion.CreadorId })" class="btn-profile">
+                                <a href="@Url.Action("Perfil", "Feed", new { id = suscripcion.CreadorId, lado = esLadoB ? "b" : "a" })" class="btn-profile">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                                         <circle cx="12" cy="7" r="4"></circle>
@@ -587,7 +670,7 @@
                                 </a>
                                 @if (suscripcion.EstaActiva)
                                 {
-                                    <button type="button" class="btn-cancel" onclick="confirmarCancelacion(@suscripcion.Id, '@suscripcion.Creador?.NombreCompleto')" title="Cancelar suscripcion">
+                                    <button type="button" class="btn-cancel" onclick="confirmarCancelacion(@suscripcion.Id, '@nombreMostrar')" title="Cancelar suscripcion">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <line x1="18" y1="6" x2="6" y2="18"></line>
                                             <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -628,11 +711,53 @@
 
 @section Scripts {
     <script>
+        var modalInstance = null;
+
         function confirmarCancelacion(id, nombreCreador) {
             document.getElementById('suscripcionId').value = id;
             document.getElementById('nombreCreador').textContent = nombreCreador;
-            var modal = new bootstrap.Modal(document.getElementById('modalCancelar'));
-            modal.show();
+
+            var modalEl = document.getElementById('modalCancelar');
+
+            // Mover el modal al final del body para evitar problemas de z-index
+            document.body.appendChild(modalEl);
+
+            // Forzar estilos para asegurar que sea clickeable
+            modalEl.style.zIndex = '999999';
+            modalEl.style.position = 'fixed';
+
+            modalInstance = new bootstrap.Modal(modalEl, {
+                backdrop: true,
+                keyboard: true
+            });
+
+            // Cuando se muestre el modal, ajustar z-index del backdrop
+            modalEl.addEventListener('shown.bs.modal', function() {
+                var backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) {
+                    backdrop.style.zIndex = '999998';
+                }
+                // Asegurar que el modal-dialog sea clickeable
+                var dialog = modalEl.querySelector('.modal-dialog');
+                if (dialog) {
+                    dialog.style.pointerEvents = 'auto';
+                    dialog.style.zIndex = '999999';
+                }
+            }, { once: true });
+
+            modalInstance.show();
         }
+
+        // Manejar el submit del formulario directamente
+        document.addEventListener('DOMContentLoaded', function() {
+            var form = document.getElementById('formCancelar');
+            var btnDanger = form.querySelector('.btn-danger');
+
+            btnDanger.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                form.submit();
+            });
+        });
     </script>
 }

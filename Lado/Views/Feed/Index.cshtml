@@ -7,6 +7,7 @@
     var stories = ViewBag.Stories as IEnumerable<dynamic>;
     var usuarioActual = ViewBag.UsuarioActual as ApplicationUser;
     var creadoresSugeridos = ViewBag.CreadoresSugeridos as List<ApplicationUser> ?? new List<ApplicationUser>();
+    var contenidoBloqueadoIds = ViewBag.ContenidoBloqueadoIds as List<int> ?? new List<int>();
 }
 
 <style>
@@ -891,6 +892,274 @@
             margin-bottom: 8px;
         }
     }
+
+    /* ========================================
+       CONTENIDO BLOQUEADO - BLUR Y CANDADO
+       ======================================== */
+    .locked-content-wrapper {
+        position: relative;
+        cursor: pointer;
+        overflow: hidden;
+    }
+
+    .locked-content-wrapper .post-media img,
+    .locked-content-wrapper .post-media video,
+    .locked-content-wrapper .post-text-content {
+        filter: blur(20px);
+        transform: scale(1.1);
+        pointer-events: none;
+    }
+
+    .locked-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 10;
+    }
+
+    .locked-icon {
+        width: 64px;
+        height: 64px;
+        background: rgba(0, 0, 0, 0.7);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .locked-icon svg {
+        width: 32px;
+        height: 32px;
+        color: #FFC400;
+    }
+
+    .locked-text {
+        color: white;
+        font-size: 16px;
+        font-weight: 600;
+        text-align: center;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+        padding: 0 20px;
+    }
+
+    .locked-subscribe-btn {
+        margin-top: 16px;
+        background: linear-gradient(135deg, #a855f7, #7c3aed);
+        color: white;
+        border: none;
+        padding: 12px 28px;
+        border-radius: 24px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 4px 16px rgba(168, 85, 247, 0.4);
+    }
+
+    .locked-subscribe-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 24px rgba(168, 85, 247, 0.5);
+    }
+
+    .locked-badge {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: linear-gradient(135deg, #a855f7, #7c3aed);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        z-index: 11;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .locked-badge svg {
+        width: 12px;
+        height: 12px;
+    }
+
+    /* Modal de suscripcion */
+    .subscribe-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .subscribe-modal.active {
+        display: flex;
+    }
+
+    .subscribe-modal-content {
+        background: var(--surface);
+        border-radius: 16px;
+        max-width: 420px;
+        width: 90%;
+        overflow: hidden;
+        animation: modalSlideIn 0.3s ease;
+    }
+
+    @@keyframes modalSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    .subscribe-modal-header {
+        position: relative;
+        padding: 24px;
+        text-align: center;
+        background: linear-gradient(135deg, #a855f7, #7c3aed);
+        color: white;
+    }
+
+    .subscribe-modal-close {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        transition: background 0.2s;
+    }
+
+    .subscribe-modal-close:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .subscribe-modal-avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        border: 4px solid white;
+        object-fit: cover;
+        margin-bottom: 12px;
+    }
+
+    .subscribe-modal-avatar-placeholder {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        border: 4px solid white;
+        background: rgba(255, 255, 255, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        font-weight: 700;
+        margin: 0 auto 12px;
+    }
+
+    .subscribe-modal-name {
+        font-size: 20px;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+
+    .subscribe-modal-username {
+        font-size: 14px;
+        opacity: 0.9;
+    }
+
+    .subscribe-modal-body {
+        padding: 24px;
+        text-align: center;
+    }
+
+    .subscribe-modal-body h4 {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--fg);
+    }
+
+    .subscribe-modal-body p {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.5;
+        margin-bottom: 20px;
+    }
+
+    .subscribe-modal-price {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--fg);
+        margin-bottom: 4px;
+    }
+
+    .subscribe-modal-price-label {
+        font-size: 13px;
+        color: var(--muted);
+        margin-bottom: 20px;
+    }
+
+    .subscribe-modal-btn {
+        width: 100%;
+        background: linear-gradient(135deg, #a855f7, #7c3aed);
+        color: white;
+        border: none;
+        padding: 14px 24px;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .subscribe-modal-btn:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 20px rgba(168, 85, 247, 0.4);
+    }
+
+    .subscribe-modal-footer {
+        padding: 16px 24px;
+        border-top: 1px solid var(--line);
+        text-align: center;
+    }
+
+    .subscribe-modal-footer a {
+        color: var(--primary);
+        font-size: 14px;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .subscribe-modal-footer a:hover {
+        text-decoration: underline;
+    }
 </style>
 
 <div class="feed-page-layout">
@@ -947,12 +1216,13 @@
             var tieneArchivo = !string.IsNullOrEmpty(post.RutaArchivo);
             var yaLeDioLike = likesUsuario.Contains(post.Id);
             var esFavorito = favoritosIds.Contains(post.Id);
+            var estaBloqueado = contenidoBloqueadoIds.Contains(post.Id);
 
             // Determinar la foto de perfil según el tipo de contenido
             var fotoPerfilMostrar = post.TipoLado == TipoLado.LadoB
                 ? (post.Usuario?.FotoPerfilLadoB ?? post.Usuario?.FotoPerfil)
                 : post.Usuario?.FotoPerfil;
-            <article class="post" data-post-id="@post.Id">
+            <article class="post @(estaBloqueado ? "post-locked" : "")" data-post-id="@post.Id" data-locked="@estaBloqueado.ToString().ToLower()" data-creator-id="@post.UsuarioId" data-creator-name="@(post.Usuario?.Seudonimo ?? post.Usuario?.NombreCompleto ?? "Creador")" data-creator-photo="@(post.Usuario?.FotoPerfilLadoB ?? post.Usuario?.FotoPerfil)" data-creator-price="@(post.Usuario?.PrecioSuscripcion.ToString("0.00") ?? "0.00")">
                 <!-- Header -->
                 <header class="post-header">
                     <a href="@urlPerfil" class="post-header-left">
@@ -1025,7 +1295,57 @@
                 </header>
 
                 <!-- Media -->
-                @if (tieneArchivo)
+                @if (estaBloqueado)
+                {
+                    <!-- Contenido bloqueado con blur y candado -->
+                    <div class="locked-content-wrapper" onclick="openSubscribeModal(this.closest('.post'))">
+                        <div class="locked-badge">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                            </svg>
+                            EXCLUSIVO
+                        </div>
+                        @if (tieneArchivo)
+                        {
+                            <div class="post-media">
+                                @if (esImagen || (!esVideo && !esAudio))
+                                {
+                                    <img src="@post.RutaArchivo" alt="" loading="lazy">
+                                }
+                                else if (esVideo)
+                                {
+                                    <video src="@post.RutaArchivo" class="feed-video" muted preload="metadata" poster=""></video>
+                                }
+                                else if (esAudio)
+                                {
+                                    <div class="post-media-audio">
+                                        <svg width="64" height="64" viewBox="0 0 24 24" fill="var(--primary)">
+                                            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                                        </svg>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="post-text-content" style="min-height: 200px;">
+                                @(post.Descripcion?.Length > 50 ? post.Descripcion.Substring(0, 50) + "..." : post.Descripcion)
+                            </div>
+                        }
+                        <div class="locked-overlay">
+                            <div class="locked-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                            </div>
+                            <div class="locked-text">Contenido exclusivo de Lado B</div>
+                            <button class="locked-subscribe-btn">Suscribirse para ver</button>
+                        </div>
+                    </div>
+                }
+                else if (tieneArchivo)
                 {
                     <div class="post-media" onclick="window.location.href='/Feed/Detalle/@post.Id'" style="cursor: pointer;">
                         @if (esImagen)
@@ -2305,5 +2625,99 @@
         updateDmBadge();
         // Actualizar cada 30 segundos
         setInterval(updateDmBadge, 30000);
+    });
+</script>
+
+<!-- ========================================
+     MODAL DE SUSCRIPCION - CONTENIDO BLOQUEADO
+     ======================================== -->
+<div class="subscribe-modal" id="subscribeModal" onclick="if(event.target === this) closeSubscribeModal()">
+    <div class="subscribe-modal-content">
+        <div class="subscribe-modal-header">
+            <button class="subscribe-modal-close" onclick="closeSubscribeModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            <div id="subscribeModalAvatar" class="subscribe-modal-avatar-placeholder">?</div>
+            <div class="subscribe-modal-name" id="subscribeModalName">Creador</div>
+            <div class="subscribe-modal-username" id="subscribeModalUsername">@@usuario</div>
+        </div>
+        <div class="subscribe-modal-body">
+            <h4>Contenido exclusivo de Lado B</h4>
+            <p>Suscribete para acceder a todo el contenido exclusivo de este creador, incluyendo fotos, videos y mas.</p>
+            <div class="subscribe-modal-price" id="subscribeModalPrice">$0.00</div>
+            <div class="subscribe-modal-price-label">por mes</div>
+            <button class="subscribe-modal-btn" id="subscribeModalBtn" onclick="goToSubscribe()">
+                Suscribirse ahora
+            </button>
+        </div>
+        <div class="subscribe-modal-footer">
+            <a href="#" id="subscribeModalProfileLink">Ver perfil del creador</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ========================================
+    // MODAL DE SUSCRIPCION - CONTENIDO BLOQUEADO
+    // ========================================
+
+    let currentCreatorId = null;
+
+    function openSubscribeModal(postElement) {
+        if (!postElement) return;
+
+        const creatorId = postElement.dataset.creatorId;
+        const creatorName = postElement.dataset.creatorName || 'Creador';
+        const creatorPhoto = postElement.dataset.creatorPhoto;
+        const creatorPrice = postElement.dataset.creatorPrice || '0.00';
+
+        currentCreatorId = creatorId;
+
+        // Actualizar contenido del modal
+        document.getElementById('subscribeModalName').textContent = creatorName;
+        document.getElementById('subscribeModalUsername').textContent = '@@' + creatorName.toLowerCase().replace(/\s+/g, '');
+        document.getElementById('subscribeModalPrice').textContent = '$' + creatorPrice;
+
+        // Avatar
+        const avatarContainer = document.getElementById('subscribeModalAvatar');
+        if (creatorPhoto && creatorPhoto !== '') {
+            avatarContainer.innerHTML = '';
+            avatarContainer.className = '';
+            const img = document.createElement('img');
+            img.src = creatorPhoto;
+            img.alt = creatorName;
+            img.className = 'subscribe-modal-avatar';
+            avatarContainer.appendChild(img);
+        } else {
+            avatarContainer.innerHTML = creatorName.charAt(0).toUpperCase();
+            avatarContainer.className = 'subscribe-modal-avatar-placeholder';
+        }
+
+        // Link al perfil
+        document.getElementById('subscribeModalProfileLink').href = '/Feed/Perfil/' + creatorId + '?verSeudonimo=true';
+
+        // Mostrar modal
+        document.getElementById('subscribeModal').classList.add('active');
+    }
+
+    function closeSubscribeModal() {
+        document.getElementById('subscribeModal').classList.remove('active');
+        currentCreatorId = null;
+    }
+
+    function goToSubscribe() {
+        if (currentCreatorId) {
+            window.location.href = '/Feed/Perfil/' + currentCreatorId + '?verSeudonimo=true&subscribe=true';
+        }
+    }
+
+    // Cerrar con Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeSubscribeModal();
+        }
     });
 </script>

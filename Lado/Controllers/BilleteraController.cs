@@ -175,6 +175,24 @@ namespace Lado.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        // GET: /Billetera/HistorialCompleto
+        public async Task<IActionResult> HistorialCompleto()
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            var transacciones = await _context.Transacciones
+                .Where(t => t.UsuarioId == usuario.Id)
+                .OrderByDescending(t => t.FechaTransaccion)
+                .ToListAsync();
+
+            ViewBag.SaldoActual = usuario.Saldo;
+            return View(transacciones);
+        }
+
         // GET: /Billetera/HistorialTransacciones
         public async Task<IActionResult> HistorialTransacciones(int pagina = 1, string tipo = "todas")
         {

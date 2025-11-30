@@ -28,76 +28,10 @@ namespace Lado.Controllers
             _logger = logger;
         }
 
-        // GET: /FanBilletera/Index
-        public async Task<IActionResult> Index()
+        // GET: /FanBilletera/Index - Redirige a Billetera
+        public IActionResult Index()
         {
-            var usuario = await _userManager.GetUserAsync(User);
-            if (usuario == null)
-            {
-                return RedirectToAction("Login", "Account");
-            }
-
-           
-            // ✅ CORREGIDO: Total gastado este mes (con Math.Abs para convertir negativos a positivos)
-            var inicioMes = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
-            var gastadoEsteMes = await _context.Transacciones
-                .Where(t => t.UsuarioId == usuario.Id &&
-                           t.FechaTransaccion >= inicioMes &&
-                           (t.TipoTransaccion == TipoTransaccion.Suscripcion ||
-                            t.TipoTransaccion == TipoTransaccion.CompraContenido ||  // ✅ Agregado
-                            t.TipoTransaccion == TipoTransaccion.Tip) &&
-                           t.EstadoPago == "Completado")  // ✅ Agregado
-                .SumAsync(t => (decimal?)Math.Abs(t.Monto)) ?? 0;  // ✅ Math.Abs para valores absolutos
-
-            ViewBag.GastadoEsteMes = gastadoEsteMes;
-
-            _logger.LogInformation($"Fan {usuario.Id} - Gastado este mes: ${gastadoEsteMes}");
-
-            // Total de recargas realizadas (histórico)
-            ViewBag.TotalRecargado = await _context.Transacciones
-                .Where(t => t.UsuarioId == usuario.Id &&
-                           t.TipoTransaccion == TipoTransaccion.Recarga &&
-                           t.EstadoPago == "Completado")  // ✅ Agregado
-                .SumAsync(t => (decimal?)t.Monto) ?? 0;
-
-            // Suscripciones activas
-            ViewBag.SuscripcionesActivas = await _context.Suscripciones
-                .CountAsync(s => s.FanId == usuario.Id && s.EstaActiva);
-
-            // Transacciones recientes (últimas 15)
-            ViewBag.Transacciones = await _context.Transacciones
-                .Where(t => t.UsuarioId == usuario.Id)
-                .OrderByDescending(t => t.FechaTransaccion)
-                .Take(15)
-                .Select(t => new
-                {
-                    t.Id,
-                    FechaTransaccion = t.FechaTransaccion,
-                    Tipo = t.TipoTransaccion == TipoTransaccion.Recarga ? "Recarga" :
-                           t.TipoTransaccion == TipoTransaccion.Suscripcion ? "Suscripción" :
-                           t.TipoTransaccion == TipoTransaccion.CompraContenido ? "Compra" :
-                           t.TipoTransaccion == TipoTransaccion.Tip ? "Tip" : "Otro",
-                    t.Descripcion,
-                    t.Monto,
-                    Estado = t.EstadoPago ?? "Completado",
-                    t.TipoTransaccion
-                })
-                .ToListAsync();
-
-            // Próxima renovación de suscripciones
-            var proximaRenovacion = await _context.Suscripciones
-                .Where(s => s.FanId == usuario.Id && s.EstaActiva && s.RenovacionAutomatica)
-                .OrderBy(s => s.ProximaRenovacion)
-                .FirstOrDefaultAsync();
-
-            ViewBag.ProximaRenovacion = proximaRenovacion?.ProximaRenovacion;
-
-            // Calcular monto de próximas renovaciones
-            ViewBag.MontoProximasRenovaciones = await _context.Suscripciones
-                .Where(s => s.FanId == usuario.Id && s.EstaActiva && s.RenovacionAutomatica)
-                .SumAsync(s => (decimal?)s.PrecioMensual) ?? 0;
-
-            return View(usuario);
+            return RedirectToAction("Index", "Billetera");
         }
 
         // POST: /FanBilletera/CargarSaldo
@@ -116,13 +50,13 @@ namespace Lado.Controllers
             if (monto < 5)
             {
                 TempData["Error"] = "El monto mínimo de recarga es $5.00";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction("Index", "Billetera");
             }
 
             if (monto > 1000)
             {
                 TempData["Error"] = "El monto máximo de recarga es $1,000.00";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction("Index", "Billetera");
             }
 
             try
@@ -137,7 +71,7 @@ namespace Lado.Controllers
                 if (!pagoExitoso)
                 {
                     TempData["Error"] = "Error al procesar el pago. Por favor intenta nuevamente.";
-                    return RedirectToAction(nameof(Index));
+                    return RedirectToAction("Index", "Billetera");
                 }
 
                 // Crear transacción de recarga
@@ -166,13 +100,13 @@ namespace Lado.Controllers
                 _logger.LogInformation($"Recarga exitosa: Usuario {usuario.Id}, Monto ${monto}");
 
                 TempData["Success"] = $"¡Recarga exitosa! Se agregaron ${monto:N2} a tu billetera.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction("Index", "Billetera");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al procesar recarga de saldo");
                 TempData["Error"] = "Error al procesar la recarga. Por favor, intenta de nuevo.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction("Index", "Billetera");
             }
         }
 
@@ -279,22 +213,10 @@ namespace Lado.Controllers
             }
         }
 
-        // GET: /FanBilletera/HistorialCompleto
-        public async Task<IActionResult> HistorialCompleto()
+        // GET: /FanBilletera/HistorialCompleto - Redirige a Billetera
+        public IActionResult HistorialCompleto()
         {
-            var usuario = await _userManager.GetUserAsync(User);
-            if (usuario == null)
-            {
-                return RedirectToAction("Login", "Account");
-            }
-
-            var transacciones = await _context.Transacciones
-                .Where(t => t.UsuarioId == usuario.Id)
-                .OrderByDescending(t => t.FechaTransaccion)
-                .ToListAsync();
-
-            ViewBag.SaldoActual = usuario.Saldo;
-            return View(transacciones);
+            return RedirectToAction("HistorialCompleto", "Billetera");
         }
     }
 }

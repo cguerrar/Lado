@@ -106,8 +106,8 @@ namespace Lado.Controllers
                 }
                 else
                 {
-                    // 📌 MODO NORMAL: Todo el contenido (LadoA + LadoB)
-                    _logger.LogInformation("Mostrando perfil completo para {Username}", usuario.UserName);
+                    // 📌 MODO NORMAL (LadoA): Solo contenido público LadoA
+                    _logger.LogInformation("Mostrando perfil LadoA para {Username}", usuario.UserName);
 
                     var contenidoLadoA = await _context.Contenidos
                         .Where(c => c.UsuarioId == id
@@ -118,35 +118,10 @@ namespace Lado.Controllers
                         .OrderByDescending(c => c.FechaPublicacion)
                         .ToListAsync();
 
-                    var contenidosComprados = await _context.ComprasContenido
-                        .Where(cc => cc.UsuarioId == usuarioActual.Id)
-                        .Select(cc => cc.ContenidoId)
-                        .ToListAsync();
+                    // En modo LadoA NO mostramos contenido LadoB
+                    var contenidoLadoB = new List<Contenido>();
 
-                    var contenidoLadoB = (estaSuscrito || id == usuarioActual.Id)
-                        ? await _context.Contenidos
-                            .Where(c => c.UsuarioId == id
-                                    && c.EstaActivo
-                                    && !c.EsBorrador
-                                    && !c.Censurado
-                                    && c.TipoLado == TipoLado.LadoB)
-                            .OrderByDescending(c => c.FechaPublicacion)
-                            .ToListAsync()
-                        : await _context.Contenidos
-                            .Where(c => c.UsuarioId == id
-                                    && c.EstaActivo
-                                    && !c.EsBorrador
-                                    && !c.Censurado
-                                    && c.TipoLado == TipoLado.LadoB
-                                    && contenidosComprados.Contains(c.Id))
-                            .OrderByDescending(c => c.FechaPublicacion)
-                            .ToListAsync();
-
-                    var contenidos = contenidoLadoA.Union(contenidoLadoB)
-                        .OrderByDescending(c => c.FechaPublicacion)
-                        .ToList();
-
-                    ViewBag.Contenidos = contenidos;
+                    ViewBag.Contenidos = contenidoLadoA;
                     ViewBag.ContenidoLadoA = contenidoLadoA;
                     ViewBag.ContenidoLadoB = contenidoLadoB;
 
@@ -402,11 +377,32 @@ namespace Lado.Controllers
                             && c.Usuario != null)
                     .ToListAsync();
 
-                // 9. Combinar todo el contenido
+                // 9. NUEVO: Contenido LadoB de creadores NO suscritos (para mostrar con blur)
+                var todosLosCreadores = creadoresLadoAIds.Union(creadoresLadoBIds).ToList();
+                var contenidoLadoBBloqueado = await _context.Contenidos
+                    .Include(c => c.Usuario)
+                    .Where(c => c.EstaActivo
+                            && !c.EsBorrador
+                            && !c.Censurado
+                            && c.TipoLado == TipoLado.LadoB
+                            && c.Usuario != null
+                            && c.UsuarioId != usuarioId
+                            && !creadoresLadoBIds.Contains(c.UsuarioId) // NO suscrito a LadoB
+                            && !contenidosCompradosIds.Contains(c.Id)) // NO comprado
+                    .OrderBy(c => Guid.NewGuid()) // Aleatorio
+                    .Take(5) // Limitar a 5 posts bloqueados
+                    .ToListAsync();
+
+                // Guardar IDs de contenido bloqueado para la vista
+                var contenidoBloqueadoIds = contenidoLadoBBloqueado.Select(c => c.Id).ToList();
+                ViewBag.ContenidoBloqueadoIds = contenidoBloqueadoIds;
+
+                // 10. Combinar todo el contenido
                 var todoContenido = contenidoPublico
                     .Union(contenidoPremiumSuscripciones)
                     .Union(contenidoPremiumPropio)
                     .Union(contenidoPremiumComprado)
+                    .Union(contenidoLadoBBloqueado) // Incluir contenido bloqueado
                     .Distinct()
                     .ToList();
 
