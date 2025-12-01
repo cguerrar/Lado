@@ -1,0 +1,496 @@
+@model Lado.Models.Agencia
+@{
+    ViewData["Title"] = "Detalle de Agencia";
+}
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>@TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="d-flex align-items-center mb-4">
+    <a href="/Admin/Agencias" class="btn btn-outline-secondary me-3">
+        <i class="fas fa-arrow-left"></i>
+    </a>
+    <div>
+        <h4 class="mb-0">@Model.NombreEmpresa</h4>
+        <small class="text-muted">Detalle de agencia publicitaria</small>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Info Agencia -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body text-center py-4">
+                @if (!string.IsNullOrEmpty(Model.LogoUrl))
+                {
+                    <img src="@Model.LogoUrl" alt="@Model.NombreEmpresa" class="rounded-circle mb-3" style="width: 100px; height: 100px; object-fit: cover;">
+                }
+                else
+                {
+                    <div class="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 100px; height: 100px; background: #4682B4;">
+                        <span class="text-white fw-bold" style="font-size: 36px;">@Model.NombreEmpresa.Substring(0, 1).ToUpper()</span>
+                    </div>
+                }
+                <h5 class="fw-bold mb-1">@Model.NombreEmpresa</h5>
+                <p class="text-muted mb-2">@Model.RazonSocial</p>
+                @{
+                    var badgeClass = Model.Estado switch
+                    {
+                        Lado.Models.EstadoAgencia.Activa => "bg-success",
+                        Lado.Models.EstadoAgencia.Pendiente => "bg-warning text-dark",
+                        Lado.Models.EstadoAgencia.Suspendida => "bg-danger",
+                        Lado.Models.EstadoAgencia.Rechazada => "bg-secondary",
+                        _ => "bg-secondary"
+                    };
+                }
+                <span class="badge @badgeClass fs-6">@Model.Estado</span>
+                @if (Model.EstaVerificada)
+                {
+                    <span class="badge bg-info ms-1"><i class="fas fa-check"></i> Verificada</span>
+                }
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0 fw-semibold">Informacion de Contacto</h6>
+            </div>
+            <div class="card-body">
+                @if (Model.Usuario != null)
+                {
+                    <div class="mb-3">
+                        <small class="text-muted d-block">Responsable</small>
+                        <span class="fw-medium">@Model.Usuario.NombreCompleto</span>
+                    </div>
+                    <div class="mb-3">
+                        <small class="text-muted d-block">Email</small>
+                        <span>@Model.Usuario.Email</span>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(Model.Telefono))
+                {
+                    <div class="mb-3">
+                        <small class="text-muted d-block">Telefono</small>
+                        <span>@Model.Telefono</span>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(Model.SitioWeb))
+                {
+                    <div class="mb-3">
+                        <small class="text-muted d-block">Sitio Web</small>
+                        <a href="@Model.SitioWeb" target="_blank">@Model.SitioWeb</a>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(Model.Direccion))
+                {
+                    <div class="mb-0">
+                        <small class="text-muted d-block">Direccion</small>
+                        <span>@Model.Direccion</span>
+                        @if (!string.IsNullOrEmpty(Model.Ciudad))
+                        {
+                            <span>, @Model.Ciudad</span>
+                        }
+                        @if (!string.IsNullOrEmpty(Model.Pais))
+                        {
+                            <span> (@Model.Pais)</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0 fw-semibold">Datos Fiscales</h6>
+            </div>
+            <div class="card-body">
+                @if (!string.IsNullOrEmpty(Model.NIF))
+                {
+                    <div class="mb-3">
+                        <small class="text-muted d-block">NIF/CIF/RFC</small>
+                        <span class="fw-medium">@Model.NIF</span>
+                    </div>
+                }
+                <div class="mb-3">
+                    <small class="text-muted d-block">Fecha de Registro</small>
+                    <span>@Model.FechaRegistro.ToString("dd/MM/yyyy HH:mm")</span>
+                </div>
+                @if (Model.FechaAprobacion.HasValue)
+                {
+                    <div class="mb-0">
+                        <small class="text-muted d-block">Fecha de Aprobacion</small>
+                        <span>@Model.FechaAprobacion.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Acciones -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0 fw-semibold">Acciones</h6>
+            </div>
+            <div class="card-body">
+                @if (Model.Estado == Lado.Models.EstadoAgencia.Pendiente)
+                {
+                    <form asp-action="AprobarAgencia" asp-route-id="@Model.Id" method="post" class="mb-2">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-success w-100" onclick="return confirm('Aprobar esta agencia?')">
+                            <i class="fas fa-check me-2"></i>Aprobar Agencia
+                        </button>
+                    </form>
+                    <button type="button" class="btn btn-danger w-100" data-bs-toggle="modal" data-bs-target="#modalRechazar">
+                        <i class="fas fa-times me-2"></i>Rechazar Agencia
+                    </button>
+                }
+                @if (Model.Estado == Lado.Models.EstadoAgencia.Activa)
+                {
+                    <button type="button" class="btn btn-warning w-100" data-bs-toggle="modal" data-bs-target="#modalSuspender">
+                        <i class="fas fa-ban me-2"></i>Suspender Agencia
+                    </button>
+                }
+                @if (Model.Estado == Lado.Models.EstadoAgencia.Suspendida)
+                {
+                    <form asp-action="ReactivarAgencia" asp-route-id="@Model.Id" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-success w-100" onclick="return confirm('Reactivar esta agencia?')">
+                            <i class="fas fa-undo me-2"></i>Reactivar Agencia
+                        </button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadisticas y Anuncios -->
+    <div class="col-lg-8">
+        <!-- KPIs -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="text-muted small">Saldo</div>
+                        <div class="fs-4 fw-bold text-success">$@Model.SaldoPublicitario.ToString("N2")</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="text-muted small">Anuncios Activos</div>
+                        <div class="fs-4 fw-bold">@ViewBag.AnunciosActivos</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="text-muted small">Impresiones</div>
+                        <div class="fs-4 fw-bold">@(((long)ViewBag.TotalImpresiones).ToString("N0"))</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="text-muted small">Clics</div>
+                        <div class="fs-4 fw-bold">@(((long)ViewBag.TotalClics).ToString("N0"))</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Anuncios Pendientes de Revision -->
+        @if (Model.Anuncios.Any(a => a.Estado == Lado.Models.EstadoAnuncio.EnRevision))
+        {
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-warning bg-opacity-25 py-3">
+                    <h6 class="mb-0 fw-semibold"><i class="fas fa-clock me-2"></i>Anuncios Pendientes de Revision (@Model.Anuncios.Count(a => a.Estado == Lado.Models.EstadoAnuncio.EnRevision))</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Anuncio</th>
+                                    <th>Tipo</th>
+                                    <th>Presupuesto</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var anuncio in Model.Anuncios.Where(a => a.Estado == Lado.Models.EstadoAnuncio.EnRevision))
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                @if (!string.IsNullOrEmpty(anuncio.UrlCreativo))
+                                                {
+                                                    <img src="@anuncio.UrlCreativo" alt="" class="rounded me-2" style="width: 48px; height: 48px; object-fit: cover;">
+                                                }
+                                                else
+                                                {
+                                                    <div class="rounded me-2 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: #f1f5f9;">
+                                                        <i class="fas fa-image text-muted"></i>
+                                                    </div>
+                                                }
+                                                <div>
+                                                    <div class="fw-medium">@anuncio.Titulo</div>
+                                                    <small class="text-muted">@(anuncio.Descripcion?.Length > 50 ? anuncio.Descripcion.Substring(0, 50) + "..." : anuncio.Descripcion)</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td><span class="badge bg-light text-dark">@anuncio.TipoCreativo</span></td>
+                                        <td>$@anuncio.PresupuestoDiario.ToString("N2")/dia</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <form asp-action="AprobarAnuncio" asp-route-id="@anuncio.Id" method="post" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="btn btn-outline-success" title="Aprobar" onclick="return confirm('Aprobar este anuncio?')">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                </form>
+                                                <button type="button" class="btn btn-outline-danger" title="Rechazar" data-bs-toggle="modal" data-bs-target="#modalRechazarAnuncio@(anuncio.Id)">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Modal Rechazar Anuncio -->
+                                    <div class="modal fade" id="modalRechazarAnuncio@(anuncio.Id)" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <form asp-action="RechazarAnuncio" method="post">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@anuncio.Id" />
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">Rechazar Anuncio</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <p>Esta a punto de rechazar el anuncio <strong>@anuncio.Titulo</strong>.</p>
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Razon del rechazo</label>
+                                                            <textarea name="razon" class="form-control" rows="3" required placeholder="Indique el motivo del rechazo..."></textarea>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                        <button type="submit" class="btn btn-danger">Rechazar</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Todos los Anuncios -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0 fw-semibold">Todos los Anuncios (@Model.Anuncios.Count)</h6>
+            </div>
+            <div class="card-body p-0">
+                @if (Model.Anuncios.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Anuncio</th>
+                                    <th>Estado</th>
+                                    <th>Impresiones</th>
+                                    <th>Clics</th>
+                                    <th>CTR</th>
+                                    <th>Gasto</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var anuncio in Model.Anuncios.OrderByDescending(a => a.FechaCreacion))
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                @if (!string.IsNullOrEmpty(anuncio.UrlCreativo))
+                                                {
+                                                    <img src="@anuncio.UrlCreativo" alt="" class="rounded me-2" style="width: 36px; height: 36px; object-fit: cover;">
+                                                }
+                                                else
+                                                {
+                                                    <div class="rounded me-2 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: #f1f5f9;">
+                                                        <i class="fas fa-image text-muted small"></i>
+                                                    </div>
+                                                }
+                                                <div class="fw-medium">@anuncio.Titulo</div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            @{
+                                                var anuncioBadge = anuncio.Estado switch
+                                                {
+                                                    Lado.Models.EstadoAnuncio.Activo => "bg-success",
+                                                    Lado.Models.EstadoAnuncio.Pausado => "bg-warning text-dark",
+                                                    Lado.Models.EstadoAnuncio.EnRevision => "bg-primary",
+                                                    Lado.Models.EstadoAnuncio.Rechazado => "bg-danger",
+                                                    _ => "bg-secondary"
+                                                };
+                                            }
+                                            <span class="badge @anuncioBadge">@anuncio.Estado</span>
+                                        </td>
+                                        <td>@anuncio.Impresiones.ToString("N0")</td>
+                                        <td>@anuncio.Clics.ToString("N0")</td>
+                                        <td>@anuncio.CTR%</td>
+                                        <td>$@anuncio.GastoTotal.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-4">
+                        <i class="fas fa-ad text-muted mb-2" style="font-size: 32px;"></i>
+                        <p class="text-muted mb-0">Esta agencia no tiene anuncios</p>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Transacciones -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0 fw-semibold">Ultimas Transacciones</h6>
+            </div>
+            <div class="card-body p-0">
+                @if (Model.Transacciones != null && Model.Transacciones.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Tipo</th>
+                                    <th>Descripcion</th>
+                                    <th class="text-end">Monto</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var tx in Model.Transacciones.OrderByDescending(t => t.FechaTransaccion).Take(10))
+                                {
+                                    <tr>
+                                        <td><small>@tx.FechaTransaccion.ToString("dd/MM/yyyy HH:mm")</small></td>
+                                        <td>
+                                            @if (tx.Tipo == Lado.Models.TipoTransaccionAgencia.RecargaSaldo)
+                                            {
+                                                <span class="badge bg-success-subtle text-success">Recarga</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning-subtle text-warning">Gasto</span>
+                                            }
+                                        </td>
+                                        <td>@tx.Descripcion</td>
+                                        <td class="text-end">
+                                            @if (tx.Tipo == Lado.Models.TipoTransaccionAgencia.RecargaSaldo)
+                                            {
+                                                <span class="text-success fw-medium">+$@tx.Monto.ToString("N2")</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-danger fw-medium">-$@tx.Monto.ToString("N2")</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-4">
+                        <i class="fas fa-receipt text-muted mb-2" style="font-size: 32px;"></i>
+                        <p class="text-muted mb-0">No hay transacciones registradas</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Rechazar Agencia -->
+<div class="modal fade" id="modalRechazar" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="RechazarAgencia" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@Model.Id" />
+                <div class="modal-header">
+                    <h5 class="modal-title">Rechazar Agencia</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Esta a punto de rechazar la agencia <strong>@Model.NombreEmpresa</strong>.</p>
+                    <div class="mb-3">
+                        <label class="form-label">Razon del rechazo</label>
+                        <textarea name="razon" class="form-control" rows="3" required placeholder="Indique el motivo del rechazo..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Rechazar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Suspender Agencia -->
+<div class="modal fade" id="modalSuspender" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="SuspenderAgencia" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@Model.Id" />
+                <div class="modal-header">
+                    <h5 class="modal-title">Suspender Agencia</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Al suspender esta agencia, todos sus anuncios activos seran pausados automaticamente.
+                    </div>
+                    <p>Esta a punto de suspender la agencia <strong>@Model.NombreEmpresa</strong>.</p>
+                    <div class="mb-3">
+                        <label class="form-label">Razon de la suspension</label>
+                        <textarea name="razon" class="form-control" rows="3" required placeholder="Indique el motivo de la suspension..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">Suspender</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

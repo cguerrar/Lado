@@ -1,0 +1,192 @@
+@model IEnumerable<Lado.Models.Anuncio>
+@{
+    ViewData["Title"] = "Mis Anuncios";
+    Layout = "~/Views/Shared/_AgenciaLayout.cshtml";
+    ViewBag.Agencia = ViewBag.Agencia;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-1">Mis Anuncios</h4>
+        <p class="text-muted mb-0">Gestiona tus campanas publicitarias</p>
+    </div>
+    <a href="/Agencia/CrearAnuncio" class="btn btn-primary">
+        <i class="fas fa-plus me-2"></i>Nuevo Anuncio
+    </a>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Buscar</label>
+                <input type="text" name="buscar" class="form-control" placeholder="Titulo del anuncio..." value="@ViewBag.Buscar">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Estado</label>
+                <select name="estado" class="form-select">
+                    <option value="">Todos los estados</option>
+                    <option value="Borrador" selected="@(ViewBag.Estado == "Borrador")">Borrador</option>
+                    <option value="EnRevision" selected="@(ViewBag.Estado == "EnRevision")">En Revision</option>
+                    <option value="Activo" selected="@(ViewBag.Estado == "Activo")">Activo</option>
+                    <option value="Pausado" selected="@(ViewBag.Estado == "Pausado")">Pausado</option>
+                    <option value="Finalizado" selected="@(ViewBag.Estado == "Finalizado")">Finalizado</option>
+                    <option value="Rechazado" selected="@(ViewBag.Estado == "Rechazado")">Rechazado</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Ordenar por</label>
+                <select name="orden" class="form-select">
+                    <option value="reciente" selected="@(ViewBag.Orden == "reciente")">Mas recientes</option>
+                    <option value="antiguo" selected="@(ViewBag.Orden == "antiguo")">Mas antiguos</option>
+                    <option value="impresiones" selected="@(ViewBag.Orden == "impresiones")">Mas impresiones</option>
+                    <option value="clics" selected="@(ViewBag.Orden == "clics")">Mas clics</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-outline-primary w-100">
+                    <i class="fas fa-filter me-1"></i>Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (Model.Any())
+{
+    <div class="row g-4">
+        @foreach (var anuncio in Model)
+        {
+            <div class="col-md-6 col-xl-4">
+                <div class="card h-100">
+                    <div class="position-relative">
+                        @if (!string.IsNullOrEmpty(anuncio.UrlCreativo))
+                        {
+                            <img src="@anuncio.UrlCreativo" class="card-img-top" alt="@anuncio.Titulo" style="height: 180px; object-fit: cover;">
+                        }
+                        else
+                        {
+                            <div class="card-img-top d-flex align-items-center justify-content-center" style="height: 180px; background: #f1f5f9;">
+                                <i class="fas fa-image text-muted" style="font-size: 48px;"></i>
+                            </div>
+                        }
+                        <div class="position-absolute top-0 end-0 m-2">
+                            @{
+                                var badgeClass = anuncio.Estado switch
+                                {
+                                    Lado.Models.EstadoAnuncio.Activo => "badge-activo",
+                                    Lado.Models.EstadoAnuncio.Pausado => "badge-pausado",
+                                    Lado.Models.EstadoAnuncio.EnRevision => "badge-revision",
+                                    Lado.Models.EstadoAnuncio.Rechazado => "badge-rechazado",
+                                    Lado.Models.EstadoAnuncio.Finalizado => "badge-pausado",
+                                    _ => "badge-borrador"
+                                };
+                            }
+                            <span class="badge-estado @badgeClass">@anuncio.Estado</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title fw-semibold mb-2">@anuncio.Titulo</h5>
+                        <p class="card-text text-muted small mb-3">
+                            @(anuncio.Descripcion?.Length > 80 ? anuncio.Descripcion.Substring(0, 80) + "..." : anuncio.Descripcion)
+                        </p>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-4 text-center">
+                                <div class="small text-muted">Impresiones</div>
+                                <div class="fw-bold">@anuncio.Impresiones.ToString("N0")</div>
+                            </div>
+                            <div class="col-4 text-center border-start border-end">
+                                <div class="small text-muted">Clics</div>
+                                <div class="fw-bold">@anuncio.Clics.ToString("N0")</div>
+                            </div>
+                            <div class="col-4 text-center">
+                                <div class="small text-muted">CTR</div>
+                                <div class="fw-bold">@anuncio.CTR%</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 mb-3">
+                            <div class="flex-fill">
+                                <small class="text-muted d-block">Presupuesto diario</small>
+                                <span class="fw-medium">$@anuncio.PresupuestoDiario.ToString("N2")</span>
+                            </div>
+                            <div class="flex-fill">
+                                <small class="text-muted d-block">Gastado hoy</small>
+                                <span class="fw-medium">$@anuncio.GastoHoy.ToString("N2")</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent border-0 pt-0">
+                        <div class="d-flex gap-2">
+                            <a href="/Agencia/MetricasAnuncio/@anuncio.Id" class="btn btn-sm btn-outline-primary flex-fill">
+                                <i class="fas fa-chart-line me-1"></i>Metricas
+                            </a>
+                            @if (anuncio.Estado == Lado.Models.EstadoAnuncio.Borrador || anuncio.Estado == Lado.Models.EstadoAnuncio.Rechazado)
+                            {
+                                <a href="/Agencia/EditarAnuncio/@anuncio.Id" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            }
+                            @if (anuncio.Estado == Lado.Models.EstadoAnuncio.Activo)
+                            {
+                                <form asp-action="PausarAnuncio" asp-route-id="@anuncio.Id" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Pausar">
+                                        <i class="fas fa-pause"></i>
+                                    </button>
+                                </form>
+                            }
+                            @if (anuncio.Estado == Lado.Models.EstadoAnuncio.Pausado)
+                            {
+                                <form asp-action="ReanudarAnuncio" asp-route-id="@anuncio.Id" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Reanudar">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </form>
+                            }
+                            @if (anuncio.Estado == Lado.Models.EstadoAnuncio.Borrador)
+                            {
+                                <form asp-action="EnviarARevision" asp-route-id="@anuncio.Id" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-success" title="Enviar a revision">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-ad text-muted mb-3" style="font-size: 64px;"></i>
+            <h4 class="mb-2">No tienes anuncios</h4>
+            <p class="text-muted mb-4">Crea tu primer anuncio para comenzar a promocionar tu marca en Lado</p>
+            <a href="/Agencia/CrearAnuncio" class="btn btn-primary btn-lg">
+                <i class="fas fa-plus me-2"></i>Crear mi primer anuncio
+            </a>
+        </div>
+    </div>
+}
+
+<style>
+    .badge-estado {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .badge-activo { background: rgba(16,185,129,0.9); color: white; }
+    .badge-pausado { background: rgba(245,158,11,0.9); color: white; }
+    .badge-borrador { background: rgba(100,116,139,0.9); color: white; }
+    .badge-revision { background: rgba(37,99,235,0.9); color: white; }
+    .badge-rechazado { background: rgba(239,68,68,0.9); color: white; }
+</style>

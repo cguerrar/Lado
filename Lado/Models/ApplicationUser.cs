@@ -52,6 +52,10 @@ namespace Lado.Models
         [Range(0, 999999)]
         public decimal PrecioSuscripcion { get; set; } = 9.99m;
 
+        [Display(Name = "Precio de Suscripción LadoB")]
+        [Range(0, 999999)]
+        public decimal? PrecioSuscripcionLadoB { get; set; }
+
         [Display(Name = "Categoría")]
         [StringLength(50)]
         public string? Categoria { get; set; }

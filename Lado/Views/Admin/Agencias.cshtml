@@ -1,0 +1,283 @@
+@model IEnumerable<Lado.Models.Agencia>
+@{
+    ViewData["Title"] = "Gestion de Agencias";
+}
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>@TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- KPIs -->
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle p-3 me-3" style="background: rgba(255,193,7,0.1);">
+                        <i class="fas fa-clock text-warning" style="font-size: 24px;"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Pendientes de Aprobacion</div>
+                        <div class="fs-4 fw-bold">@ViewBag.AgenciasPendientes</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle p-3 me-3" style="background: rgba(40,167,69,0.1);">
+                        <i class="fas fa-check-circle text-success" style="font-size: 24px;"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Agencias Activas</div>
+                        <div class="fs-4 fw-bold">@ViewBag.AgenciasActivas</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle p-3 me-3" style="background: rgba(220,53,69,0.1);">
+                        <i class="fas fa-ban text-danger" style="font-size: 24px;"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Agencias Suspendidas</div>
+                        <div class="fs-4 fw-bold">@ViewBag.AgenciasSuspendidas</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Filtrar por Estado</label>
+                <select name="estado" class="form-select" onchange="this.form.submit()">
+                    <option value="">Todas las agencias</option>
+                    <option value="Pendiente" selected="@(ViewBag.EstadoFiltro == "Pendiente")">Pendientes</option>
+                    <option value="Activa" selected="@(ViewBag.EstadoFiltro == "Activa")">Activas</option>
+                    <option value="Suspendida" selected="@(ViewBag.EstadoFiltro == "Suspendida")">Suspendidas</option>
+                    <option value="Rechazada" selected="@(ViewBag.EstadoFiltro == "Rechazada")">Rechazadas</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                @if (!string.IsNullOrEmpty(ViewBag.EstadoFiltro))
+                {
+                    <a href="/Admin/Agencias" class="btn btn-outline-secondary">Limpiar filtro</a>
+                }
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista de Agencias -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3">
+        <h5 class="mb-0 fw-semibold">Lista de Agencias</h5>
+    </div>
+    <div class="card-body p-0">
+        @if (Model.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Empresa</th>
+                            <th>Responsable</th>
+                            <th>Estado</th>
+                            <th>Verificada</th>
+                            <th>Saldo</th>
+                            <th>Anuncios</th>
+                            <th>Registro</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var agencia in Model)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        @if (!string.IsNullOrEmpty(agencia.LogoUrl))
+                                        {
+                                            <img src="@agencia.LogoUrl" alt="" class="rounded me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                                        }
+                                        else
+                                        {
+                                            <div class="rounded me-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; background: #4682B4;">
+                                                <span class="text-white fw-bold">@agencia.NombreEmpresa.Substring(0, 1).ToUpper()</span>
+                                            </div>
+                                        }
+                                        <div>
+                                            <div class="fw-medium">@agencia.NombreEmpresa</div>
+                                            <small class="text-muted">@agencia.RazonSocial</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (agencia.Usuario != null)
+                                    {
+                                        <div>@agencia.Usuario.NombreCompleto</div>
+                                        <small class="text-muted">@agencia.Usuario.Email</small>
+                                    }
+                                </td>
+                                <td>
+                                    @{
+                                        var badgeClass = agencia.Estado switch
+                                        {
+                                            Lado.Models.EstadoAgencia.Activa => "bg-success",
+                                            Lado.Models.EstadoAgencia.Pendiente => "bg-warning text-dark",
+                                            Lado.Models.EstadoAgencia.Suspendida => "bg-danger",
+                                            Lado.Models.EstadoAgencia.Rechazada => "bg-secondary",
+                                            _ => "bg-secondary"
+                                        };
+                                    }
+                                    <span class="badge @badgeClass">@agencia.Estado</span>
+                                </td>
+                                <td>
+                                    @if (agencia.EstaVerificada)
+                                    {
+                                        <i class="fas fa-check-circle text-success" title="Verificada"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="fas fa-times-circle text-muted" title="No verificada"></i>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="fw-medium">$@agencia.SaldoPublicitario.ToString("N2")</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark">@agencia.Anuncios.Count</span>
+                                </td>
+                                <td>
+                                    <small>@agencia.FechaRegistro.ToString("dd/MM/yyyy")</small>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="/Admin/DetalleAgencia/@agencia.Id" class="btn btn-outline-primary" title="Ver detalle">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        @if (agencia.Estado == Lado.Models.EstadoAgencia.Pendiente)
+                                        {
+                                            <form asp-action="AprobarAgencia" asp-route-id="@agencia.Id" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-outline-success" title="Aprobar" onclick="return confirm('Aprobar esta agencia?')">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                            </form>
+                                            <button type="button" class="btn btn-outline-danger" title="Rechazar" data-bs-toggle="modal" data-bs-target="#modalRechazar@(agencia.Id)">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        }
+                                        @if (agencia.Estado == Lado.Models.EstadoAgencia.Activa)
+                                        {
+                                            <button type="button" class="btn btn-outline-warning" title="Suspender" data-bs-toggle="modal" data-bs-target="#modalSuspender@(agencia.Id)">
+                                                <i class="fas fa-ban"></i>
+                                            </button>
+                                        }
+                                        @if (agencia.Estado == Lado.Models.EstadoAgencia.Suspendida)
+                                        {
+                                            <form asp-action="ReactivarAgencia" asp-route-id="@agencia.Id" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-outline-success" title="Reactivar" onclick="return confirm('Reactivar esta agencia?')">
+                                                    <i class="fas fa-undo"></i>
+                                                </button>
+                                            </form>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- Modal Rechazar -->
+                            <div class="modal fade" id="modalRechazar@(agencia.Id)" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form asp-action="RechazarAgencia" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@agencia.Id" />
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Rechazar Agencia</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p>Esta a punto de rechazar la agencia <strong>@agencia.NombreEmpresa</strong>.</p>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Razon del rechazo</label>
+                                                    <textarea name="razon" class="form-control" rows="3" required placeholder="Indique el motivo del rechazo..."></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-danger">Rechazar</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Modal Suspender -->
+                            <div class="modal fade" id="modalSuspender@(agencia.Id)" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form asp-action="SuspenderAgencia" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@agencia.Id" />
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Suspender Agencia</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="alert alert-warning">
+                                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                                    Al suspender esta agencia, todos sus anuncios activos seran pausados automaticamente.
+                                                </div>
+                                                <p>Esta a punto de suspender la agencia <strong>@agencia.NombreEmpresa</strong>.</p>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Razon de la suspension</label>
+                                                    <textarea name="razon" class="form-control" rows="3" required placeholder="Indique el motivo de la suspension..."></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-warning">Suspender</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5">
+                <i class="fas fa-building text-muted mb-3" style="font-size: 48px;"></i>
+                <p class="text-muted mb-0">No hay agencias registradas</p>
+            </div>
+        }
+    </div>
+</div>

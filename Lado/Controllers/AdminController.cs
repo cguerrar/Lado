@@ -674,8 +674,190 @@ namespace Lado.Controllers
         [HttpPost]
         public async Task<IActionResult> ActualizarComision(decimal comision)
         {
-            TempData["Success"] = $"Comisi�n actualizada a {comision}%";
+            TempData["Success"] = $"Comision actualizada a {comision}%";
             return RedirectToAction(nameof(Configuracion));
+        }
+
+        // ========================================
+        // AGENCIAS
+        // ========================================
+        public async Task<IActionResult> Agencias(string estado = "")
+        {
+            var query = _context.Agencias
+                .Include(a => a.Usuario)
+                .Include(a => a.Anuncios)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(estado))
+            {
+                if (Enum.TryParse<EstadoAgencia>(estado, out var estadoEnum))
+                {
+                    query = query.Where(a => a.Estado == estadoEnum);
+                }
+            }
+
+            var agencias = await query
+                .OrderByDescending(a => a.FechaRegistro)
+                .ToListAsync();
+
+            ViewBag.EstadoFiltro = estado;
+            ViewBag.AgenciasPendientes = await _context.Agencias.CountAsync(a => a.Estado == EstadoAgencia.Pendiente);
+            ViewBag.AgenciasActivas = await _context.Agencias.CountAsync(a => a.Estado == EstadoAgencia.Activa);
+            ViewBag.AgenciasSuspendidas = await _context.Agencias.CountAsync(a => a.Estado == EstadoAgencia.Suspendida);
+
+            return View(agencias);
+        }
+
+        public async Task<IActionResult> DetalleAgencia(int id)
+        {
+            var agencia = await _context.Agencias
+                .Include(a => a.Usuario)
+                .Include(a => a.Anuncios)
+                .Include(a => a.Transacciones)
+                .FirstOrDefaultAsync(a => a.Id == id);
+
+            if (agencia == null)
+            {
+                return NotFound();
+            }
+
+            ViewBag.AnunciosActivos = agencia.Anuncios.Count(a => a.Estado == EstadoAnuncio.Activo);
+            ViewBag.AnunciosPendientes = agencia.Anuncios.Count(a => a.Estado == EstadoAnuncio.EnRevision);
+            ViewBag.TotalImpresiones = agencia.Anuncios.Sum(a => a.Impresiones);
+            ViewBag.TotalClics = agencia.Anuncios.Sum(a => a.Clics);
+
+            return View(agencia);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AprobarAgencia(int id)
+        {
+            var agencia = await _context.Agencias.FindAsync(id);
+            if (agencia == null)
+            {
+                TempData["Error"] = "Agencia no encontrada.";
+                return RedirectToAction(nameof(Agencias));
+            }
+
+            agencia.Estado = EstadoAgencia.Activa;
+            agencia.EstaVerificada = true;
+            agencia.FechaAprobacion = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"La agencia '{agencia.NombreEmpresa}' ha sido aprobada exitosamente.";
+            return RedirectToAction(nameof(Agencias));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RechazarAgencia(int id, string razon)
+        {
+            var agencia = await _context.Agencias.FindAsync(id);
+            if (agencia == null)
+            {
+                TempData["Error"] = "Agencia no encontrada.";
+                return RedirectToAction(nameof(Agencias));
+            }
+
+            agencia.Estado = EstadoAgencia.Rechazada;
+            agencia.MotivoRechazo = razon;
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"La agencia '{agencia.NombreEmpresa}' ha sido rechazada.";
+            return RedirectToAction(nameof(Agencias));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SuspenderAgencia(int id, string razon)
+        {
+            var agencia = await _context.Agencias.FindAsync(id);
+            if (agencia == null)
+            {
+                TempData["Error"] = "Agencia no encontrada.";
+                return RedirectToAction(nameof(Agencias));
+            }
+
+            agencia.Estado = EstadoAgencia.Suspendida;
+            agencia.MotivoSuspension = razon;
+            agencia.FechaSuspension = DateTime.Now;
+
+            // Pausar todos los anuncios activos
+            var anunciosActivos = await _context.Anuncios
+                .Where(a => a.AgenciaId == id && a.Estado == EstadoAnuncio.Activo)
+                .ToListAsync();
+
+            foreach (var anuncio in anunciosActivos)
+            {
+                anuncio.Estado = EstadoAnuncio.Pausado;
+            }
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"La agencia '{agencia.NombreEmpresa}' ha sido suspendida.";
+            return RedirectToAction(nameof(Agencias));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReactivarAgencia(int id)
+        {
+            var agencia = await _context.Agencias.FindAsync(id);
+            if (agencia == null)
+            {
+                TempData["Error"] = "Agencia no encontrada.";
+                return RedirectToAction(nameof(Agencias));
+            }
+
+            agencia.Estado = EstadoAgencia.Activa;
+            agencia.MotivoSuspension = null;
+            agencia.FechaSuspension = null;
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"La agencia '{agencia.NombreEmpresa}' ha sido reactivada.";
+            return RedirectToAction(nameof(Agencias));
+        }
+
+        // ========================================
+        // GESTION DE ANUNCIOS (desde Admin)
+        // ========================================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AprobarAnuncio(int id)
+        {
+            var anuncio = await _context.Anuncios.FindAsync(id);
+            if (anuncio == null)
+            {
+                TempData["Error"] = "Anuncio no encontrado.";
+                return RedirectToAction(nameof(Agencias));
+            }
+
+            anuncio.Estado = EstadoAnuncio.Activo;
+            anuncio.FechaInicio = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"El anuncio '{anuncio.Titulo}' ha sido aprobado y esta activo.";
+            return RedirectToAction(nameof(DetalleAgencia), new { id = anuncio.AgenciaId });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RechazarAnuncio(int id, string razon)
+        {
+            var anuncio = await _context.Anuncios.FindAsync(id);
+            if (anuncio == null)
+            {
+                TempData["Error"] = "Anuncio no encontrado.";
+                return RedirectToAction(nameof(Agencias));
+            }
+
+            anuncio.Estado = EstadoAnuncio.Rechazado;
+            anuncio.MotivoRechazo = razon;
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"El anuncio '{anuncio.Titulo}' ha sido rechazado.";
+            return RedirectToAction(nameof(DetalleAgencia), new { id = anuncio.AgenciaId });
         }
     }
 }

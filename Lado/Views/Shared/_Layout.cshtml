@@ -9,10 +9,15 @@
 	var usuario = await UserManager.GetUserAsync(User);
 
 	int mensajesNoLeidos = 0;
+	Lado.Models.Agencia? agenciaUsuario = null;
 	if (usuario != null)
 	{
 		mensajesNoLeidos = Context.MensajesPrivados
 			.Count(m => m.DestinatarioId == usuario.Id && !m.Leido && !m.EliminadoPorDestinatario);
+
+		// Cargar agencia del usuario si existe y está activa
+		agenciaUsuario = Context.Agencias
+			.FirstOrDefault(a => a.UsuarioId == usuario.Id && a.Estado == Lado.Models.EstadoAgencia.Activa);
 	}
 }
 
@@ -960,6 +965,31 @@
 						}
 					</a>
 				</li>
+
+				@if (agenciaUsuario != null)
+				{
+				<li class="nav-item dropdown">
+					<a class="nav-link dropdown-toggle @(ViewContext.RouteData.Values["controller"]?.ToString() == "Agencia" ? "active" : "")"
+					   href="#"
+					   id="agenciaDropdown"
+					   role="button"
+					   data-bs-toggle="dropdown"
+					   aria-expanded="false">
+						<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+							<polyline points="9 22 9 12 15 12 15 22"></polyline>
+						</svg>
+						Mi Agencia
+						<span class="badge-notify" style="background: var(--primary);">$@agenciaUsuario.SaldoPublicitario.ToString("N0")</span>
+					</a>
+					<ul class="dropdown-menu" aria-labelledby="agenciaDropdown">
+						<li><a class="dropdown-item" href="/Agencia">Dashboard</a></li>
+						<li><a class="dropdown-item" href="/Agencia/Anuncios">Mis Anuncios</a></li>
+						<li><a class="dropdown-item" href="/Agencia/CrearAnuncio">Crear Anuncio</a></li>
+						<li><a class="dropdown-item" href="/Agencia/RecargarSaldo">Recargar Saldo</a></li>
+					</ul>
+				</li>
+				}
 
 				<li class="nav-item">
 					<a class="nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "Estadisticas" ? "active" : "")" href="/Usuario/Estadisticas">

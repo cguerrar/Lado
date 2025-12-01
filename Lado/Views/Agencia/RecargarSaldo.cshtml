@@ -1,0 +1,286 @@
+@model Lado.Models.Agencia
+@{
+    ViewData["Title"] = "Recargar Saldo";
+    Layout = "~/Views/Shared/_AgenciaLayout.cshtml";
+    ViewBag.Agencia = Model;
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="d-flex align-items-center mb-4">
+            <a href="/Agencia" class="btn btn-outline-secondary me-3">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div>
+                <h4 class="mb-0">Saldo y Pagos</h4>
+                <small class="text-muted">Gestiona tu saldo publicitario</small>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Resumen de saldo -->
+            <div class="col-lg-4">
+                <div class="card bg-primary text-white mb-4">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="rounded-circle bg-white bg-opacity-25 p-3 me-3">
+                                <i class="fas fa-wallet fa-lg"></i>
+                            </div>
+                            <div>
+                                <div class="small opacity-75">Saldo Disponible</div>
+                                <div class="fs-3 fw-bold">$@Model.SaldoPublicitario.ToString("N2")</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h6 class="fw-semibold mb-3">Resumen de Cuenta</h6>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Total Recargado</span>
+                            <span class="fw-medium">$@Model.TotalRecargado.ToString("N2")</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Total Gastado</span>
+                            <span class="fw-medium">$@Model.TotalGastado.ToString("N2")</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Saldo Actual</span>
+                            <span class="fw-bold text-success">$@Model.SaldoPublicitario.ToString("N2")</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="fw-semibold mb-3"><i class="fas fa-shield-alt me-2 text-success"></i>Pago Seguro</h6>
+                        <p class="text-muted small mb-0">
+                            Todas las transacciones son procesadas de forma segura. Tu informacion de pago esta protegida con encriptacion SSL.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulario de recarga -->
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header bg-transparent border-0 py-3">
+                        <h5 class="mb-0 fw-semibold"><i class="fas fa-plus-circle me-2 text-primary"></i>Recargar Saldo</h5>
+                    </div>
+                    <div class="card-body">
+                        <form asp-action="ProcesarRecarga" method="post" id="formRecarga">
+                            @Html.AntiForgeryToken()
+
+                            <!-- Montos predefinidos -->
+                            <div class="mb-4">
+                                <label class="form-label fw-medium">Selecciona un monto</label>
+                                <div class="row g-3">
+                                    @foreach (var monto in new[] { 50, 100, 250, 500, 1000, 2500 })
+                                    {
+                                        <div class="col-4">
+                                            <input type="radio" class="btn-check" name="montoPredefinido" id="monto@monto" value="@monto" autocomplete="off" onchange="seleccionarMonto(@monto)">
+                                            <label class="btn btn-outline-primary w-100 py-3" for="monto@monto">
+                                                <span class="d-block fw-bold">$@monto</span>
+                                            </label>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- Monto personalizado -->
+                            <div class="mb-4">
+                                <label class="form-label fw-medium">O ingresa un monto personalizado</label>
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" name="monto" id="montoInput" class="form-control" placeholder="0.00" min="10" step="0.01" required onchange="limpiarPredefinidos()">
+                                </div>
+                                <small class="text-muted">Monto minimo: $10.00</small>
+                            </div>
+
+                            <hr>
+
+                            <!-- Metodo de pago -->
+                            <div class="mb-4">
+                                <label class="form-label fw-medium">Metodo de Pago</label>
+                                <div class="list-group">
+                                    <label class="list-group-item list-group-item-action d-flex align-items-center">
+                                        <input class="form-check-input me-3" type="radio" name="metodoPago" value="tarjeta" checked>
+                                        <i class="fas fa-credit-card me-3 text-primary" style="font-size: 24px;"></i>
+                                        <div class="flex-fill">
+                                            <div class="fw-medium">Tarjeta de Credito/Debito</div>
+                                            <small class="text-muted">Visa, Mastercard, American Express</small>
+                                        </div>
+                                    </label>
+                                    <label class="list-group-item list-group-item-action d-flex align-items-center">
+                                        <input class="form-check-input me-3" type="radio" name="metodoPago" value="paypal">
+                                        <i class="fab fa-paypal me-3 text-primary" style="font-size: 24px;"></i>
+                                        <div class="flex-fill">
+                                            <div class="fw-medium">PayPal</div>
+                                            <small class="text-muted">Paga con tu cuenta PayPal</small>
+                                        </div>
+                                    </label>
+                                    <label class="list-group-item list-group-item-action d-flex align-items-center">
+                                        <input class="form-check-input me-3" type="radio" name="metodoPago" value="transferencia">
+                                        <i class="fas fa-university me-3 text-primary" style="font-size: 24px;"></i>
+                                        <div class="flex-fill">
+                                            <div class="fw-medium">Transferencia Bancaria</div>
+                                            <small class="text-muted">Deposita directamente a nuestra cuenta</small>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Datos de tarjeta (simplificado para demo) -->
+                            <div id="datosTarjeta">
+                                <div class="row g-3 mb-4">
+                                    <div class="col-12">
+                                        <label class="form-label">Numero de Tarjeta</label>
+                                        <input type="text" class="form-control" placeholder="1234 5678 9012 3456" maxlength="19">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Fecha de Expiracion</label>
+                                        <input type="text" class="form-control" placeholder="MM/AA" maxlength="5">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">CVV</label>
+                                        <input type="text" class="form-control" placeholder="123" maxlength="4">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Nombre en la Tarjeta</label>
+                                        <input type="text" class="form-control" placeholder="Como aparece en la tarjeta">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Resumen -->
+                            <div class="bg-light rounded-3 p-4 mb-4">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Monto a recargar</span>
+                                    <span class="fw-bold" id="resumenMonto">$0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Comision</span>
+                                    <span class="text-success">$0.00</span>
+                                </div>
+                                <hr>
+                                <div class="d-flex justify-content-between">
+                                    <span class="fw-bold">Total a Pagar</span>
+                                    <span class="fw-bold text-primary fs-5" id="resumenTotal">$0.00</span>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-lg w-100 py-3">
+                                <i class="fas fa-lock me-2"></i>Procesar Pago Seguro
+                            </button>
+
+                            <p class="text-center text-muted small mt-3 mb-0">
+                                Al hacer clic en "Procesar Pago", aceptas nuestros terminos y condiciones de pago.
+                            </p>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Historial de transacciones -->
+        <div class="card mt-4">
+            <div class="card-header bg-transparent border-0 py-3">
+                <h5 class="mb-0 fw-semibold"><i class="fas fa-history me-2 text-primary"></i>Historial de Transacciones</h5>
+            </div>
+            <div class="card-body p-0">
+                @if (ViewBag.Transacciones != null && ((IEnumerable<Lado.Models.TransaccionAgencia>)ViewBag.Transacciones).Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Tipo</th>
+                                    <th>Descripcion</th>
+                                    <th class="text-end">Monto</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var tx in (IEnumerable<Lado.Models.TransaccionAgencia>)ViewBag.Transacciones)
+                                {
+                                    <tr>
+                                        <td>@tx.FechaTransaccion.ToString("dd/MM/yyyy HH:mm")</td>
+                                        <td>
+                                            @if (tx.Tipo == Lado.Models.TipoTransaccionAgencia.RecargaSaldo)
+                                            {
+                                                <span class="badge bg-success-subtle text-success">Recarga</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning-subtle text-warning">Gasto</span>
+                                            }
+                                        </td>
+                                        <td>@tx.Descripcion</td>
+                                        <td class="text-end">
+                                            @if (tx.Tipo == Lado.Models.TipoTransaccionAgencia.RecargaSaldo)
+                                            {
+                                                <span class="text-success fw-medium">+$@tx.Monto.ToString("N2")</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-danger fw-medium">-$@tx.Monto.ToString("N2")</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-5">
+                        <i class="fas fa-receipt text-muted mb-3" style="font-size: 48px;"></i>
+                        <p class="text-muted mb-0">No hay transacciones registradas</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function seleccionarMonto(monto) {
+    document.getElementById('montoInput').value = monto;
+    actualizarResumen(monto);
+}
+
+function limpiarPredefinidos() {
+    document.querySelectorAll('input[name="montoPredefinido"]').forEach(function(radio) {
+        radio.checked = false;
+    });
+    var monto = parseFloat(document.getElementById('montoInput').value) || 0;
+    actualizarResumen(monto);
+}
+
+function actualizarResumen(monto) {
+    document.getElementById('resumenMonto').textContent = '$' + monto.toFixed(2);
+    document.getElementById('resumenTotal').textContent = '$' + monto.toFixed(2);
+}
+
+document.getElementById('montoInput').addEventListener('input', function() {
+    var monto = parseFloat(this.value) || 0;
+    actualizarResumen(monto);
+});
+
+// Mostrar/ocultar campos segun metodo de pago
+document.querySelectorAll('input[name="metodoPago"]').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+        var datosTarjeta = document.getElementById('datosTarjeta');
+        if (this.value === 'tarjeta') {
+            datosTarjeta.style.display = 'block';
+        } else {
+            datosTarjeta.style.display = 'none';
+        }
+    });
+});
+</script>
+}

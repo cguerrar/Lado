@@ -1,0 +1,258 @@
+@{
+    ViewData["Title"] = "Metricas";
+    Layout = "~/Views/Shared/_AgenciaLayout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-1">Metricas y Rendimiento</h4>
+        <p class="text-muted mb-0">Analiza el rendimiento de tus campanas publicitarias</p>
+    </div>
+    <div class="d-flex gap-2">
+        <select class="form-select" id="periodoSelect" onchange="cambiarPeriodo(this.value)">
+            <option value="7">Ultimos 7 dias</option>
+            <option value="30" selected>Ultimos 30 dias</option>
+            <option value="90">Ultimos 90 dias</option>
+        </select>
+    </div>
+</div>
+
+<!-- KPIs principales -->
+<div class="row g-4 mb-4">
+    <div class="col-md-6 col-xl-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Impresiones Totales</div>
+                    <div class="stat-value">@(((long)ViewBag.ImpresionesTotales).ToString("N0"))</div>
+                    <small class="text-success"><i class="fas fa-arrow-up me-1"></i>+12% vs periodo anterior</small>
+                </div>
+                <div class="stat-icon" style="background: rgba(37, 99, 235, 0.1); color: #2563eb;">
+                    <i class="fas fa-eye"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Clics Totales</div>
+                    <div class="stat-value">@(((long)ViewBag.ClicsTotales).ToString("N0"))</div>
+                    <small class="text-success"><i class="fas fa-arrow-up me-1"></i>+8% vs periodo anterior</small>
+                </div>
+                <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                    <i class="fas fa-mouse-pointer"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">CTR Promedio</div>
+                    <div class="stat-value">@ViewBag.CTRPromedio%</div>
+                    <small class="text-muted">Click-Through Rate</small>
+                </div>
+                <div class="stat-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">
+                    <i class="fas fa-percentage"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Gasto Total</div>
+                    <div class="stat-value">$@(((decimal)ViewBag.GastoTotal).ToString("N2"))</div>
+                    <small class="text-muted">En el periodo seleccionado</small>
+                </div>
+                <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                    <i class="fas fa-dollar-sign"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Grafico de rendimiento -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center py-3">
+                <h5 class="mb-0 fw-semibold">Rendimiento en el Tiempo</h5>
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-primary active">Impresiones</button>
+                    <button type="button" class="btn btn-outline-primary">Clics</button>
+                    <button type="button" class="btn btn-outline-primary">Gasto</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-placeholder d-flex align-items-center justify-content-center" style="height: 300px; background: #f8fafc; border-radius: 12px;">
+                    <div class="text-center text-muted">
+                        <i class="fas fa-chart-area mb-3" style="font-size: 48px;"></i>
+                        <p class="mb-0">Grafico de rendimiento</p>
+                        <small>Proximamente: Graficos interactivos con Chart.js</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumen por anuncio -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-transparent border-0 py-3">
+                <h5 class="mb-0 fw-semibold">Top Anuncios</h5>
+            </div>
+            <div class="card-body p-0">
+                @if (ViewBag.TopAnuncios != null && ((IEnumerable<Lado.Models.Anuncio>)ViewBag.TopAnuncios).Any())
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var anuncio in (IEnumerable<Lado.Models.Anuncio>)ViewBag.TopAnuncios)
+                        {
+                            <a href="/Agencia/MetricasAnuncio/@anuncio.Id" class="list-group-item list-group-item-action">
+                                <div class="d-flex align-items-center">
+                                    @if (!string.IsNullOrEmpty(anuncio.UrlCreativo))
+                                    {
+                                        <img src="@anuncio.UrlCreativo" alt="" class="rounded me-3" style="width: 48px; height: 48px; object-fit: cover;">
+                                    }
+                                    else
+                                    {
+                                        <div class="rounded me-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: #f1f5f9;">
+                                            <i class="fas fa-image text-muted"></i>
+                                        </div>
+                                    }
+                                    <div class="flex-fill">
+                                        <div class="fw-medium">@anuncio.Titulo</div>
+                                        <small class="text-muted">@anuncio.Impresiones.ToString("N0") impresiones</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="fw-bold text-primary">@anuncio.CTR%</div>
+                                        <small class="text-muted">CTR</small>
+                                    </div>
+                                </div>
+                            </a>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-4">
+                        <i class="fas fa-chart-pie text-muted mb-2" style="font-size: 32px;"></i>
+                        <p class="text-muted mb-0 small">Sin datos de anuncios</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla detallada -->
+<div class="card mt-4">
+    <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center py-3">
+        <h5 class="mb-0 fw-semibold">Detalle por Anuncio</h5>
+        <button class="btn btn-sm btn-outline-primary">
+            <i class="fas fa-download me-1"></i>Exportar CSV
+        </button>
+    </div>
+    <div class="card-body p-0">
+        @if (ViewBag.Anuncios != null && ((IEnumerable<Lado.Models.Anuncio>)ViewBag.Anuncios).Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Anuncio</th>
+                            <th>Estado</th>
+                            <th class="text-end">Impresiones</th>
+                            <th class="text-end">Clics</th>
+                            <th class="text-end">CTR</th>
+                            <th class="text-end">Gasto</th>
+                            <th class="text-end">CPC Real</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var anuncio in (IEnumerable<Lado.Models.Anuncio>)ViewBag.Anuncios)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        @if (!string.IsNullOrEmpty(anuncio.UrlCreativo))
+                                        {
+                                            <img src="@anuncio.UrlCreativo" alt="" class="rounded me-2" style="width: 36px; height: 36px; object-fit: cover;">
+                                        }
+                                        else
+                                        {
+                                            <div class="rounded me-2 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: #f1f5f9;">
+                                                <i class="fas fa-image text-muted small"></i>
+                                            </div>
+                                        }
+                                        <div>
+                                            <div class="fw-medium">@anuncio.Titulo</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    @{
+                                        var badgeClass = anuncio.Estado switch
+                                        {
+                                            Lado.Models.EstadoAnuncio.Activo => "badge-activo",
+                                            Lado.Models.EstadoAnuncio.Pausado => "badge-pausado",
+                                            Lado.Models.EstadoAnuncio.EnRevision => "badge-revision",
+                                            Lado.Models.EstadoAnuncio.Rechazado => "badge-rechazado",
+                                            _ => "badge-borrador"
+                                        };
+                                    }
+                                    <span class="badge-estado @badgeClass">@anuncio.Estado</span>
+                                </td>
+                                <td class="text-end">@anuncio.Impresiones.ToString("N0")</td>
+                                <td class="text-end">@anuncio.Clics.ToString("N0")</td>
+                                <td class="text-end">@anuncio.CTR%</td>
+                                <td class="text-end">$@anuncio.GastoTotal.ToString("N2")</td>
+                                <td class="text-end">$@anuncio.CostoPromedioPorClic.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5">
+                <i class="fas fa-chart-bar text-muted mb-3" style="font-size: 48px;"></i>
+                <p class="text-muted mb-0">No hay datos de metricas disponibles</p>
+                <a href="/Agencia/CrearAnuncio" class="btn btn-primary mt-3">
+                    <i class="fas fa-plus me-2"></i>Crear mi primer anuncio
+                </a>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .badge-estado {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .badge-activo { background: rgba(16,185,129,0.1); color: #10b981; }
+    .badge-pausado { background: rgba(245,158,11,0.1); color: #f59e0b; }
+    .badge-borrador { background: rgba(100,116,139,0.1); color: #64748b; }
+    .badge-revision { background: rgba(37,99,235,0.1); color: #2563eb; }
+    .badge-rechazado { background: rgba(239,68,68,0.1); color: #ef4444; }
+</style>
+
+@section Scripts {
+<script>
+function cambiarPeriodo(dias) {
+    window.location.href = '/Agencia/Metricas?dias=' + dias;
+}
+</script>
+}
