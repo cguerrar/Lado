@@ -1211,10 +1211,13 @@
     .fullscreen-slides-container {
         flex: 1;
         overflow-y: scroll;
+        overflow-x: hidden;
         scroll-snap-type: y mandatory;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
         -ms-overflow-style: none;
+        overscroll-behavior-y: contain;
+        scroll-behavior: smooth;
     }
 
     .fullscreen-slides-container::-webkit-scrollbar {
@@ -1225,13 +1228,16 @@
         width: 100%;
         height: 100vh;
         height: 100dvh;
-        scroll-snap-align: start;
+        min-height: 100vh;
+        min-height: 100dvh;
+        scroll-snap-align: center;
         scroll-snap-stop: always;
         display: flex;
         align-items: center;
         justify-content: center;
         position: relative;
         background: #000;
+        flex-shrink: 0;
     }
 
     .fullscreen-slide img,
@@ -3272,7 +3278,11 @@
 
     // Dar like con animacion
     function triggerLike(postId, slideElement) {
-        // Animacion del corazon
+        // Verificar si ya tiene like (para no quitarlo con el toggle)
+        const likeBtn = document.querySelector(`.like-btn[data-id="${postId}"]`);
+        const yaLeDioLike = likeBtn?.classList.contains('liked');
+
+        // Siempre mostrar animacion del corazon
         const heart = slideElement.querySelector('.fullscreen-heart-animation');
         if (heart) {
             heart.classList.remove('animate');
@@ -3284,27 +3294,30 @@
             }, 800);
         }
 
-        // Llamar al API de like
+        // Si ya tiene like, solo mostrar animacion, no llamar API
+        if (yaLeDioLike) {
+            return;
+        }
+
+        // Llamar al API de like (solo si no tiene like)
         fetch('/Feed/Like', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                'Content-Type': 'application/x-www-form-urlencoded'
             },
-            body: JSON.stringify({ contenidoId: postId })
+            body: `id=${postId}`
         })
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
+            if (data.success && data.liked) {
                 // Actualizar el boton de like en el feed
-                const likeBtn = document.querySelector(`.like-btn[data-id="${postId}"]`);
-                if (likeBtn && !likeBtn.classList.contains('liked')) {
+                if (likeBtn) {
                     likeBtn.classList.add('liked');
-                    // Actualizar contador
-                    const likesSpan = document.getElementById(`likes-${postId}`);
-                    if (likesSpan && data.nuevoTotal !== undefined) {
-                        likesSpan.textContent = `${data.nuevoTotal} Me gusta`;
-                    }
+                }
+                // Actualizar contador
+                const likesSpan = document.getElementById(`likes-${postId}`);
+                if (likesSpan && data.likes !== undefined) {
+                    likesSpan.textContent = `${data.likes} Me gusta`;
                 }
             }
         })
@@ -3442,60 +3455,62 @@
     });
 
     // ==========================================
-    // SWIPE HORIZONTAL PARA CERRAR (izquierda)
+    // SWIPE HORIZONTAL PARA CERRAR/DETALLE
     // ==========================================
     let touchStartX = 0;
     let touchStartY = 0;
     let touchStartTime = 0;
-    let isSwiping = false;
+    let swipeDirection = null; // 'horizontal', 'vertical', o null
 
     document.getElementById('fullscreenSlidesContainer')?.addEventListener('touchstart', function(e) {
         if (e.touches.length === 1) {
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
             touchStartTime = Date.now();
-            isSwiping = true;
+            swipeDirection = null;
         }
     }, { passive: true });
 
     document.getElementById('fullscreenSlidesContainer')?.addEventListener('touchmove', function(e) {
-        if (!isSwiping || e.touches.length !== 1) return;
+        if (e.touches.length !== 1 || swipeDirection === 'vertical') return;
 
         const touchX = e.touches[0].clientX;
         const touchY = e.touches[0].clientY;
-        const deltaX = touchX - touchStartX;
-        const deltaY = touchY - touchStartY;
+        const deltaX = Math.abs(touchX - touchStartX);
+        const deltaY = Math.abs(touchY - touchStartY);
 
-        // Si el movimiento es mas vertical que horizontal, no es swipe para cerrar
-        if (Math.abs(deltaY) > Math.abs(deltaX) * 0.5) {
-            isSwiping = false;
+        // Determinar direccion del swipe en los primeros 15px de movimiento
+        if (swipeDirection === null && (deltaX > 15 || deltaY > 15)) {
+            if (deltaX > deltaY * 1.5) {
+                swipeDirection = 'horizontal';
+            } else {
+                swipeDirection = 'vertical';
+            }
         }
     }, { passive: true });
 
     document.getElementById('fullscreenSlidesContainer')?.addEventListener('touchend', function(e) {
-        if (!isSwiping) return;
+        if (swipeDirection !== 'horizontal') {
+            swipeDirection = null;
+            return;
+        }
 
         const touchEndX = e.changedTouches[0].clientX;
-        const touchEndY = e.changedTouches[0].clientY;
         const deltaX = touchEndX - touchStartX;
-        const deltaY = touchEndY - touchStartY;
         const deltaTime = Date.now() - touchStartTime;
 
         // Calcular velocidad del swipe
         const velocity = Math.abs(deltaX) / deltaTime;
 
-        // Verificar si es un swipe horizontal
-        const isHorizontalSwipe = Math.abs(deltaX) > Math.abs(deltaY);
-
         // Swipe hacia la izquierda: deltaX negativo -> cerrar viewer
-        const isSwipeLeft = deltaX < -80 || (deltaX < -30 && velocity > 0.5);
+        const isSwipeLeft = deltaX < -100 || (deltaX < -50 && velocity > 0.4);
 
         // Swipe hacia la derecha: deltaX positivo -> ir al detalle
-        const isSwipeRight = deltaX > 80 || (deltaX > 30 && velocity > 0.5);
+        const isSwipeRight = deltaX > 100 || (deltaX > 50 && velocity > 0.4);
 
-        if (isHorizontalSwipe && isSwipeLeft) {
+        if (isSwipeLeft) {
             closeFullscreenViewer();
-        } else if (isHorizontalSwipe && isSwipeRight) {
+        } else if (isSwipeRight) {
             // Ir al detalle de la publicacion actual
             const currentPost = fullscreenPosts[currentFullscreenIndex];
             if (currentPost && currentPost.id) {
@@ -3504,6 +3519,6 @@
             }
         }
 
-        isSwiping = false;
+        swipeDirection = null;
     }, { passive: true });
 </script>
