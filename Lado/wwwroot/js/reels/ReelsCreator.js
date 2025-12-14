@@ -1009,8 +1009,11 @@ class ReelsCreator {
                 this.showMessage('Publicado exitosamente!', 'success');
                 setTimeout(() => {
                     this.close();
+                    // Refrescar la página para mostrar el nuevo contenido en el feed
                     if (result.redirectUrl) {
                         window.location.href = result.redirectUrl;
+                    } else {
+                        window.location.reload();
                     }
                 }, 1500);
             } else {
