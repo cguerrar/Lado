@@ -10,8 +10,24 @@ class FileUpload {
         // Límites de archivo
         this.maxImageSize = 20 * 1024 * 1024; // 20MB
         this.maxVideoSize = 100 * 1024 * 1024; // 100MB
-        this.allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        this.allowedVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo'];
+        this.allowedImageTypes = [
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'image/webp',
+            'image/heic',      // iPhone HEIC
+            'image/heif',      // iPhone HEIF
+            'image/avif'       // AVIF moderno
+        ];
+        this.allowedVideoTypes = [
+            'video/mp4',
+            'video/webm',
+            'video/quicktime',    // MOV
+            'video/x-msvideo',    // AVI
+            'video/x-m4v',        // M4V
+            'video/3gpp',         // 3GP móviles
+            'video/x-matroska'    // MKV
+        ];
 
         this.init();
     }
@@ -64,8 +80,16 @@ class FileUpload {
             return;
         }
 
-        // Determine type
-        const isImage = this.allowedImageTypes.includes(file.type);
+        // Determine type - primero por MIME, luego por extensión
+        let isImage = this.allowedImageTypes.includes(file.type);
+
+        if (!isImage && !this.allowedVideoTypes.includes(file.type)) {
+            // Fallback por extensión
+            const ext = file.name.split('.').pop().toLowerCase();
+            const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'avif'];
+            isImage = imageExtensions.includes(ext);
+        }
+
         const type = isImage ? 'photo' : 'video';
 
         // Set media in reels creator
@@ -76,14 +100,25 @@ class FileUpload {
     }
 
     validateFile(file) {
-        const isImage = this.allowedImageTypes.includes(file.type);
-        const isVideo = this.allowedVideoTypes.includes(file.type);
+        // Validar por MIME type
+        let isImage = this.allowedImageTypes.includes(file.type);
+        let isVideo = this.allowedVideoTypes.includes(file.type);
+
+        // Fallback: validar por extensión (iOS a veces no reporta MIME type correctamente)
+        if (!isImage && !isVideo) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'avif'];
+            const videoExtensions = ['mp4', 'webm', 'mov', 'avi', 'm4v', '3gp', 'mkv'];
+
+            isImage = imageExtensions.includes(ext);
+            isVideo = videoExtensions.includes(ext);
+        }
 
         // Check type
         if (!isImage && !isVideo) {
             return {
                 valid: false,
-                message: 'Tipo de archivo no soportado. Usa JPG, PNG, GIF, MP4, MOV o WebM.'
+                message: 'Tipo de archivo no soportado. Usa JPG, PNG, HEIC, GIF, MP4, MOV o WebM.'
             };
         }
 
