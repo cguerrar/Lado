@@ -284,6 +284,143 @@ namespace Lado.Controllers
         }
 
         // ========================================
+        // CREAR DESDE REELS (AJAX)
+        // ========================================
+
+        [HttpPost]
+        public async Task<IActionResult> CrearDesdeReels(
+            IFormFile archivo,
+            string descripcion,
+            string lado,
+            string tipo,
+            bool esGratis = false,
+            bool permitirComentarios = true)
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+
+                if (usuario == null)
+                {
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                _logger.LogInformation("=== CREAR DESDE REELS ===");
+                _logger.LogInformation("Usuario: {Username}, Lado: {Lado}, Tipo: {Tipo}, EsGratis: {EsGratis}",
+                    usuario.UserName, lado, tipo, esGratis);
+
+                // Validar archivo
+                if (archivo == null || archivo.Length == 0)
+                {
+                    return Json(new { success = false, message = "No se recibió ningún archivo" });
+                }
+
+                // Validar tamaño
+                if (archivo.Length > 100 * 1024 * 1024)
+                {
+                    return Json(new { success = false, message = "El archivo excede el tamaño máximo de 100 MB" });
+                }
+
+                // Determinar tipo de contenido
+                var extension = Path.GetExtension(archivo.FileName).ToLower();
+                var tiposImagen = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+                var tiposVideo = new[] { ".mp4", ".mov", ".avi", ".webm" };
+
+                TipoContenido tipoContenido;
+                if (tiposImagen.Contains(extension) || tipo?.ToLower() == "imagen")
+                {
+                    tipoContenido = TipoContenido.Foto;
+                }
+                else if (tiposVideo.Contains(extension) || tipo?.ToLower() == "video")
+                {
+                    tipoContenido = TipoContenido.Video;
+                }
+                else
+                {
+                    return Json(new { success = false, message = "Tipo de archivo no soportado" });
+                }
+
+                // Determinar lado
+                var tipoLado = lado?.ToUpper() == "B" ? TipoLado.LadoB : TipoLado.LadoA;
+                var nombreMostrado = tipoLado == TipoLado.LadoA ? usuario.NombreCompleto : usuario.Seudonimo;
+
+                // Verificación para monetización
+                var precioDesbloqueo = 0m;
+                if (!esGratis && tipoLado == TipoLado.LadoB)
+                {
+                    if (!usuario.CreadorVerificado)
+                    {
+                        esGratis = true;
+                        _logger.LogWarning("Usuario sin verificar intentó monetizar - forzando gratis");
+                    }
+                    else
+                    {
+                        precioDesbloqueo = 10m; // Precio por defecto
+                    }
+                }
+
+                // Guardar archivo
+                var carpetaUsuario = usuario.UserName?.Replace("@", "_").Replace(".", "_") ?? usuario.Id;
+                var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", carpetaUsuario);
+
+                if (!Directory.Exists(uploadsFolder))
+                {
+                    Directory.CreateDirectory(uploadsFolder);
+                }
+
+                var uniqueFileName = $"{Guid.NewGuid()}{extension}";
+                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                using (var fileStream = new FileStream(filePath, FileMode.Create))
+                {
+                    await archivo.CopyToAsync(fileStream);
+                }
+
+                var rutaArchivo = $"/uploads/{carpetaUsuario}/{uniqueFileName}";
+
+                // Crear contenido
+                var contenido = new Contenido
+                {
+                    UsuarioId = usuario.Id,
+                    TipoContenido = tipoContenido,
+                    Descripcion = descripcion ?? "",
+                    TipoLado = tipoLado,
+                    EsGratis = esGratis || tipoLado == TipoLado.LadoA,
+                    NombreMostrado = nombreMostrado,
+                    EsPremium = !esGratis && tipoLado == TipoLado.LadoB && usuario.CreadorVerificado,
+                    PrecioDesbloqueo = precioDesbloqueo,
+                    EsBorrador = false,
+                    FechaPublicacion = DateTime.Now,
+                    EstaActivo = true,
+                    NumeroLikes = 0,
+                    NumeroComentarios = 0,
+                    NumeroVistas = 0,
+                    RutaArchivo = rutaArchivo,
+                    EsPublicoGeneral = tipoLado == TipoLado.LadoA
+                };
+
+                _context.Contenidos.Add(contenido);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("✅ Contenido creado desde Reels - ID: {Id}, Ruta: {Ruta}",
+                    contenido.Id, rutaArchivo);
+
+                return Json(new
+                {
+                    success = true,
+                    message = "Contenido publicado exitosamente",
+                    contenidoId = contenido.Id,
+                    redirectUrl = "/Feed"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al crear contenido desde Reels");
+                return Json(new { success = false, message = $"Error: {ex.Message}" });
+            }
+        }
+
+        // ========================================
         // PUBLICAR BORRADOR
         // ========================================
 
