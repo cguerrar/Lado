@@ -57,6 +57,11 @@ namespace Lado.Data
         public DbSet<InteresUsuario> InteresesUsuarios { get; set; }
         public DbSet<InteraccionContenido> InteraccionesContenidos { get; set; }
 
+        // ========================================
+        // ⭐ DbSets NUEVOS - SISTEMA DE BLOQUEOS
+        // ========================================
+        public DbSet<BloqueoUsuario> BloqueosUsuarios { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -843,6 +848,40 @@ namespace Lado.Data
                     .WithMany()
                     .HasForeignKey(c => c.CategoriaInteresId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE BLOQUEOS USUARIO
+            // ========================================
+            modelBuilder.Entity<BloqueoUsuario>(entity =>
+            {
+                entity.HasKey(b => b.Id);
+
+                entity.HasOne(b => b.Bloqueador)
+                    .WithMany()
+                    .HasForeignKey(b => b.BloqueadorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(b => b.Bloqueado)
+                    .WithMany()
+                    .HasForeignKey(b => b.BloqueadoId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.Property(b => b.Razon)
+                    .HasMaxLength(500)
+                    .IsRequired(false);
+
+                // Índices
+                entity.HasIndex(b => b.BloqueadorId)
+                    .HasDatabaseName("IX_BloqueosUsuarios_BloqueadorId");
+
+                entity.HasIndex(b => b.BloqueadoId)
+                    .HasDatabaseName("IX_BloqueosUsuarios_BloqueadoId");
+
+                // Un usuario solo puede bloquear a otro una vez
+                entity.HasIndex(b => new { b.BloqueadorId, b.BloqueadoId })
+                    .IsUnique()
+                    .HasDatabaseName("IX_BloqueosUsuarios_Bloqueador_Bloqueado_Unique");
             });
         }
     }

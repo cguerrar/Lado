@@ -576,6 +576,45 @@ namespace Lado.Controllers
             return RedirectToAction(nameof(Configuracion));
         }
 
+        // POST: /Usuario/CambiarIdioma
+        [HttpPost]
+        public async Task<IActionResult> CambiarIdioma([FromBody] CambiarIdiomaRequest request)
+        {
+            // Validar idioma
+            var idiomasValidos = new[] { "es", "en", "pt" };
+            if (string.IsNullOrEmpty(request.Idioma) || !idiomasValidos.Contains(request.Idioma))
+            {
+                return Json(new { success = false, message = "Idioma no válido" });
+            }
+
+            // Guardar en cookie para usuarios no autenticados
+            Response.Cookies.Append("Lado.Language", request.Idioma, new CookieOptions
+            {
+                Expires = DateTimeOffset.Now.AddYears(1),
+                HttpOnly = false,
+                Secure = true,
+                SameSite = SameSiteMode.Lax
+            });
+
+            // Si el usuario está autenticado, guardar en su perfil
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario != null)
+            {
+                usuario.Idioma = request.Idioma;
+                await _userManager.UpdateAsync(usuario);
+            }
+
+            var nombreIdioma = request.Idioma switch
+            {
+                "es" => "Español",
+                "en" => "English",
+                "pt" => "Português",
+                _ => request.Idioma
+            };
+
+            return Json(new { success = true, message = $"Idioma cambiado a {nombreIdioma}" });
+        }
+
         // GET: /Usuario/ActividadReciente
         public async Task<IActionResult> ActividadReciente(int pagina = 1, string tipo = "todas")
         {
@@ -762,5 +801,216 @@ namespace Lado.Controllers
                 // Si falla al eliminar el archivo, continuar sin detener el proceso
             }
         }
+
+        // ========================================
+        // SISTEMA DE BLOQUEO DE USUARIOS
+        // ========================================
+
+        /// <summary>
+        /// Bloquear a un usuario
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> BloquearUsuario([FromBody] BloquearUsuarioRequest request)
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            if (string.IsNullOrEmpty(request.UsuarioId))
+            {
+                return Json(new { success = false, message = "ID de usuario inválido" });
+            }
+
+            // No puede bloquearse a sí mismo
+            if (request.UsuarioId == usuario.Id)
+            {
+                return Json(new { success = false, message = "No puedes bloquearte a ti mismo" });
+            }
+
+            // Verificar que el usuario a bloquear existe
+            var usuarioABloquear = await _userManager.FindByIdAsync(request.UsuarioId);
+            if (usuarioABloquear == null)
+            {
+                return Json(new { success = false, message = "Usuario no encontrado" });
+            }
+
+            // Verificar si ya está bloqueado
+            var bloqueoExistente = await _context.BloqueosUsuarios
+                .FirstOrDefaultAsync(b => b.BloqueadorId == usuario.Id && b.BloqueadoId == request.UsuarioId);
+
+            if (bloqueoExistente != null)
+            {
+                return Json(new { success = false, message = "Este usuario ya está bloqueado" });
+            }
+
+            // Crear el bloqueo
+            var bloqueo = new BloqueoUsuario
+            {
+                BloqueadorId = usuario.Id,
+                BloqueadoId = request.UsuarioId,
+                FechaBloqueo = DateTime.Now,
+                Razon = request.Razon
+            };
+
+            _context.BloqueosUsuarios.Add(bloqueo);
+
+            // Cancelar suscripciones mutuas si existen
+            var suscripcionesACancelar = await _context.Suscripciones
+                .Where(s => s.EstaActiva &&
+                           ((s.FanId == usuario.Id && s.CreadorId == request.UsuarioId) ||
+                            (s.FanId == request.UsuarioId && s.CreadorId == usuario.Id)))
+                .ToListAsync();
+
+            foreach (var suscripcion in suscripcionesACancelar)
+            {
+                suscripcion.EstaActiva = false;
+                suscripcion.FechaCancelacion = DateTime.Now;
+                suscripcion.RenovacionAutomatica = false;
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Json(new {
+                success = true,
+                message = $"Has bloqueado a {usuarioABloquear.NombreCompleto}",
+                suscripcionesCanceladas = suscripcionesACancelar.Count
+            });
+        }
+
+        /// <summary>
+        /// Desbloquear a un usuario
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> DesbloquearUsuario([FromBody] DesbloquearUsuarioRequest request)
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            var bloqueo = await _context.BloqueosUsuarios
+                .FirstOrDefaultAsync(b => b.BloqueadorId == usuario.Id && b.BloqueadoId == request.UsuarioId);
+
+            if (bloqueo == null)
+            {
+                return Json(new { success = false, message = "Este usuario no está bloqueado" });
+            }
+
+            _context.BloqueosUsuarios.Remove(bloqueo);
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, message = "Usuario desbloqueado correctamente" });
+        }
+
+        /// <summary>
+        /// Obtener lista de usuarios bloqueados
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> UsuariosBloqueados()
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            var bloqueados = await _context.BloqueosUsuarios
+                .Where(b => b.BloqueadorId == usuario.Id)
+                .Include(b => b.Bloqueado)
+                .OrderByDescending(b => b.FechaBloqueo)
+                .Select(b => new UsuarioBloqueadoDto
+                {
+                    Id = b.Bloqueado!.Id,
+                    NombreCompleto = b.Bloqueado.NombreCompleto,
+                    UserName = b.Bloqueado.UserName ?? "",
+                    FotoPerfil = b.Bloqueado.FotoPerfil,
+                    FechaBloqueo = b.FechaBloqueo,
+                    Razon = b.Razon
+                })
+                .ToListAsync();
+
+            return View(bloqueados);
+        }
+
+        /// <summary>
+        /// API: Verificar si un usuario está bloqueado
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> VerificarBloqueo(string usuarioId)
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { bloqueado = false });
+            }
+
+            // Verificar si yo lo bloqueé
+            var yoLoBloquee = await _context.BloqueosUsuarios
+                .AnyAsync(b => b.BloqueadorId == usuario.Id && b.BloqueadoId == usuarioId);
+
+            // Verificar si él me bloqueó
+            var elMeBloqueo = await _context.BloqueosUsuarios
+                .AnyAsync(b => b.BloqueadorId == usuarioId && b.BloqueadoId == usuario.Id);
+
+            return Json(new {
+                bloqueado = yoLoBloquee || elMeBloqueo,
+                yoLoBloquee = yoLoBloquee,
+                elMeBloqueo = elMeBloqueo
+            });
+        }
+
+        /// <summary>
+        /// API: Obtener IDs de usuarios bloqueados (para filtrar en Feed)
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ObtenerIdsBloqueados()
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { ids = new List<string>() });
+            }
+
+            // Usuarios que yo bloqueé + usuarios que me bloquearon
+            var bloqueados = await _context.BloqueosUsuarios
+                .Where(b => b.BloqueadorId == usuario.Id || b.BloqueadoId == usuario.Id)
+                .Select(b => b.BloqueadorId == usuario.Id ? b.BloqueadoId : b.BloqueadorId)
+                .Distinct()
+                .ToListAsync();
+
+            return Json(new { ids = bloqueados });
+        }
+    }
+
+    // ========================================
+    // DTOs para Bloqueos
+    // ========================================
+    public class BloquearUsuarioRequest
+    {
+        public string UsuarioId { get; set; } = string.Empty;
+        public string? Razon { get; set; }
+    }
+
+    public class DesbloquearUsuarioRequest
+    {
+        public string UsuarioId { get; set; } = string.Empty;
+    }
+
+    public class UsuarioBloqueadoDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string NombreCompleto { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
+        public string? FotoPerfil { get; set; }
+        public DateTime FechaBloqueo { get; set; }
+        public string? Razon { get; set; }
+    }
+
+    public class CambiarIdiomaRequest
+    {
+        public string Idioma { get; set; } = "es";
     }
 }

@@ -122,6 +122,13 @@ namespace Lado.Models
         [Display(Name = "Permite Publicidad Personalizada")]
         public bool PermitePublicidadPersonalizada { get; set; } = true;
 
+        // ========================================
+        // PREFERENCIAS DE IDIOMA
+        // ========================================
+        [Display(Name = "Idioma Preferido")]
+        [StringLength(5)]
+        public string Idioma { get; set; } = "es"; // es = Español, en = English, pt = Português
+
         // Relacion con Agencia (si TipoUsuario == 2)
         public virtual Agencia? Agencia { get; set; }
 

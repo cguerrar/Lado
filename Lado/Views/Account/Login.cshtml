@@ -1,6 +1,7 @@
 ﻿@model Lado.ViewModels.LoginViewModel
+@inject Lado.Services.ILocalizationService Localizer
 @{
-    ViewData["Title"] = "Iniciar Sesión - Lado";
+    ViewData["Title"] = Localizer.Get("Auth_Login") + " - Lado";
     Layout = null;
 }
 
@@ -16,12 +17,19 @@
         :root {
             --primary: #4682B4;
             --primary-dark: #36648B;
+            --primary-darker: #2C5278;
             --primary-light: #B0C4DE;
-            --text-dark: #0a0a0a;
-            --text-gray: #737373;
-            --text-light: #a3a3a3;
-            --border-color: #e5e5e5;
-            --bg-light: #fafafa;
+            --primary-pale: rgba(70, 130, 180, 0.08);
+            --text-dark: #1a1a2e;
+            --text-gray: #64748b;
+            --text-light: #94a3b8;
+            --border-color: #e2e8f0;
+            --bg-light: #f8fafc;
+            --white: #ffffff;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+            --shadow-md: 0 4px 20px rgba(0,0,0,0.08);
+            --shadow-lg: 0 10px 40px rgba(0,0,0,0.12);
+            --shadow-primary: 0 8px 30px rgba(70, 130, 180, 0.35);
         }
 
         * {
@@ -31,306 +39,307 @@
         }
 
         body {
-            background: #ffffff;
             min-height: 100vh;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             color: var(--text-dark);
             -webkit-font-smoothing: antialiased;
-            overflow-x: hidden;
-        }
-
-        /* Header minimalista */
-        .header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border-color);
-            padding: 16px 0;
-            z-index: 1000;
-        }
-
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 32px;
+            background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 50%, #cbd5e1 100%);
             display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* Contenedor principal tipo card */
+        .login-card {
+            width: 100%;
+            max-width: 1000px;
+            background: var(--white);
+            border-radius: 24px;
+            box-shadow: var(--shadow-lg);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            overflow: hidden;
+            min-height: 620px;
+        }
+
+        /* Lado izquierdo - Visual */
+        .visual-side {
+            background: linear-gradient(145deg, var(--primary) 0%, var(--primary-dark) 50%, var(--primary-darker) 100%);
+            padding: 48px;
+            display: flex;
+            flex-direction: column;
             justify-content: space-between;
-            align-items: center;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-decoration: none;
-            color: var(--text-dark);
-            font-weight: 900;
-            font-size: 1.5rem;
-            letter-spacing: -0.02em;
-            transition: opacity 0.2s;
-        }
-
-            .brand:hover {
-                opacity: 0.8;
-            }
-
-        .brand-badge {
-            width: 36px;
-            height: 36px;
-            border-radius: 10px;
-            background: var(--primary);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 800;
-            font-size: 1.1rem;
-            box-shadow: 0 4px 12px rgba(70, 130, 180, 0.3);
-        }
-
-        .help-link {
-            color: var(--text-gray);
-            text-decoration: none;
-            font-size: 0.95rem;
-            font-weight: 600;
-            transition: color 0.2s;
-        }
-
-            .help-link:hover {
-                color: var(--text-dark);
-            }
-
-        /* Main layout */
-        .main-wrapper {
-            min-height: 100vh;
-            display: flex;
-            padding-top: 70px;
-        }
-
-        /* Left side - Hero */
-        .hero-side {
-            flex: 1;
-            background: linear-gradient(135deg, #fafafa 0%, #ffffff 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 80px 60px;
             position: relative;
             overflow: hidden;
         }
 
-            .hero-side::before {
-                content: '';
-                position: absolute;
-                width: 500px;
-                height: 500px;
-                background: radial-gradient(circle, rgba(70, 130, 180, 0.08) 0%, transparent 70%);
-                top: -200px;
-                left: -200px;
-                border-radius: 50%;
-            }
+        .visual-side::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            pointer-events: none;
+        }
 
-        .hero-content {
-            max-width: 520px;
+        .visual-side::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -30%;
+            width: 80%;
+            height: 80%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .brand-section {
             position: relative;
             z-index: 1;
         }
 
-        .hero-badge {
-            display: inline-block;
-            background: var(--primary-light);
-            color: var(--primary-dark);
-            padding: 8px 16px;
-            border-radius: 100px;
-            font-size: 0.85rem;
-            font-weight: 700;
-            letter-spacing: 0.02em;
-            margin-bottom: 24px;
-        }
-
-        .hero-title {
-            font-size: 3.5rem;
-            font-weight: 900;
-            line-height: 1.1;
-            letter-spacing: -0.03em;
-            margin-bottom: 20px;
-            color: var(--text-dark);
-        }
-
-        .hero-subtitle {
-            font-size: 1.3rem;
-            color: var(--text-gray);
-            line-height: 1.6;
-            margin-bottom: 48px;
-            font-weight: 500;
-        }
-
-        /* Frase destacada */
-        .hero-quote {
-            background: white;
-            border: 2px solid var(--border-color);
-            border-radius: 16px;
-            padding: 32px;
-            margin-bottom: 48px;
-            position: relative;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-            text-align: center;
-        }
-
-            .hero-quote p {
-                font-size: 1.25rem;
-                font-weight: 600;
-                color: var(--text-dark);
-                line-height: 1.5;
-                margin: 0;
-                font-style: italic;
-            }
-
-        /* Features compactas */
-        .hero-features {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 20px;
-        }
-
-        .hero-feature {
+        .brand-logo {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
+            margin-bottom: 48px;
         }
 
-        .hero-feature-icon {
-            width: 44px;
-            height: 44px;
-            background: var(--primary-light);
+        .brand-logo img {
+            height: 56px;
+            width: auto;
             border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
 
-            .hero-feature-icon svg {
-                width: 22px;
-                height: 22px;
-                fill: var(--primary-dark);
-            }
+        .brand-text {
+            color: white;
+            font-size: 1.75rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
 
-        .hero-feature-text {
-            font-size: 0.95rem;
+        .visual-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .visual-title {
+            color: white;
+            font-size: 2.25rem;
+            font-weight: 800;
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+            margin-bottom: 16px;
+        }
+
+        .visual-subtitle {
+            color: rgba(255,255,255,0.85);
+            font-size: 1.05rem;
+            line-height: 1.6;
+            font-weight: 500;
+            margin-bottom: 32px;
+        }
+
+        /* Quote card */
+        .quote-card {
+            background: rgba(255,255,255,0.12);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 16px;
+            padding: 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .quote-icon {
+            font-size: 2rem;
+            opacity: 0.6;
+            margin-bottom: 8px;
+            line-height: 1;
+        }
+
+        .quote-text {
+            color: white;
+            font-size: 1.1rem;
             font-weight: 600;
-            color: var(--text-dark);
+            font-style: italic;
+            line-height: 1.5;
         }
 
-        /* Right side - Form */
-        .form-side {
-            width: 480px;
-            background: white;
+        /* Features en visual */
+        .visual-features {
+            display: flex;
+            gap: 24px;
+            margin-top: 32px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .visual-feature {
             display: flex;
             align-items: center;
-            justify-content: center;
-            padding: 80px 60px;
-            border-left: 1px solid var(--border-color);
+            gap: 8px;
+            color: rgba(255,255,255,0.9);
+            font-size: 0.875rem;
+            font-weight: 600;
         }
 
-        .form-container {
-            width: 100%;
-            max-width: 400px;
+        .visual-feature svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+            opacity: 0.9;
+        }
+
+        /* Lado derecho - Formulario */
+        .form-side {
+            padding: 48px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .form-header {
-            margin-bottom: 40px;
+            margin-bottom: 32px;
+        }
+
+        .form-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--primary-pale);
+            color: var(--primary-dark);
+            padding: 6px 12px;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .form-badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @@keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
         .form-title {
-            font-size: 2rem;
-            font-weight: 900;
-            margin-bottom: 8px;
+            font-size: 1.75rem;
+            font-weight: 800;
             color: var(--text-dark);
             letter-spacing: -0.02em;
+            margin-bottom: 6px;
         }
 
         .form-subtitle {
             color: var(--text-gray);
-            font-size: 1rem;
+            font-size: 0.95rem;
             font-weight: 500;
         }
 
         /* Form elements */
         .form-group {
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
 
         .form-label {
             display: block;
             margin-bottom: 8px;
             color: var(--text-dark);
-            font-weight: 700;
-            font-size: 0.9rem;
-            letter-spacing: -0.01em;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            color: var(--text-light);
+            pointer-events: none;
+            transition: color 0.2s;
         }
 
         .form-control {
             width: 100%;
-            padding: 16px 18px;
+            padding: 14px 16px 14px 48px;
             border: 2px solid var(--border-color);
             border-radius: 12px;
-            font-size: 1rem;
+            font-size: 0.95rem;
             transition: all 0.2s;
-            background: white;
+            background: var(--white);
             font-family: inherit;
             font-weight: 500;
+            color: var(--text-dark);
         }
 
-            .form-control:focus {
-                outline: none;
-                border-color: var(--primary);
-                box-shadow: 0 0 0 4px rgba(70, 130, 180, 0.1);
-            }
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px var(--primary-pale);
+        }
 
-            .form-control::placeholder {
-                color: var(--text-light);
-                font-weight: 500;
-            }
+        .form-control:focus ~ .input-icon {
+            color: var(--primary);
+        }
 
-        .password-wrapper {
-            position: relative;
+        .form-control::placeholder {
+            color: var(--text-light);
+            font-weight: 500;
         }
 
         .password-toggle {
             position: absolute;
-            right: 16px;
+            right: 14px;
             top: 50%;
             transform: translateY(-50%);
             background: none;
             border: none;
             cursor: pointer;
-            padding: 8px;
-            color: var(--text-gray);
+            padding: 6px;
+            color: var(--text-light);
             display: flex;
             align-items: center;
             transition: color 0.2s;
+            border-radius: 6px;
         }
 
-            .password-toggle:hover {
-                color: var(--text-dark);
-            }
+        .password-toggle:hover {
+            color: var(--text-gray);
+            background: var(--bg-light);
+        }
 
-            .password-toggle svg {
-                width: 20px;
-                height: 20px;
-                fill: currentColor;
-            }
+        .password-toggle svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
 
         /* Form options */
         .form-options {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 28px;
+            margin-bottom: 24px;
         }
 
         .form-check {
@@ -340,102 +349,115 @@
         }
 
         .form-check-input {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             border: 2px solid var(--border-color);
-            border-radius: 6px;
+            border-radius: 5px;
             cursor: pointer;
             transition: all 0.2s;
+            accent-color: var(--primary);
         }
 
-            .form-check-input:checked {
-                background-color: var(--primary);
-                border-color: var(--primary);
-            }
+        .form-check-input:checked {
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
 
         .form-check-label {
-            font-size: 0.9rem;
-            color: var(--text-dark);
+            font-size: 0.875rem;
+            color: var(--text-gray);
             cursor: pointer;
-            font-weight: 600;
+            font-weight: 500;
         }
 
         .forgot-link {
-            color: var(--text-gray);
+            color: var(--primary);
             text-decoration: none;
-            font-size: 0.9rem;
+            font-size: 0.875rem;
             font-weight: 600;
             transition: color 0.2s;
         }
 
-            .forgot-link:hover {
-                color: var(--primary-dark);
-            }
+        .forgot-link:hover {
+            color: var(--primary-dark);
+            text-decoration: underline;
+        }
 
         /* Button */
         .btn-login {
             width: 100%;
-            padding: 18px;
-            background: var(--primary);
+            padding: 16px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
             color: white;
             border: none;
             border-radius: 12px;
             font-size: 1rem;
-            font-weight: 800;
+            font-weight: 700;
             cursor: pointer;
-            transition: all 0.2s;
-            box-shadow: 0 4px 16px rgba(70, 130, 180, 0.3);
+            transition: all 0.25s;
+            box-shadow: var(--shadow-primary);
             letter-spacing: -0.01em;
+            position: relative;
+            overflow: hidden;
         }
 
-            .btn-login:hover {
-                background: var(--primary-dark);
-                transform: translateY(-2px);
-                box-shadow: 0 6px 20px rgba(70, 130, 180, 0.4);
-            }
+        .btn-login::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
 
-            .btn-login:active {
-                transform: translateY(0);
-            }
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(70, 130, 180, 0.45);
+        }
+
+        .btn-login:hover::before {
+            left: 100%;
+        }
+
+        .btn-login:active {
+            transform: translateY(0);
+        }
 
         /* Divider */
         .divider {
             position: relative;
             text-align: center;
-            margin: 32px 0;
+            margin: 28px 0;
         }
 
-            .divider::before {
-                content: "";
-                position: absolute;
-                top: 50%;
-                left: 0;
-                right: 0;
-                height: 1px;
-                background: var(--border-color);
-            }
-
-            .divider span {
-                position: relative;
-                background: white;
-                padding: 0 16px;
-                color: var(--text-gray);
-                font-size: 0.85rem;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-            }
-
-        /* Social buttons */
-        .social-buttons {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 32px;
+        .divider::before {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: var(--border-color);
         }
 
-        .social-btn {
+        .divider span {
+            position: relative;
+            background: var(--white);
+            padding: 0 16px;
+            color: var(--text-light);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Social button */
+        .btn-social {
+            width: 100%;
             padding: 14px;
-            background: white;
+            background: var(--white);
             border: 2px solid var(--border-color);
             border-radius: 12px;
             cursor: pointer;
@@ -443,262 +465,283 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
-            font-size: 0.9rem;
+            gap: 12px;
+            font-size: 0.95rem;
             color: var(--text-dark);
-            font-weight: 700;
+            font-weight: 600;
+            font-family: inherit;
         }
 
-            .social-btn:hover {
-                border-color: var(--text-dark);
-                transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            }
+        .btn-social:hover {
+            border-color: var(--text-light);
+            background: var(--bg-light);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
 
-            .social-btn svg {
-                width: 20px;
-                height: 20px;
-            }
+        .btn-social svg {
+            width: 20px;
+            height: 20px;
+        }
 
-        /* Sign up */
+        /* Sign up prompt */
         .signup-prompt {
             text-align: center;
-            padding-top: 28px;
+            margin-top: 28px;
+            padding-top: 24px;
             border-top: 1px solid var(--border-color);
             color: var(--text-gray);
-            font-size: 0.95rem;
-            font-weight: 600;
+            font-size: 0.9rem;
+            font-weight: 500;
         }
 
         .signup-link {
-            color: var(--primary-dark);
+            color: var(--primary);
             text-decoration: none;
-            font-weight: 800;
-            transition: opacity 0.2s;
+            font-weight: 700;
+            transition: all 0.2s;
         }
 
-            .signup-link:hover {
-                opacity: 0.8;
-            }
+        .signup-link:hover {
+            color: var(--primary-dark);
+            text-decoration: underline;
+        }
 
         /* Alert */
         .alert {
-            padding: 16px 20px;
-            border-radius: 12px;
-            margin-bottom: 24px;
-            font-size: 0.9rem;
-            font-weight: 600;
+            padding: 14px 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .alert-danger {
             background: #fef2f2;
-            border: 2px solid #fecaca;
+            border: 1px solid #fecaca;
             color: #dc2626;
+        }
+
+        .alert-danger::before {
+            content: '!';
+            width: 20px;
+            height: 20px;
+            background: #dc2626;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.75rem;
+            flex-shrink: 0;
         }
 
         .text-danger {
             color: #dc2626;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             margin-top: 6px;
             display: block;
-            font-weight: 600;
+            font-weight: 500;
+        }
+
+        /* Toast */
+        .toast-notification {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            background: var(--text-dark);
+            color: white;
+            box-shadow: var(--shadow-lg);
+            z-index: 10000;
+            max-width: 360px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transform: translateX(calc(100% + 24px));
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .toast-notification.show {
+            transform: translateX(0);
+        }
+
+        .toast-notification.error {
+            background: #dc2626;
+        }
+
+        .toast-notification.warning {
+            background: #f59e0b;
+            color: var(--text-dark);
+        }
+
+        .toast-notification.success {
+            background: var(--primary);
         }
 
         /* Responsive */
-        @@media (max-width: 1024px) {
-            .main-wrapper {
-                flex-direction: column;
+        @@media (max-width: 900px) {
+            .login-card {
+                grid-template-columns: 1fr;
+                max-width: 480px;
             }
 
-            .hero-side {
-                padding: 60px 32px;
-                min-height: 60vh;
-            }
-
-            .hero-title {
-                font-size: 2.5rem;
+            .visual-side {
+                display: none;
             }
 
             .form-side {
-                width: 100%;
-                border-left: none;
-                border-top: 1px solid var(--border-color);
-                padding: 60px 32px;
-            }
-
-            .hero-features {
-                grid-template-columns: 1fr;
+                padding: 40px 32px;
             }
         }
 
-        @@media (max-width: 640px) {
-            .hero-title {
-                font-size: 2rem;
+        @@media (max-width: 520px) {
+            body {
+                padding: 16px;
             }
 
-            .hero-subtitle {
-                font-size: 1.1rem;
-            }
-
-            .hero-quote p {
-                font-size: 1.1rem;
+            .login-card {
+                border-radius: 20px;
             }
 
             .form-side {
-                padding: 40px 24px;
+                padding: 32px 24px;
+            }
+
+            .form-title {
+                font-size: 1.5rem;
             }
 
             .form-options {
                 flex-direction: column;
-                gap: 16px;
+                gap: 12px;
                 align-items: flex-start;
-            }
-
-            .social-buttons {
-                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Header -->
-    <header class="header">
-        <div class="header-content">
-            <a href="/" class="brand">
-                <img src="/images/logo.png" alt="Lado" style="height: 64px; width: auto; border-radius: 10px;">
-            </a>
-            <a href="#" class="help-link">Ayuda</a>
-        </div>
-    </header>
+    <div class="login-card">
+        <!-- Lado Visual -->
+        <div class="visual-side">
+            <div class="brand-section">
+                <div class="brand-logo">
+                    <img src="/images/logo.png" alt="Lado">
+                    <span class="brand-text">Lado</span>
+                </div>
+            </div>
 
-    <!-- Main -->
-    <div class="main-wrapper">
-        <!-- Left - Hero -->
-        <div class="hero-side">
-            <div class="hero-content">
-                <span class="hero-badge">EN BETA</span>
+            <div class="visual-content">
+                <h1 class="visual-title">@Localizer.Get("Login_VisualTitle")</h1>
+                <p class="visual-subtitle">@Localizer.Get("Login_VisualSubtitle")</p>
 
-                <h1 class="hero-title">Tu otro lado te espera</h1>
-                <p class="hero-subtitle">El espacio donde no tienes que fingir. Comparte lo que realmente eres.</p>
-
-                <!-- Frase única -->
-                <div class="hero-quote">
-                    <p id="heroQuote"></p>
+                <div class="quote-card">
+                    <div class="quote-icon">"</div>
+                    <p class="quote-text" id="heroQuote"></p>
                 </div>
 
-                <!-- Features -->
-                <div class="hero-features">
-                    <div class="hero-feature">
-                        <div class="hero-feature-icon">
-                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-                            </svg>
-                        </div>
-                        <span class="hero-feature-text">Sin censura</span>
+                <div class="visual-features">
+                    <div class="visual-feature">
+                        <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+                        <span>@Localizer.Get("Login_FeaturePrivate")</span>
                     </div>
-
-                    <div class="hero-feature">
-                        <div class="hero-feature-icon">
-                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
-                            </svg>
-                        </div>
-                        <span class="hero-feature-text">100% privado</span>
+                    <div class="visual-feature">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                        <span>@Localizer.Get("Login_FeatureNoCensorship")</span>
                     </div>
-
-                    <div class="hero-feature">
-                        <div class="hero-feature-icon">
-                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
-                            </svg>
-                        </div>
-                        <span class="hero-feature-text">Tu comunidad</span>
-                    </div>
-
-                    <div class="hero-feature">
-                        <div class="hero-feature-icon">
-                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z" />
-                            </svg>
-                        </div>
-                        <span class="hero-feature-text">Monetiza real</span>
+                    <div class="visual-feature">
+                        <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+                        <span>@Localizer.Get("Login_FeatureMonetize")</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Right - Form -->
+        <!-- Lado Formulario -->
         <div class="form-side">
-            <div class="form-container">
-                <div class="form-header">
-                    <h2 class="form-title">Bienvenido</h2>
-                    <p class="form-subtitle">Entra a tu cuenta</p>
+            <div class="form-header">
+                <div class="form-badge">@Localizer.Get("Login_Beta")</div>
+                <h2 class="form-title">@Localizer.Get("Auth_WelcomeBack")</h2>
+                <p class="form-subtitle">@Localizer.Get("Auth_LoginSubtitle")</p>
+            </div>
+
+            <form asp-action="Login" method="post">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+                <div class="form-group">
+                    <label asp-for="EmailOUsuario" class="form-label">@Localizer.Get("Auth_EmailOrUsername")</label>
+                    <div class="input-wrapper">
+                        <input asp-for="EmailOUsuario" class="form-control" placeholder="@Localizer.Get("Auth_EmailPlaceholder")" autocomplete="username" />
+                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                    </div>
+                    <span asp-validation-for="EmailOUsuario" class="text-danger"></span>
                 </div>
 
-                <form asp-action="Login" method="post">
-                    <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
-
-                    <div class="form-group">
-                        <label asp-for="EmailOUsuario" class="form-label">Email o usuario</label>
-                        <input asp-for="EmailOUsuario" class="form-control" placeholder="tu@email.com" autocomplete="username" />
-                        <span asp-validation-for="EmailOUsuario" class="text-danger"></span>
-                    </div>
-
-                    <div class="form-group">
-                        <label asp-for="Contraseña" class="form-label">Contraseña</label>
-                        <div class="password-wrapper">
-                            <input asp-for="Contraseña" type="password" class="form-control" id="passwordInput" placeholder="••••••••" autocomplete="current-password" />
-                            <button type="button" class="password-toggle" id="togglePassword" aria-label="Mostrar contraseña">
-                                <svg id="eyeIcon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
-                                </svg>
-                                <svg id="eyeOffIcon" style="display: none;" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z" />
-                                </svg>
-                            </button>
-                        </div>
-                        <span asp-validation-for="Contraseña" class="text-danger"></span>
-                    </div>
-
-                    <div class="form-options">
-                        <div class="form-check">
-                            <input asp-for="Recordarme" class="form-check-input" type="checkbox" id="recordarmeCheck" />
-                            <label asp-for="Recordarme" class="form-check-label" for="recordarmeCheck">
-                                Recordarme
-                            </label>
-                        </div>
-                        <a href="#" class="forgot-link">¿Olvidaste tu contraseña?</a>
-                    </div>
-
-                    <button type="submit" class="btn-login">
-                        Entrar
-                    </button>
-                </form>
-
-                <div class="divider">
-                    <span>O continúa con</span>
-                </div>
-
-                <div class="social-buttons">
-                    <form asp-action="ExternalLogin" asp-controller="Account" asp-route-provider="Google" method="post" style="display: contents;">
-                        <button type="submit" class="social-btn" style="width: 100%;">
-                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path fill="#DB4437" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                                <path fill="#4285F4" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                                <path fill="#34A853" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                <div class="form-group">
+                    <label asp-for="Contraseña" class="form-label">@Localizer.Get("Auth_Password")</label>
+                    <div class="input-wrapper">
+                        <input asp-for="Contraseña" type="password" class="form-control" id="passwordInput" placeholder="••••••••" autocomplete="current-password" />
+                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        <button type="button" class="password-toggle" id="togglePassword" aria-label="Mostrar contraseña">
+                            <svg id="eyeIcon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
                             </svg>
-                            Continuar con Google
+                            <svg id="eyeOffIcon" style="display: none;" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z" />
+                            </svg>
                         </button>
-                    </form>
+                    </div>
+                    <span asp-validation-for="Contraseña" class="text-danger"></span>
                 </div>
 
-                <div class="signup-prompt">
-                    <p>¿No tienes cuenta? <a href="/Account/Register" class="signup-link">Regístrate</a></p>
+                <div class="form-options">
+                    <div class="form-check">
+                        <input asp-for="Recordarme" class="form-check-input" type="checkbox" id="recordarmeCheck" />
+                        <label asp-for="Recordarme" class="form-check-label" for="recordarmeCheck">
+                            @Localizer.Get("Auth_RememberMe")
+                        </label>
+                    </div>
+                    <a href="/Account/ForgotPassword" class="forgot-link">@Localizer.Get("Auth_ForgotPassword")</a>
                 </div>
+
+                <button type="submit" class="btn-login">
+                    @Localizer.Get("Auth_Login")
+                </button>
+            </form>
+
+            <div class="divider">
+                <span>@Localizer.Get("Auth_OrContinueWith")</span>
+            </div>
+
+            <form asp-action="ExternalLogin" asp-controller="Account" asp-route-provider="Google" method="post">
+                <button type="submit" class="btn-social">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                    </svg>
+                    Google
+                </button>
+            </form>
+
+            <div class="signup-prompt">
+                @Localizer.Get("Auth_NoAccount") <a href="/Account/Register" class="signup-link">@Localizer.Get("Nav_Register")</a>
             </div>
         </div>
     </div>
+
+    <div class="toast-notification" id="toastNotification"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://ajax.aspnetcdn.com/ajax/jquery/jquery-3.6.0.min.js"></script>
@@ -730,7 +773,7 @@
                 });
             }
 
-            // Frases - UNA SOLA aleatoria por sesión
+            // Frases motivacionales
             const phrases = [
                 "La dualidad no es mentir. Es ser completo.",
                 "Dos mundos, una verdad.",
@@ -755,8 +798,6 @@
             ];
 
             const heroQuote = document.getElementById('heroQuote');
-
-            // Obtener o generar frase única para esta sesión
             let phraseIndex = sessionStorage.getItem('ladoPhraseIndex');
 
             if (phraseIndex === null) {
@@ -764,35 +805,35 @@
                 sessionStorage.setItem('ladoPhraseIndex', phraseIndex);
             }
 
-            heroQuote.textContent = phrases[phraseIndex];
+            if (heroQuote) {
+                heroQuote.textContent = phrases[phraseIndex];
+            }
         });
 
-        // Toast notification function para consumir TempData
-        function showLoginToast(message, type) {
-            const toast = document.createElement('div');
-            toast.style.cssText = 'position: fixed; top: 20px; right: 20px; padding: 16px 24px; border-radius: 12px; background: #1a1a2e; color: white; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 10000; max-width: 350px; font-size: 14px;';
-            if (type === 'error') toast.style.background = '#dc3545';
-            else if (type === 'warning') { toast.style.background = '#ffc107'; toast.style.color = '#1a1a2e'; }
+        // Toast notification
+        function showToast(message, type) {
+            const toast = document.getElementById('toastNotification');
             toast.textContent = message;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 4000);
+            toast.className = 'toast-notification ' + type;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 4000);
         }
 
         @if (TempData["Success"] != null)
         {
-            <text>showLoginToast('@Html.Raw(TempData["Success"]?.ToString()?.Replace("'", "\\'"))', 'success');</text>
+            <text>showToast('@Html.Raw(TempData["Success"]?.ToString()?.Replace("'", "\\'"))', 'success');</text>
         }
         @if (TempData["Error"] != null)
         {
-            <text>showLoginToast('@Html.Raw(TempData["Error"]?.ToString()?.Replace("'", "\\'"))', 'error');</text>
+            <text>showToast('@Html.Raw(TempData["Error"]?.ToString()?.Replace("'", "\\'"))', 'error');</text>
         }
         @if (TempData["Warning"] != null)
         {
-            <text>showLoginToast('@Html.Raw(TempData["Warning"]?.ToString()?.Replace("'", "\\'"))', 'warning');</text>
+            <text>showToast('@Html.Raw(TempData["Warning"]?.ToString()?.Replace("'", "\\'"))', 'warning');</text>
         }
         @if (TempData["Info"] != null)
         {
-            <text>showLoginToast('@Html.Raw(TempData["Info"]?.ToString()?.Replace("'", "\\'"))', 'info');</text>
+            <text>showToast('@Html.Raw(TempData["Info"]?.ToString()?.Replace("'", "\\'"))', 'info');</text>
         }
     </script>
 </body>

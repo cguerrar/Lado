@@ -1,15 +1,43 @@
 ﻿using Lado.Data;
 using Lado.Models;
 using Lado.Middleware;
+using Lado.Services;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
+using System.Globalization;
 using System.Security.Principal;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ========================================
+// CONFIGURACION PARA IIS/PLESK (Proxy Reverso)
+// ========================================
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 // Configurar SQL Server - usa ConnectionStrings:DefaultConnection desde appsettings
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// ========================================
+// CONFIGURACION DATA PROTECTION (para IIS/Plesk)
+// ========================================
+var keysFolder = Path.Combine(builder.Environment.ContentRootPath, "keys");
+if (!Directory.Exists(keysFolder))
+{
+    Directory.CreateDirectory(keysFolder);
+}
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(keysFolder))
+    .SetApplicationName("Lado");
 
 // Configurar Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -24,23 +52,39 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-// Configurar Google Authentication - usa Authentication:Google desde appsettings
-builder.Services.AddAuthentication()
-    .AddGoogle(options =>
-    {
-        options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? "";
-        options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? "";
-    });
+// Configurar Google Authentication - solo si hay credenciales configuradas
+var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
+var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
+
+if (!string.IsNullOrEmpty(googleClientId) && !string.IsNullOrEmpty(googleClientSecret))
+{
+    builder.Services.AddAuthentication()
+        .AddGoogle(options =>
+        {
+            options.ClientId = googleClientId;
+            options.ClientSecret = googleClientSecret;
+        });
+}
+else
+{
+    // Sin Google Auth configurado - solo usar autenticacion local
+    builder.Services.AddAuthentication();
+}
 
 // ========================================
-// CONFIGURACION SEGURA DE COOKIES
+// CONFIGURACION SEGURA DE COOKIES (Compatible con IIS/Plesk)
 // ========================================
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.Cookie.HttpOnly = true;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Solo HTTPS
-    options.Cookie.SameSite = SameSiteMode.Strict; // Proteccion CSRF
-    options.Cookie.Name = ".Lado.Auth"; // Nombre personalizado
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // HTTPS en produccion
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.Name = ".Lado.Auth";
+    // Dominio para que funcione con www y sin www
+    if (!builder.Environment.IsDevelopment())
+    {
+        options.Cookie.Domain = ".ladoapp.com";
+    }
     options.ExpireTimeSpan = TimeSpan.FromDays(30);
     options.SlidingExpiration = true;
     options.LoginPath = "/Account/Login";
@@ -72,9 +116,42 @@ builder.Services.AddSession(options =>
     options.IdleTimeout = TimeSpan.FromMinutes(30);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    if (!builder.Environment.IsDevelopment())
+    {
+        options.Cookie.Domain = ".ladoapp.com";
+    }
 });
 
 builder.Services.AddScoped<Lado.Services.StripeSimuladoService>();
+builder.Services.AddScoped<Lado.Services.IAdService, Lado.Services.AdService>();
+builder.Services.AddSingleton<Lado.Services.IServerMetricsService, Lado.Services.ServerMetricsService>();
+builder.Services.AddScoped<Lado.Services.IEmailService, Lado.Services.EmailService>();
+
+// ========================================
+// CONFIGURACIÓN DE LOCALIZACIÓN (i18n)
+// ========================================
+builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+builder.Services.AddSingleton<ILocalizationService, LocalizationService>();
+
+// Configurar idiomas soportados
+var supportedCultures = new[]
+{
+    new CultureInfo("es"), // Español (Latino)
+    new CultureInfo("en"), // English
+    new CultureInfo("pt")  // Português
+};
+
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.DefaultRequestCulture = new RequestCulture("es");
+    options.SupportedCultures = supportedCultures;
+    options.SupportedUICultures = supportedCultures;
+    options.RequestCultureProviders.Clear();
+    options.RequestCultureProviders.Add(new UserLanguageRequestCultureProvider());
+});
+
 var app = builder.Build();
 
 // Configurar pipeline HTTP
@@ -84,7 +161,16 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+// ========================================
+// CRITICO: ForwardedHeaders DEBE ir PRIMERO para IIS/Plesk
+// ========================================
+app.UseForwardedHeaders();
+
+// Solo redirigir a HTTPS en desarrollo (IIS/Plesk maneja SSL externamente)
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 // ========================================
 // HEADERS DE SEGURIDAD
@@ -105,6 +191,7 @@ app.UseStaticFiles(); // Sirve archivos desde wwwroot
 app.UseRouting();
 
 app.UseAuthentication();
+app.UseRequestLocalization(); // Localización (i18n)
 app.UseAgeVerification();
 app.UseAuthorization();
 app.UseSession();
@@ -135,7 +222,15 @@ try
         // ✅ INFORMACIÓN DE DIAGNÓSTICO
         logger.LogInformation("📁 ContentRootPath: {Path}", app.Environment.ContentRootPath);
         logger.LogInformation("📁 WebRootPath: {Path}", app.Environment.WebRootPath ?? "NO DEFINIDO");
-        logger.LogInformation("👤 Usuario ejecutando app: {User}", WindowsIdentity.GetCurrent()?.Name ?? "DESCONOCIDO");
+        // WindowsIdentity puede fallar en algunos entornos de hosting
+        try
+        {
+            logger.LogInformation("👤 Usuario ejecutando app: {User}", WindowsIdentity.GetCurrent()?.Name ?? "DESCONOCIDO");
+        }
+        catch
+        {
+            logger.LogInformation("👤 Usuario ejecutando app: IIS AppPool");
+        }
         logger.LogInformation("🖥️  Entorno: {Environment}", app.Environment.EnvironmentName);
 
         // Crear roles si no existen
@@ -150,7 +245,7 @@ try
         }
 
         // Crear usuario admin si no existe
-        var adminEmail = "admin@Ladodemo.com";
+        var adminEmail = "admin@ladoapp.com";
         var adminUser = await userManager.FindByEmailAsync(adminEmail);
 
         if (adminUser == null)
