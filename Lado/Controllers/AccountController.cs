@@ -1,4 +1,5 @@
 ﻿using Lado.Models;
+using Lado.Services;
 using Lado.ViewModels;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -12,15 +13,24 @@ namespace Lado.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ILogger<AccountController> _logger;
+        private readonly IEmailService _emailService;
+        private readonly IConfiguration _configuration;
+        private readonly IWebHostEnvironment _environment;
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
-            ILogger<AccountController> logger)
+            ILogger<AccountController> logger,
+            IEmailService emailService,
+            IConfiguration configuration,
+            IWebHostEnvironment environment)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _logger = logger;
+            _emailService = emailService;
+            _configuration = configuration;
+            _environment = environment;
         }
 
         // ========================================
@@ -275,10 +285,88 @@ namespace Lado.Controllers
         public async Task<IActionResult> Logout()
         {
             var userName = User?.Identity?.Name;
+            var isProduction = !_environment.IsDevelopment();
 
-            await _signInManager.SignOutAsync();
+            _logger.LogInformation("🔄 Iniciando logout para: {Username}, Entorno: {Env}",
+                userName ?? "Unknown",
+                isProduction ? "Produccion" : "Desarrollo");
 
-            _logger.LogInformation("✅ Usuario cerró sesión: {Username}", userName ?? "Unknown");
+            try
+            {
+                // 1. Cerrar sesión de Identity
+                await _signInManager.SignOutAsync();
+                _logger.LogInformation("✅ SignOutAsync completado");
+
+                // 2. Limpiar sesión HTTP
+                HttpContext.Session.Clear();
+                _logger.LogInformation("✅ Sesión HTTP limpiada");
+
+                // 3. Eliminar cookies - probar todas las combinaciones posibles
+                var cookieNames = new[] { ".Lado.Auth", ".AspNetCore.Identity.Application", ".AspNetCore.Session", ".AspNetCore.Cookies" };
+
+                foreach (var cookieName in cookieNames)
+                {
+                    // Intentar eliminar con dominio de producción
+                    if (isProduction)
+                    {
+                        Response.Cookies.Delete(cookieName, new CookieOptions
+                        {
+                            Domain = ".ladoapp.com",
+                            Path = "/",
+                            Secure = true,
+                            SameSite = SameSiteMode.Lax
+                        });
+
+                        // También sin el punto inicial
+                        Response.Cookies.Delete(cookieName, new CookieOptions
+                        {
+                            Domain = "ladoapp.com",
+                            Path = "/",
+                            Secure = true,
+                            SameSite = SameSiteMode.Lax
+                        });
+
+                        // Con www
+                        Response.Cookies.Delete(cookieName, new CookieOptions
+                        {
+                            Domain = "www.ladoapp.com",
+                            Path = "/",
+                            Secure = true,
+                            SameSite = SameSiteMode.Lax
+                        });
+                    }
+
+                    // Siempre eliminar sin dominio también (por si acaso)
+                    Response.Cookies.Delete(cookieName, new CookieOptions
+                    {
+                        Path = "/",
+                        Secure = isProduction,
+                        SameSite = SameSiteMode.Lax
+                    });
+
+                    // Eliminar de forma simple
+                    Response.Cookies.Delete(cookieName);
+                }
+
+                // 4. Expirar cookies estableciendo fecha pasada
+                foreach (var cookieName in cookieNames)
+                {
+                    Response.Cookies.Append(cookieName, "", new CookieOptions
+                    {
+                        Expires = DateTimeOffset.UtcNow.AddDays(-1),
+                        Path = "/",
+                        Domain = isProduction ? ".ladoapp.com" : null,
+                        Secure = isProduction,
+                        SameSite = SameSiteMode.Lax
+                    });
+                }
+
+                _logger.LogInformation("✅ Logout completo para: {Username}", userName ?? "Unknown");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error durante logout para: {Username}", userName ?? "Unknown");
+            }
 
             TempData["Info"] = "Has cerrado sesión exitosamente.";
             return RedirectToAction("Index", "Home");
@@ -288,14 +376,7 @@ namespace Lado.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> LogoutPost()
         {
-            var userName = User?.Identity?.Name;
-
-            await _signInManager.SignOutAsync();
-
-            _logger.LogInformation("✅ Usuario cerró sesión (POST): {Username}", userName ?? "Unknown");
-
-            TempData["Info"] = "Has cerrado sesión exitosamente.";
-            return RedirectToAction("Index", "Home");
+            return await Logout();
         }
 
         // ========================================
@@ -307,6 +388,137 @@ namespace Lado.Controllers
         {
             _logger.LogWarning("⚠️ Acceso denegado. ReturnUrl: {ReturnUrl}", returnUrl);
             ViewData["ReturnUrl"] = returnUrl;
+            return View();
+        }
+
+        // ========================================
+        // RECUPERAR CONTRASEÑA
+        // ========================================
+
+        [HttpGet]
+        public IActionResult ForgotPassword()
+        {
+            if (User.Identity?.IsAuthenticated == true)
+            {
+                return RedirectToAction("Index", "Feed");
+            }
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ForgotPassword(ForgotPasswordViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user == null)
+            {
+                // No revelar que el usuario no existe - mostrar el mismo mensaje
+                _logger.LogWarning("Intento de recuperar contraseña para email no existente: {Email}", model.Email);
+                return RedirectToAction(nameof(ForgotPasswordConfirmation));
+            }
+
+            // Generar token de restablecimiento
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var baseUrl = _configuration["AppSettings:BaseUrl"] ?? "https://www.ladoapp.com";
+            var resetLink = $"{baseUrl}/Account/ResetPassword?email={Uri.EscapeDataString(user.Email!)}&token={Uri.EscapeDataString(token)}";
+
+            _logger.LogInformation("Generando enlace de restablecimiento para: {Email}", model.Email);
+
+            // Enviar email
+            var emailSent = await _emailService.SendPasswordResetEmailAsync(
+                user.Email!,
+                user.NombreCompleto ?? user.UserName ?? "Usuario",
+                resetLink
+            );
+
+            if (!emailSent)
+            {
+                _logger.LogError("Error al enviar email de restablecimiento a: {Email}", model.Email);
+                ModelState.AddModelError(string.Empty, "Hubo un error al enviar el correo. Por favor intenta nuevamente.");
+                return View(model);
+            }
+
+            _logger.LogInformation("Email de restablecimiento enviado exitosamente a: {Email}", model.Email);
+            return RedirectToAction(nameof(ForgotPasswordConfirmation));
+        }
+
+        [HttpGet]
+        public IActionResult ForgotPasswordConfirmation()
+        {
+            return View();
+        }
+
+        [HttpGet]
+        public IActionResult ResetPassword(string email, string token)
+        {
+            if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
+            {
+                _logger.LogWarning("Intento de acceso a ResetPassword sin email o token");
+                return RedirectToAction(nameof(Login));
+            }
+
+            var model = new ResetPasswordViewModel
+            {
+                Email = email,
+                Token = token
+            };
+
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResetPassword(ResetPasswordViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user == null)
+            {
+                // No revelar que el usuario no existe
+                _logger.LogWarning("Intento de restablecer contraseña para email no existente: {Email}", model.Email);
+                return RedirectToAction(nameof(ResetPasswordConfirmation));
+            }
+
+            var result = await _userManager.ResetPasswordAsync(user, model.Token, model.Password);
+
+            if (result.Succeeded)
+            {
+                _logger.LogInformation("Contraseña restablecida exitosamente para: {Email}", model.Email);
+                return RedirectToAction(nameof(ResetPasswordConfirmation));
+            }
+
+            foreach (var error in result.Errors)
+            {
+                _logger.LogWarning("Error al restablecer contraseña: {Error}", error.Description);
+
+                // Traducir errores comunes
+                var errorMessage = error.Code switch
+                {
+                    "InvalidToken" => "El enlace de restablecimiento ha expirado o es invalido. Por favor solicita uno nuevo.",
+                    "PasswordTooShort" => "La contraseña debe tener al menos 8 caracteres.",
+                    "PasswordRequiresDigit" => "La contraseña debe contener al menos un numero.",
+                    "PasswordRequiresLower" => "La contraseña debe contener al menos una letra minuscula.",
+                    _ => error.Description
+                };
+
+                ModelState.AddModelError(string.Empty, errorMessage);
+            }
+
+            return View(model);
+        }
+
+        [HttpGet]
+        public IActionResult ResetPasswordConfirmation()
+        {
             return View();
         }
 
@@ -384,119 +596,143 @@ namespace Lado.Controllers
         [HttpGet]
         public async Task<IActionResult> ExternalLoginCallback(string returnUrl = null, string remoteError = null)
         {
-            returnUrl ??= Url.Content("~/");
-
-            if (remoteError != null)
+            try
             {
-                _logger.LogError("Error de proveedor externo: {Error}", remoteError);
-                TempData["Error"] = $"Error del proveedor externo: {remoteError}";
-                return RedirectToAction(nameof(Login));
-            }
+                returnUrl ??= Url.Content("~/");
 
-            var info = await _signInManager.GetExternalLoginInfoAsync();
-            if (info == null)
-            {
-                _logger.LogError("No se pudo cargar información de login externo");
-                TempData["Error"] = "Error al obtener información de login externo.";
-                return RedirectToAction(nameof(Login));
-            }
-
-            _logger.LogInformation("Login externo con {Provider}", info.LoginProvider);
-
-            // Intentar login con el proveedor externo
-            var result = await _signInManager.ExternalLoginSignInAsync(
-                info.LoginProvider,
-                info.ProviderKey,
-                isPersistent: true,
-                bypassTwoFactor: true);
-
-            if (result.Succeeded)
-            {
-                _logger.LogInformation("Usuario logueado con {Provider}", info.LoginProvider);
-
-                // Obtener el usuario para redirigir correctamente
-                var user = await _userManager.FindByLoginAsync(info.LoginProvider, info.ProviderKey);
-                if (user != null)
+                if (remoteError != null)
                 {
-                    var roles = await _userManager.GetRolesAsync(user);
-                    if (roles.Contains("Admin"))
+                    _logger.LogError("Error de proveedor externo: {Error}", remoteError);
+                    TempData["Error"] = $"Error del proveedor externo: {remoteError}";
+                    return RedirectToAction(nameof(Login));
+                }
+
+                var info = await _signInManager.GetExternalLoginInfoAsync();
+                if (info == null)
+                {
+                    _logger.LogError("No se pudo cargar información de login externo");
+                    TempData["Error"] = "Error al obtener información de login externo.";
+                    return RedirectToAction(nameof(Login));
+                }
+
+                _logger.LogInformation("Login externo con {Provider}", info.LoginProvider);
+
+                // Intentar login con el proveedor externo
+                var result = await _signInManager.ExternalLoginSignInAsync(
+                    info.LoginProvider,
+                    info.ProviderKey,
+                    isPersistent: true,
+                    bypassTwoFactor: true);
+
+                if (result.Succeeded)
+                {
+                    _logger.LogInformation("Usuario logueado con {Provider}", info.LoginProvider);
+
+                    // Obtener el usuario para redirigir correctamente
+                    var user = await _userManager.FindByLoginAsync(info.LoginProvider, info.ProviderKey);
+                    if (user != null)
                     {
-                        return RedirectToAction("Index", "Admin");
+                        var roles = await _userManager.GetRolesAsync(user);
+                        if (roles.Contains("Admin"))
+                        {
+                            return RedirectToAction("Index", "Admin");
+                        }
+                    }
+
+                    return LocalRedirect(returnUrl);
+                }
+
+                if (result.IsLockedOut)
+                {
+                    return View("Lockout");
+                }
+
+                // Si el usuario no existe, crear cuenta
+                var email = info.Principal.FindFirstValue(System.Security.Claims.ClaimTypes.Email);
+                var name = info.Principal.FindFirstValue(System.Security.Claims.ClaimTypes.Name);
+
+                if (string.IsNullOrEmpty(email))
+                {
+                    _logger.LogError("No se pudo obtener email del proveedor externo");
+                    TempData["Error"] = "No se pudo obtener tu email de Google. Asegúrate de dar permiso.";
+                    return RedirectToAction(nameof(Login));
+                }
+
+                // Verificar si ya existe usuario con ese email
+                var existingUser = await _userManager.FindByEmailAsync(email);
+                if (existingUser != null)
+                {
+                    // Verificar si la cuenta está activa
+                    if (!existingUser.EstaActivo)
+                    {
+                        _logger.LogWarning("Intento de login con cuenta desactivada: {Email}", email);
+                        TempData["Error"] = "Tu cuenta está desactivada. Contacta a soporte.";
+                        return RedirectToAction(nameof(Login));
+                    }
+
+                    // Intentar vincular el login externo a la cuenta existente
+                    var addLoginResult = await _userManager.AddLoginAsync(existingUser, info);
+                    if (addLoginResult.Succeeded)
+                    {
+                        await _signInManager.SignInAsync(existingUser, isPersistent: true);
+                        _logger.LogInformation("Login externo vinculado a usuario existente: {Email}", email);
+                        return LocalRedirect(returnUrl);
+                    }
+                    else
+                    {
+                        // Si falla porque ya existe el login, simplemente hacer sign in
+                        _logger.LogInformation("Login externo ya vinculado, haciendo sign in: {Email}", email);
+                        await _signInManager.SignInAsync(existingUser, isPersistent: true);
+                        return LocalRedirect(returnUrl);
                     }
                 }
 
-                return LocalRedirect(returnUrl);
-            }
+                // Crear nuevo usuario
+                var newUser = new ApplicationUser
+                {
+                    UserName = email.Split('@')[0] + "_" + Guid.NewGuid().ToString("N").Substring(0, 6),
+                    Email = email,
+                    NombreCompleto = name ?? email.Split('@')[0],
+                    Seudonimo = email.Split('@')[0] + "_" + Guid.NewGuid().ToString("N").Substring(0, 4),
+                    FechaRegistro = DateTime.Now,
+                    EstaActivo = true,
+                    EmailConfirmed = true, // Email verificado por Google
+                    AgeVerified = false,
+                    PrecioSuscripcion = 9.99m,
+                    NumeroSeguidores = 0,
+                    Saldo = 0,
+                    TotalGanancias = 0,
+                    EsVerificado = false,
+                    SeudonimoVerificado = false
+                };
 
-            if (result.IsLockedOut)
-            {
-                return View("Lockout");
-            }
+                var createResult = await _userManager.CreateAsync(newUser);
+                if (createResult.Succeeded)
+                {
+                    var addLoginResult = await _userManager.AddLoginAsync(newUser, info);
+                    if (addLoginResult.Succeeded)
+                    {
+                        await _signInManager.SignInAsync(newUser, isPersistent: true);
+                        _logger.LogInformation("Nuevo usuario creado con Google: {Email}", email);
+                        TempData["Success"] = "¡Bienvenido a LADO! Tu cuenta ha sido creada con Google.";
+                        return RedirectToAction("Index", "Feed");
+                    }
+                }
 
-            // Si el usuario no existe, crear cuenta
-            var email = info.Principal.FindFirstValue(System.Security.Claims.ClaimTypes.Email);
-            var name = info.Principal.FindFirstValue(System.Security.Claims.ClaimTypes.Name);
+                foreach (var error in createResult.Errors)
+                {
+                    _logger.LogError("Error creando usuario: {Error}", error.Description);
+                }
 
-            if (string.IsNullOrEmpty(email))
-            {
-                _logger.LogError("No se pudo obtener email del proveedor externo");
-                TempData["Error"] = "No se pudo obtener tu email de Google. Asegúrate de dar permiso.";
+                TempData["Error"] = "Error al crear la cuenta. Por favor intenta nuevamente.";
                 return RedirectToAction(nameof(Login));
             }
-
-            // Verificar si ya existe usuario con ese email
-            var existingUser = await _userManager.FindByEmailAsync(email);
-            if (existingUser != null)
+            catch (Exception ex)
             {
-                // Vincular el login externo a la cuenta existente
-                var addLoginResult = await _userManager.AddLoginAsync(existingUser, info);
-                if (addLoginResult.Succeeded)
-                {
-                    await _signInManager.SignInAsync(existingUser, isPersistent: true);
-                    _logger.LogInformation("Login externo vinculado a usuario existente: {Email}", email);
-                    return LocalRedirect(returnUrl);
-                }
+                _logger.LogError(ex, "Error en ExternalLoginCallback");
+                TempData["Error"] = "Ocurrió un error durante el login. Por favor intenta nuevamente.";
+                return RedirectToAction(nameof(Login));
             }
-
-            // Crear nuevo usuario
-            var newUser = new ApplicationUser
-            {
-                UserName = email.Split('@')[0] + "_" + Guid.NewGuid().ToString("N").Substring(0, 6),
-                Email = email,
-                NombreCompleto = name ?? email.Split('@')[0],
-                Seudonimo = email.Split('@')[0] + "_" + Guid.NewGuid().ToString("N").Substring(0, 4),
-                FechaRegistro = DateTime.Now,
-                EstaActivo = true,
-                EmailConfirmed = true, // Email verificado por Google
-                AgeVerified = false,
-                PrecioSuscripcion = 9.99m,
-                NumeroSeguidores = 0,
-                Saldo = 0,
-                TotalGanancias = 0,
-                EsVerificado = false,
-                SeudonimoVerificado = false
-            };
-
-            var createResult = await _userManager.CreateAsync(newUser);
-            if (createResult.Succeeded)
-            {
-                var addLoginResult = await _userManager.AddLoginAsync(newUser, info);
-                if (addLoginResult.Succeeded)
-                {
-                    await _signInManager.SignInAsync(newUser, isPersistent: true);
-                    _logger.LogInformation("Nuevo usuario creado con Google: {Email}", email);
-                    TempData["Success"] = "¡Bienvenido a LADO! Tu cuenta ha sido creada con Google.";
-                    return RedirectToAction("Index", "Feed");
-                }
-            }
-
-            foreach (var error in createResult.Errors)
-            {
-                _logger.LogError("Error creando usuario: {Error}", error.Description);
-            }
-
-            TempData["Error"] = "Error al crear la cuenta. Por favor intenta nuevamente.";
-            return RedirectToAction(nameof(Login));
         }
     }
 }

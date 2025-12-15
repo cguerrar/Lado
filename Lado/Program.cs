@@ -128,6 +128,13 @@ builder.Services.AddScoped<Lado.Services.StripeSimuladoService>();
 builder.Services.AddScoped<Lado.Services.IAdService, Lado.Services.AdService>();
 builder.Services.AddSingleton<Lado.Services.IServerMetricsService, Lado.Services.ServerMetricsService>();
 builder.Services.AddScoped<Lado.Services.IEmailService, Lado.Services.EmailService>();
+builder.Services.AddScoped<Lado.Services.IVisitasService, Lado.Services.VisitasService>();
+
+// ========================================
+// CONFIGURACIÓN DE CACHING
+// ========================================
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<Lado.Services.ICacheService, Lado.Services.CacheService>();
 
 // ========================================
 // CONFIGURACIÓN DE LOCALIZACIÓN (i18n)
@@ -195,6 +202,9 @@ app.UseRequestLocalization(); // Localización (i18n)
 app.UseAgeVerification();
 app.UseAuthorization();
 app.UseSession();
+
+// Contador de visitas
+app.UseVisitasMiddleware();
 
 // ⭐⭐⭐ CORRECCIÓN CRÍTICA: Línea estaba incompleta
 app.MapControllerRoute(

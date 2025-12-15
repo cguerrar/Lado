@@ -62,6 +62,22 @@ namespace Lado.Data
         // ========================================
         public DbSet<BloqueoUsuario> BloqueosUsuarios { get; set; }
 
+        // ========================================
+        // ⭐ DbSets NUEVOS - BIBLIOTECA DE MÚSICA
+        // ========================================
+        public DbSet<PistaMusical> PistasMusica { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - SISTEMA DE FEEDBACK
+        // ========================================
+        public DbSet<Feedback> Feedbacks { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - CONTADOR DE VISITAS
+        // ========================================
+        public DbSet<VisitaApp> VisitasApp { get; set; }
+        public DbSet<VisitaDetalle> VisitasDetalle { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -882,6 +898,68 @@ namespace Lado.Data
                 entity.HasIndex(b => new { b.BloqueadorId, b.BloqueadoId })
                     .IsUnique()
                     .HasDatabaseName("IX_BloqueosUsuarios_Bloqueador_Bloqueado_Unique");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE PISTAS MUSICALES
+            // ========================================
+            modelBuilder.Entity<PistaMusical>(entity =>
+            {
+                entity.HasKey(p => p.Id);
+
+                entity.Property(p => p.Titulo)
+                    .HasMaxLength(200)
+                    .IsRequired();
+
+                entity.Property(p => p.Artista)
+                    .HasMaxLength(200)
+                    .IsRequired();
+
+                entity.Property(p => p.Album)
+                    .HasMaxLength(100)
+                    .IsRequired(false);
+
+                entity.Property(p => p.Genero)
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                entity.Property(p => p.RutaArchivo)
+                    .HasMaxLength(500)
+                    .IsRequired();
+
+                entity.Property(p => p.RutaPortada)
+                    .HasMaxLength(500)
+                    .IsRequired(false);
+
+                entity.Property(p => p.Energia)
+                    .HasMaxLength(20)
+                    .IsRequired(false);
+
+                entity.Property(p => p.EstadoAnimo)
+                    .HasMaxLength(50)
+                    .IsRequired(false);
+
+                entity.Property(p => p.EsLibreDeRegalias)
+                    .HasDefaultValue(true);
+
+                entity.Property(p => p.ContadorUsos)
+                    .HasDefaultValue(0);
+
+                entity.Property(p => p.Activo)
+                    .HasDefaultValue(true);
+
+                // Índices para búsqueda eficiente
+                entity.HasIndex(p => p.Genero)
+                    .HasDatabaseName("IX_PistasMusica_Genero");
+
+                entity.HasIndex(p => p.Activo)
+                    .HasDatabaseName("IX_PistasMusica_Activo");
+
+                entity.HasIndex(p => p.ContadorUsos)
+                    .HasDatabaseName("IX_PistasMusica_ContadorUsos");
+
+                entity.HasIndex(p => new { p.Activo, p.Genero })
+                    .HasDatabaseName("IX_PistasMusica_Activo_Genero");
             });
         }
     }
