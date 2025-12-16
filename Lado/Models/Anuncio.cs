@@ -8,11 +8,18 @@ namespace Lado.Models
         [Key]
         public int Id { get; set; }
 
-        [Required]
-        public int AgenciaId { get; set; }
+        // AgenciaId es nullable para permitir anuncios de Lado (empresa)
+        public int? AgenciaId { get; set; }
 
         [ForeignKey("AgenciaId")]
         public virtual Agencia? Agencia { get; set; }
+
+        // Indica si es un anuncio interno de Lado (no de agencia)
+        public bool EsAnuncioLado { get; set; } = false;
+
+        // Prioridad del anuncio (mayor = más probabilidad de mostrarse)
+        // Los anuncios de Lado pueden tener prioridad alta
+        public int Prioridad { get; set; } = 1;
 
         [Required]
         [StringLength(100)]

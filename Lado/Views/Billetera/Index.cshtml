@@ -1,6 +1,7 @@
-﻿@model Lado.Models.ApplicationUser
+@model Lado.Models.ApplicationUser
 @{
     ViewData["Title"] = "Mi Billetera";
+    var esCreador = Model.EsCreador;
 }
 
 <style>
@@ -14,25 +15,27 @@
         box-shadow: 0 20px 60px rgba(70, 130, 180, 0.3);
     }
 
-        .wallet-gradient-card::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            animation: pulse 15s ease-in-out infinite;
-        }
+    .wallet-blob {
+        position: absolute;
+        border-radius: 50%;
+        pointer-events: none;
+        will-change: transform;
+    }
 
-    @@keyframes pulse {
-        0%, 100% {
-            transform: scale(1) rotate(0deg);
-        }
+    .wallet-blob-1 {
+        width: 300px;
+        height: 300px;
+        background: rgba(255,255,255,0.15);
+        top: -100px;
+        right: -50px;
+    }
 
-        50% {
-            transform: scale(1.1) rotate(180deg);
-        }
+    .wallet-blob-2 {
+        width: 200px;
+        height: 200px;
+        background: rgba(255,255,255,0.12);
+        bottom: -80px;
+        left: -40px;
     }
 
     .wallet-icon-box {
@@ -156,6 +159,12 @@
         border: none;
     }
 
+    .commission-card {
+        border-radius: 20px;
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border: 2px solid #f59e0b;
+    }
+
     .btn-action {
         border-radius: 12px;
         padding: 12px 28px;
@@ -210,32 +219,18 @@
         border-radius: 24px;
         border: none;
         position: relative;
-        z-index: 1060;
     }
 
     .modal {
-        z-index: 1055 !important;
+        z-index: 9999 !important;
     }
 
     .modal-backdrop {
-        z-index: 1050 !important;
+        z-index: 9998 !important;
     }
 
     .modal-dialog {
-        z-index: 1060;
-    }
-
-    /* Asegurar que el modal sea interactivo */
-    #modalCargarSaldo .modal-body {
-        pointer-events: auto;
-    }
-
-    #modalCargarSaldo input,
-    #modalCargarSaldo select,
-    #modalCargarSaldo button {
-        pointer-events: auto;
-        position: relative;
-        z-index: 1;
+        z-index: 9999;
     }
 
     .quick-amount-btn {
@@ -273,6 +268,28 @@
 </style>
 
 <div class="container-fluid">
+    <!-- Banner Beta -->
+    <div class="alert mb-4" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 16px; padding: 20px;">
+        <div class="d-flex align-items-center gap-3">
+            <div style="width: 48px; height: 48px; background: #f59e0b; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            </div>
+            <div>
+                <h6 style="font-weight: 700; color: #92400e; margin: 0 0 4px 0;">
+                    LADO Beta - Dinero Ficticio
+                </h6>
+                <p style="color: #a16207; margin: 0; font-size: 0.9rem;">
+                    Mientras LADO esta en etapa Beta, todo el dinero mostrado es <strong>ficticio y de prueba</strong>.
+                    No se realizan cobros reales. Disfruta explorando la plataforma.
+                </p>
+            </div>
+        </div>
+    </div>
+
     <!-- Header -->
     <div class="row mb-4">
         <div class="col-12">
@@ -281,16 +298,38 @@
                     <h1 class="mb-2" style="font-weight: 800; font-size: 2.5rem; color: #111827;">
                         Mi Billetera
                     </h1>
-                    <p class="text-muted mb-0" style="font-size: 1.1rem;">Gestiona tu saldo y realiza pagos de forma segura</p>
+                    <p class="text-muted mb-0" style="font-size: 1.1rem;">
+                        @if (esCreador)
+                        {
+                            <span>Gestiona tus ganancias y solicita retiros</span>
+                        }
+                        else
+                        {
+                            <span>Gestiona tu saldo y realiza pagos de forma segura</span>
+                        }
+                    </p>
                 </div>
-                <button class="btn btn-primary btn-action" data-bs-toggle="modal" data-bs-target="#modalCargarSaldo">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="8" x2="12" y2="16"></line>
-                        <line x1="8" y1="12" x2="16" y2="12"></line>
-                    </svg>
-                    Cargar Saldo
-                </button>
+                @if (esCreador)
+                {
+                    <button class="btn btn-success btn-action" data-bs-toggle="modal" data-bs-target="#modalSolicitarRetiro">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <polyline points="19 12 12 19 5 12"></polyline>
+                        </svg>
+                        Solicitar Retiro
+                    </button>
+                }
+                else
+                {
+                    <button class="btn btn-primary btn-action" data-bs-toggle="modal" data-bs-target="#modalCargarSaldo">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="16"></line>
+                            <line x1="8" y1="12" x2="16" y2="12"></line>
+                        </svg>
+                        Cargar Saldo
+                    </button>
+                }
             </div>
         </div>
     </div>
@@ -299,15 +338,36 @@
     <div class="row mb-4">
         <div class="col-12">
             <div class="wallet-gradient-card">
+                <div class="wallet-blob wallet-blob-1"></div>
+                <div class="wallet-blob wallet-blob-2"></div>
                 <div class="row align-items-center position-relative">
                     <div class="col-md-8">
-                        <p class="mb-2 opacity-75" style="font-size: 0.95rem; text-transform: uppercase; letter-spacing: 1px;">Saldo Disponible</p>
+                        <p class="mb-2 opacity-75" style="font-size: 0.95rem; text-transform: uppercase; letter-spacing: 1px;">
+                            @if (esCreador)
+                            {
+                                <span>Saldo Disponible para Retiro</span>
+                            }
+                            else
+                            {
+                                <span>Saldo Disponible</span>
+                            }
+                        </p>
                         <h1 class="mb-3" style="font-size: 3.5rem; font-weight: 800;">$@Model.Saldo.ToString("N2")</h1>
                         <div class="d-flex gap-3 flex-wrap">
-                            <div class="d-flex align-items-center gap-2">
-                                <div style="width: 8px; height: 8px; background: #60a5fa; border-radius: 50%; box-shadow: 0 0 8px #60a5fa;"></div>
-                                <small class="opacity-90">Listo para usar</small>
-                            </div>
+                            @if (esCreador)
+                            {
+                                <div class="d-flex align-items-center gap-2">
+                                    <div style="width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 8px #10b981;"></div>
+                                    <small class="opacity-90">Ganancias acumuladas: $@Model.TotalGanancias.ToString("N2")</small>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="d-flex align-items-center gap-2">
+                                    <div style="width: 8px; height: 8px; background: #60a5fa; border-radius: 50%; box-shadow: 0 0 8px #60a5fa;"></div>
+                                    <small class="opacity-90">Listo para usar</small>
+                                </div>
+                            }
                             <div class="d-flex align-items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -330,91 +390,248 @@
         </div>
     </div>
 
-    <!-- Cards de Estadísticas -->
-    <div class="row g-4 mb-4">
-        <!-- Gastado Este Mes -->
-        <div class="col-md-6 col-xl-4">
-            <div class="card stat-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div>
-                            <p class="text-muted mb-1" style="font-size: 0.9rem; font-weight: 600;">Gastado Este Mes</p>
-                            <h2 class="mb-0" style="font-weight: 800; color: #111827;">$@((ViewBag.GastadoEsteMes ?? 0).ToString("N2"))</h2>
-                        </div>
-                        <div class="stat-icon-circle" style="background: #fee2e2;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="12" y1="19" x2="12" y2="5"></line>
-                                <polyline points="5 12 12 5 19 12"></polyline>
-                            </svg>
+    @if (esCreador)
+    {
+        <!-- VISTA CREADOR -->
+        <!-- Aviso de Comision -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card commission-card">
+                    <div class="card-body" style="padding: 24px;">
+                        <div class="d-flex align-items-start gap-3">
+                            <div style="width: 56px; height: 56px; background: #f59e0b; border-radius: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                </svg>
+                            </div>
+                            @{
+                                decimal retencionImpuestosVal = ViewBag.RetencionImpuestos != null ? (decimal)ViewBag.RetencionImpuestos : 0m;
+                                string nombrePaisVal = ViewBag.NombrePais ?? "No definido";
+                                decimal comisionEjemplo = 100 * Model.ComisionRetiro / 100;
+                                decimal impuestoEjemplo = 100 * retencionImpuestosVal / 100;
+                                decimal netoEjemplo = 100 - comisionEjemplo - impuestoEjemplo;
+                            }
+                            <div class="flex-grow-1">
+                                <h5 style="font-weight: 700; color: #92400e; margin: 0 0 8px 0;">
+                                    Informacion sobre Comisiones, Impuestos y Retiros
+                                </h5>
+                                <p style="color: #a16207; margin: 0 0 16px 0; font-size: 0.95rem; line-height: 1.6;">
+                                    Al momento del retiro, <strong>LadoApp.com</strong> aplicara la comision acordada en tu contrato
+                                    y la retencion de impuestos segun tu pais de residencia (@nombrePaisVal).
+                                </p>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-3">
+                                        <div class="p-3" style="background: white; border-radius: 12px; border: 2px solid rgba(245, 158, 11, 0.3);">
+                                            <small class="text-muted d-block mb-1">Comision LadoApp</small>
+                                            <strong style="font-size: 1.4rem; color: #dc2626;">@Model.ComisionRetiro%</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="p-3" style="background: white; border-radius: 12px; border: 2px solid rgba(245, 158, 11, 0.3);">
+                                            <small class="text-muted d-block mb-1">Retencion Impuestos</small>
+                                            <strong style="font-size: 1.4rem; color: #d97706;">@retencionImpuestosVal%</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="p-3" style="background: white; border-radius: 12px; border: 2px solid rgba(245, 158, 11, 0.3);">
+                                            <small class="text-muted d-block mb-1">Minimo para retirar</small>
+                                            <strong style="font-size: 1.4rem; color: #92400e;">$@Model.MontoMinimoRetiro.ToString("N0")</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="p-3" style="background: white; border-radius: 12px; border: 2px solid rgba(16, 185, 129, 0.3);">
+                                            <small class="text-muted d-block mb-1">Retiro de $100</small>
+                                            <strong style="font-size: 1.4rem; color: #10b981;">Recibes $@netoEjemplo.ToString("N2")</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="p-2" style="background: rgba(255,255,255,0.7); border-radius: 8px; font-size: 0.85rem; color: #78350f;">
+                                    <strong>Desglose:</strong> $100 - $@comisionEjemplo.ToString("N2") (comision) - $@impuestoEjemplo.ToString("N2") (impuestos) = <strong class="text-success">$@netoEjemplo.ToString("N2") neto</strong>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <p class="text-muted mb-0" style="font-size: 0.85rem;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                        Suscripciones y tips
-                    </p>
                 </div>
             </div>
         </div>
 
-        <!-- Total Recargado -->
-        <div class="col-md-6 col-xl-4">
-            <div class="card stat-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div>
-                            <p class="text-muted mb-1" style="font-size: 0.9rem; font-weight: 600;">Total Recargado</p>
-                            <h2 class="mb-0" style="font-weight: 800; color: #111827;">$@((ViewBag.TotalRecargado ?? 0).ToString("N2"))</h2>
+        <!-- Cards de Estadisticas Creador -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-6 col-xl-3">
+                <div class="card stat-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <p class="text-muted mb-1" style="font-size: 0.9rem; font-weight: 600;">Ingresos Este Mes</p>
+                                <h2 class="mb-0" style="font-weight: 800; color: #111827;">$@((ViewBag.IngresosEsteMes ?? 0m).ToString("N2"))</h2>
+                            </div>
+                            <div class="stat-icon-circle" style="background: #dcfce7;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <polyline points="19 12 12 19 5 12"></polyline>
+                                </svg>
+                            </div>
                         </div>
-                        <div class="stat-icon-circle" style="background: #dbeafe;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#36648B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                <polyline points="19 12 12 19 5 12"></polyline>
-                            </svg>
-                        </div>
+                        @if ((decimal)(ViewBag.CrecimientoMes ?? 0m) != 0)
+                        {
+                            var crecimiento = (decimal)(ViewBag.CrecimientoMes ?? 0m);
+                            var colorCrecimiento = crecimiento >= 0 ? "#16a34a" : "#dc2626";
+                            var iconoCrecimiento = crecimiento >= 0 ? "M5 12l5-5 5 5" : "M19 12l-5 5-5-5";
+                            <p class="mb-0" style="font-size: 0.85rem; color: @colorCrecimiento; font-weight: 600;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                                    <polyline points="@iconoCrecimiento"></polyline>
+                                </svg>
+                                @(crecimiento >= 0 ? "+" : "")@crecimiento.ToString("N1")% vs mes anterior
+                            </p>
+                        }
                     </div>
-                    <p class="text-muted mb-0" style="font-size: 0.85rem;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;">
-                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-                        </svg>
-                        Histórico de recargas
-                    </p>
                 </div>
             </div>
-        </div>
 
-        <!-- Suscripciones Activas -->
-        <div class="col-md-12 col-xl-4">
-            <div class="card stat-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div>
-                            <p class="text-muted mb-1" style="font-size: 0.9rem; font-weight: 600;">Suscripciones</p>
-                            <h2 class="mb-0" style="font-weight: 800; color: #111827;">@(ViewBag.SuscripcionesActivas ?? 0)</h2>
+            <div class="col-md-6 col-xl-3">
+                <div class="card stat-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <p class="text-muted mb-1" style="font-size: 0.9rem; font-weight: 600;">Total Retirado</p>
+                                <h2 class="mb-0" style="font-weight: 800; color: #111827;">$@((ViewBag.TotalRetirado ?? 0m).ToString("N2"))</h2>
+                            </div>
+                            <div class="stat-icon-circle" style="background: #dbeafe;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                                    <line x1="1" y1="10" x2="23" y2="10"></line>
+                                </svg>
+                            </div>
                         </div>
-                        <div class="stat-icon-circle" style="background: #dbeafe;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                <circle cx="9" cy="7" r="4"></circle>
-                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                            </svg>
-                        </div>
+                        <p class="text-muted mb-0" style="font-size: 0.85rem;">
+                            Historico de retiros completados
+                        </p>
                     </div>
-                    <p class="text-muted mb-0" style="font-size: 0.85rem;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        Activas en este momento
-                    </p>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-xl-3">
+                <div class="card stat-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <p class="text-muted mb-1" style="font-size: 0.9rem; font-weight: 600;">Retiros Pendientes</p>
+                                <h2 class="mb-0" style="font-weight: 800; color: #111827;">@(ViewBag.RetirosPendientes ?? 0)</h2>
+                            </div>
+                            <div class="stat-icon-circle" style="background: #fef3c7;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <polyline points="12 6 12 12 16 14"></polyline>
+                                </svg>
+                            </div>
+                        </div>
+                        <p class="text-muted mb-0" style="font-size: 0.85rem;">
+                            En proceso de transferencia
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-xl-3">
+                <div class="card stat-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <p class="text-muted mb-1" style="font-size: 0.9rem; font-weight: 600;">Proximo Pago</p>
+                                <h2 class="mb-0" style="font-weight: 800; color: #111827;">@((ViewBag.ProximoPago ?? DateTime.Now).ToString("dd MMM"))</h2>
+                            </div>
+                            <div class="stat-icon-circle" style="background: #ede9fe;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                                </svg>
+                            </div>
+                        </div>
+                        <p class="text-muted mb-0" style="font-size: 0.85rem;">
+                            Estimado: $@((ViewBag.MontoEstimado ?? 0m).ToString("N2"))
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+    }
+    else
+    {
+        <!-- VISTA FAN -->
+        <!-- Cards de Estadisticas Fan -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-6 col-xl-4">
+                <div class="card stat-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <p class="text-muted mb-1" style="font-size: 0.9rem; font-weight: 600;">Gastado Este Mes</p>
+                                <h2 class="mb-0" style="font-weight: 800; color: #111827;">$@((ViewBag.GastadoEsteMes ?? 0m).ToString("N2"))</h2>
+                            </div>
+                            <div class="stat-icon-circle" style="background: #fee2e2;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="12" y1="19" x2="12" y2="5"></line>
+                                    <polyline points="5 12 12 5 19 12"></polyline>
+                                </svg>
+                            </div>
+                        </div>
+                        <p class="text-muted mb-0" style="font-size: 0.85rem;">
+                            Suscripciones y tips
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-xl-4">
+                <div class="card stat-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <p class="text-muted mb-1" style="font-size: 0.9rem; font-weight: 600;">Total Recargado</p>
+                                <h2 class="mb-0" style="font-weight: 800; color: #111827;">$@((ViewBag.TotalRecargado ?? 0m).ToString("N2"))</h2>
+                            </div>
+                            <div class="stat-icon-circle" style="background: #dbeafe;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#36648B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <polyline points="19 12 12 19 5 12"></polyline>
+                                </svg>
+                            </div>
+                        </div>
+                        <p class="text-muted mb-0" style="font-size: 0.85rem;">
+                            Historico de recargas
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-12 col-xl-4">
+                <div class="card stat-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <p class="text-muted mb-1" style="font-size: 0.9rem; font-weight: 600;">Suscripciones</p>
+                                <h2 class="mb-0" style="font-weight: 800; color: #111827;">@(ViewBag.SuscripcionesActivas ?? 0)</h2>
+                            </div>
+                            <div class="stat-icon-circle" style="background: #dbeafe;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <p class="text-muted mb-0" style="font-size: 0.85rem;">
+                            Activas en este momento
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 
     <div class="row">
         <!-- Columna Principal -->
@@ -423,10 +640,10 @@
             <div class="card transaction-card mb-4">
                 <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center" style="padding: 24px;">
                     <div>
-                        <h5 class="mb-1" style="font-weight: 700; color: #111827;">📊 Transacciones Recientes</h5>
-                        <p class="text-muted mb-0" style="font-size: 0.9rem;">Últimos movimientos de tu cuenta</p>
+                        <h5 class="mb-1" style="font-weight: 700; color: #111827;">Transacciones Recientes</h5>
+                        <p class="text-muted mb-0" style="font-size: 0.9rem;">Ultimos movimientos de tu cuenta</p>
                     </div>
-                    <a href="/FanBilletera/HistorialCompleto" class="btn btn-sm btn-outline-primary" style="border-radius: 10px; font-weight: 600;">
+                    <a href="/Billetera/HistorialCompleto" class="btn btn-sm btn-outline-primary" style="border-radius: 10px; font-weight: 600;">
                         Ver todas
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-left: 4px;">
                             <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -435,23 +652,23 @@
                     </a>
                 </div>
                 <div class="card-body" style="padding: 24px;">
-                    @if (ViewBag.Transacciones != null && ViewBag.Transacciones.Count > 0)
+                    @if (ViewBag.Transacciones != null && ((List<Lado.Models.TransaccionDto>)ViewBag.Transacciones).Count > 0)
                     {
                         <table class="table transaction-table">
                             <tbody>
                                 @foreach (var transaccion in ViewBag.Transacciones)
                                 {
-                                    var esRecarga = transaccion.TipoTransaccion == Lado.Models.TipoTransaccion.Recarga;
-                                    var colorMonto = esRecarga ? "#4682B4" : "#dc2626";
-                                    var signoMonto = esRecarga ? "+" : "-";
-                                    var bgIcon = esRecarga ? "#dbeafe" : "#fee2e2";
+                                    var esIngreso = transaccion.TipoTransaccion != Lado.Models.TipoTransaccion.Retiro;
+                                    var colorMonto = esIngreso ? "#16a34a" : "#dc2626";
+                                    var signoMonto = esIngreso ? "+" : "-";
+                                    var bgIcon = esIngreso ? "#dcfce7" : "#fee2e2";
 
                                     <tr>
                                         <td style="width: 60px;">
                                             <div style="width: 48px; height: 48px; background: @bgIcon; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                                                @if (esRecarga)
+                                                @if (esIngreso)
                                                 {
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                         <line x1="12" y1="5" x2="12" y2="19"></line>
                                                         <polyline points="19 12 12 19 5 12"></polyline>
                                                     </svg>
@@ -469,7 +686,7 @@
                                             <div>
                                                 <p class="mb-1" style="font-weight: 600; color: #111827;">@transaccion.Descripcion</p>
                                                 <small class="text-muted">
-                                                    @transaccion.FechaTransaccion.ToString("dd MMM yyyy") • @transaccion.FechaTransaccion.ToString("HH:mm")
+                                                    @transaccion.FechaTransaccion.ToString("dd MMM yyyy") - @transaccion.FechaTransaccion.ToString("HH:mm")
                                                 </small>
                                             </div>
                                         </td>
@@ -494,7 +711,16 @@
                                 </svg>
                             </div>
                             <h5 style="font-weight: 700; color: #374151; margin-bottom: 12px;">No hay transacciones</h5>
-                            <p class="text-muted" style="font-size: 1rem;">Carga saldo para comenzar a disfrutar del contenido exclusivo</p>
+                            <p class="text-muted" style="font-size: 1rem;">
+                                @if (esCreador)
+                                {
+                                    <span>Tus ingresos por suscripciones y tips apareceran aqui</span>
+                                }
+                                else
+                                {
+                                    <span>Carga saldo para comenzar a disfrutar del contenido exclusivo</span>
+                                }
+                            </p>
                         </div>
                     }
                 </div>
@@ -503,41 +729,70 @@
 
         <!-- Columna Lateral -->
         <div class="col-lg-4">
-            <!-- Próximas Renovaciones -->
-            @if (ViewBag.ProximaRenovacion != null)
+            @if (esCreador)
             {
-                <div class="card renewal-card mb-4">
+                <!-- Metodo de Pago Configurado -->
+                <div class="card info-card mb-4">
                     <div class="card-body" style="padding: 24px;">
-                        <h6 class="mb-3" style="font-weight: 700; color: #92400e;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                <line x1="16" y1="2" x2="16" y2="6"></line>
-                                <line x1="8" y1="2" x2="8" y2="6"></line>
-                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                        <h6 class="mb-3" style="font-weight: 700; color: #36648B;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#36648B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
+                                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                                <line x1="1" y1="10" x2="23" y2="10"></line>
                             </svg>
-                            Próxima Renovación
+                            Metodo de Pago
                         </h6>
-                        <div class="text-center py-3">
-                            <h2 class="mb-1" style="font-weight: 800; color: #92400e;">@ViewBag.ProximaRenovacion.ToString("dd MMM")</h2>
-                            <p class="text-muted mb-3">@ViewBag.ProximaRenovacion.ToString("yyyy")</p>
-                            <div class="d-flex justify-content-between align-items-center p-3" style="background: white; border-radius: 12px;">
-                                <span style="color: #6b7280; font-weight: 600;">Monto total:</span>
-                                <strong style="color: #92400e; font-size: 1.2rem;">$@((ViewBag.MontoProximasRenovaciones ?? 0).ToString("N2"))</strong>
-                            </div>
-                            @if (Model.Saldo < (ViewBag.MontoProximasRenovaciones ?? 0))
-                            {
-                                <div class="alert alert-warning mt-3 mb-0" style="border-radius: 12px; border: 2px solid #fbbf24;">
-                                    <small style="font-weight: 600;">
-                                        ⚠️ Saldo insuficiente para renovación
-                                    </small>
-                                </div>
-                            }
+                        <div class="info-list-item">
+                            <small class="text-muted d-block">Tipo de cuenta</small>
+                            <strong>@(Model.TipoCuentaRetiro ?? "No configurado")</strong>
                         </div>
+                        <div class="info-list-item" style="margin-bottom: 0;">
+                            <small class="text-muted d-block">Cuenta</small>
+                            <strong>@(string.IsNullOrEmpty(Model.CuentaRetiro) ? "No configurada" : "****" + Model.CuentaRetiro.Substring(Math.Max(0, Model.CuentaRetiro.Length - 4)))</strong>
+                        </div>
+                        <button class="btn btn-outline-primary w-100 mt-3" data-bs-toggle="modal" data-bs-target="#modalConfiguracion" style="border-radius: 12px; font-weight: 600;">
+                            Configurar Metodo
+                        </button>
                     </div>
                 </div>
             }
+            else
+            {
+                <!-- Proximas Renovaciones -->
+                @if (ViewBag.ProximaRenovacion != null)
+                {
+                    <div class="card renewal-card mb-4">
+                        <div class="card-body" style="padding: 24px;">
+                            <h6 class="mb-3" style="font-weight: 700; color: #92400e;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                                </svg>
+                                Proxima Renovacion
+                            </h6>
+                            <div class="text-center py-3">
+                                <h2 class="mb-1" style="font-weight: 800; color: #92400e;">@ViewBag.ProximaRenovacion.ToString("dd MMM")</h2>
+                                <p class="text-muted mb-3">@ViewBag.ProximaRenovacion.ToString("yyyy")</p>
+                                <div class="d-flex justify-content-between align-items-center p-3" style="background: white; border-radius: 12px;">
+                                    <span style="color: #6b7280; font-weight: 600;">Monto total:</span>
+                                    <strong style="color: #92400e; font-size: 1.2rem;">$@((ViewBag.MontoProximasRenovaciones ?? 0m).ToString("N2"))</strong>
+                                </div>
+                                @if (Model.Saldo < (ViewBag.MontoProximasRenovaciones ?? 0m))
+                                {
+                                    <div class="alert alert-warning mt-3 mb-0" style="border-radius: 12px; border: 2px solid #fbbf24;">
+                                        <small style="font-weight: 600;">
+                                            Saldo insuficiente para renovacion
+                                        </small>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
 
-            <!-- Información -->
+            <!-- Informacion -->
             <div class="card info-card">
                 <div class="card-body" style="padding: 24px;">
                     <h6 class="mb-3" style="font-weight: 700; color: #36648B;">
@@ -546,150 +801,315 @@
                             <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
                             <line x1="12" y1="17" x2="12.01" y2="17"></line>
                         </svg>
-                        Información Importante
+                        Informacion Importante
                     </h6>
-                    <div class="info-list-item">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        <span style="font-weight: 600; color: #374151;">Recarga mínima: $5.00</span>
-                    </div>
-                    <div class="info-list-item">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        <span style="font-weight: 600; color: #374151;">Recarga máxima: $1,000</span>
-                    </div>
-                    <div class="info-list-item">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        <span style="font-weight: 600; color: #374151;">Recargas instantáneas</span>
-                    </div>
-                    <div class="info-list-item">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        <span style="font-weight: 600; color: #374151;">Renovación automática</span>
-                    </div>
-                    <div class="info-list-item" style="margin-bottom: 0;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        <span style="font-weight: 600; color: #374151;">Cancela cuando quieras</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Cargar Saldo -->
-<div class="modal fade" id="modalCargarSaldo" tabindex="-1" aria-labelledby="modalCargarSaldoLabel" aria-hidden="true" data-bs-backdrop="true" data-bs-keyboard="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header border-0" style="padding: 32px 32px 0 32px;">
-                <div>
-                    <h4 class="modal-title mb-2" id="modalCargarSaldoLabel" style="font-weight: 800;">
-                        Cargar Saldo
-                    </h4>
-                    <p class="text-muted mb-0">Añade fondos a tu billetera de forma segura</p>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-            </div>
-            <div class="modal-body" style="padding: 32px;">
-                <form asp-action="CargarSaldo" asp-controller="FanBilletera" method="post" id="formCargarSaldo">
-                    <div class="alert" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border: 2px solid #93c5fd; border-radius: 16px; padding: 16px;">
-                        <div class="d-flex align-items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1e40af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                            </svg>
-                            <strong style="color: #1e40af;">Saldo actual: $@Model.Saldo.ToString("N2")</strong>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 12px;">Monto a Cargar</label>
-                        <div class="input-group" style="height: 56px;">
-                            <span class="input-group-text" style="background: #f9fafb; border: 2px solid #e5e7eb; border-right: none; font-weight: 700; font-size: 1.2rem;">$</span>
-                            <input type="number" class="form-control" name="Monto" id="inputMonto" step="0.01" min="5" max="1000" placeholder="0.00" required style="border: 2px solid #e5e7eb; border-left: none; font-size: 1.2rem; font-weight: 600;">
-                        </div>
-                        <small class="text-muted">Mínimo: $5.00 | Máximo: $1,000.00</small>
-                    </div>
-
-                    <!-- Montos Rápidos -->
-                    <div class="mb-4">
-                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 12px;">Montos Rápidos</label>
-                        <div class="row g-2">
-                            <div class="col-3">
-                                <button type="button" class="quick-amount-btn w-100" data-amount="10">$10</button>
-                            </div>
-                            <div class="col-3">
-                                <button type="button" class="quick-amount-btn w-100" data-amount="25">$25</button>
-                            </div>
-                            <div class="col-3">
-                                <button type="button" class="quick-amount-btn w-100" data-amount="50">$50</button>
-                            </div>
-                            <div class="col-3">
-                                <button type="button" class="quick-amount-btn w-100" data-amount="100">$100</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 12px;">Método de Pago</label>
-                        <select class="form-select" name="MetodoPago" id="selectMetodoPago" required style="height: 56px; border: 2px solid #e5e7eb; border-radius: 12px; font-weight: 600;">
-                            <option value="">Selecciona un método</option>
-                            <option value="Tarjeta">Tarjeta de Crédito/Débito</option>
-                            <option value="PayPal">PayPal</option>
-                            <option value="Stripe">Stripe</option>
-                        </select>
-                    </div>
-
-                    <div class="alert alert-warning" style="border-radius: 16px; border: 2px solid #fbbf24; background: #fef3c7;">
-                        <small style="font-weight: 600; color: #92400e;">
-                            <strong>Modo Simulado:</strong> Los pagos son procesados de forma simulada para desarrollo.
-                        </small>
-                    </div>
-
-                    <div class="d-flex gap-3">
-                        <button type="button" class="btn btn-secondary flex-grow-1" data-bs-dismiss="modal" style="height: 56px; border-radius: 12px; font-weight: 600;">Cancelar</button>
-                        <button type="submit" class="btn btn-primary btn-action flex-grow-1" style="height: 56px;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
+                    @if (esCreador)
+                    {
+                        <div class="info-list-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
                                 <polyline points="20 6 9 17 4 12"></polyline>
                             </svg>
-                            Confirmar Recarga
-                        </button>
-                    </div>
-                </form>
+                            <span style="font-weight: 600; color: #374151;">Minimo retiro: $@Model.MontoMinimoRetiro.ToString("N0")</span>
+                        </div>
+                        <div class="info-list-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            <span style="font-weight: 600; color: #374151;">Comision: @Model.ComisionRetiro%</span>
+                        </div>
+                        <div class="info-list-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            <span style="font-weight: 600; color: #374151;">Proceso: 3-5 dias habiles</span>
+                        </div>
+                        <div class="info-list-item" style="margin-bottom: 0;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            <span style="font-weight: 600; color: #374151;">Pagos seguros SSL</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="info-list-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            <span style="font-weight: 600; color: #374151;">Recarga minima: $5.00</span>
+                        </div>
+                        <div class="info-list-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            <span style="font-weight: 600; color: #374151;">Recarga maxima: $1,000</span>
+                        </div>
+                        <div class="info-list-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            <span style="font-weight: 600; color: #374151;">Recargas instantaneas</span>
+                        </div>
+                        <div class="info-list-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            <span style="font-weight: 600; color: #374151;">Renovacion automatica</span>
+                        </div>
+                        <div class="info-list-item" style="margin-bottom: 0;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            <span style="font-weight: 600; color: #374151;">Cancela cuando quieras</span>
+                        </div>
+                    }
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+@if (esCreador)
+{
+    <!-- Modal Solicitar Retiro -->
+    <div class="modal fade" id="modalSolicitarRetiro" tabindex="-1" aria-labelledby="modalSolicitarRetiroLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0" style="padding: 32px 32px 0 32px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 24px 24px 0 0;">
+                    <div>
+                        <h4 class="modal-title mb-2" id="modalSolicitarRetiroLabel" style="font-weight: 800;">
+                            Solicitar Retiro
+                        </h4>
+                        <p class="mb-0 opacity-90">Transfiere tus ganancias a tu cuenta</p>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body" style="padding: 32px;">
+                    <form asp-action="SolicitarRetiro" asp-controller="Billetera" method="post" id="formRetiro">
+                        <div class="alert" style="background: #dcfce7; border: 2px solid #86efac; border-radius: 16px; padding: 16px;">
+                            <div class="d-flex align-items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"></path>
+                                    <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"></path>
+                                </svg>
+                                <strong style="color: #166534;">Saldo disponible: $@Model.Saldo.ToString("N2")</strong>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 12px;">Monto a Retirar</label>
+                            <div class="input-group" style="height: 56px;">
+                                <span class="input-group-text" style="background: #f9fafb; border: 2px solid #e5e7eb; border-right: none; font-weight: 700; font-size: 1.2rem;">$</span>
+                                <input type="number" class="form-control" name="monto" id="inputMontoRetiro" step="0.01" min="@Model.MontoMinimoRetiro" max="@Model.Saldo" placeholder="0.00" required style="border: 2px solid #e5e7eb; border-left: none; font-size: 1.2rem; font-weight: 600;">
+                            </div>
+                            <small class="text-muted">Minimo: $@Model.MontoMinimoRetiro.ToString("N0") | Maximo: $@Model.Saldo.ToString("N2")</small>
+                        </div>
+
+                        <!-- Calculo en tiempo real -->
+                        <div class="card bg-light border-0 mb-4">
+                            <div class="card-body">
+                                <h6 class="mb-3 text-muted">Desglose del retiro:</h6>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Monto bruto:</span>
+                                    <strong>$<span id="montoBruto">0.00</span></strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2 text-danger">
+                                    <span>Comision LadoApp (@Model.ComisionRetiro%):</span>
+                                    <strong>-$<span id="montoComision">0.00</span></strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2 text-warning">
+                                    <span>Retencion Impuestos (@(ViewBag.RetencionImpuestos != null ? ((decimal)ViewBag.RetencionImpuestos).ToString("N1") : "0")%):</span>
+                                    <strong>-$<span id="montoImpuestos">0.00</span></strong>
+                                </div>
+                                <hr>
+                                <div class="d-flex justify-content-between">
+                                    <span class="fw-bold">Neto a recibir:</span>
+                                    <strong class="text-success" style="font-size: 1.2rem;">$<span id="montoNeto">0.00</span></strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 12px;">Metodo de Pago</label>
+                            <select class="form-select" name="metodoPago" required style="height: 56px; border: 2px solid #e5e7eb; border-radius: 12px; font-weight: 600;">
+                                <option value="">Selecciona un metodo</option>
+                                <option value="Transferencia">Transferencia Bancaria</option>
+                                <option value="PayPal">PayPal</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 12px;">Notas (opcional)</label>
+                            <textarea class="form-control" name="detalles" rows="2" placeholder="Informacion adicional..." style="border: 2px solid #e5e7eb; border-radius: 12px;"></textarea>
+                        </div>
+
+                        <div class="alert alert-warning" style="border-radius: 16px; border: 2px solid #fbbf24; background: #fef3c7;">
+                            <small style="font-weight: 600; color: #92400e;">
+                                El retiro se procesara en 3-5 dias habiles. Recibiras una notificacion cuando se complete.
+                            </small>
+                        </div>
+
+                        <div class="d-flex gap-3">
+                            <button type="button" class="btn btn-secondary flex-grow-1" data-bs-dismiss="modal" style="height: 56px; border-radius: 12px; font-weight: 600;">Cancelar</button>
+                            <button type="submit" class="btn btn-success btn-action flex-grow-1" style="height: 56px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                Confirmar Retiro
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <!-- Modal Cargar Saldo (para fans) -->
+    <div class="modal fade" id="modalCargarSaldo" tabindex="-1" aria-labelledby="modalCargarSaldoLabel" aria-hidden="true" data-bs-backdrop="true" data-bs-keyboard="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0" style="padding: 32px 32px 0 32px;">
+                    <div>
+                        <h4 class="modal-title mb-2" id="modalCargarSaldoLabel" style="font-weight: 800;">
+                            Cargar Saldo
+                        </h4>
+                        <p class="text-muted mb-0">Anade fondos a tu billetera de forma segura</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body" style="padding: 32px;">
+                    <form asp-action="CargarSaldo" asp-controller="FanBilletera" method="post" id="formCargarSaldo">
+                        <div class="alert" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border: 2px solid #93c5fd; border-radius: 16px; padding: 16px;">
+                            <div class="d-flex align-items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1e40af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                </svg>
+                                <strong style="color: #1e40af;">Saldo actual: $@Model.Saldo.ToString("N2")</strong>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 12px;">Monto a Cargar</label>
+                            <div class="input-group" style="height: 56px;">
+                                <span class="input-group-text" style="background: #f9fafb; border: 2px solid #e5e7eb; border-right: none; font-weight: 700; font-size: 1.2rem;">$</span>
+                                <input type="number" class="form-control" name="Monto" id="inputMonto" step="0.01" min="5" max="1000" placeholder="0.00" required style="border: 2px solid #e5e7eb; border-left: none; font-size: 1.2rem; font-weight: 600;">
+                            </div>
+                            <small class="text-muted">Minimo: $5.00 | Maximo: $1,000.00</small>
+                        </div>
+
+                        <!-- Montos Rapidos -->
+                        <div class="mb-4">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 12px;">Montos Rapidos</label>
+                            <div class="row g-2">
+                                <div class="col-3">
+                                    <button type="button" class="quick-amount-btn w-100" data-amount="10">$10</button>
+                                </div>
+                                <div class="col-3">
+                                    <button type="button" class="quick-amount-btn w-100" data-amount="25">$25</button>
+                                </div>
+                                <div class="col-3">
+                                    <button type="button" class="quick-amount-btn w-100" data-amount="50">$50</button>
+                                </div>
+                                <div class="col-3">
+                                    <button type="button" class="quick-amount-btn w-100" data-amount="100">$100</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 12px;">Metodo de Pago</label>
+                            <select class="form-select" name="MetodoPago" id="selectMetodoPago" required style="height: 56px; border: 2px solid #e5e7eb; border-radius: 12px; font-weight: 600;">
+                                <option value="">Selecciona un metodo</option>
+                                <option value="Tarjeta">Tarjeta de Credito/Debito</option>
+                                <option value="PayPal">PayPal</option>
+                                <option value="Stripe">Stripe</option>
+                            </select>
+                        </div>
+
+                        <div class="alert alert-warning" style="border-radius: 16px; border: 2px solid #fbbf24; background: #fef3c7;">
+                            <small style="font-weight: 600; color: #92400e;">
+                                <strong>Modo Simulado:</strong> Los pagos son procesados de forma simulada para desarrollo.
+                            </small>
+                        </div>
+
+                        <div class="d-flex gap-3">
+                            <button type="button" class="btn btn-secondary flex-grow-1" data-bs-dismiss="modal" style="height: 56px; border-radius: 12px; font-weight: 600;">Cancelar</button>
+                            <button type="submit" class="btn btn-primary btn-action flex-grow-1" style="height: 56px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                Confirmar Recarga
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 @section Scripts {
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Manejar botones de montos rápidos
-    document.querySelectorAll('.quick-amount-btn').forEach(function(btn) {
-        btn.addEventListener('click', function(e) {
-            e.preventDefault();
-            var amount = this.getAttribute('data-amount');
-            document.getElementById('inputMonto').value = amount;
-        });
-    });
+    var esCreador = @(esCreador.ToString().ToLower());
+    var comisionRetiro = @Model.ComisionRetiro;
+    var retencionImpuestos = @(ViewBag.RetencionImpuestos != null ? (decimal)ViewBag.RetencionImpuestos : 0);
 
-    // Asegurar que el modal se mueva al body cuando se abra
-    var modalEl = document.getElementById('modalCargarSaldo');
-    if (modalEl) {
-        modalEl.addEventListener('show.bs.modal', function() {
-            // Mover el modal al body si no está ya ahí
-            if (this.parentElement !== document.body) {
-                document.body.appendChild(this);
-            }
+    if (esCreador) {
+        // Calcular neto en tiempo real para retiros
+        var inputRetiro = document.getElementById('inputMontoRetiro');
+        if (inputRetiro) {
+            inputRetiro.addEventListener('input', function() {
+                var monto = parseFloat(this.value) || 0;
+                var comision = monto * (comisionRetiro / 100);
+                var impuestos = monto * (retencionImpuestos / 100);
+                var neto = monto - comision - impuestos;
+
+                document.getElementById('montoBruto').textContent = monto.toFixed(2);
+                document.getElementById('montoComision').textContent = comision.toFixed(2);
+                document.getElementById('montoImpuestos').textContent = impuestos.toFixed(2);
+                document.getElementById('montoNeto').textContent = neto.toFixed(2);
+            });
+        }
+    } else {
+        // Manejar botones de montos rapidos para fans
+        document.querySelectorAll('.quick-amount-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                var amount = this.getAttribute('data-amount');
+                document.getElementById('inputMonto').value = amount;
+            });
         });
+    }
+
+    // Animacion suave de los blobs decorativos
+    var blob1 = document.querySelector('.wallet-blob-1');
+    var blob2 = document.querySelector('.wallet-blob-2');
+
+    if (blob1 && blob2) {
+        var startTime = Date.now();
+
+        function animateBlobs() {
+            var elapsed = (Date.now() - startTime) / 1000;
+            var cycle1 = (elapsed / 12) * Math.PI * 2;
+            var cycle2 = (elapsed / 15) * Math.PI * 2;
+
+            var x1 = Math.sin(cycle1) * 15;
+            var y1 = Math.cos(cycle1) * 12;
+            var x2 = Math.cos(cycle2) * 12;
+            var y2 = Math.sin(cycle2) * 15;
+
+            blob1.style.transform = 'translate(' + x1 + 'px, ' + y1 + 'px)';
+            blob2.style.transform = 'translate(' + x2 + 'px, ' + y2 + 'px)';
+
+            requestAnimationFrame(animateBlobs);
+        }
+
+        animateBlobs();
     }
 });
 </script>

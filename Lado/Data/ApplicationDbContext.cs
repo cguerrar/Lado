@@ -73,10 +73,31 @@ namespace Lado.Data
         public DbSet<Feedback> Feedbacks { get; set; }
 
         // ========================================
+        // ⭐ DbSets NUEVOS - NOTIFICACIONES
+        // ========================================
+        public DbSet<Notificacion> Notificaciones { get; set; }
+
+        // ========================================
         // ⭐ DbSets NUEVOS - CONTADOR DE VISITAS
         // ========================================
         public DbSet<VisitaApp> VisitasApp { get; set; }
         public DbSet<VisitaDetalle> VisitasDetalle { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - TASAS DE CAMBIO
+        // ========================================
+        public DbSet<TasaCambio> TasasCambio { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - RETENCIONES POR PAÍS
+        // ========================================
+        public DbSet<RetencionPais> RetencionesPaises { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - ALGORITMOS DE FEED
+        // ========================================
+        public DbSet<AlgoritmoFeed> AlgoritmosFeed { get; set; }
+        public DbSet<PreferenciaAlgoritmoUsuario> PreferenciasAlgoritmoUsuario { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -901,6 +922,59 @@ namespace Lado.Data
             });
 
             // ========================================
+            // ⭐ CONFIGURACIÓN DE NOTIFICACIONES
+            // ========================================
+            modelBuilder.Entity<Notificacion>(entity =>
+            {
+                entity.HasKey(n => n.Id);
+
+                entity.HasOne(n => n.Usuario)
+                    .WithMany()
+                    .HasForeignKey(n => n.UsuarioId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(n => n.UsuarioOrigen)
+                    .WithMany()
+                    .HasForeignKey(n => n.UsuarioOrigenId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.Property(n => n.Mensaje)
+                    .HasMaxLength(500)
+                    .IsRequired();
+
+                entity.Property(n => n.Titulo)
+                    .HasMaxLength(200)
+                    .IsRequired(false);
+
+                entity.Property(n => n.UrlDestino)
+                    .HasMaxLength(500)
+                    .IsRequired(false);
+
+                entity.Property(n => n.ImagenUrl)
+                    .HasMaxLength(500)
+                    .IsRequired(false);
+
+                entity.Property(n => n.Leida)
+                    .HasDefaultValue(false);
+
+                entity.Property(n => n.EstaActiva)
+                    .HasDefaultValue(true);
+
+                // Índices para búsqueda eficiente
+                entity.HasIndex(n => n.UsuarioId)
+                    .HasDatabaseName("IX_Notificaciones_UsuarioId");
+
+                entity.HasIndex(n => n.Leida)
+                    .HasDatabaseName("IX_Notificaciones_Leida");
+
+                entity.HasIndex(n => n.FechaCreacion)
+                    .HasDatabaseName("IX_Notificaciones_FechaCreacion");
+
+                entity.HasIndex(n => new { n.UsuarioId, n.Leida, n.EstaActiva })
+                    .HasDatabaseName("IX_Notificaciones_Usuario_Leida_Activa");
+            });
+
+            // ========================================
             // ⭐ CONFIGURACIÓN DE PISTAS MUSICALES
             // ========================================
             modelBuilder.Entity<PistaMusical>(entity =>
@@ -960,6 +1034,73 @@ namespace Lado.Data
 
                 entity.HasIndex(p => new { p.Activo, p.Genero })
                     .HasDatabaseName("IX_PistasMusica_Activo_Genero");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE ALGORITMOS DE FEED
+            // ========================================
+            modelBuilder.Entity<AlgoritmoFeed>(entity =>
+            {
+                entity.HasKey(a => a.Id);
+
+                entity.Property(a => a.Codigo)
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                entity.Property(a => a.Nombre)
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                entity.Property(a => a.Descripcion)
+                    .HasMaxLength(500)
+                    .IsRequired(false);
+
+                entity.Property(a => a.Icono)
+                    .HasMaxLength(100)
+                    .IsRequired(false);
+
+                entity.Property(a => a.Activo)
+                    .HasDefaultValue(true);
+
+                entity.Property(a => a.EsPorDefecto)
+                    .HasDefaultValue(false);
+
+                entity.Property(a => a.TotalUsos)
+                    .HasDefaultValue(0);
+
+                // Índices
+                entity.HasIndex(a => a.Codigo)
+                    .IsUnique()
+                    .HasDatabaseName("IX_AlgoritmosFeed_Codigo");
+
+                entity.HasIndex(a => a.Activo)
+                    .HasDatabaseName("IX_AlgoritmosFeed_Activo");
+
+                entity.HasIndex(a => a.EsPorDefecto)
+                    .HasDatabaseName("IX_AlgoritmosFeed_EsPorDefecto");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE PREFERENCIAS ALGORITMO USUARIO
+            // ========================================
+            modelBuilder.Entity<PreferenciaAlgoritmoUsuario>(entity =>
+            {
+                entity.HasKey(p => p.Id);
+
+                entity.HasOne(p => p.Usuario)
+                    .WithMany()
+                    .HasForeignKey(p => p.UsuarioId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(p => p.AlgoritmoFeed)
+                    .WithMany()
+                    .HasForeignKey(p => p.AlgoritmoFeedId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // Un usuario solo puede tener una preferencia
+                entity.HasIndex(p => p.UsuarioId)
+                    .IsUnique()
+                    .HasDatabaseName("IX_PreferenciasAlgoritmoUsuario_UsuarioId");
             });
         }
     }

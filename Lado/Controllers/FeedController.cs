@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Lado.Data;
 using Lado.Models;
+using Lado.Services;
 
 namespace Lado.Controllers
 {
@@ -14,15 +15,24 @@ namespace Lado.Controllers
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILogger<FeedController> _logger;
+        private readonly IAdService _adService;
+        private readonly INotificationService _notificationService;
+        private readonly IFeedAlgorithmService _feedAlgorithmService;
 
         public FeedController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
-            ILogger<FeedController> logger)
+            ILogger<FeedController> logger,
+            IAdService adService,
+            INotificationService notificationService,
+            IFeedAlgorithmService feedAlgorithmService)
         {
             _context = context;
             _userManager = userManager;
             _logger = logger;
+            _adService = adService;
+            _notificationService = notificationService;
+            _feedAlgorithmService = feedAlgorithmService;
         }
 
 
@@ -145,7 +155,21 @@ namespace Lado.Controllers
                 ViewBag.TotalLadoA = (ViewBag.ContenidoLadoA as List<Contenido>)?.Count ?? 0;
                 ViewBag.TotalLadoB = (ViewBag.ContenidoLadoB as List<Contenido>)?.Count ?? 0;
 
-          
+                // Verificar si el creador tiene contenido LadoB (puede recibir propinas)
+                var tieneContenidoLadoB = await _context.Contenidos
+                    .AnyAsync(c => c.UsuarioId == id
+                                && c.TipoLado == TipoLado.LadoB
+                                && c.EstaActivo
+                                && !c.EsBorrador);
+                ViewBag.PuedeRecibirPropinas = tieneContenidoLadoB || usuario.CreadorVerificado;
+
+                // Incrementar contador de visitas al perfil (solo si no es el propietario)
+                if (usuarioActual.Id != usuario.Id)
+                {
+                    usuario.VisitasPerfil++;
+                    await _context.SaveChangesAsync();
+                }
+
                 return View(usuario);
             }
             catch (Exception ex)
@@ -243,8 +267,24 @@ namespace Lado.Controllers
                     .Distinct()
                     .ToList();
 
-                _logger.LogInformation("Usuario {UserId} tiene {Count} suscripciones activas",
-                    usuarioId, creadoresIds.Count);
+                // ========================================
+                // FILTRAR USUARIOS BLOQUEADOS
+                // ========================================
+                var usuariosBloqueadosIds = await _context.BloqueosUsuarios
+                    .Where(b => b.BloqueadorId == usuarioId || b.BloqueadoId == usuarioId)
+                    .Select(b => b.BloqueadorId == usuarioId ? b.BloqueadoId : b.BloqueadorId)
+                    .Distinct()
+                    .ToListAsync();
+
+                // Remover usuarios bloqueados de las listas de creadores
+                creadoresLadoAIds = creadoresLadoAIds.Where(id => !usuariosBloqueadosIds.Contains(id)).ToList();
+                creadoresLadoBIds = creadoresLadoBIds.Where(id => !usuariosBloqueadosIds.Contains(id)).ToList();
+                creadoresIds = creadoresIds.Where(id => !usuariosBloqueadosIds.Contains(id)).ToList();
+
+                ViewBag.UsuariosBloqueadosIds = usuariosBloqueadosIds;
+
+                _logger.LogInformation("Usuario {UserId} tiene {Count} suscripciones activas, {Blocked} usuarios bloqueados",
+                    usuarioId, creadoresIds.Count, usuariosBloqueadosIds.Count);
 
                 // 2. CREADORES FAVORITOS - Solo suscritos
                 var creadoresFavoritos = await _context.Users
@@ -322,11 +362,13 @@ namespace Lado.Controllers
                 // 5. ✅ CORREGIDO: Contenido público (LadoA) SOLO de creadores suscritos en LadoA + propio
                 var contenidoPublico = await _context.Contenidos
                     .Include(c => c.Usuario)
+                    .Include(c => c.PistaMusical) // Incluir música asociada
                     .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
                         .ThenInclude(com => com.Usuario)
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
+                            && (c.UsuarioId == usuarioId || !c.EsPrivado) // Mostrar privado solo si es propio
                             && c.TipoLado == TipoLado.LadoA
                             && c.Usuario != null
                             && (creadoresLadoAIds.Contains(c.UsuarioId) || c.UsuarioId == usuarioId)) // ✅ Solo LadoA
@@ -336,12 +378,14 @@ namespace Lado.Controllers
                 var contenidoPremiumSuscripciones = creadoresLadoBIds.Any()
                     ? await _context.Contenidos
                         .Include(c => c.Usuario)
+                        .Include(c => c.PistaMusical) // Incluir música asociada
                         .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
                             .ThenInclude(com => com.Usuario)
                         .Where(c => creadoresLadoBIds.Contains(c.UsuarioId) // ✅ Solo LadoB
                                 && c.EstaActivo
                                 && !c.EsBorrador
                                 && !c.Censurado
+                                && !c.EsPrivado
                                 && c.TipoLado == TipoLado.LadoB
                                 && c.Usuario != null)
                         .ToListAsync()
@@ -350,6 +394,7 @@ namespace Lado.Controllers
                 // 7. Contenido premium (LadoB) PROPIO
                 var contenidoPremiumPropio = await _context.Contenidos
                     .Include(c => c.Usuario)
+                    .Include(c => c.PistaMusical) // Incluir música asociada
                     .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
                         .ThenInclude(com => com.Usuario)
                     .Where(c => c.UsuarioId == usuarioId
@@ -368,12 +413,14 @@ namespace Lado.Controllers
 
                 var contenidoPremiumComprado = await _context.Contenidos
                     .Include(c => c.Usuario)
+                    .Include(c => c.PistaMusical) // Incluir música asociada
                     .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
                         .ThenInclude(com => com.Usuario)
                     .Where(c => contenidosCompradosIds.Contains(c.Id)
                             && c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
+                            && !c.EsPrivado
                             && c.Usuario != null)
                     .ToListAsync();
 
@@ -381,14 +428,17 @@ namespace Lado.Controllers
                 var todosLosCreadores = creadoresLadoAIds.Union(creadoresLadoBIds).ToList();
                 var contenidoLadoBBloqueado = await _context.Contenidos
                     .Include(c => c.Usuario)
+                    .Include(c => c.PistaMusical) // Incluir música asociada
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
+                            && !c.EsPrivado
                             && c.TipoLado == TipoLado.LadoB
                             && c.Usuario != null
                             && c.UsuarioId != usuarioId
                             && !creadoresLadoBIds.Contains(c.UsuarioId) // NO suscrito a LadoB
-                            && !contenidosCompradosIds.Contains(c.Id)) // NO comprado
+                            && !contenidosCompradosIds.Contains(c.Id) // NO comprado
+                            && !usuariosBloqueadosIds.Contains(c.UsuarioId)) // NO bloqueado
                     .OrderBy(c => Guid.NewGuid()) // Aleatorio
                     .Take(5) // Limitar a 5 posts bloqueados
                     .ToListAsync();
@@ -433,29 +483,42 @@ namespace Lado.Controllers
 
                 ViewBag.ReaccionesPorContenido = reaccionesPorContenido.ToDictionary(r => r.ContenidoId);
 
-                // 12. Ordenar contenido
-                var contenidoOrdenado = todoContenido
-                    .Select(c => new
-                    {
-                        Contenido = c,
-                        Score = CalcularScoreMejorado(c, usuarioId)
-                    })
-                    .OrderByDescending(x => x.Score)
-                    .ThenByDescending(x => x.Contenido.FechaPublicacion)
-                    .Select(x => x.Contenido)
-                    .Take(50)
-                    .ToList();
+                // 12. Obtener algoritmo del usuario y aplicarlo
+                var algoritmoUsuario = await _feedAlgorithmService.ObtenerAlgoritmoUsuarioAsync(usuarioId, _context);
+                var codigoAlgoritmo = algoritmoUsuario?.Codigo ?? "cronologico";
+
+                var contenidoOrdenado = await _feedAlgorithmService.AplicarAlgoritmoAsync(
+                    todoContenido,
+                    codigoAlgoritmo,
+                    usuarioId,
+                    _context);
+
+                contenidoOrdenado = contenidoOrdenado.Take(50).ToList();
+
+                // Incrementar contador de uso del algoritmo
+                if (algoritmoUsuario != null)
+                {
+                    await _feedAlgorithmService.IncrementarUsoAsync(algoritmoUsuario.Id, _context);
+                }
+
+                // Pasar info del algoritmo a la vista
+                ViewBag.AlgoritmoActual = algoritmoUsuario;
+                ViewBag.AlgoritmosDisponibles = await _feedAlgorithmService.ObtenerAlgoritmosActivosAsync(_context);
 
                 // 13. ViewBag data
                 ViewBag.EstaSuscrito = true;
                 ViewBag.TotalLadoA = contenidoPublico.Count;
                 ViewBag.TotalLadoB = contenidoPremiumSuscripciones.Count + contenidoPremiumPropio.Count;
 
-                // 14. Sugerencias de usuarios NO suscritos
+                // 14. Sugerencias de usuarios NO suscritos (excluyendo admins)
+                var adminUsersIndex = await _userManager.GetUsersInRoleAsync("Admin");
+                var adminIdsIndex = adminUsersIndex.Select(u => u.Id).ToList();
+
                 ViewBag.CreadoresSugeridos = await _userManager.Users
                     .Where(u => u.Id != usuarioId
                             && u.EstaActivo
-                            && !creadoresIds.Contains(u.Id)) // ✅ Excluye a los que ya está suscrito
+                            && !creadoresIds.Contains(u.Id) // Excluye a los que ya está suscrito
+                            && !adminIdsIndex.Contains(u.Id)) // Excluir administradores
                     .OrderByDescending(u => u.NumeroSeguidores)
                     .ThenBy(u => Guid.NewGuid())
                     .Take(5)
@@ -478,6 +541,17 @@ namespace Lado.Controllers
                     .Select(f => f.ContenidoId)
                     .ToListAsync();
                 ViewBag.FavoritosIds = favoritosUsuario;
+
+                // Cargar anuncios para el feed
+                var anuncios = await _adService.ObtenerAnunciosActivos(3, usuarioId);
+                ViewBag.Anuncios = anuncios;
+
+                // Registrar impresiones de los anuncios
+                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+                foreach (var anuncio in anuncios)
+                {
+                    await _adService.RegistrarImpresion(anuncio.Id, usuarioId, ipAddress);
+                }
 
                 return View(contenidoOrdenado);
             }
@@ -612,6 +686,82 @@ namespace Lado.Controllers
         }
 
         // ========================================
+        // CAMBIAR ALGORITMO DE FEED
+        // ========================================
+
+        [HttpPost]
+        public async Task<IActionResult> CambiarAlgoritmo(int algoritmoId)
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(usuarioId))
+                {
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                var algoritmo = await _context.AlgoritmosFeed.FindAsync(algoritmoId);
+                if (algoritmo == null || !algoritmo.Activo)
+                {
+                    return Json(new { success = false, message = "Algoritmo no disponible" });
+                }
+
+                await _feedAlgorithmService.GuardarPreferenciaUsuarioAsync(usuarioId, algoritmoId, _context);
+
+                _logger.LogInformation("Usuario {UsuarioId} cambio a algoritmo {Algoritmo}", usuarioId, algoritmo.Nombre);
+
+                return Json(new
+                {
+                    success = true,
+                    message = $"Algoritmo cambiado a '{algoritmo.Nombre}'",
+                    algoritmo = new
+                    {
+                        algoritmo.Id,
+                        algoritmo.Codigo,
+                        algoritmo.Nombre,
+                        algoritmo.Icono
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al cambiar algoritmo");
+                return Json(new { success = false, message = "Error al cambiar algoritmo" });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ObtenerAlgoritmosDisponibles()
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var algoritmos = await _feedAlgorithmService.ObtenerAlgoritmosActivosAsync(_context);
+                var algoritmoActual = await _feedAlgorithmService.ObtenerAlgoritmoUsuarioAsync(usuarioId ?? "", _context);
+
+                return Json(new
+                {
+                    success = true,
+                    algoritmos = algoritmos.Select(a => new
+                    {
+                        a.Id,
+                        a.Codigo,
+                        a.Nombre,
+                        a.Descripcion,
+                        a.Icono,
+                        EsActual = algoritmoActual?.Id == a.Id
+                    }),
+                    algoritmoActualId = algoritmoActual?.Id
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener algoritmos disponibles");
+                return Json(new { success = false, message = "Error" });
+            }
+        }
+
+        // ========================================
         // COMENTAR
         // ========================================
 
@@ -661,6 +811,16 @@ namespace Lado.Controllers
                 await _context.SaveChangesAsync();
 
                 var usuario = await _userManager.FindByIdAsync(usuarioId);
+
+                // Notificar al dueño del contenido sobre el nuevo comentario
+                if (contenido.UsuarioId != usuarioId)
+                {
+                    _ = _notificationService.NotificarNuevoComentarioAsync(
+                        contenido.UsuarioId,
+                        usuarioId!,
+                        contenido.Id,
+                        comentario.Id);
+                }
 
                 _logger.LogInformation("Comentario agregado: Usuario {UserId} en Contenido {ContenidoId}",
                     usuarioId, id);
@@ -717,6 +877,122 @@ namespace Lado.Controllers
                 _logger.LogError(ex, "Error al compartir contenido {ContenidoId}", id);
                 return Json(new { success = false, message = "Error al compartir" });
             }
+        }
+
+        // ========================================
+        // OBTENER USUARIOS QUE SIGO (PARA COMPARTIR)
+        // ========================================
+
+        [HttpGet]
+        public async Task<IActionResult> ObtenerSiguiendo()
+        {
+            try
+            {
+                var usuarioActual = await _userManager.GetUserAsync(User);
+                if (usuarioActual == null)
+                {
+                    return Json(new List<object>());
+                }
+
+                // Obtener usuarios que sigo (con suscripción activa)
+                var siguiendo = await _context.Suscripciones
+                    .Where(s => s.FanId == usuarioActual.Id && s.EstaActiva)
+                    .Select(s => s.CreadorId)
+                    .Distinct()
+                    .ToListAsync();
+
+                var usuarios = await _context.Users
+                    .Where(u => siguiendo.Contains(u.Id))
+                    .Select(u => new
+                    {
+                        id = u.Id,
+                        nombre = u.NombreCompleto,
+                        username = u.UserName,
+                        fotoPerfil = u.FotoPerfil
+                    })
+                    .OrderBy(u => u.nombre)
+                    .ToListAsync();
+
+                return Json(usuarios);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener usuarios siguiendo");
+                return Json(new List<object>());
+            }
+        }
+
+        // ========================================
+        // ENVIAR CONTENIDO A AMIGOS
+        // ========================================
+
+        [HttpPost]
+        public async Task<IActionResult> EnviarAAmigos([FromBody] EnviarAAmigosRequest request)
+        {
+            try
+            {
+                var usuarioActual = await _userManager.GetUserAsync(User);
+                if (usuarioActual == null)
+                {
+                    return Json(new { success = false, message = "Debes iniciar sesión" });
+                }
+
+                if (request.AmigosIds == null || !request.AmigosIds.Any())
+                {
+                    return Json(new { success = false, message = "Selecciona al menos un amigo" });
+                }
+
+                var contenido = await _context.Contenidos
+                    .Include(c => c.Usuario)
+                    .FirstOrDefaultAsync(c => c.Id == request.ContenidoId);
+
+                if (contenido == null)
+                {
+                    return Json(new { success = false, message = "Contenido no encontrado" });
+                }
+
+                int enviados = 0;
+                foreach (var amigoId in request.AmigosIds.Distinct())
+                {
+                    // Verificar que el amigo exista y que lo sigo
+                    var suscripcion = await _context.Suscripciones
+                        .AnyAsync(s => s.FanId == usuarioActual.Id && s.CreadorId == amigoId && s.EstaActiva);
+
+                    if (!suscripcion) continue;
+
+                    // Crear mensaje privado con el contenido compartido
+                    var tipoContenido = contenido.TipoContenido == TipoContenido.Foto || contenido.TipoContenido == TipoContenido.Imagen
+                        ? "📷" : contenido.TipoContenido == TipoContenido.Video ? "🎬" : "📝";
+
+                    var mensaje = new MensajePrivado
+                    {
+                        RemitenteId = usuarioActual.Id,
+                        DestinatarioId = amigoId,
+                        Contenido = $"{tipoContenido} Te compartió una publicación de @{contenido.Usuario?.UserName ?? "usuario"}\n{request.Url}",
+                        FechaEnvio = DateTime.Now,
+                        Leido = false
+                    };
+
+                    _context.MensajesPrivados.Add(mensaje);
+                    enviados++;
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, enviados });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al enviar contenido a amigos");
+                return Json(new { success = false, message = "Error al enviar" });
+            }
+        }
+
+        public class EnviarAAmigosRequest
+        {
+            public int ContenidoId { get; set; }
+            public List<string> AmigosIds { get; set; } = new();
+            public string Url { get; set; } = "";
         }
 
         // ========================================
@@ -782,6 +1058,12 @@ namespace Lado.Controllers
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Notificar al creador sobre el nuevo seguidor
+                if (siguiendo)
+                {
+                    _ = _notificationService.NotificarNuevoSeguidorAsync(id, usuarioActual.Id);
+                }
 
                 return Json(new
                 {
@@ -966,14 +1248,62 @@ namespace Lado.Controllers
                     return RedirectToAction("Login", "Account");
                 }
 
+                // Obtener IDs de administradores para excluirlos
+                var adminUsers = await _userManager.GetUsersInRoleAsync("Admin");
+                var adminIds = adminUsers.Select(u => u.Id).ToList();
+
+                // Obtener usuarios bloqueados
+                var usuariosBloqueadosIds = await _context.BloqueosUsuarios
+                    .Where(b => b.BloqueadorId == usuarioActual.Id || b.BloqueadoId == usuarioActual.Id)
+                    .Select(b => b.BloqueadorId == usuarioActual.Id ? b.BloqueadoId : b.BloqueadorId)
+                    .Distinct()
+                    .ToListAsync();
+
+                // Mostrar creadores: EsCreador = true O tienen Seudonimo (creadores de facto)
                 var usuarios = await _userManager.Users
-                    .Where(u => u.EstaActivo && u.Id != usuarioActual.Id)
+                    .Where(u => u.EstaActivo
+                            && (u.EsCreador || u.Seudonimo != null)
+                            && u.Id != usuarioActual.Id
+                            && !adminIds.Contains(u.Id)
+                            && !usuariosBloqueadosIds.Contains(u.Id))
                     .OrderByDescending(u => u.CreadorVerificado)
                     .ThenByDescending(u => u.NumeroSeguidores)
                     .Take(50)
                     .ToListAsync();
 
-                _logger.LogInformation("Explorar: {Count} usuarios encontrados", usuarios.Count);
+                // Separar creadores por tipo
+                var creadoresLadoA = usuarios.Where(c => !c.TieneLadoB()).ToList();
+                var creadoresLadoB = usuarios.Where(c => c.TieneLadoB()).ToList();
+
+                ViewBag.CreadoresLadoA = creadoresLadoA;
+                ViewBag.CreadoresLadoB = creadoresLadoB;
+
+                // Obtener IDs de creadores a los que el usuario está suscrito
+                var suscripcionesActivas = await _context.Suscripciones
+                    .Where(s => s.FanId == usuarioActual.Id && s.EstaActiva)
+                    .Select(s => s.CreadorId)
+                    .ToListAsync();
+                ViewBag.SuscripcionesActivas = suscripcionesActivas;
+
+                // Obtener contenido para explorar (60 items iniciales)
+                // Incluye todo el contenido público (LadoA y LadoB)
+                var contenidoExplorar = await _context.Contenidos
+                    .Include(c => c.Usuario)
+                    .Where(c => c.EstaActivo
+                            && !c.EsBorrador
+                            && !c.Censurado
+                            && !c.EsPrivado
+                            && !string.IsNullOrEmpty(c.RutaArchivo) // Solo contenido con media
+                            && !usuariosBloqueadosIds.Contains(c.UsuarioId))
+                    .OrderByDescending(c => c.NumeroLikes + c.NumeroComentarios * 2)
+                    .ThenByDescending(c => c.FechaPublicacion)
+                    .Take(60)
+                    .ToListAsync();
+
+                ViewBag.ContenidoExplorar = contenidoExplorar;
+
+                _logger.LogInformation("Explorar: {Creadores} creadores, {Contenido} contenidos",
+                    usuarios.Count, contenidoExplorar.Count);
 
                 return View(usuarios);
             }
@@ -985,23 +1315,112 @@ namespace Lado.Controllers
             }
         }
 
-
         // ========================================
-        // DETALLE DE CONTENIDO CON REACCIONES
+        // EXPLORAR CONTENIDO (AJAX - INFINITE SCROLL)
         // ========================================
 
-        public async Task<IActionResult> Detalle(int id)
+        [HttpGet]
+        public async Task<IActionResult> ExplorarContenido(int page = 1, string tipo = "todos", string orden = "popular")
         {
             try
             {
                 var usuarioActual = await _userManager.GetUserAsync(User);
                 if (usuarioActual == null)
                 {
-                    return RedirectToAction("Login", "Account");
+                    return Json(new { success = false, message = "No autenticado" });
                 }
+
+                const int pageSize = 30;
+                var skip = (page - 1) * pageSize;
+
+                // Obtener IDs de administradores
+                var adminUsers = await _userManager.GetUsersInRoleAsync("Admin");
+                var adminIds = adminUsers.Select(u => u.Id).ToList();
+
+                // Obtener usuarios bloqueados
+                var usuariosBloqueadosIds = await _context.BloqueosUsuarios
+                    .Where(b => b.BloqueadorId == usuarioActual.Id || b.BloqueadoId == usuarioActual.Id)
+                    .Select(b => b.BloqueadorId == usuarioActual.Id ? b.BloqueadoId : b.BloqueadorId)
+                    .Distinct()
+                    .ToListAsync();
+
+                var query = _context.Contenidos
+                    .Include(c => c.Usuario)
+                    .Where(c => c.EstaActivo
+                            && !c.EsBorrador
+                            && !c.Censurado
+                            && !c.EsPrivado
+                            && !string.IsNullOrEmpty(c.RutaArchivo) // Solo contenido con media
+                            && !usuariosBloqueadosIds.Contains(c.UsuarioId));
+
+                // Filtrar por tipo
+                if (tipo == "fotos")
+                {
+                    query = query.Where(c => c.TipoContenido == TipoContenido.Foto || c.TipoContenido == TipoContenido.Imagen);
+                }
+                else if (tipo == "videos")
+                {
+                    query = query.Where(c => c.TipoContenido == TipoContenido.Video);
+                }
+
+                // Ordenar
+                if (orden == "reciente")
+                {
+                    query = query.OrderByDescending(c => c.FechaPublicacion);
+                }
+                else
+                {
+                    query = query.OrderByDescending(c => c.NumeroLikes + c.NumeroComentarios * 2)
+                                 .ThenByDescending(c => c.FechaPublicacion);
+                }
+
+                var contenido = await query.Skip(skip).Take(pageSize).ToListAsync();
+
+                return Json(new
+                {
+                    success = true,
+                    items = contenido.Select(c => new
+                    {
+                        id = c.Id,
+                        rutaArchivo = c.RutaArchivo,
+                        tipoContenido = (int)c.TipoContenido,
+                        tipoLado = (int)c.TipoLado,
+                        esPremium = c.TipoLado == TipoLado.LadoB,
+                        numeroLikes = c.NumeroLikes,
+                        numeroComentarios = c.NumeroComentarios,
+                        usuario = new
+                        {
+                            id = c.Usuario?.Id,
+                            username = c.Usuario?.UserName,
+                            fotoPerfil = c.Usuario?.FotoPerfil
+                        }
+                    }),
+                    hasMore = contenido.Count == pageSize,
+                    page = page
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error en ExplorarContenido");
+                return Json(new { success = false, message = "Error al cargar contenido" });
+            }
+        }
+
+
+        // ========================================
+        // DETALLE DE CONTENIDO CON REACCIONES
+        // ========================================
+
+        [AllowAnonymous]
+        public async Task<IActionResult> Detalle(int id)
+        {
+            try
+            {
+                var usuarioActual = await _userManager.GetUserAsync(User);
 
                 var contenido = await _context.Contenidos
                     .Include(c => c.Usuario)
+                    .Include(c => c.PistaMusical) // Incluir música asociada
                     .Include(c => c.Comentarios)
                         .ThenInclude(com => com.Usuario)
                     .FirstOrDefaultAsync(c => c.Id == id
@@ -1014,6 +1433,35 @@ namespace Lado.Controllers
                     TempData["Error"] = "Contenido no encontrado";
                     return RedirectToAction("Index");
                 }
+
+                // Si no está autenticado, solo puede ver contenido público general
+                if (usuarioActual == null)
+                {
+                    if (!contenido.EsPublicoGeneral)
+                    {
+                        // Redirigir al login con returnUrl
+                        return RedirectToAction("Login", "Account", new { returnUrl = $"/Feed/Detalle/{id}" });
+                    }
+
+                    // Usuario no autenticado viendo contenido público
+                    contenido.NumeroVistas++;
+                    await _context.SaveChangesAsync();
+
+                    ViewBag.Reacciones = new List<object>();
+                    ViewBag.TotalReacciones = 0;
+                    ViewBag.MiReaccion = null;
+                    ViewBag.EstaSuscrito = false;
+                    ViewBag.EsPropio = false;
+                    ViewBag.EsFavorito = false;
+                    ViewBag.EstaAutenticado = false;
+
+                    _logger.LogInformation("Detalle público visto: Contenido {Id} por usuario anónimo", id);
+
+                    return View(contenido);
+                }
+
+                // Usuario autenticado
+                ViewBag.EstaAutenticado = true;
 
                 var esPropio = contenido.UsuarioId == usuarioActual.Id;
                 var tieneAcceso = esPropio || await VerificarAccesoContenido(usuarioActual.Id, contenido);
@@ -1071,6 +1519,60 @@ namespace Lado.Controllers
         }
 
         // ========================================
+        // CAMBIAR VISIBILIDAD (AJAX)
+        // ========================================
+
+        [HttpPost]
+        public async Task<IActionResult> CambiarVisibilidad(int id, bool esPublico)
+        {
+            try
+            {
+                var usuarioActual = await _userManager.GetUserAsync(User);
+                if (usuarioActual == null)
+                {
+                    return Json(new { success = false, message = "No autenticado" });
+                }
+
+                var contenido = await _context.Contenidos.FindAsync(id);
+                if (contenido == null)
+                {
+                    return Json(new { success = false, message = "Contenido no encontrado" });
+                }
+
+                // Verificar que el usuario es el propietario
+                if (contenido.UsuarioId != usuarioActual.Id)
+                {
+                    return Json(new { success = false, message = "No tienes permiso para modificar este contenido" });
+                }
+
+                // No permitir hacer público el contenido de Lado B
+                if (esPublico && contenido.TipoLado == TipoLado.LadoB)
+                {
+                    return Json(new { success = false, message = "El contenido de Lado B no puede ser público" });
+                }
+
+                contenido.EsPublicoGeneral = esPublico;
+                contenido.FechaActualizacion = DateTime.Now;
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Visibilidad cambiada: Contenido {Id} ahora es {Visibilidad} por Usuario {UserId}",
+                    id, esPublico ? "Público" : "Privado", usuarioActual.Id);
+
+                return Json(new
+                {
+                    success = true,
+                    esPublico = esPublico,
+                    message = esPublico ? "Contenido ahora es público" : "Contenido ahora es privado"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al cambiar visibilidad del contenido {Id}", id);
+                return Json(new { success = false, message = "Error al cambiar visibilidad" });
+            }
+        }
+
+        // ========================================
         // LIKE (AJAX)
         // ========================================
 
@@ -1123,6 +1625,25 @@ namespace Lado.Controllers
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Notificar en segundo plano (no bloquea la respuesta)
+                if (liked && contenido.UsuarioId != usuarioId)
+                {
+                    var propietarioId = contenido.UsuarioId;
+                    var likeUsuarioId = usuarioId!;
+                    var contId = contenido.Id;
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _notificationService.NotificarNuevoLikeAsync(propietarioId, likeUsuarioId, contId);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "🔔 Error en notificación de like");
+                        }
+                    });
+                }
 
                 return Json(new
                 {

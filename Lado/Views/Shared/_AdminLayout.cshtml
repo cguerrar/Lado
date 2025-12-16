@@ -1,12 +1,74 @@
+@{
+    var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+    var versionString = version != null ? $"v{version.Major}.{version.Minor}.{version.Build}" : "v1.0.0";
+}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="light">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Lado Admin</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
+        :root {
+            /* Colores primarios - Steel Blue */
+            --primary: #4682B4;
+            --primary-dark: #36648B;
+            --primary-darker: #2C5278;
+            --primary-light: #B0C4DE;
+            --primary-pale: rgba(70, 130, 180, 0.08);
+            --primary-gradient: linear-gradient(145deg, #4682B4 0%, #36648B 50%, #2C5278 100%);
+            --primary-glow: 0 0 20px rgba(70, 130, 180, 0.4);
+
+            /* Colores de texto */
+            --text-dark: #1a1a2e;
+            --text-gray: #64748b;
+            --text-light: #94a3b8;
+            --text-white: #ffffff;
+
+            /* Fondos */
+            --bg-body: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 50%, #cbd5e1 100%);
+            --bg-light: #f8fafc;
+            --bg-white: #ffffff;
+            --surface: #ffffff;
+
+            /* Bordes */
+            --border-color: #e2e8f0;
+            --border-light: #f1f5f9;
+
+            /* Sombras */
+            --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 40px rgba(0,0,0,0.12);
+            --shadow-xl: 0 20px 50px rgba(0,0,0,0.15);
+            --shadow-primary: 0 8px 30px rgba(70, 130, 180, 0.35);
+
+            /* Radios */
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+            --radius-2xl: 24px;
+
+            /* Colores de estado */
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+
+            /* Layout */
+            --sidebar-width: 280px;
+            --header-height: 72px;
+
+            /* Transiciones */
+            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -14,305 +76,1143 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #f8f9fa;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-body);
+            min-height: 100vh;
+            color: var(--text-dark);
+            -webkit-font-smoothing: antialiased;
             overflow-x: hidden;
         }
 
-        /* Sidebar Mejorado */
+        /* ============================================
+           SIDEBAR
+           ============================================ */
         .admin-sidebar {
             position: fixed;
             left: 0;
             top: 0;
-            width: 260px;
+            width: var(--sidebar-width);
             height: 100vh;
-            background: #4682B4;
-            padding: 30px 0;
-            box-shadow: 4px 0 20px rgba(0,0,0,0.1);
+            background: var(--primary-gradient);
+            padding: 0;
             z-index: 1000;
-            transition: all 0.3s ease;
+            transition: transform var(--transition-slow);
+            overflow-y: auto;
+            overflow-x: hidden;
         }
 
-            .admin-sidebar .logo {
-                text-align: center;
-                padding: 0 20px 30px;
-                border-bottom: 1px solid rgba(255,255,255,0.1);
-                margin-bottom: 30px;
-            }
+        .admin-sidebar::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            pointer-events: none;
+        }
 
-            .admin-sidebar .logo-icon {
-                width: 60px;
-                height: 60px;
-                background: rgba(255,255,255,0.2);
-                border-radius: 16px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 0 auto 15px;
-                backdrop-filter: blur(10px);
-            }
+        .admin-sidebar::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -30%;
+            width: 80%;
+            height: 80%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 50%);
+            pointer-events: none;
+        }
 
-            .admin-sidebar .logo h3 {
-                color: white;
-                font-size: 24px;
-                font-weight: 700;
-                margin: 0;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }
+        /* Logo Section */
+        .sidebar-header {
+            padding: 28px 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+            z-index: 1;
+        }
 
-            .admin-sidebar .logo p {
-                color: rgba(255,255,255,0.8);
-                font-size: 13px;
-                margin: 5px 0 0;
-            }
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            text-decoration: none;
+        }
+
+        .brand-logo {
+            width: 52px;
+            height: 52px;
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform var(--transition-base);
+        }
+
+        .brand-container:hover .brand-logo {
+            transform: scale(1.05);
+        }
+
+        .brand-logo img {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+            filter: brightness(0) invert(1);
+        }
+
+        .brand-info h3 {
+            color: var(--text-white);
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: -0.02em;
+        }
+
+        .brand-info p {
+            color: rgba(255,255,255,0.7);
+            font-size: 0.75rem;
+            margin: 4px 0 0;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .version-badge {
+            position: absolute;
+            bottom: 10px;
+            right: 24px;
+            font-size: 0.65rem;
+            color: rgba(255,255,255,0.4);
+            font-weight: 600;
+        }
+
+        /* Navigation */
+        .sidebar-nav {
+            padding: 20px 16px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-section {
+            margin-bottom: 8px;
+        }
+
+        .nav-section-title {
+            color: rgba(255,255,255,0.5);
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: 0 12px;
+            margin-bottom: 12px;
+        }
 
         .admin-menu {
             list-style: none;
-            padding: 0 15px;
+            padding: 0;
+            margin: 0;
         }
 
-            .admin-menu li {
-                margin-bottom: 5px;
-            }
+        .admin-menu li {
+            margin-bottom: 4px;
+        }
 
-            .admin-menu a {
-                display: flex;
-                align-items: center;
-                padding: 12px 15px;
-                color: rgba(255,255,255,0.85);
-                text-decoration: none;
-                border-radius: 12px;
-                transition: all 0.3s ease;
-                font-weight: 500;
-                font-size: 15px;
-            }
+        .admin-menu a {
+            display: flex;
+            align-items: center;
+            padding: 14px 16px;
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            border-radius: var(--radius-md);
+            transition: all var(--transition-fast);
+            font-weight: 500;
+            font-size: 0.9375rem;
+            position: relative;
+            overflow: hidden;
+        }
 
-                .admin-menu a:hover {
-                    background: rgba(255,255,255,0.2);
-                    color: white;
-                    transform: translateX(5px);
-                }
+        .admin-menu a::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 0;
+            height: 100%;
+            background: rgba(255,255,255,0.1);
+            transition: width var(--transition-base);
+            border-radius: var(--radius-md);
+        }
 
-                .admin-menu a.active {
-                    background: rgba(255,255,255,0.2);
-                    color: white;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                }
+        .admin-menu a:hover::before {
+            width: 100%;
+        }
 
-                .admin-menu a svg {
-                    margin-right: 12px;
-                    flex-shrink: 0;
-                }
+        .admin-menu a:hover {
+            color: var(--text-white);
+            transform: translateX(4px);
+        }
 
-            .admin-menu .logout-btn {
-                margin-top: 30px;
-                border-top: 1px solid rgba(255,255,255,0.1);
-                padding-top: 20px;
-            }
+        .admin-menu a.active {
+            background: rgba(255,255,255,0.2);
+            color: var(--text-white);
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
 
-                .admin-menu .logout-btn a {
-                    background: rgba(220, 53, 69, 0.2);
-                    color: #fff;
-                }
+        .admin-menu a.active::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 60%;
+            background: var(--text-white);
+            border-radius: 0 4px 4px 0;
+        }
 
-                    .admin-menu .logout-btn a:hover {
-                        background: rgba(220, 53, 69, 0.4);
-                        transform: translateX(0);
-                    }
+        .admin-menu a svg {
+            width: 20px;
+            height: 20px;
+            margin-right: 14px;
+            flex-shrink: 0;
+            position: relative;
+            z-index: 1;
+        }
 
-        /* Main Content */
+        .admin-menu a span {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Menu Divider */
+        .menu-divider {
+            height: 1px;
+            background: rgba(255,255,255,0.1);
+            margin: 20px 12px;
+        }
+
+        /* Logout Button */
+        .logout-section {
+            padding: 16px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            margin-top: auto;
+        }
+
+        .logout-btn a {
+            background: rgba(239, 68, 68, 0.2) !important;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .logout-btn a:hover {
+            background: rgba(239, 68, 68, 0.35) !important;
+            transform: translateX(0) !important;
+        }
+
+        /* ============================================
+           MAIN CONTENT
+           ============================================ */
         .admin-main {
-            margin-left: 260px;
+            margin-left: var(--sidebar-width);
             min-height: 100vh;
-            background: #f8f9fa;
+            transition: margin-left var(--transition-slow);
         }
 
+        /* Header */
         .admin-header {
-            background: white;
-            padding: 20px 30px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+            background: var(--bg-white);
+            height: var(--header-height);
+            padding: 0 32px;
             position: sticky;
             top: 0;
             z-index: 999;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
         }
 
-            .admin-header h1 {
-                font-size: 24px;
-                font-weight: 700;
-                color: #2d3748;
-                margin: 0;
-            }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
 
+        .hamburger-btn {
+            display: none;
+            width: 44px;
+            height: 44px;
+            border: none;
+            background: var(--bg-light);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-gray);
+            transition: all var(--transition-fast);
+        }
+
+        .hamburger-btn:hover {
+            background: var(--primary-pale);
+            color: var(--primary);
+        }
+
+        .hamburger-btn svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .page-title-header {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .page-title-header h1 {
+            font-size: 1.375rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin: 0;
+            letter-spacing: -0.02em;
+        }
+
+        .page-title-header .breadcrumb-text {
+            font-size: 0.8125rem;
+            color: var(--text-gray);
+            margin-top: 2px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        /* Theme Toggle */
+        .theme-toggle {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-md);
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            color: var(--text-gray);
+        }
+
+        .theme-toggle:hover {
+            background: var(--primary-pale);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .theme-toggle svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Search Box */
+        .search-box {
+            position: relative;
+            width: 280px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 16px 12px 44px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            font-size: 0.875rem;
+            background: var(--bg-light);
+            color: var(--text-dark);
+            transition: all var(--transition-fast);
+            font-family: inherit;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px var(--primary-pale);
+            background: var(--bg-white);
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-light);
+        }
+
+        .search-box svg {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 18px;
+            height: 18px;
+            color: var(--text-light);
+            pointer-events: none;
+        }
+
+        /* User Menu */
         .admin-user {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
+            padding: 8px 16px 8px 8px;
+            background: var(--bg-light);
+            border-radius: var(--radius-lg);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            border: 1px solid transparent;
+        }
+
+        .admin-user:hover {
+            background: var(--primary-pale);
+            border-color: var(--primary-light);
         }
 
         .admin-user-avatar {
             width: 40px;
             height: 40px;
-            border-radius: 50%;
-            background: #4682B4;
+            border-radius: var(--radius-md);
+            background: var(--primary-gradient);
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
+            color: var(--text-white);
             font-weight: 700;
-            font-size: 16px;
+            font-size: 1rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .admin-user-info {
+            display: flex;
+            flex-direction: column;
         }
 
         .admin-user-info h6 {
             margin: 0;
-            font-size: 14px;
+            font-size: 0.875rem;
             font-weight: 600;
-            color: #2d3748;
+            color: var(--text-dark);
         }
 
         .admin-user-info p {
             margin: 0;
-            font-size: 12px;
-            color: #718096;
+            font-size: 0.75rem;
+            color: var(--text-gray);
         }
 
+        /* Content Area */
         .admin-content {
-            padding: 30px;
+            padding: 32px;
+            min-height: calc(100vh - var(--header-height));
         }
 
-        /* Responsive */
-        @@media (max-width: 768px) {
-            .admin-sidebar
-
-        {
-            transform: translateX(-100%);
+        /* ============================================
+           MOBILE OVERLAY
+           ============================================ */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 999;
+            opacity: 0;
+            transition: opacity var(--transition-slow);
         }
 
-        .admin-sidebar.show {
+        .sidebar-overlay.active {
+            opacity: 1;
+        }
+
+        /* ============================================
+           TOAST NOTIFICATIONS
+           ============================================ */
+        .toast-container {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 10000;
+        }
+
+        .toast-notification {
+            padding: 16px 20px;
+            border-radius: var(--radius-md);
+            background: var(--text-dark);
+            color: var(--text-white);
+            box-shadow: var(--shadow-lg);
+            max-width: 360px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transform: translateX(calc(100% + 24px));
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            margin-bottom: 12px;
+        }
+
+        .toast-notification.show {
             transform: translateX(0);
         }
 
-        .admin-main {
-            margin-left: 0;
+        .toast-notification.success {
+            background: var(--primary);
         }
 
+        .toast-notification.error {
+            background: var(--danger);
+        }
+
+        .toast-notification.warning {
+            background: var(--warning);
+            color: var(--text-dark);
+        }
+
+        /* ============================================
+           GLOBAL COMPONENT STYLES
+           ============================================ */
+
+        /* Cards */
+        .card {
+            background: var(--bg-white);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            transition: all var(--transition-fast);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+        }
+
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            background: transparent;
+        }
+
+        .card-body {
+            padding: 24px;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--primary-gradient);
+            color: var(--text-white);
+            box-shadow: var(--shadow-primary);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(70, 130, 180, 0.45);
+            color: var(--text-white);
+        }
+
+        .btn-outline-primary {
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .btn-outline-primary:hover {
+            background: var(--primary);
+            color: var(--text-white);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge.bg-primary {
+            background: var(--primary) !important;
+        }
+
+        .badge.bg-success {
+            background: var(--success) !important;
+        }
+
+        .badge.bg-warning {
+            background: var(--warning) !important;
+        }
+
+        .badge.bg-danger {
+            background: var(--danger) !important;
+        }
+
+        /* Stat Cards */
+        .stat-card {
+            background: var(--bg-white);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: all var(--transition-fast);
+            border: 1px solid var(--border-color);
+            height: 100%;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-md);
+            border-color: var(--primary);
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .stat-icon.bg-primary {
+            background: var(--primary-gradient);
+            box-shadow: var(--shadow-primary);
+        }
+
+        .stat-icon.bg-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 8px 30px rgba(16, 185, 129, 0.35);
+        }
+
+        .stat-icon.bg-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            box-shadow: 0 8px 30px rgba(245, 158, 11, 0.35);
+        }
+
+        .stat-icon.bg-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            box-shadow: 0 8px 30px rgba(239, 68, 68, 0.35);
+        }
+
+        .stat-icon.bg-info {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            box-shadow: 0 8px 30px rgba(59, 130, 246, 0.35);
+        }
+
+        .stat-icon.bg-secondary {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+            box-shadow: 0 8px 30px rgba(100, 116, 139, 0.35);
+        }
+
+        .stat-content {
+            flex: 1;
+        }
+
+        .stat-label {
+            color: var(--text-gray);
+            font-size: 0.8125rem;
+            font-weight: 600;
+            margin: 0 0 8px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            color: var(--text-dark);
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: -0.02em;
+        }
+
+        /* Action Cards */
+        .action-card {
+            display: block;
+            background: var(--bg-white);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            text-align: center;
+            text-decoration: none;
+            box-shadow: var(--shadow-sm);
+            transition: all var(--transition-fast);
+            height: 100%;
+            border: 1px solid var(--border-color);
+        }
+
+        .action-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-md);
+            border-color: var(--primary);
+        }
+
+        .action-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+        }
+
+        .action-card h5 {
+            color: var(--text-dark);
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .action-card p {
+            color: var(--text-gray);
+            font-size: 0.875rem;
+            margin: 0;
+        }
+
+        /* ============================================
+           RESPONSIVE
+           ============================================ */
+        @@media (max-width: 1024px) {
+            .search-box {
+                width: 200px;
+            }
+        }
+
+        @@media (max-width: 991px) {
+            .admin-sidebar {
+                transform: translateX(-100%);
+            }
+
+            .admin-sidebar.active {
+                transform: translateX(0);
+            }
+
+            .admin-main {
+                margin-left: 0;
+            }
+
+            .hamburger-btn {
+                display: flex;
+            }
+
+            body.sidebar-open .sidebar-overlay {
+                display: block;
+            }
+
+            body.sidebar-open {
+                overflow: hidden;
+            }
+        }
+
+        @@media (max-width: 768px) {
+            .admin-header {
+                padding: 0 16px;
+                height: 64px;
+            }
+
+            .search-box {
+                display: none;
+            }
+
+            .admin-content {
+                padding: 20px 16px;
+            }
+
+            .admin-user-info {
+                display: none;
+            }
+
+            .admin-user {
+                padding: 8px;
+            }
+
+            .page-title-header h1 {
+                font-size: 1.125rem;
+            }
+
+            .stat-card {
+                padding: 20px;
+            }
+
+            .stat-value {
+                font-size: 1.75rem;
+            }
+        }
+
+        @@media (max-width: 576px) {
+            .admin-content {
+                padding: 16px 12px;
+            }
+
+            .stat-card {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .action-card {
+                padding: 20px;
+            }
+        }
+
+        /* Scrollbar */
+        .admin-sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .admin-sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .admin-sidebar::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+        }
+
+        .admin-sidebar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.3);
         }
     </style>
 </head>
 <body>
+    <!-- Overlay para mobile -->
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
     <!-- Sidebar -->
-    <div class="admin-sidebar">
-        <div class="logo">
-            <div class="logo-icon">
-                <img src="/images/logo.png" alt="Lado" style="width: 40px; height: 40px; object-fit: contain; filter: brightness(0) invert(1);">
-            </div>
-            <h3>Lado</h3>
-            <p>Panel de Administraci�n</p>
+    <div class="admin-sidebar" id="adminSidebar">
+        <div class="sidebar-header">
+            <a href="/Admin" class="brand-container">
+                <div class="brand-logo">
+                    <img src="/images/logo.png" alt="Lado">
+                </div>
+                <div class="brand-info">
+                    <h3>Lado</h3>
+                    <p>Panel Admin</p>
+                </div>
+            </a>
+            <span class="version-badge">@versionString</span>
         </div>
 
-        <ul class="admin-menu">
-            <li>
-                <a href="/Admin" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Index" ? "active" : "")">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                        <polyline points="9 22 9 12 15 12 15 22" />
-                    </svg>
-                    Resumen
-                </a>
-            </li>
-            <li>
-                <a href="/Admin/Usuarios" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Usuarios" ? "active" : "")">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                        <circle cx="9" cy="7" r="4" />
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                    Gestionar Usuarios
-                </a>
-            </li>
-            <li>
-                <a href="/Admin/Agencias" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Agencias" || ViewContext.RouteData.Values["action"]?.ToString() == "DetalleAgencia" ? "active" : "")">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                        <polyline points="9 22 9 12 15 12 15 22"/>
-                    </svg>
-                    Agencias
-                </a>
-            </li>
-            <li>
-                <a href="/Admin/Contenido" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Contenido" ? "active" : "")">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                        <circle cx="12" cy="12" r="3" />
-                    </svg>
-                    Moderar Contenido
-                </a>
-            </li>
-            <li>
-                <a href="/Admin/Reportes" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Reportes" ? "active" : "")">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-                        <line x1="4" y1="22" x2="4" y2="15" />
-                    </svg>
-                    Ver Reportes
-                </a>
-            </li>
-            <li>
-                <a href="/Admin/Estadisticas" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Estadisticas" ? "active" : "")">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="20" x2="18" y2="10" />
-                        <line x1="12" y1="20" x2="12" y2="4" />
-                        <line x1="6" y1="20" x2="6" y2="14" />
-                    </svg>
-                    Estad�sticas
-                </a>
-            </li>
-            <li>
-                <a href="/Admin/Configuracion" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Configuracion" ? "active" : "")">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="3" />
-                        <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24" />
-                    </svg>
-                    Configuraci�n
-                </a>
-            </li>
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Principal</div>
+                <ul class="admin-menu">
+                    <li>
+                        <a href="/Admin" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Index" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="9"></rect>
+                                <rect x="14" y="3" width="7" height="5"></rect>
+                                <rect x="14" y="12" width="7" height="9"></rect>
+                                <rect x="3" y="16" width="7" height="5"></rect>
+                            </svg>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Admin/Estadisticas" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Estadisticas" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="20" x2="18" y2="10"></line>
+                                <line x1="12" y1="20" x2="12" y2="4"></line>
+                                <line x1="6" y1="20" x2="6" y2="14"></line>
+                            </svg>
+                            <span>Estadisticas</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
 
-            <li class="logout-btn">
-                <a href="/Account/Logout" onclick="return confirm('�Cerrar sesi�n?')">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                        <polyline points="16 17 21 12 16 7" />
-                        <line x1="21" y1="12" x2="9" y2="12" />
-                    </svg>
-                    Cerrar Sesi�n
-                </a>
-            </li>
-        </ul>
+            <div class="menu-divider"></div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Gestion</div>
+                <ul class="admin-menu">
+                    <li>
+                        <a href="/Admin/Usuarios" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Usuarios" || ViewContext.RouteData.Values["action"]?.ToString() == "DetalleUsuario" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            <span>Usuarios</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/CreatorVerification/AdminPanel" class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "CreatorVerification" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                            <span>Verificar Creadores</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Admin/Agencias" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Agencias" || ViewContext.RouteData.Values["action"]?.ToString() == "DetalleAgencia" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                            </svg>
+                            <span>Agencias</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Admin/Publicidad" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Publicidad" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                                <path d="M16 7V5a4 4 0 0 0-8 0v2"></path>
+                                <line x1="12" y1="12" x2="12" y2="16"></line>
+                                <line x1="10" y1="14" x2="14" y2="14"></line>
+                            </svg>
+                            <span>Publicidad</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Admin/Retiros" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Retiros" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                                <line x1="1" y1="10" x2="23" y2="10"></line>
+                            </svg>
+                            <span>Retiros</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Admin/Transacciones" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Transacciones" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
+                            <span>Transacciones</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Admin/Contenido" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Contenido" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="9" cy="9" r="2"></circle>
+                                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+                            </svg>
+                            <span>Contenido</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Admin/Reportes" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Reportes" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>
+                                <line x1="4" y1="22" x2="4" y2="15"></line>
+                            </svg>
+                            <span>Reportes</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Admin/Feedbacks" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Feedbacks" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                            <span>Feedbacks</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Admin/RetencionesPaises" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "RetencionesPaises" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
+                            <span>Retenciones</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Admin/Musica" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Musica" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 18V5l12-2v13"></path>
+                                <circle cx="6" cy="18" r="3"></circle>
+                                <circle cx="18" cy="16" r="3"></circle>
+                            </svg>
+                            <span>Biblioteca Musical</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Admin/Algoritmos" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Algoritmos" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                            </svg>
+                            <span>Algoritmos Feed</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="menu-divider"></div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Sistema</div>
+                <ul class="admin-menu">
+                    <li>
+                        <a href="/Admin/Servidor" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Servidor" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                                <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                                <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                            </svg>
+                            <span>Servidor</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Admin/Configuracion" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Configuracion" ? "active" : "")">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                            <span>Configuracion</span>
+                        </a>
+                    </li>
+                    <li class="logout-btn">
+                        <a href="/Account/Logout" onclick="return confirm('¿Cerrar sesion?')">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                            <span>Cerrar Sesion</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
     </div>
 
     <!-- Main Content -->
     <div class="admin-main">
-        <div class="admin-header">
-            <h1>@ViewData["Title"]</h1>
-            <div class="admin-user">
-                <div class="admin-user-avatar">A</div>
-                <div class="admin-user-info">
-                    <h6>@User.Identity.Name</h6>
-                    <p>Administrador</p>
+        <header class="admin-header">
+            <div class="header-left">
+                <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+                <div class="page-title-header">
+                    <h1>@ViewData["Title"]</h1>
+                    <span class="breadcrumb-text">Panel de Administracion</span>
                 </div>
             </div>
-        </div>
 
-        <div class="admin-content">
+            <div class="header-right">
+                <div class="search-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    <input type="text" placeholder="Buscar...">
+                </div>
+
+                <div class="admin-user">
+                    <div class="admin-user-avatar">
+                        @(User.Identity?.Name?.Substring(0, 1).ToUpper() ?? "A")
+                    </div>
+                    <div class="admin-user-info">
+                        <h6>@User.Identity?.Name</h6>
+                        <p>Administrador</p>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="admin-content">
             @RenderBody()
-        </div>
+        </main>
     </div>
 
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Toggle Sidebar
+        function toggleSidebar() {
+            const sidebar = document.getElementById('adminSidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            const body = document.body;
+
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+            body.classList.toggle('sidebar-open');
+        }
+
+        // Close sidebar when clicking a link (mobile)
+        document.querySelectorAll('.admin-menu a').forEach(link => {
+            link.addEventListener('click', function() {
+                if (window.innerWidth <= 991) {
+                    toggleSidebar();
+                }
+            });
+        });
+
+        // Handle resize
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 991) {
+                const sidebar = document.getElementById('adminSidebar');
+                const overlay = document.querySelector('.sidebar-overlay');
+                const body = document.body;
+
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
+                body.classList.remove('sidebar-open');
+            }
+        });
+
+        // Toast notification function
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast-notification ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 400);
+            }, 4000);
+        }
+
+        // TempData toasts
+        @if (TempData["Success"] != null)
+        {
+            <text>showToast('@Html.Raw(TempData["Success"]?.ToString()?.Replace("'", "\\'"))', 'success');</text>
+        }
+        @if (TempData["Error"] != null)
+        {
+            <text>showToast('@Html.Raw(TempData["Error"]?.ToString()?.Replace("'", "\\'"))', 'error');</text>
+        }
+        @if (TempData["Warning"] != null)
+        {
+            <text>showToast('@Html.Raw(TempData["Warning"]?.ToString()?.Replace("'", "\\'"))', 'warning');</text>
+        }
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

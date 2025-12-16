@@ -40,8 +40,7 @@ namespace Lado.Controllers
             _logger.LogInformation("Explorando usuarios - Buscar: {Buscar}, Categoría: {Categoria}",
                 buscar, categoria);
 
-            // ⭐ CAMBIO: Ya no filtramos por TipoUsuario, todos son creadores
-            // Excluir solo al usuario actual
+            // Obtener usuarios activos (excluyendo al usuario actual)
             var query = _context.Users
                 .Where(u => u.Id != usuarioActual.Id && u.EstaActivo);
 
@@ -51,7 +50,7 @@ namespace Lado.Controllers
                 query = query.Where(u =>
                     u.UserName.Contains(buscar) ||
                     u.NombreCompleto.Contains(buscar) ||
-                    u.Seudonimo.Contains(buscar) || // ⭐ NUEVO: Buscar por seudónimo
+                    u.Seudonimo.Contains(buscar) ||
                     (u.Biografia != null && u.Biografia.Contains(buscar)));
             }
 
@@ -63,24 +62,60 @@ namespace Lado.Controllers
 
             var usuarios = await query
                 .OrderByDescending(u => u.NumeroSeguidores)
-                .ThenByDescending(u => u.CreadorVerificado) // Verificados primero
+                .ThenByDescending(u => u.CreadorVerificado)
                 .Take(50)
                 .ToListAsync();
 
-            _logger.LogInformation("Usuarios encontrados: {Count}", usuarios.Count);
+            // Crear lista de perfiles (LadoA + LadoB como entidades separadas)
+            var perfiles = new List<PerfilExplorar>();
 
-            // Obtener suscripciones actuales del usuario
-            var suscripcionesIds = await _context.Suscripciones
+            foreach (var usuario in usuarios)
+            {
+                // Agregar perfil LadoA (nombre real)
+                perfiles.Add(new PerfilExplorar
+                {
+                    Id = usuario.Id,
+                    NombreMostrado = usuario.NombreCompleto,
+                    UsernameMostrado = usuario.UserName,
+                    FotoPerfil = usuario.FotoPerfil,
+                    Biografia = usuario.Biografia,
+                    NumeroSeguidores = usuario.NumeroSeguidores,
+                    CreadorVerificado = usuario.CreadorVerificado,
+                    EsLadoB = false
+                });
+
+                // Agregar perfil LadoB (seudónimo) si tiene uno
+                if (!string.IsNullOrEmpty(usuario.Seudonimo))
+                {
+                    perfiles.Add(new PerfilExplorar
+                    {
+                        Id = usuario.Id,
+                        NombreMostrado = usuario.Seudonimo,
+                        UsernameMostrado = usuario.Seudonimo.ToLower().Replace(" ", ""),
+                        FotoPerfil = usuario.FotoPerfilLadoB ?? usuario.FotoPerfil,
+                        Biografia = usuario.BiografiaLadoB ?? usuario.Biografia,
+                        NumeroSeguidores = usuario.NumeroSeguidores,
+                        CreadorVerificado = usuario.CreadorVerificado,
+                        EsLadoB = true
+                    });
+                }
+            }
+
+            _logger.LogInformation("Perfiles encontrados: {Count} (LadoA + LadoB)", perfiles.Count);
+
+            // Obtener suscripciones actuales del usuario (LadoA y LadoB)
+            var suscripciones = await _context.Suscripciones
                 .Where(s => s.FanId == usuarioActual.Id && s.EstaActiva)
-                .Select(s => s.CreadorId)
+                .Select(s => new { s.CreadorId, s.TipoLado })
                 .ToListAsync();
 
-            ViewBag.SuscripcionesIds = suscripcionesIds;
+            ViewBag.SuscripcionesLadoA = suscripciones.Where(s => s.TipoLado == TipoLado.LadoA).Select(s => s.CreadorId).ToList();
+            ViewBag.SuscripcionesLadoB = suscripciones.Where(s => s.TipoLado == TipoLado.LadoB).Select(s => s.CreadorId).ToList();
             ViewBag.BuscarTexto = buscar;
             ViewBag.Categoria = categoria;
-            ViewBag.TotalUsuarios = usuarios.Count;
+            ViewBag.TotalUsuarios = perfiles.Count;
 
-            return View(usuarios);
+            return View(perfiles);
         }
 
         // ========================================
@@ -477,11 +512,23 @@ namespace Lado.Controllers
     }
 
     // ========================================
-    // VIEW MODEL
+    // VIEW MODELS
     // ========================================
 
     public class SuscripcionRequest
     {
         public string CreadorId { get; set; }
+    }
+
+    public class PerfilExplorar
+    {
+        public string Id { get; set; }
+        public string NombreMostrado { get; set; }
+        public string UsernameMostrado { get; set; }
+        public string? FotoPerfil { get; set; }
+        public string? Biografia { get; set; }
+        public int NumeroSeguidores { get; set; }
+        public bool CreadorVerificado { get; set; }
+        public bool EsLadoB { get; set; }
     }
 }

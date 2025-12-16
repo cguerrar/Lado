@@ -1,188 +1,504 @@
-﻿@model IEnumerable<Lado.Models.ApplicationUser>
+@model IEnumerable<Lado.Controllers.PerfilExplorar>
 @{
-    ViewData["Title"] = "Explorar Creadores";
-    var suscripcionesIds = ViewBag.SuscripcionesIds as List<string> ?? new List<string>();
+    ViewData["Title"] = "Buscar Usuarios";
+    var suscripcionesLadoA = ViewBag.SuscripcionesLadoA as List<string> ?? new List<string>();
+    var suscripcionesLadoB = ViewBag.SuscripcionesLadoB as List<string> ?? new List<string>();
 }
 
-<div class="container py-4">
-    <div class="row mb-4">
-        <div class="col-12">
-            <h2 class="fw-bold mb-2">Explorar Creadores</h2>
-            <p class="text-muted">Descubre contenido exclusivo de creadores increíbles</p>
-        </div>
+<style>
+    .explorar-page {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .explorar-header {
+        text-align: center;
+        margin-bottom: 24px;
+    }
+
+    .explorar-header h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+
+    .explorar-header p {
+        color: var(--muted);
+        font-size: 0.9375rem;
+    }
+
+    /* Search box */
+    .search-container {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        padding: 16px;
+        margin-bottom: 24px;
+    }
+
+    .search-form {
+        display: flex;
+        gap: 12px;
+    }
+
+    .search-input-wrapper {
+        flex: 1;
+        position: relative;
+    }
+
+    .search-input-wrapper svg {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 20px;
+        height: 20px;
+        color: var(--muted);
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 12px 16px 12px 46px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        font-size: 0.9375rem;
+        background: var(--bg);
+        color: var(--fg);
+        transition: all 0.2s;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(70, 130, 180, 0.15);
+    }
+
+    .search-btn {
+        padding: 12px 24px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: var(--radius-md);
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .search-btn:hover {
+        background: var(--primary-dark);
+    }
+
+    .search-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Results count */
+    .results-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        font-size: 0.875rem;
+        color: var(--muted);
+    }
+
+    /* User list */
+    .user-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .user-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 16px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        transition: all 0.2s;
+    }
+
+    .user-card:hover {
+        border-color: var(--primary);
+        background: var(--bg-tertiary);
+    }
+
+    .user-card.lado-b {
+        border-left: 3px solid #a855f7;
+    }
+
+    .user-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        overflow: hidden;
+        flex-shrink: 0;
+        background: var(--bg-tertiary);
+        position: relative;
+    }
+
+    .user-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .user-avatar-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #4682B4 0%, #5a9fd4 100%);
+    }
+
+    .user-card.lado-b .user-avatar-placeholder {
+        background: linear-gradient(135deg, #a855f7 0%, #c084fc 100%);
+    }
+
+    .user-avatar-placeholder svg {
+        width: 28px;
+        height: 28px;
+        color: white;
+    }
+
+    .user-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .user-name {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        color: var(--fg);
+        margin-bottom: 2px;
+    }
+
+    .verified-badge {
+        width: 16px;
+        height: 16px;
+        color: var(--primary);
+    }
+
+    .ladob-badge {
+        padding: 2px 8px;
+        background: rgba(168, 85, 247, 0.15);
+        color: #a855f7;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        border-radius: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .user-username {
+        font-size: 0.8125rem;
+        color: var(--muted);
+        margin-bottom: 4px;
+    }
+
+    .user-bio {
+        font-size: 0.8125rem;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .user-stats {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 0.8125rem;
+        color: var(--muted);
+        margin-right: 12px;
+    }
+
+    .user-stats span {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .user-stats svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .user-actions {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .btn-profile {
+        padding: 8px 16px;
+        background: transparent;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        color: var(--fg);
+        font-size: 0.8125rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .btn-profile:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .btn-profile svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .btn-message {
+        padding: 8px 16px;
+        background: var(--primary);
+        border: none;
+        border-radius: var(--radius-md);
+        color: white;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .btn-message:hover {
+        background: var(--primary-dark);
+        color: white;
+    }
+
+    .btn-message svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .following-badge {
+        padding: 4px 10px;
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+        font-size: 0.75rem;
+        font-weight: 500;
+        border-radius: 20px;
+        margin-right: 8px;
+    }
+
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+    }
+
+    .empty-state .empty-icon {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 20px;
+        background: var(--bg-tertiary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .empty-state .empty-icon svg {
+        width: 40px;
+        height: 40px;
+        color: var(--muted);
+    }
+
+    .empty-state h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--fg);
+    }
+
+    .empty-state p {
+        color: var(--muted);
+        font-size: 0.9375rem;
+    }
+
+    /* Responsive */
+    @@media (max-width: 640px) {
+        .explorar-page {
+            padding: 16px;
+        }
+
+        .search-form {
+            flex-direction: column;
+        }
+
+        .search-btn {
+            justify-content: center;
+        }
+
+        .user-card {
+            flex-wrap: wrap;
+            padding: 12px;
+        }
+
+        .user-info {
+            flex: 1 1 calc(100% - 70px);
+        }
+
+        .user-stats {
+            display: none;
+        }
+
+        .user-actions {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .user-actions a,
+        .user-actions button {
+            flex: 1;
+            justify-content: center;
+        }
+    }
+</style>
+
+<div class="explorar-page">
+    <div class="explorar-header">
+        <h1>Buscar Usuarios</h1>
+        <p>Encuentra personas para seguir o enviar mensajes</p>
     </div>
 
-    <!-- Búsqueda y Filtros -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <form asp-action="Index" method="get">
-                        <div class="row g-3">
-                            <div class="col-lg-8">
-                                <div class="input-group">
-                                    <span class="input-group-text bg-white">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <circle cx="11" cy="11" r="8"></circle>
-                                            <path d="m21 21-4.35-4.35"></path>
-                                        </svg>
-                                    </span>
-                                    <input type="text" name="buscar" class="form-control border-start-0"
-                                           placeholder="Buscar creadores por nombre, usuario o biografía..."
-                                           value="@ViewBag.BuscarTexto">
-                                </div>
-                            </div>
-                            <div class="col-lg-2 col-md-6">
-                                <select name="categoria" class="form-select">
-                                    <option value="todos">Todas las categorías</option>
-                                    <option value="fitness">Fitness</option>
-                                    <option value="gaming">Gaming</option>
-                                    <option value="musica">Música</option>
-                                    <option value="arte">Arte</option>
-                                    <option value="cocina">Cocina</option>
-                                </select>
-                            </div>
-                            <div class="col-lg-2 col-md-6">
-                                <button type="submit" class="btn btn-primary w-100">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 6px;">
-                                        <circle cx="11" cy="11" r="8"></circle>
-                                        <path d="m21 21-4.35-4.35"></path>
-                                    </svg>
-                                    Buscar
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
+    <div class="search-container">
+        <form asp-action="Index" method="get" class="search-form">
+            <div class="search-input-wrapper">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.35-4.35"></path>
+                </svg>
+                <input type="text"
+                       name="buscar"
+                       class="search-input"
+                       placeholder="Buscar por nombre o usuario..."
+                       value="@ViewBag.BuscarTexto"
+                       autocomplete="off">
             </div>
-        </div>
+            <button type="submit" class="search-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.35-4.35"></path>
+                </svg>
+                Buscar
+            </button>
+        </form>
     </div>
 
-    <!-- Creadores -->
     @if (Model.Any())
     {
-        <div class="row g-4">
-            @foreach (var creador in Model)
+        <div class="results-info">
+            <span>@ViewBag.TotalUsuarios perfiles encontrados</span>
+            @if (!string.IsNullOrEmpty(ViewBag.BuscarTexto as string))
             {
-                var estaSuscrito = suscripcionesIds.Contains(creador.Id);
+                <a href="/Explorar" style="color: var(--primary); text-decoration: none;">Limpiar búsqueda</a>
+            }
+        </div>
 
-                <div class="col-sm-6 col-lg-4 col-xl-3">
-                    <div class="card creador-card h-100 shadow-sm">
-                        <!-- Cover/Banner -->
-                        <div class="card-cover position-relative">
-                            @if (!string.IsNullOrEmpty(creador.FotoPortada))
-                            {
-                                <img src="@creador.FotoPortada" alt="Portada" class="w-100 h-100 object-fit-cover">
-                            }
-                            else
-                            {
-                                <div class="cover-gradient"></div>
-                            }
+        <div class="user-list">
+            @foreach (var perfil in Model)
+            {
+                var estaSuscrito = perfil.EsLadoB
+                    ? suscripcionesLadoB.Contains(perfil.Id)
+                    : suscripcionesLadoA.Contains(perfil.Id);
 
-                            <!-- Badge Suscrito -->
-                            @if (estaSuscrito)
+                var perfilUrl = perfil.EsLadoB
+                    ? $"/Feed/Perfil/{perfil.Id}?verSeudonimo=true"
+                    : $"/Feed/Perfil/{perfil.Id}";
+
+                <div class="user-card @(perfil.EsLadoB ? "lado-b" : "")">
+                    <div class="user-avatar">
+                        @if (!string.IsNullOrEmpty(perfil.FotoPerfil))
+                        {
+                            <img src="@perfil.FotoPerfil" alt="@perfil.UsernameMostrado">
+                        }
+                        else
+                        {
+                            <div class="user-avatar-placeholder">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="12" cy="7" r="4"></circle>
+                                </svg>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="user-info">
+                        <div class="user-name">
+                            @perfil.NombreMostrado
+                            @if (perfil.CreadorVerificado)
                             {
-                                <span class="badge bg-success position-absolute top-0 end-0 m-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
-                                        <polyline points="20 6 9 17 4 12"></polyline>
-                                    </svg>
-                                    Suscrito
-                                </span>
+                                <svg class="verified-badge" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            }
+                            @if (perfil.EsLadoB)
+                            {
+                                <span class="ladob-badge">Premium</span>
                             }
                         </div>
-
-                        <div class="card-body text-center pt-0">
-                            <!-- Avatar -->
-                            <div class="avatar-container">
-                                @if (!string.IsNullOrEmpty(creador.FotoPerfil))
-                                {
-                                    <img src="@creador.FotoPerfil" class="avatar" alt="@creador.UserName">
-                                }
-                                else
-                                {
-                                    <div class="avatar avatar-placeholder">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                            <circle cx="12" cy="7" r="4"></circle>
-                                        </svg>
-                                    </div>
-                                }
+                        <div class="user-username">@@@perfil.UsernameMostrado</div>
+                        @if (!string.IsNullOrEmpty(perfil.Biografia))
+                        {
+                            <div class="user-bio">
+                                @(perfil.Biografia.Length > 80 ? perfil.Biografia.Substring(0, 80) + "..." : perfil.Biografia)
                             </div>
+                        }
+                    </div>
 
-                            <!-- Info -->
-                            <h5 class="mb-1 mt-2">@creador.NombreCompleto</h5>
-                            <p class="text-muted small mb-2">@@@creador.UserName</p>
+                    <div class="user-stats">
+                        <span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                            </svg>
+                            @FormatNumber(perfil.NumeroSeguidores)
+                        </span>
+                    </div>
 
-                            @if (!string.IsNullOrEmpty(creador.Biografia))
-                            {
-                                <p class="text-muted small mb-3" style="min-height: 40px;">
-                                    @(creador.Biografia.Length > 60 ? creador.Biografia.Substring(0, 60) + "..." : creador.Biografia)
-                                </p>
-                            }
-                            else
-                            {
-                                <p class="text-muted small fst-italic mb-3" style="min-height: 40px;">
-                                    Sin biografía
-                                </p>
-                            }
+                    @if (estaSuscrito)
+                    {
+                        <span class="following-badge">Siguiendo</span>
+                    }
 
-                            <!-- Stats -->
-                            <div class="row g-2 mb-3">
-                                <div class="col-6">
-                                    <div class="stat-box">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mb-1">
-                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                            <circle cx="9" cy="7" r="4"></circle>
-                                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                        </svg>
-                                        <div class="fw-bold">@creador.NumeroSeguidores</div>
-                                        <small class="text-muted">Seguidores</small>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="stat-box">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mb-1">
-                                            <line x1="12" y1="1" x2="12" y2="23"></line>
-                                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                                        </svg>
-                                        <div class="fw-bold text-success">$@creador.PrecioSuscripcion.ToString("N2")</div>
-                                        <small class="text-muted">/mes</small>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Botones -->
-                            <div class="d-grid gap-2">
-                                <a href="/Explorar/Perfil/@creador.Id" class="btn btn-outline-primary btn-sm">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 6px;">
-                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                        <circle cx="12" cy="12" r="3"></circle>
-                                    </svg>
-                                    Ver Perfil
-                                </a>
-
-                                @if (estaSuscrito)
-                                {
-                                    <button class="btn btn-outline-danger btn-sm" onclick="cancelarSuscripcion('@creador.Id')">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 6px;">
-                                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                                        </svg>
-                                        Cancelar
-                                    </button>
-                                }
-                                else
-                                {
-                                    <button class="btn btn-primary btn-sm" onclick="suscribirse('@creador.Id', @creador.PrecioSuscripcion)">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 6px;">
-                                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                                        </svg>
-                                        Suscribirse
-                                    </button>
-                                }
-                            </div>
-                        </div>
+                    <div class="user-actions">
+                        <a href="@perfilUrl" class="btn-profile">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            Perfil
+                        </a>
+                        <a href="/Mensajes?chat=@perfil.Id" class="btn-message">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                            Mensaje
+                        </a>
                     </div>
                 </div>
             }
@@ -190,166 +506,34 @@
     }
     else
     {
-        <div class="card shadow-sm">
-            <div class="card-body text-center py-5">
-                <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-muted mb-3">
+        <div class="empty-state">
+            <div class="empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <circle cx="11" cy="11" r="8"></circle>
                     <path d="m21 21-4.35-4.35"></path>
                 </svg>
-                <h4 class="text-muted">No se encontraron creadores</h4>
-                <p class="text-muted mb-0">Intenta con otros términos de búsqueda</p>
             </div>
+            @if (!string.IsNullOrEmpty(ViewBag.BuscarTexto as string))
+            {
+                <h3>No se encontraron usuarios</h3>
+                <p>Intenta con otros términos de búsqueda</p>
+            }
+            else
+            {
+                <h3>Busca usuarios</h3>
+                <p>Escribe un nombre o usuario para comenzar</p>
+            }
         </div>
     }
 </div>
 
-<style>
-    .creador-card {
-        transition: all 0.3s ease;
-        overflow: hidden;
-        border-radius: 15px;
-    }
-
-        .creador-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 12px 35px rgba(0,0,0,0.15) !important;
-        }
-
-    .card-cover {
-        height: 120px;
-        overflow: hidden;
-    }
-
-        .card-cover img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-    .cover-gradient {
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-
-    .avatar-container {
-        margin-top: -40px;
-        position: relative;
-        z-index: 10;
-    }
-
-    .avatar {
-        width: 80px;
-        height: 80px;
-        border-radius: 50%;
-        border: 4px solid white;
-        object-fit: cover;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    }
-
-    .avatar-placeholder {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .stat-box {
-        background: #f8f9fa;
-        padding: 12px 8px;
-        border-radius: 10px;
-        transition: all 0.3s;
-    }
-
-        .stat-box:hover {
-            background: #e9ecef;
-            transform: scale(1.05);
-        }
-
-        .stat-box svg {
-            color: var(--bs-primary);
-        }
-
-    /* Responsivo */
-    @@media (max-width: 576px) {
-        .card-cover
-
+@functions {
+    string FormatNumber(int number)
     {
-        height: 100px;
+        if (number >= 1000000)
+            return (number / 1000000.0).ToString("0.#") + "M";
+        if (number >= 1000)
+            return (number / 1000.0).ToString("0.#") + "K";
+        return number.ToString();
     }
-
-    .avatar {
-        width: 70px;
-        height: 70px;
-    }
-
-    .avatar-container {
-        margin-top: -35px;
-    }
-
-    .stat-box {
-        padding: 10px 6px;
-    }
-
-    }
-</style>
-
-@section Scripts {
-    <script>
-        async function suscribirse(creadorId, precio) {
-            if (!confirm(`¿Confirmas que quieres suscribirte por $${precio.toFixed(2)} al mes?`)) {
-                return;
-            }
-
-            try {
-                const response = await fetch('/Explorar/Suscribirse', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ creadorId: creadorId })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    alert(data.message || '¡Suscripción exitosa!');
-                    location.reload();
-                } else {
-                    alert(data.message || 'Error al procesar la suscripción');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Error al procesar la suscripción');
-            }
-        }
-
-        async function cancelarSuscripcion(creadorId) {
-            if (!confirm('¿Seguro que quieres cancelar tu suscripción?')) {
-                return;
-            }
-
-            try {
-                const response = await fetch('/Explorar/Cancelar', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ creadorId: creadorId })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    alert(data.message || 'Suscripción cancelada');
-                    location.reload();
-                } else {
-                    alert(data.message || 'Error al cancelar');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Error al cancelar la suscripción');
-            }
-        }
-    </script>
 }

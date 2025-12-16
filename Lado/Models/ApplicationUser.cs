@@ -63,12 +63,46 @@ namespace Lado.Models
         [Display(Name = "Número de Seguidores")]
         public int NumeroSeguidores { get; set; } = 0;
 
+        [Display(Name = "Visitas al Perfil")]
+        public int VisitasPerfil { get; set; } = 0;
+
         // === FINANZAS ===
         [Display(Name = "Saldo Disponible")]
         public decimal Saldo { get; set; } = 0;
 
         [Display(Name = "Total de Ganancias")]
         public decimal TotalGanancias { get; set; } = 0;
+
+        // ========================================
+        // CONFIGURACIÓN DE RETIROS (CREADORES)
+        // ========================================
+
+        [Display(Name = "Comisión de Retiro (%)")]
+        [Range(0, 100)]
+        public decimal ComisionRetiro { get; set; } = 20; // 20% por defecto
+
+        [Display(Name = "Monto Mínimo de Retiro")]
+        [Range(0, 999999)]
+        public decimal MontoMinimoRetiro { get; set; } = 50; // $50 USD mínimo por defecto
+
+        [Display(Name = "Moneda Preferida")]
+        [StringLength(3)]
+        public string MonedaPreferida { get; set; } = "USD";
+
+        [Display(Name = "Cuenta de Retiro (PayPal/Banco)")]
+        [StringLength(200)]
+        public string? CuentaRetiro { get; set; }
+
+        [Display(Name = "Tipo de Cuenta de Retiro")]
+        [StringLength(50)]
+        public string? TipoCuentaRetiro { get; set; } // PayPal, Transferencia, etc.
+
+        [Display(Name = "Retención de Impuestos (%)")]
+        [Range(0, 100)]
+        public decimal? RetencionImpuestos { get; set; } // null = usar tasa del país
+
+        [Display(Name = "Usar Retención del País")]
+        public bool UsarRetencionPais { get; set; } = true; // true = usa la tasa del país, false = usa RetencionImpuestos
 
         // === ESTADO DE CUENTA ===
         [Display(Name = "Cuenta Activa")]
@@ -183,12 +217,12 @@ namespace Lado.Models
 
         /// <summary>
         /// Verifica si tiene configurada la identidad de LadoB (creador premium).
-        /// Un usuario es Premium (LadoB) si EsCreador es true.
+        /// Un usuario es LadoB si es CREADOR y tiene un seudónimo configurado.
         /// </summary>
-        /// <returns>True si es creador premium</returns>
+        /// <returns>True si es creador premium (EsCreador + tiene seudónimo)</returns>
         public bool TieneLadoB()
         {
-            return EsCreador;
+            return EsCreador && !string.IsNullOrEmpty(Seudonimo);
         }
 
         /// <summary>

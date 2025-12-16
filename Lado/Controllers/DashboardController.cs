@@ -58,6 +58,13 @@ namespace Lado.Controllers
             ViewBag.Contenidos = await _context.Contenidos
                 .CountAsync(c => c.UsuarioId == usuario.Id);
 
+            // Conteo por tipo de lado
+            ViewBag.TotalLadoA = await _context.Contenidos
+                .CountAsync(c => c.UsuarioId == usuario.Id && c.TipoLado == TipoLado.LadoA);
+
+            ViewBag.TotalLadoB = await _context.Contenidos
+                .CountAsync(c => c.UsuarioId == usuario.Id && c.TipoLado == TipoLado.LadoB);
+
             ViewBag.Likes = await _context.Set<Like>()
                 .Where(l => l.Contenido.UsuarioId == usuario.Id)
                 .CountAsync();
@@ -81,36 +88,32 @@ namespace Lado.Controllers
                 .Take(5)
                 .ToListAsync();
 
-            // CORREGIDO: Cálculo de ingresos por semana (últimas 4 semanas)
+            // OPTIMIZADO: Cálculo de ingresos por semana (últimas 4 semanas) en UNA sola consulta
             var hoy = DateTime.Now;
-            var ingresosPorSemana = new List<decimal>();
+            var hace4Semanas = hoy.AddDays(-28);
 
-            // Calcular las últimas 4 semanas de forma correcta
-            for (int i = 0; i < 4; i++)
+            // Una sola consulta para todas las transacciones de las últimas 4 semanas
+            var transacciones4Semanas = await _context.Transacciones
+                .Where(t => t.UsuarioId == usuario.Id &&
+                           t.TipoTransaccion != TipoTransaccion.Retiro &&
+                           t.EstadoPago == "Completado" &&
+                           t.FechaTransaccion >= hace4Semanas)
+                .Select(t => new { t.FechaTransaccion, t.Monto })
+                .ToListAsync();
+
+            // Agrupar en memoria por semana
+            var ingresosPorSemana = new decimal[4];
+            foreach (var t in transacciones4Semanas)
             {
-                var finSemana = hoy.AddDays(-7 * i);
-                var inicioSemanaGrafico = finSemana.AddDays(-7);
-
-                var ingresos = await _context.Transacciones
-                    .Where(t => t.UsuarioId == usuario.Id &&
-                               t.TipoTransaccion != TipoTransaccion.Retiro &&
-                               t.EstadoPago == "Completado" &&
-                               t.FechaTransaccion >= inicioSemanaGrafico &&
-                               t.FechaTransaccion <= finSemana)
-                    .SumAsync(t => (decimal?)t.Monto) ?? 0;
-
-                ingresosPorSemana.Insert(0, ingresos); // Insertar al inicio para mantener orden cronológico
+                var diasAtras = (hoy - t.FechaTransaccion).Days;
+                var semanaIndex = Math.Min(3, diasAtras / 7);
+                ingresosPorSemana[3 - semanaIndex] += t.Monto; // Invertir para orden cronológico
             }
 
             ViewBag.IngresosSemana1 = ingresosPorSemana[0];
             ViewBag.IngresosSemana2 = ingresosPorSemana[1];
             ViewBag.IngresosSemana3 = ingresosPorSemana[2];
             ViewBag.IngresosSemana4 = ingresosPorSemana[3];
-
-            System.Diagnostics.Debug.WriteLine($"Ingresos Semana 1: {ViewBag.IngresosSemana1}");
-            System.Diagnostics.Debug.WriteLine($"Ingresos Semana 2: {ViewBag.IngresosSemana2}");
-            System.Diagnostics.Debug.WriteLine($"Ingresos Semana 3: {ViewBag.IngresosSemana3}");
-            System.Diagnostics.Debug.WriteLine($"Ingresos Semana 4: {ViewBag.IngresosSemana4}");
         }
 
         private async Task CargarDatosFan(ApplicationUser usuario)

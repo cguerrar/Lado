@@ -1,0 +1,484 @@
+@model List<Lado.Models.Anuncio>
+@{
+    ViewData["Title"] = "Publicidad de Lado";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+<div class="container-fluid px-0">
+    <!-- Header con estadísticas -->
+    <div class="row g-4 mb-4">
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-primary">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="3" y1="9" x2="21" y2="9"></line>
+                        <line x1="9" y1="21" x2="9" y2="9"></line>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p class="stat-label">Anuncios Lado</p>
+                    <h3 class="stat-value">@ViewBag.TotalAnuncios</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-success">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p class="stat-label">Activos</p>
+                    <h3 class="stat-value">@ViewBag.AnunciosActivos</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-info">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p class="stat-label">Impresiones</p>
+                    <h3 class="stat-value">@ViewBag.TotalImpresiones.ToString("N0")</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-warning">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <path d="M15 3h6v6"></path>
+                        <path d="M10 14L21 3"></path>
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p class="stat-label">Clics</p>
+                    <h3 class="stat-value">@ViewBag.TotalClics.ToString("N0")</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información y botón crear -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <p class="text-muted mb-0">
+                <strong>@ViewBag.AnunciosAgencias</strong> anuncios de agencias |
+                <strong>@ViewBag.ImpresionesAgencias.ToString("N0")</strong> impresiones de agencias
+            </p>
+        </div>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAnuncio" onclick="abrirModalNuevo()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Nuevo Anuncio
+        </button>
+    </div>
+
+    <!-- Lista de anuncios -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Anuncios de Lado</h5>
+            <span class="badge bg-primary">@Model.Count anuncios</span>
+        </div>
+        <div class="card-body p-0">
+            @if (!Model.Any())
+            {
+                <div class="text-center py-5">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5" class="mb-3">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="9" cy="9" r="2"></circle>
+                        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+                    </svg>
+                    <h5 class="text-muted">No hay anuncios de Lado</h5>
+                    <p class="text-muted mb-0">Crea tu primer anuncio para promocionar en la plataforma</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 80px;">Creativo</th>
+                                <th>Titulo</th>
+                                <th>Prioridad</th>
+                                <th>Estado</th>
+                                <th>Impresiones</th>
+                                <th>Clics</th>
+                                <th>CTR</th>
+                                <th>Fecha</th>
+                                <th style="width: 140px;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var anuncio in Model)
+                            {
+                                <tr>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(anuncio.UrlCreativo))
+                                        {
+                                            <img src="@anuncio.UrlCreativo" alt="@anuncio.Titulo" class="rounded" style="width: 60px; height: 45px; object-fit: cover;">
+                                        }
+                                        else
+                                        {
+                                            <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width: 60px; height: 45px;">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
+                                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                                    <circle cx="9" cy="9" r="2"></circle>
+                                                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+                                                </svg>
+                                            </div>
+                                        }
+                                    </td>
+                                    <td>
+                                        <strong>@anuncio.Titulo</strong>
+                                        @if (!string.IsNullOrEmpty(anuncio.Descripcion))
+                                        {
+                                            <br><small class="text-muted">@(anuncio.Descripcion.Length > 50 ? anuncio.Descripcion.Substring(0, 50) + "..." : anuncio.Descripcion)</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="badge @(anuncio.Prioridad >= 8 ? "bg-danger" : anuncio.Prioridad >= 5 ? "bg-warning" : "bg-secondary")">
+                                            @anuncio.Prioridad
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" role="switch"
+                                                   id="estado_@anuncio.Id"
+                                                   @(anuncio.Estado == Lado.Models.EstadoAnuncio.Activo ? "checked" : "")
+                                                   onchange="toggleEstado(@anuncio.Id, this.checked)">
+                                            <label class="form-check-label" for="estado_@anuncio.Id">
+                                                @(anuncio.Estado == Lado.Models.EstadoAnuncio.Activo ? "Activo" : "Pausado")
+                                            </label>
+                                        </div>
+                                    </td>
+                                    <td>@anuncio.Impresiones.ToString("N0")</td>
+                                    <td>@anuncio.Clics.ToString("N0")</td>
+                                    <td>
+                                        @{
+                                            var ctr = anuncio.Impresiones > 0 ? (double)anuncio.Clics / anuncio.Impresiones * 100 : 0;
+                                        }
+                                        <span class="@(ctr >= 2 ? "text-success" : ctr >= 1 ? "text-warning" : "text-muted")">
+                                            @ctr.ToString("F2")%
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">@anuncio.FechaCreacion.ToString("dd/MM/yyyy")</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" onclick="editarAnuncio(@anuncio.Id)" title="Editar">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                </svg>
+                                            </button>
+                                            <a href="@anuncio.UrlDestino" target="_blank" class="btn btn-outline-secondary" title="Ver destino">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                                                </svg>
+                                            </a>
+                                            <form asp-action="EliminarAnuncioLado" method="post" style="display: inline;" onsubmit="return confirm('¿Eliminar este anuncio?');">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@anuncio.Id">
+                                                <button type="submit" class="btn btn-outline-danger" title="Eliminar">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                    </svg>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Modal Crear/Editar Anuncio -->
+<div class="modal fade" id="modalAnuncio" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form asp-action="GuardarAnuncioLado" method="post" enctype="multipart/form-data" id="formAnuncio">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" id="anuncioId" value="0">
+
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitulo">Nuevo Anuncio</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <!-- Titulo -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Titulo *</label>
+                            <input type="text" class="form-control" name="Titulo" id="inputTitulo" required maxlength="100" placeholder="Ej: Promociona tu contenido premium">
+                        </div>
+
+                        <!-- Descripcion -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Descripcion</label>
+                            <textarea class="form-control" name="Descripcion" id="inputDescripcion" rows="2" maxlength="500" placeholder="Descripcion breve del anuncio"></textarea>
+                        </div>
+
+                        <!-- URL Destino -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">URL Destino *</label>
+                            <input type="url" class="form-control" name="UrlDestino" id="inputUrlDestino" required placeholder="https://ejemplo.com/pagina">
+                            <small class="text-muted">URL a donde se redirigira al usuario al hacer clic</small>
+                        </div>
+
+                        <!-- Imagen Creativo -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Imagen del Creativo *</label>
+                            <input type="file" class="form-control" name="ImagenCreativo" id="inputImagen" accept="image/*,video/mp4,video/webm,.gif">
+                            <small class="text-muted">Formatos: JPG, PNG, GIF, MP4, WebM. Tamano recomendado: 1200x628px</small>
+                            <div id="previewImagen" class="mt-2" style="display: none;">
+                                <img id="imgPreview" src="" alt="Preview" class="rounded" style="max-width: 200px; max-height: 150px; object-fit: cover;">
+                            </div>
+                        </div>
+
+                        <!-- Prioridad y Estado -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Prioridad *</label>
+                            <select class="form-select" name="Prioridad" id="inputPrioridad" required>
+                                <option value="1">1 - Muy Baja</option>
+                                <option value="2">2 - Baja</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5" selected>5 - Normal</option>
+                                <option value="6">6</option>
+                                <option value="7">7</option>
+                                <option value="8">8 - Alta</option>
+                                <option value="9">9 - Muy Alta</option>
+                                <option value="10">10 - Maxima</option>
+                            </select>
+                            <small class="text-muted">Mayor prioridad = mas probabilidad de aparecer</small>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Estado</label>
+                            <select class="form-select" name="Estado" id="inputEstado">
+                                <option value="Activo">Activo</option>
+                                <option value="Pausado">Pausado</option>
+                                <option value="Borrador">Borrador</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Texto del Boton</label>
+                            <select class="form-select" name="TextoBoton" id="inputTextoBoton" onchange="toggleTextoPersonalizado()">
+                                <option value="VerMas">Ver mas</option>
+                                <option value="Suscribirse">Suscribirse</option>
+                                <option value="Comprar">Comprar</option>
+                                <option value="Descargar">Descargar</option>
+                                <option value="Registrarse">Registrarse</option>
+                                <option value="MasInformacion">Mas informacion</option>
+                                <option value="Personalizado">Personalizado</option>
+                            </select>
+                        </div>
+
+                        <!-- Texto personalizado -->
+                        <div class="col-12" id="divTextoPersonalizado" style="display: none;">
+                            <label class="form-label fw-semibold">Texto Personalizado</label>
+                            <input type="text" class="form-control" name="TextoBotonPersonalizado" id="inputTextoPersonalizado" maxlength="50" placeholder="Texto del boton">
+                        </div>
+
+                        <!-- Fechas -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Fecha Inicio</label>
+                            <input type="date" class="form-control" name="FechaInicio" id="inputFechaInicio">
+                            <small class="text-muted">Opcional - dejalo vacio para iniciar ahora</small>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Fecha Fin</label>
+                            <input type="date" class="form-control" name="FechaFin" id="inputFechaFin">
+                            <small class="text-muted">Opcional - dejalo vacio para sin fecha limite</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                            <polyline points="7 3 7 8 15 8"></polyline>
+                        </svg>
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Abrir modal para nuevo anuncio
+        function abrirModalNuevo() {
+            document.getElementById('modalTitulo').textContent = 'Nuevo Anuncio';
+            document.getElementById('formAnuncio').reset();
+            document.getElementById('anuncioId').value = '0';
+            document.getElementById('previewImagen').style.display = 'none';
+            document.getElementById('inputImagen').required = true;
+            document.getElementById('divTextoPersonalizado').style.display = 'none';
+        }
+
+        // Editar anuncio existente
+        async function editarAnuncio(id) {
+            try {
+                const response = await fetch(`/Admin/ObtenerAnuncioLado/${id}`);
+                if (!response.ok) throw new Error('Error al cargar anuncio');
+
+                const anuncio = await response.json();
+
+                document.getElementById('modalTitulo').textContent = 'Editar Anuncio';
+                document.getElementById('anuncioId').value = anuncio.id;
+                document.getElementById('inputTitulo').value = anuncio.titulo;
+                document.getElementById('inputDescripcion').value = anuncio.descripcion || '';
+                document.getElementById('inputUrlDestino').value = anuncio.urlDestino;
+                document.getElementById('inputPrioridad').value = anuncio.prioridad;
+                document.getElementById('inputEstado').value = anuncio.estado;
+                document.getElementById('inputTextoBoton').value = anuncio.textoBoton;
+                document.getElementById('inputTextoPersonalizado').value = anuncio.textoBotonPersonalizado || '';
+                document.getElementById('inputFechaInicio').value = anuncio.fechaInicio || '';
+                document.getElementById('inputFechaFin').value = anuncio.fechaFin || '';
+
+                // Mostrar preview de imagen actual
+                if (anuncio.urlCreativo) {
+                    document.getElementById('imgPreview').src = anuncio.urlCreativo;
+                    document.getElementById('previewImagen').style.display = 'block';
+                }
+
+                // No requerir imagen al editar
+                document.getElementById('inputImagen').required = false;
+
+                // Mostrar texto personalizado si aplica
+                toggleTextoPersonalizado();
+
+                // Abrir modal
+                const modal = new bootstrap.Modal(document.getElementById('modalAnuncio'));
+                modal.show();
+            } catch (error) {
+                console.error(error);
+                showToast('Error al cargar el anuncio', 'error');
+            }
+        }
+
+        // Toggle estado activo/pausado
+        async function toggleEstado(id, activo) {
+            try {
+                const response = await fetch('/Admin/ToggleEstadoAnuncioLado', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ id, activo })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    // Actualizar label
+                    const label = document.querySelector(`label[for="estado_${id}"]`);
+                    if (label) {
+                        label.textContent = activo ? 'Activo' : 'Pausado';
+                    }
+                    showToast(activo ? 'Anuncio activado' : 'Anuncio pausado', 'success');
+                } else {
+                    showToast(result.message || 'Error al cambiar estado', 'error');
+                    // Revertir checkbox
+                    document.getElementById(`estado_${id}`).checked = !activo;
+                }
+            } catch (error) {
+                console.error(error);
+                showToast('Error al cambiar estado', 'error');
+                document.getElementById(`estado_${id}`).checked = !activo;
+            }
+        }
+
+        // Toggle texto personalizado
+        function toggleTextoPersonalizado() {
+            const select = document.getElementById('inputTextoBoton');
+            const div = document.getElementById('divTextoPersonalizado');
+            div.style.display = select.value === 'Personalizado' ? 'block' : 'none';
+        }
+
+        // Preview de imagen
+        document.getElementById('inputImagen').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('imgPreview').src = e.target.result;
+                    document.getElementById('previewImagen').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    </script>
+}
+
+<style>
+    .form-check-input:checked {
+        background-color: var(--primary);
+        border-color: var(--primary);
+    }
+
+    .table th {
+        font-weight: 600;
+        font-size: 0.8125rem;
+        text-transform: uppercase;
+        color: var(--text-gray);
+        border-bottom-width: 2px;
+    }
+
+    .table td {
+        vertical-align: middle;
+    }
+
+    .btn-group .btn {
+        padding: 0.375rem 0.5rem;
+    }
+
+    .modal-content {
+        border: none;
+        border-radius: var(--radius-lg);
+    }
+
+    .modal-header {
+        border-bottom: 1px solid var(--border-color);
+        padding: 1.25rem 1.5rem;
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .modal-footer {
+        border-top: 1px solid var(--border-color);
+        padding: 1rem 1.5rem;
+    }
+</style>

@@ -1,5 +1,6 @@
 ﻿using Lado.Data;
 using Lado.Models;
+using Lado.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -15,17 +16,20 @@ namespace Lado.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IWebHostEnvironment _environment;
         private readonly ILogger<ContenidoController> _logger;
+        private readonly INotificationService _notificationService;
 
         public ContenidoController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             IWebHostEnvironment environment,
-            ILogger<ContenidoController> logger)
+            ILogger<ContenidoController> logger,
+            INotificationService notificationService)
         {
             _context = context;
             _userManager = userManager;
             _environment = environment;
             _logger = logger;
+            _notificationService = notificationService;
         }
 
         // ========================================
@@ -258,6 +262,13 @@ namespace Lado.Controllers
                 }
                 else
                 {
+                    // Notificar a seguidores sobre el nuevo contenido
+                    _ = _notificationService.NotificarNuevoContenidoAsync(
+                        usuario.Id,
+                        contenido.Id,
+                        contenido.Descripcion ?? "Nuevo contenido",
+                        tipoLado);
+
                     if (tipoLado == TipoLado.LadoA)
                     {
                         TempData["Success"] = $"✅ Contenido público (LadoA) publicado como {usuario.NombreCompleto}";
@@ -294,7 +305,14 @@ namespace Lado.Controllers
             string lado,
             string tipo,
             bool esGratis = false,
-            bool permitirComentarios = true)
+            bool permitirComentarios = true,
+            bool esPublicoGeneral = false,
+            // Parámetros de música
+            int? audioTrackId = null,
+            string? audioTrackTitle = null,
+            decimal? audioStartTime = null,
+            decimal? audioVolume = null,
+            decimal? originalVolume = null)
         {
             try
             {
@@ -308,6 +326,8 @@ namespace Lado.Controllers
                 _logger.LogInformation("=== CREAR DESDE REELS ===");
                 _logger.LogInformation("Usuario: {Username}, Lado: {Lado}, Tipo: {Tipo}, EsGratis: {EsGratis}",
                     usuario.UserName, lado, tipo, esGratis);
+                _logger.LogInformation("🎵 Audio: TrackId={TrackId}, Title={Title}, StartTime={Start}, Volume={Vol}",
+                    audioTrackId, audioTrackTitle, audioStartTime, audioVolume);
 
                 // Validar archivo
                 if (archivo == null || archivo.Length == 0)
@@ -396,14 +416,38 @@ namespace Lado.Controllers
                     NumeroComentarios = 0,
                     NumeroVistas = 0,
                     RutaArchivo = rutaArchivo,
-                    EsPublicoGeneral = tipoLado == TipoLado.LadoA
+                    EsPublicoGeneral = esPublicoGeneral,
+                    // Música asociada
+                    PistaMusicalId = audioTrackId,
+                    MusicaVolumen = audioVolume,
+                    AudioOriginalVolumen = originalVolume,
+                    AudioTrimInicio = audioStartTime.HasValue ? (int)audioStartTime.Value : null,
+                    AudioDuracion = null // Se calculará si es necesario
                 };
+
+                // Incrementar contador de uso de la pista musical
+                if (audioTrackId.HasValue)
+                {
+                    var pista = await _context.PistasMusica.FindAsync(audioTrackId.Value);
+                    if (pista != null)
+                    {
+                        pista.ContadorUsos++;
+                        _logger.LogInformation("Música agregada: {Titulo} - {Artista}", pista.Titulo, pista.Artista);
+                    }
+                }
 
                 _context.Contenidos.Add(contenido);
                 await _context.SaveChangesAsync();
 
                 _logger.LogInformation("✅ Contenido creado desde Reels - ID: {Id}, Ruta: {Ruta}",
                     contenido.Id, rutaArchivo);
+
+                // Notificar a seguidores sobre el nuevo contenido
+                _ = _notificationService.NotificarNuevoContenidoAsync(
+                    usuario.Id,
+                    contenido.Id,
+                    contenido.Descripcion ?? "Nuevo contenido",
+                    contenido.TipoLado);
 
                 return Json(new
                 {
@@ -460,6 +504,13 @@ namespace Lado.Controllers
             contenido.FechaPublicacion = DateTime.Now;
             await _context.SaveChangesAsync();
 
+            // Notificar a seguidores sobre el nuevo contenido
+            _ = _notificationService.NotificarNuevoContenidoAsync(
+                usuario.Id,
+                contenido.Id,
+                contenido.Descripcion ?? "Nuevo contenido",
+                contenido.TipoLado);
+
             var tipoContenido = contenido.TipoLado == TipoLado.LadoA ? "público (LadoA)" :
                                 contenido.EsGratis ? "gratis en LadoB" : "premium (LadoB)";
             TempData["Success"] = $"✅ Contenido {tipoContenido} publicado exitosamente";
@@ -483,6 +534,7 @@ namespace Lado.Controllers
             }
 
             var contenido = await _context.Contenidos
+                .Include(c => c.PistaMusical)
                 .FirstOrDefaultAsync(c => c.Id == id && c.UsuarioId == usuario.Id && c.EstaActivo);
 
             if (contenido == null)
@@ -512,7 +564,11 @@ namespace Lado.Controllers
             int TipoContenido,
             bool EsGratis,
             decimal? PrecioDesbloqueo,
-            bool EsPublicoGeneral = false)
+            bool EsPublicoGeneral = false,
+            bool EsPrivado = false,
+            int? PistaMusicalId = null,
+            int? AudioTrimInicio = null,
+            decimal? MusicaVolumen = null)
         {
             try
             {
@@ -575,8 +631,36 @@ namespace Lado.Controllers
                 contenido.NombreMostrado = contenido.TipoLado == TipoLado.LadoA ?
                                           usuario.NombreCompleto : usuario.Seudonimo;
 
-                // EsPublicoGeneral solo aplica para LadoA
-                contenido.EsPublicoGeneral = contenido.TipoLado == TipoLado.LadoA ? EsPublicoGeneral : false;
+                // EsPublicoGeneral solo aplica para LadoA y no privado
+                contenido.EsPublicoGeneral = (contenido.TipoLado == TipoLado.LadoA && !EsPrivado) ? EsPublicoGeneral : false;
+
+                // ✅ Actualizar campo privado
+                contenido.EsPrivado = EsPrivado;
+
+                // ✅ Actualizar música asociada (solo para fotos)
+                if (contenido.TipoContenido == Models.TipoContenido.Foto || contenido.TipoContenido == Models.TipoContenido.Imagen)
+                {
+                    // Si se envió PistaMusicalId = 0, significa quitar la música
+                    if (PistaMusicalId.HasValue && PistaMusicalId.Value == 0)
+                    {
+                        contenido.PistaMusicalId = null;
+                        contenido.AudioTrimInicio = null;
+                        contenido.MusicaVolumen = null;
+                        _logger.LogInformation("Música eliminada del contenido ID {Id}", id);
+                    }
+                    else if (PistaMusicalId.HasValue && PistaMusicalId.Value > 0)
+                    {
+                        // Verificar que la pista existe
+                        var pistaExiste = await _context.PistasMusica.AnyAsync(p => p.Id == PistaMusicalId.Value && p.Activo);
+                        if (pistaExiste)
+                        {
+                            contenido.PistaMusicalId = PistaMusicalId.Value;
+                            contenido.AudioTrimInicio = AudioTrimInicio ?? 0;
+                            contenido.MusicaVolumen = MusicaVolumen ?? 0.7m;
+                            _logger.LogInformation("Música ID {MusicaId} asociada al contenido ID {Id}", PistaMusicalId.Value, id);
+                        }
+                    }
+                }
 
                 _logger.LogInformation("Tipo anterior: {TipoAnterior}, Nuevo tipo: {TipoNuevo}",
                     tipoAnterior, contenido.TipoLado);

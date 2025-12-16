@@ -1,0 +1,352 @@
+@model List<Lado.Models.RetencionPais>
+@{
+    ViewData["Title"] = "Retenciones por País";
+    Layout = "_AdminLayout";
+}
+
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #4682B4 0%, #36648B 100%);
+        border-radius: 20px;
+        padding: 32px;
+        color: white;
+        margin-bottom: 24px;
+    }
+
+    .stat-card {
+        border-radius: 16px;
+        border: none;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    }
+
+    .table-card {
+        border-radius: 20px;
+        border: none;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+
+    .table th {
+        background: #f8fafc;
+        font-weight: 600;
+        color: #374151;
+        border-bottom: 2px solid #e5e7eb;
+    }
+
+    .table td {
+        vertical-align: middle;
+        padding: 16px;
+    }
+
+    .btn-action {
+        border-radius: 10px;
+        padding: 8px 16px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+
+    .badge-activo {
+        background: #dcfce7;
+        color: #166534;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+    }
+
+    .badge-inactivo {
+        background: #fee2e2;
+        color: #991b1b;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+    }
+
+    .retencion-alta {
+        color: #dc2626;
+        font-weight: 700;
+    }
+
+    .retencion-media {
+        color: #d97706;
+        font-weight: 700;
+    }
+
+    .retencion-baja {
+        color: #16a34a;
+        font-weight: 700;
+    }
+
+    .modal-content {
+        border-radius: 20px;
+        border: none;
+    }
+
+    .modal-header {
+        border-radius: 20px 20px 0 0;
+    }
+</style>
+
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h1 class="mb-2" style="font-weight: 800; font-size: 2rem;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 12px;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                    Retenciones por País
+                </h1>
+                <p class="mb-0 opacity-75">Gestiona las tasas de retención de impuestos por país</p>
+            </div>
+            <button class="btn btn-light btn-action" data-bs-toggle="modal" data-bs-target="#agregarModal">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="16"></line>
+                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                </svg>
+                Agregar País
+            </button>
+        </div>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Total Países</p>
+                            <h2 class="mb-0" style="font-weight: 800;">@Model.Count</h2>
+                        </div>
+                        <div style="width: 56px; height: 56px; background: #dbeafe; border-radius: 16px; display: flex; align-items: center; justify-content: center;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="2" y1="12" x2="22" y2="12"></line>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Países Activos</p>
+                            <h2 class="mb-0" style="font-weight: 800; color: #16a34a;">@Model.Count(r => r.Activo)</h2>
+                        </div>
+                        <div style="width: 56px; height: 56px; background: #dcfce7; border-radius: 16px; display: flex; align-items: center; justify-content: center;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Retención Promedio</p>
+                            <h2 class="mb-0" style="font-weight: 800; color: #d97706;">@(Model.Any() ? Model.Average(r => r.PorcentajeRetencion).ToString("N1") : "0")%</h2>
+                        </div>
+                        <div style="width: 56px; height: 56px; background: #fef3c7; border-radius: 16px; display: flex; align-items: center; justify-content: center;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de Retenciones -->
+    <div class="card table-card">
+        <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center" style="padding: 24px;">
+            <h5 class="mb-0" style="font-weight: 700;">Lista de Retenciones por País</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th style="padding-left: 24px;">Código</th>
+                            <th>País</th>
+                            <th>Retención</th>
+                            <th>Descripción</th>
+                            <th>Estado</th>
+                            <th>Última Actualización</th>
+                            <th style="padding-right: 24px;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var retencion in Model.OrderBy(r => r.NombrePais))
+                        {
+                            var claseRetencion = retencion.PorcentajeRetencion >= 25 ? "retencion-alta" :
+                                                 retencion.PorcentajeRetencion >= 10 ? "retencion-media" : "retencion-baja";
+                            <tr>
+                                <td style="padding-left: 24px;">
+                                    <span class="badge bg-secondary">@retencion.CodigoPais</span>
+                                </td>
+                                <td>
+                                    <strong>@retencion.NombrePais</strong>
+                                </td>
+                                <td>
+                                    <span class="@claseRetencion" style="font-size: 1.1rem;">@retencion.PorcentajeRetencion%</span>
+                                </td>
+                                <td>
+                                    <small class="text-muted">@(retencion.Descripcion ?? "-")</small>
+                                </td>
+                                <td>
+                                    @if (retencion.Activo)
+                                    {
+                                        <span class="badge-activo">Activo</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-inactivo">Inactivo</span>
+                                    }
+                                </td>
+                                <td>
+                                    <small class="text-muted">@retencion.UltimaActualizacion.ToString("dd/MM/yyyy HH:mm")</small>
+                                </td>
+                                <td style="padding-right: 24px;">
+                                    <button type="button" class="btn btn-outline-primary btn-sm"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#editarModal"
+                                            data-id="@retencion.Id"
+                                            data-codigo="@retencion.CodigoPais"
+                                            data-nombre="@retencion.NombrePais"
+                                            data-retencion="@retencion.PorcentajeRetencion"
+                                            data-descripcion="@retencion.Descripcion"
+                                            data-activo="@retencion.Activo.ToString().ToLower()">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                        </svg>
+                                        Editar
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Agregar País -->
+<div class="modal fade" id="agregarModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, #4682B4 0%, #36648B 100%); color: white;">
+                <h5 class="modal-title">Agregar País</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-action="AgregarRetencionPais">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Código del País</label>
+                        <input type="text" class="form-control" name="codigoPais" maxlength="5" required placeholder="Ej: MX, CO, AR">
+                        <small class="text-muted">Código ISO del país (2-5 caracteres)</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nombre del País</label>
+                        <input type="text" class="form-control" name="nombrePais" required placeholder="Ej: México">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Porcentaje de Retención</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="porcentajeRetencion" step="0.1" min="0" max="100" required placeholder="0">
+                            <span class="input-group-text">%</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Descripción (opcional)</label>
+                        <input type="text" class="form-control" name="descripcion" placeholder="Ej: ISR sobre servicios digitales">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Agregar País</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar País -->
+<div class="modal fade" id="editarModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, #4682B4 0%, #36648B 100%); color: white;">
+                <h5 class="modal-title">Editar Retención - <span id="editarPaisNombre"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-action="ActualizarRetencionPais">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="editarId">
+                <div class="modal-body">
+                    <div class="alert alert-info border-0">
+                        <strong>País:</strong> <span id="editarPaisCodigo"></span> - <span id="editarPaisNombreInfo"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Porcentaje de Retención</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="porcentajeRetencion" id="editarRetencion" step="0.1" min="0" max="100" required>
+                            <span class="input-group-text">%</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Descripción</label>
+                        <input type="text" class="form-control" name="descripcion" id="editarDescripcion" placeholder="Descripción del impuesto">
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="activo" id="editarActivo" value="true">
+                            <label class="form-check-label fw-bold" for="editarActivo">País Activo</label>
+                        </div>
+                        <small class="text-muted">Si está inactivo, no se aplicará retención a usuarios de este país</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Modal Editar
+    document.getElementById('editarModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        document.getElementById('editarId').value = button.getAttribute('data-id');
+        document.getElementById('editarPaisCodigo').textContent = button.getAttribute('data-codigo');
+        document.getElementById('editarPaisNombre').textContent = button.getAttribute('data-nombre');
+        document.getElementById('editarPaisNombreInfo').textContent = button.getAttribute('data-nombre');
+        document.getElementById('editarRetencion').value = button.getAttribute('data-retencion');
+        document.getElementById('editarDescripcion').value = button.getAttribute('data-descripcion') || '';
+        document.getElementById('editarActivo').checked = button.getAttribute('data-activo') === 'true';
+    });
+</script>
+}

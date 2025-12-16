@@ -1,0 +1,663 @@
+@model List<Lado.Models.Feedback>
+@{
+    ViewData["Title"] = "Gestion de Feedbacks";
+    Layout = "_AdminLayout";
+}
+
+<style>
+    .feedbacks-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .feedbacks-header h1 {
+        margin: 0;
+        color: #333;
+        font-size: 1.8rem;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+
+    .stat-card .number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #4682B4;
+    }
+
+    .stat-card .label {
+        color: #666;
+        font-size: 0.9rem;
+        margin-top: 5px;
+    }
+
+    .stat-card.pendiente .number { color: #ffc107; }
+    .stat-card.revision .number { color: #17a2b8; }
+    .stat-card.respondido .number { color: #28a745; }
+
+    .filter-tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 25px;
+        flex-wrap: wrap;
+    }
+
+    .filter-tab {
+        padding: 10px 20px;
+        border: 2px solid #e0e0e0;
+        background: white;
+        border-radius: 25px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        color: #666;
+        font-weight: 500;
+    }
+
+    .filter-tab:hover,
+    .filter-tab.active {
+        border-color: #4682B4;
+        background: #4682B4;
+        color: white;
+    }
+
+    .feedbacks-table {
+        width: 100%;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+
+    .feedbacks-table th {
+        background: #f8f9fa;
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+        color: #333;
+        border-bottom: 2px solid #e0e0e0;
+    }
+
+    .feedbacks-table td {
+        padding: 15px;
+        border-bottom: 1px solid #f0f0f0;
+        vertical-align: middle;
+    }
+
+    .feedbacks-table tr:hover {
+        background: #f8f9fa;
+    }
+
+    .tipo-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 12px;
+        border-radius: 15px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .tipo-sugerencia { background: #e7f3ff; color: #0066cc; }
+    .tipo-error { background: #ffebee; color: #c62828; }
+    .tipo-pregunta { background: #fff3e0; color: #ef6c00; }
+    .tipo-queja { background: #fce4ec; color: #c2185b; }
+    .tipo-otro { background: #f3e5f5; color: #7b1fa2; }
+
+    .estado-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 12px;
+        border-radius: 15px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .estado-pendiente { background: #fff3cd; color: #856404; }
+    .estado-enrevision { background: #cce5ff; color: #004085; }
+    .estado-respondido { background: #d4edda; color: #155724; }
+    .estado-cerrado { background: #e2e3e5; color: #383d41; }
+
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .user-avatar {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .user-details {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .user-name {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .user-email {
+        font-size: 0.8rem;
+        color: #999;
+    }
+
+    .asunto-text {
+        max-width: 250px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-action {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all 0.3s ease;
+    }
+
+    .btn-view {
+        background: #e7f3ff;
+        color: #0066cc;
+    }
+
+    .btn-respond {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .btn-delete {
+        background: #ffebee;
+        color: #c62828;
+    }
+
+    .btn-action:hover {
+        transform: scale(1.05);
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-overlay.active {
+        display: flex;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 16px;
+        width: 90%;
+        max-width: 600px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    }
+
+    .modal-header {
+        padding: 20px 25px;
+        border-bottom: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        color: #333;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #999;
+    }
+
+    .modal-body {
+        padding: 25px;
+    }
+
+    .feedback-detail {
+        margin-bottom: 20px;
+    }
+
+    .feedback-detail label {
+        display: block;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 5px;
+    }
+
+    .feedback-detail p {
+        color: #666;
+        margin: 0;
+        line-height: 1.6;
+    }
+
+    .feedback-mensaje {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 10px;
+        white-space: pre-wrap;
+    }
+
+    .response-form textarea {
+        width: 100%;
+        min-height: 120px;
+        padding: 15px;
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        font-size: 1rem;
+        resize: vertical;
+    }
+
+    .response-form textarea:focus {
+        outline: none;
+        border-color: #4682B4;
+    }
+
+    .modal-footer {
+        padding: 20px 25px;
+        border-top: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .btn-modal {
+        padding: 12px 25px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .btn-cancel {
+        background: #f0f0f0;
+        color: #666;
+    }
+
+    .btn-submit {
+        background: #4682B4;
+        color: white;
+    }
+
+    .btn-modal:hover {
+        transform: translateY(-2px);
+    }
+
+    .respuesta-existente {
+        background: #e7f3ff;
+        border-left: 4px solid #4682B4;
+        padding: 15px;
+        border-radius: 0 10px 10px 0;
+        margin-top: 15px;
+    }
+
+    .respuesta-existente .label {
+        color: #4682B4;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        background: white;
+        border-radius: 12px;
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: #ddd;
+        margin-bottom: 20px;
+    }
+
+    .empty-state h3 {
+        color: #666;
+        margin-bottom: 10px;
+    }
+
+    @@media (max-width: 768px) {
+        .feedbacks-table {
+            display: block;
+            overflow-x: auto;
+        }
+
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+</style>
+
+<div class="feedbacks-header">
+    <h1><i class="fas fa-comments"></i> Gestion de Feedbacks</h1>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success" style="background: #d4edda; color: #155724; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+        <i class="fas fa-check-circle"></i> @TempData["Success"]
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger" style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+        <i class="fas fa-exclamation-circle"></i> @TempData["Error"]
+    </div>
+}
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="number">@ViewBag.TotalFeedbacks</div>
+        <div class="label">Total</div>
+    </div>
+    <div class="stat-card pendiente">
+        <div class="number">@ViewBag.FeedbacksPendientes</div>
+        <div class="label">Pendientes</div>
+    </div>
+    <div class="stat-card revision">
+        <div class="number">@ViewBag.FeedbacksEnRevision</div>
+        <div class="label">En Revision</div>
+    </div>
+    <div class="stat-card respondido">
+        <div class="number">@ViewBag.FeedbacksRespondidos</div>
+        <div class="label">Respondidos</div>
+    </div>
+</div>
+
+<div class="filter-tabs">
+    <a href="@Url.Action("Feedbacks")" class="filter-tab @(ViewBag.EstadoFiltro == null ? "active" : "")">
+        <i class="fas fa-list"></i> Todos
+    </a>
+    <a href="@Url.Action("Feedbacks", new { estado = Lado.Models.EstadoFeedback.Pendiente })"
+       class="filter-tab @(ViewBag.EstadoFiltro?.ToString() == "Pendiente" ? "active" : "")">
+        <i class="fas fa-clock"></i> Pendientes
+    </a>
+    <a href="@Url.Action("Feedbacks", new { estado = Lado.Models.EstadoFeedback.EnRevision })"
+       class="filter-tab @(ViewBag.EstadoFiltro?.ToString() == "EnRevision" ? "active" : "")">
+        <i class="fas fa-search"></i> En Revision
+    </a>
+    <a href="@Url.Action("Feedbacks", new { estado = Lado.Models.EstadoFeedback.Respondido })"
+       class="filter-tab @(ViewBag.EstadoFiltro?.ToString() == "Respondido" ? "active" : "")">
+        <i class="fas fa-check-circle"></i> Respondidos
+    </a>
+</div>
+
+@if (Model == null || Model.Count == 0)
+{
+    <div class="empty-state">
+        <i class="fas fa-inbox"></i>
+        <h3>No hay feedbacks</h3>
+        <p style="color: #999;">Cuando los usuarios envien feedbacks, apareceran aqui</p>
+    </div>
+}
+else
+{
+    <table class="feedbacks-table">
+        <thead>
+            <tr>
+                <th>Usuario</th>
+                <th>Tipo</th>
+                <th>Asunto</th>
+                <th>Estado</th>
+                <th>Fecha</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var feedback in Model)
+            {
+                <tr>
+                    <td>
+                        <div class="user-info">
+                            @if (feedback.Usuario?.FotoPerfil != null)
+                            {
+                                <img src="@feedback.Usuario.FotoPerfil" alt="Avatar" class="user-avatar">
+                            }
+                            else
+                            {
+                                <div class="user-avatar" style="background: #e0e0e0; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-user" style="color: #999;"></i>
+                                </div>
+                            }
+                            <div class="user-details">
+                                <span class="user-name">@feedback.NombreUsuario</span>
+                                <span class="user-email">@feedback.Email</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        @switch (feedback.Tipo)
+                        {
+                            case Lado.Models.TipoFeedback.Sugerencia:
+                                <span class="tipo-badge tipo-sugerencia"><i class="fas fa-lightbulb"></i> Sugerencia</span>
+                                break;
+                            case Lado.Models.TipoFeedback.Error:
+                                <span class="tipo-badge tipo-error"><i class="fas fa-bug"></i> Error</span>
+                                break;
+                            case Lado.Models.TipoFeedback.Pregunta:
+                                <span class="tipo-badge tipo-pregunta"><i class="fas fa-question-circle"></i> Pregunta</span>
+                                break;
+                            case Lado.Models.TipoFeedback.Queja:
+                                <span class="tipo-badge tipo-queja"><i class="fas fa-frown"></i> Queja</span>
+                                break;
+                            default:
+                                <span class="tipo-badge tipo-otro"><i class="fas fa-ellipsis-h"></i> Otro</span>
+                                break;
+                        }
+                    </td>
+                    <td>
+                        <span class="asunto-text" title="@feedback.Asunto">@feedback.Asunto</span>
+                    </td>
+                    <td>
+                        @switch (feedback.Estado)
+                        {
+                            case Lado.Models.EstadoFeedback.Pendiente:
+                                <span class="estado-badge estado-pendiente"><i class="fas fa-clock"></i> Pendiente</span>
+                                break;
+                            case Lado.Models.EstadoFeedback.EnRevision:
+                                <span class="estado-badge estado-enrevision"><i class="fas fa-search"></i> En Revision</span>
+                                break;
+                            case Lado.Models.EstadoFeedback.Respondido:
+                                <span class="estado-badge estado-respondido"><i class="fas fa-check-circle"></i> Respondido</span>
+                                break;
+                            case Lado.Models.EstadoFeedback.Cerrado:
+                                <span class="estado-badge estado-cerrado"><i class="fas fa-lock"></i> Cerrado</span>
+                                break;
+                        }
+                    </td>
+                    <td>@feedback.FechaEnvio.ToString("dd/MM/yy HH:mm")</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-action btn-view" onclick="verFeedback(@feedback.Id)" title="Ver detalles">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            @if (feedback.Estado != Lado.Models.EstadoFeedback.Respondido)
+                            {
+                                <button class="btn-action btn-respond" onclick="responderFeedback(@feedback.Id)" title="Responder">
+                                    <i class="fas fa-reply"></i>
+                                </button>
+                            }
+                            <form asp-action="EliminarFeedback" method="post" style="display: inline;"
+                                  onsubmit="return confirm('Estas seguro de eliminar este feedback?');">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@feedback.Id" />
+                                <button type="submit" class="btn-action btn-delete" title="Eliminar">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<!-- Modal Ver Feedback -->
+<div class="modal-overlay" id="viewModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-envelope-open-text"></i> Detalle del Feedback</h3>
+            <button class="modal-close" onclick="cerrarModal('viewModal')">&times;</button>
+        </div>
+        <div class="modal-body" id="viewModalBody">
+            <!-- Contenido cargado dinamicamente -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn-modal btn-cancel" onclick="cerrarModal('viewModal')">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Responder -->
+<div class="modal-overlay" id="respondModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-reply"></i> Responder Feedback</h3>
+            <button class="modal-close" onclick="cerrarModal('respondModal')">&times;</button>
+        </div>
+        <form asp-action="ResponderFeedback" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="respondFeedbackId" />
+            <div class="modal-body">
+                <div id="respondModalInfo"></div>
+                <div class="response-form" style="margin-top: 20px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 10px;">Tu respuesta:</label>
+                    <textarea name="respuesta" required placeholder="Escribe tu respuesta al usuario..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-modal btn-cancel" onclick="cerrarModal('respondModal')">Cancelar</button>
+                <button type="submit" class="btn-modal btn-submit">
+                    <i class="fas fa-paper-plane"></i> Enviar Respuesta
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    async function verFeedback(id) {
+        try {
+            const response = await fetch(`/Admin/ObtenerFeedback/${id}`);
+            const data = await response.json();
+
+            const html = `
+                <div class="feedback-detail">
+                    <label><i class="fas fa-user"></i> Usuario</label>
+                    <p><strong>${data.nombreUsuario}</strong> (${data.email})</p>
+                </div>
+                <div class="feedback-detail">
+                    <label><i class="fas fa-tag"></i> Tipo</label>
+                    <p>${data.tipo}</p>
+                </div>
+                <div class="feedback-detail">
+                    <label><i class="fas fa-heading"></i> Asunto</label>
+                    <p>${data.asunto}</p>
+                </div>
+                <div class="feedback-detail">
+                    <label><i class="fas fa-comment"></i> Mensaje</label>
+                    <div class="feedback-mensaje">${data.mensaje}</div>
+                </div>
+                <div class="feedback-detail">
+                    <label><i class="fas fa-calendar"></i> Fecha de envio</label>
+                    <p>${data.fechaEnvio}</p>
+                </div>
+                ${data.respuestaAdmin ? `
+                <div class="respuesta-existente">
+                    <div class="label"><i class="fas fa-reply"></i> Respuesta del Admin</div>
+                    <p>${data.respuestaAdmin}</p>
+                    <small style="color: #666;">Respondido: ${data.fechaRespuesta}</small>
+                </div>
+                ` : ''}
+            `;
+
+            document.getElementById('viewModalBody').innerHTML = html;
+            document.getElementById('viewModal').classList.add('active');
+        } catch (error) {
+            console.error('Error al cargar feedback:', error);
+        }
+    }
+
+    async function responderFeedback(id) {
+        try {
+            const response = await fetch(`/Admin/ObtenerFeedback/${id}`);
+            const data = await response.json();
+
+            const html = `
+                <div class="feedback-detail">
+                    <label>De: <strong>${data.nombreUsuario}</strong> (${data.email})</label>
+                </div>
+                <div class="feedback-detail">
+                    <label>Asunto: <strong>${data.asunto}</strong></label>
+                </div>
+                <div class="feedback-detail">
+                    <label>Mensaje:</label>
+                    <div class="feedback-mensaje">${data.mensaje}</div>
+                </div>
+            `;
+
+            document.getElementById('respondFeedbackId').value = id;
+            document.getElementById('respondModalInfo').innerHTML = html;
+            document.getElementById('respondModal').classList.add('active');
+        } catch (error) {
+            console.error('Error al cargar feedback:', error);
+        }
+    }
+
+    function cerrarModal(modalId) {
+        document.getElementById(modalId).classList.remove('active');
+    }
+
+    // Cerrar modal al hacer clic fuera
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.remove('active');
+            }
+        });
+    });
+</script>

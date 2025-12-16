@@ -1,0 +1,717 @@
+@{
+    ViewData["Title"] = "Metricas del Servidor";
+}
+
+<style>
+    /* Header */
+    .server-header {
+        margin-bottom: 32px;
+    }
+
+    .server-header h2 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: var(--text-dark);
+        margin: 0 0 8px 0;
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .server-header h2 svg {
+        width: 32px;
+        height: 32px;
+        color: var(--primary);
+    }
+
+    .server-header p {
+        color: var(--text-gray);
+        margin: 0;
+        font-size: 0.9375rem;
+    }
+
+    .last-update {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--bg-light);
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.8125rem;
+        color: var(--text-gray);
+        margin-top: 12px;
+    }
+
+    .last-update .dot {
+        width: 8px;
+        height: 8px;
+        background: var(--success);
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    /* Server Info Card */
+    .server-info-card {
+        background: var(--primary-gradient);
+        border-radius: var(--radius-lg);
+        padding: 28px;
+        color: white;
+        margin-bottom: 24px;
+        box-shadow: var(--shadow-primary);
+    }
+
+    .server-info-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 24px;
+    }
+
+    .server-info-item {
+        text-align: center;
+    }
+
+    .server-info-item .label {
+        font-size: 0.75rem;
+        opacity: 0.8;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
+    }
+
+    .server-info-item .value {
+        font-size: 1.125rem;
+        font-weight: 700;
+    }
+
+    /* Metrics Grid */
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+        margin-bottom: 24px;
+    }
+
+    /* Metric Card */
+    .metric-card {
+        background: var(--bg-white);
+        border-radius: var(--radius-lg);
+        padding: 28px;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
+    }
+
+    .metric-card h4 {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: var(--text-gray);
+        margin: 0 0 20px 0;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .metric-card h4 svg {
+        width: 20px;
+        height: 20px;
+        color: var(--primary);
+    }
+
+    /* Circular Progress */
+    .circular-progress-container {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+
+    .circular-progress {
+        position: relative;
+        width: 160px;
+        height: 160px;
+    }
+
+    .circular-progress svg {
+        transform: rotate(-90deg);
+    }
+
+    .circular-progress .bg {
+        fill: none;
+        stroke: var(--bg-light);
+        stroke-width: 12;
+    }
+
+    .circular-progress .progress {
+        fill: none;
+        stroke-width: 12;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.5s ease;
+    }
+
+    .circular-progress .progress.cpu { stroke: url(#cpuGradient); }
+    .circular-progress .progress.memory { stroke: url(#memoryGradient); }
+    .circular-progress .progress.disk { stroke: url(#diskGradient); }
+
+    .circular-progress .center-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+    }
+
+    .circular-progress .percentage {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--text-dark);
+        line-height: 1;
+    }
+
+    .circular-progress .label {
+        font-size: 0.75rem;
+        color: var(--text-gray);
+        margin-top: 4px;
+    }
+
+    /* Metric Details */
+    .metric-details {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .metric-detail-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 14px;
+        background: var(--bg-light);
+        border-radius: var(--radius-md);
+    }
+
+    .metric-detail-row .label {
+        font-size: 0.8125rem;
+        color: var(--text-gray);
+    }
+
+    .metric-detail-row .value {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: var(--text-dark);
+    }
+
+    /* Disks Grid */
+    .disks-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+    }
+
+    .disk-card {
+        background: var(--bg-white);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
+    }
+
+    .disk-header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+
+    .disk-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: var(--radius-md);
+        background: var(--primary-pale);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .disk-icon svg {
+        width: 24px;
+        height: 24px;
+        color: var(--primary);
+    }
+
+    .disk-info h5 {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0 0 4px 0;
+    }
+
+    .disk-info p {
+        font-size: 0.8125rem;
+        color: var(--text-gray);
+        margin: 0;
+    }
+
+    /* Progress Bar */
+    .progress-bar-container {
+        margin-bottom: 16px;
+    }
+
+    .progress-bar-bg {
+        height: 10px;
+        background: var(--bg-light);
+        border-radius: 5px;
+        overflow: hidden;
+    }
+
+    .progress-bar-fill {
+        height: 100%;
+        border-radius: 5px;
+        transition: width 0.5s ease;
+        background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+    }
+
+    .progress-bar-fill.warning {
+        background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+    }
+
+    .progress-bar-fill.danger {
+        background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
+    }
+
+    .disk-stats {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8125rem;
+    }
+
+    .disk-stats .used {
+        color: var(--text-dark);
+        font-weight: 600;
+    }
+
+    .disk-stats .free {
+        color: var(--text-gray);
+    }
+
+    /* Status Indicator */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .status-badge.good {
+        background: rgba(16, 185, 129, 0.1);
+        color: #059669;
+    }
+
+    .status-badge.warning {
+        background: rgba(245, 158, 11, 0.1);
+        color: #d97706;
+    }
+
+    .status-badge.danger {
+        background: rgba(239, 68, 68, 0.1);
+        color: #dc2626;
+    }
+
+    /* Loading State */
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius-lg);
+        z-index: 10;
+    }
+
+    .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid var(--bg-light);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Responsive */
+    @@media (max-width: 1200px) {
+        .metrics-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .server-info-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .metrics-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .server-info-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .disks-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<!-- SVG Gradients -->
+<svg width="0" height="0">
+    <defs>
+        <linearGradient id="cpuGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#4682B4" />
+            <stop offset="100%" style="stop-color:#5BA3D9" />
+        </linearGradient>
+        <linearGradient id="memoryGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#10b981" />
+            <stop offset="100%" style="stop-color:#34d399" />
+        </linearGradient>
+        <linearGradient id="diskGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#8b5cf6" />
+            <stop offset="100%" style="stop-color:#a78bfa" />
+        </linearGradient>
+    </defs>
+</svg>
+
+<!-- Header -->
+<div class="server-header">
+    <h2>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+            <line x1="6" y1="6" x2="6.01" y2="6"/>
+            <line x1="6" y1="18" x2="6.01" y2="18"/>
+        </svg>
+        Metricas del Servidor
+    </h2>
+    <p>Monitoreo en tiempo real del rendimiento del servidor</p>
+    <div class="last-update">
+        <span class="dot"></span>
+        <span>Actualizado: <span id="lastUpdateTime">--:--:--</span></span>
+    </div>
+</div>
+
+<!-- Server Info -->
+<div class="server-info-card">
+    <div class="server-info-grid">
+        <div class="server-info-item">
+            <div class="label">Servidor</div>
+            <div class="value" id="serverName">Cargando...</div>
+        </div>
+        <div class="server-info-item">
+            <div class="label">Sistema Operativo</div>
+            <div class="value" id="serverOs">Cargando...</div>
+        </div>
+        <div class="server-info-item">
+            <div class="label">Nucleos CPU</div>
+            <div class="value" id="cpuCores">--</div>
+        </div>
+        <div class="server-info-item">
+            <div class="label">Tiempo Activo</div>
+            <div class="value" id="serverUptime">--</div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Metrics -->
+<div class="metrics-grid">
+    <!-- CPU -->
+    <div class="metric-card" style="position: relative;">
+        <h4>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
+                <rect x="9" y="9" width="6" height="6"/>
+                <line x1="9" y1="1" x2="9" y2="4"/>
+                <line x1="15" y1="1" x2="15" y2="4"/>
+                <line x1="9" y1="20" x2="9" y2="23"/>
+                <line x1="15" y1="20" x2="15" y2="23"/>
+                <line x1="20" y1="9" x2="23" y2="9"/>
+                <line x1="20" y1="14" x2="23" y2="14"/>
+                <line x1="1" y1="9" x2="4" y2="9"/>
+                <line x1="1" y1="14" x2="4" y2="14"/>
+            </svg>
+            Uso de CPU
+        </h4>
+        <div class="circular-progress-container">
+            <div class="circular-progress">
+                <svg width="160" height="160" viewBox="0 0 160 160">
+                    <circle class="bg" cx="80" cy="80" r="70"/>
+                    <circle class="progress cpu" id="cpuProgress" cx="80" cy="80" r="70"
+                            stroke-dasharray="440" stroke-dashoffset="440"/>
+                </svg>
+                <div class="center-text">
+                    <div class="percentage" id="cpuPercent">0%</div>
+                    <div class="label">CPU</div>
+                </div>
+            </div>
+        </div>
+        <div class="metric-details">
+            <div class="metric-detail-row">
+                <span class="label">Estado</span>
+                <span class="status-badge good" id="cpuStatus">Normal</span>
+            </div>
+            <div class="metric-detail-row">
+                <span class="label">Nucleos</span>
+                <span class="value" id="cpuCoresDetail">--</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Memory -->
+    <div class="metric-card" style="position: relative;">
+        <h4>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 19v-3"/>
+                <path d="M10 19v-3"/>
+                <path d="M14 19v-3"/>
+                <path d="M18 19v-3"/>
+                <path d="M8 11V9"/>
+                <path d="M16 11V9"/>
+                <path d="M12 11V9"/>
+                <path d="M2 15h20"/>
+                <path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v1.1a2 2 0 0 0 0 3.837V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5.1a2 2 0 0 0 0-3.837Z"/>
+            </svg>
+            Memoria RAM
+        </h4>
+        <div class="circular-progress-container">
+            <div class="circular-progress">
+                <svg width="160" height="160" viewBox="0 0 160 160">
+                    <circle class="bg" cx="80" cy="80" r="70"/>
+                    <circle class="progress memory" id="memoryProgress" cx="80" cy="80" r="70"
+                            stroke-dasharray="440" stroke-dashoffset="440"/>
+                </svg>
+                <div class="center-text">
+                    <div class="percentage" id="memoryPercent">0%</div>
+                    <div class="label">RAM</div>
+                </div>
+            </div>
+        </div>
+        <div class="metric-details">
+            <div class="metric-detail-row">
+                <span class="label">En Uso</span>
+                <span class="value" id="memoryUsed">-- MB</span>
+            </div>
+            <div class="metric-detail-row">
+                <span class="label">Total</span>
+                <span class="value" id="memoryTotal">-- MB</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Disk Summary -->
+    <div class="metric-card" style="position: relative;">
+        <h4>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+            </svg>
+            Disco Principal
+        </h4>
+        <div class="circular-progress-container">
+            <div class="circular-progress">
+                <svg width="160" height="160" viewBox="0 0 160 160">
+                    <circle class="bg" cx="80" cy="80" r="70"/>
+                    <circle class="progress disk" id="diskProgress" cx="80" cy="80" r="70"
+                            stroke-dasharray="440" stroke-dashoffset="440"/>
+                </svg>
+                <div class="center-text">
+                    <div class="percentage" id="diskPercent">0%</div>
+                    <div class="label">Disco</div>
+                </div>
+            </div>
+        </div>
+        <div class="metric-details">
+            <div class="metric-detail-row">
+                <span class="label">Usado</span>
+                <span class="value" id="diskUsed">-- GB</span>
+            </div>
+            <div class="metric-detail-row">
+                <span class="label">Libre</span>
+                <span class="value" id="diskFree">-- GB</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- All Disks -->
+<div class="metric-card">
+    <h4>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 12H2"/>
+            <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+            <line x1="6" y1="16" x2="6.01" y2="16"/>
+            <line x1="10" y1="16" x2="10.01" y2="16"/>
+        </svg>
+        Todas las Unidades de Disco
+    </h4>
+    <div class="disks-grid" id="disksContainer">
+        <!-- Disks will be loaded here -->
+        <div class="disk-card">
+            <div class="disk-header">
+                <div class="disk-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                    </svg>
+                </div>
+                <div class="disk-info">
+                    <h5>Cargando...</h5>
+                    <p>Obteniendo informacion</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Circumference for circular progress (2 * PI * r)
+    const circumference = 2 * Math.PI * 70;
+
+    function setProgress(elementId, percent) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            const offset = circumference - (percent / 100) * circumference;
+            element.style.strokeDashoffset = offset;
+        }
+    }
+
+    function getStatusClass(percent) {
+        if (percent >= 90) return 'danger';
+        if (percent >= 70) return 'warning';
+        return 'good';
+    }
+
+    function getStatusText(percent) {
+        if (percent >= 90) return 'Critico';
+        if (percent >= 70) return 'Alto';
+        return 'Normal';
+    }
+
+    function formatBytes(mb) {
+        if (mb >= 1024) {
+            return (mb / 1024).toFixed(1) + ' GB';
+        }
+        return mb + ' MB';
+    }
+
+    function updateMetrics() {
+        fetch('/Admin/GetServerMetrics')
+            .then(response => response.json())
+            .then(result => {
+                if (!result.success) {
+                    console.error('Error:', result.error);
+                    return;
+                }
+
+                const data = result.data;
+
+                // Update timestamp
+                document.getElementById('lastUpdateTime').textContent = data.timestamp;
+
+                // Update server info
+                document.getElementById('serverName').textContent = data.server.name;
+                document.getElementById('serverOs').textContent = data.server.os.length > 30
+                    ? data.server.os.substring(0, 30) + '...'
+                    : data.server.os;
+                document.getElementById('cpuCores').textContent = data.cpu.cores + ' Nucleos';
+                document.getElementById('serverUptime').textContent =
+                    `${data.server.uptime.days}d ${data.server.uptime.hours}h ${data.server.uptime.minutes}m`;
+
+                // Update CPU
+                const cpuPercent = data.cpu.usage;
+                setProgress('cpuProgress', cpuPercent);
+                document.getElementById('cpuPercent').textContent = cpuPercent + '%';
+                document.getElementById('cpuCoresDetail').textContent = data.cpu.cores + ' nucleos';
+
+                const cpuStatus = document.getElementById('cpuStatus');
+                cpuStatus.className = 'status-badge ' + getStatusClass(cpuPercent);
+                cpuStatus.textContent = getStatusText(cpuPercent);
+
+                // Update Memory
+                const memPercent = data.memory.usagePercent;
+                setProgress('memoryProgress', memPercent);
+                document.getElementById('memoryPercent').textContent = memPercent + '%';
+                document.getElementById('memoryUsed').textContent = formatBytes(data.memory.used);
+                document.getElementById('memoryTotal').textContent = formatBytes(data.memory.total);
+
+                // Update Primary Disk
+                if (data.disks && data.disks.length > 0) {
+                    const primaryDisk = data.disks[0];
+                    setProgress('diskProgress', primaryDisk.usagePercent);
+                    document.getElementById('diskPercent').textContent = primaryDisk.usagePercent + '%';
+                    document.getElementById('diskUsed').textContent = primaryDisk.usedGB + ' GB';
+                    document.getElementById('diskFree').textContent = primaryDisk.freeGB + ' GB';
+
+                    // Update all disks
+                    const disksContainer = document.getElementById('disksContainer');
+                    disksContainer.innerHTML = data.disks.map(disk => {
+                        const statusClass = getStatusClass(disk.usagePercent);
+                        return `
+                            <div class="disk-card">
+                                <div class="disk-header">
+                                    <div class="disk-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                                            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                                            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                                        </svg>
+                                    </div>
+                                    <div class="disk-info">
+                                        <h5>${disk.name} ${disk.label}</h5>
+                                        <p>${disk.format} - ${disk.totalGB} GB Total</p>
+                                    </div>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar-bg">
+                                        <div class="progress-bar-fill ${statusClass}" style="width: ${disk.usagePercent}%"></div>
+                                    </div>
+                                </div>
+                                <div class="disk-stats">
+                                    <span class="used">${disk.usedGB} GB usados (${disk.usagePercent}%)</span>
+                                    <span class="free">${disk.freeGB} GB libres</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching metrics:', error);
+            });
+    }
+
+    // Initial load
+    updateMetrics();
+
+    // Update every 5 seconds
+    setInterval(updateMetrics, 5000);
+</script>
+}

@@ -60,13 +60,24 @@ namespace Lado.Controllers
                 .Distinct()
                 .ToListAsync();
 
+            // ========================================
+            // FILTRAR USUARIOS BLOQUEADOS
+            // ========================================
+            var usuariosBloqueadosIds = await _context.BloqueosUsuarios
+                .Where(b => b.BloqueadorId == usuario.Id || b.BloqueadoId == usuario.Id)
+                .Select(b => b.BloqueadorId == usuario.Id ? b.BloqueadoId : b.BloqueadorId)
+                .Distinct()
+                .ToListAsync();
+
             // CAMBIO: Solo mostrar conversaciones que ya tienen mensajes
-            // Eliminar contactos sin conversación iniciada
+            // Eliminar contactos sin conversación iniciada Y filtrar bloqueados
             var contactosIds = conversacionesExistentes
+                .Where(id => !usuariosBloqueadosIds.Contains(id))
                 .Distinct()
                 .ToList();
 
-            _logger.LogInformation("Total de contactos encontrados: {Count}", contactosIds.Count);
+            _logger.LogInformation("Total de contactos encontrados: {Count} (excluidos {Bloqueados} bloqueados)",
+                contactosIds.Count, usuariosBloqueadosIds.Count);
 
             var conversaciones = new List<ConversacionViewModel>();
 
@@ -140,6 +151,19 @@ namespace Lado.Controllers
 
             _logger.LogInformation("Abriendo chat entre {Usuario} y {Destinatario}",
                 usuario.UserName, destinatario.UserName);
+
+            // ========================================
+            // VERIFICAR BLOQUEO
+            // ========================================
+            var existeBloqueo = await _context.BloqueosUsuarios
+                .AnyAsync(b => (b.BloqueadorId == usuario.Id && b.BloqueadoId == id) ||
+                              (b.BloqueadorId == id && b.BloqueadoId == usuario.Id));
+
+            if (existeBloqueo)
+            {
+                TempData["Error"] = "No puedes enviar mensajes a este usuario";
+                return RedirectToAction("Index");
+            }
 
             // ⭐ CAMBIO: Verificar si existe una relación de suscripción (en cualquier dirección)
             var existeRelacion = await _context.Suscripciones
@@ -239,6 +263,19 @@ namespace Lado.Controllers
                 }
 
                 _logger.LogInformation("Destinatario: {Username}", destinatario.UserName);
+
+                // ========================================
+                // VERIFICAR BLOQUEO
+                // ========================================
+                var existeBloqueo = await _context.BloqueosUsuarios
+                    .AnyAsync(b => (b.BloqueadorId == usuario.Id && b.BloqueadoId == destinatarioId) ||
+                                  (b.BloqueadorId == destinatarioId && b.BloqueadoId == usuario.Id));
+
+                if (existeBloqueo)
+                {
+                    _logger.LogWarning("Intento de mensaje a usuario bloqueado");
+                    return Json(new { success = false, message = "No puedes enviar mensajes a este usuario" });
+                }
 
                 // ⭐ CAMBIO: Verificar relación de suscripción (bidireccional)
                 var existeRelacion = await _context.Suscripciones
@@ -447,11 +484,166 @@ namespace Lado.Controllers
                 return Json(new { success = false, message = "Error al marcar como leído" });
             }
         }
+
+        // ========================================
+        // ENVIAR MENSAJE DIRECTO (desde perfil)
+        // ========================================
+
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> EnviarMensajeDirecto([FromBody] EnviarMensajeDirectoRequest request)
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
+                {
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                if (string.IsNullOrEmpty(request?.ReceptorId))
+                {
+                    return Json(new { success = false, message = "Receptor no especificado" });
+                }
+
+                if (string.IsNullOrWhiteSpace(request.Mensaje))
+                {
+                    return Json(new { success = false, message = "El mensaje no puede estar vacío" });
+                }
+
+                var receptor = await _userManager.FindByIdAsync(request.ReceptorId);
+                if (receptor == null)
+                {
+                    return Json(new { success = false, message = "Usuario no encontrado" });
+                }
+
+                if (receptor.Id == usuario.Id)
+                {
+                    return Json(new { success = false, message = "No puedes enviarte un mensaje a ti mismo" });
+                }
+
+                // Verificar si hay bloqueo
+                var hayBloqueo = await _context.BloqueosUsuarios
+                    .AnyAsync(b => (b.BloqueadorId == usuario.Id && b.BloqueadoId == receptor.Id) ||
+                                   (b.BloqueadorId == receptor.Id && b.BloqueadoId == usuario.Id));
+
+                if (hayBloqueo)
+                {
+                    return Json(new { success = false, message = "No puedes enviar mensajes a este usuario" });
+                }
+
+                // Si hay propina, procesarla
+                if (request.Monto > 0)
+                {
+                    // Verificar si el receptor puede recibir propinas (tiene contenido LadoB o es creador verificado)
+                    var puedeRecibirPropinas = await _context.Contenidos
+                        .AnyAsync(c => c.UsuarioId == receptor.Id
+                                    && c.TipoLado == TipoLado.LadoB
+                                    && c.EstaActivo
+                                    && !c.EsBorrador)
+                        || receptor.CreadorVerificado;
+
+                    if (!puedeRecibirPropinas)
+                    {
+                        return Json(new { success = false, message = "Este usuario no puede recibir propinas" });
+                    }
+
+                    if (usuario.Saldo < request.Monto)
+                    {
+                        return Json(new
+                        {
+                            success = false,
+                            requiereRecarga = true,
+                            message = $"Saldo insuficiente. Necesitas ${request.Monto - usuario.Saldo:N2} más."
+                        });
+                    }
+
+                    // Descontar saldo
+                    usuario.Saldo -= request.Monto;
+
+                    // Calcular comisión (10%)
+                    var comision = request.Monto * 0.10m;
+                    var gananciaReceptor = request.Monto - comision;
+
+                    // Agregar al receptor
+                    receptor.Saldo += gananciaReceptor;
+                    receptor.TotalGanancias += gananciaReceptor;
+
+                    // Registrar tip
+                    var tip = new Tip
+                    {
+                        FanId = usuario.Id,
+                        CreadorId = receptor.Id,
+                        Monto = request.Monto,
+                        Mensaje = request.Mensaje,
+                        FechaEnvio = DateTime.Now
+                    };
+                    _context.Tips.Add(tip);
+
+                    // Registrar transacciones
+                    _context.Transacciones.Add(new Transaccion
+                    {
+                        UsuarioId = usuario.Id,
+                        TipoTransaccion = TipoTransaccion.Tip,
+                        Monto = -request.Monto,
+                        FechaTransaccion = DateTime.Now,
+                        Descripcion = $"Propina enviada a {receptor.NombreCompleto}"
+                    });
+
+                    _context.Transacciones.Add(new Transaccion
+                    {
+                        UsuarioId = receptor.Id,
+                        TipoTransaccion = TipoTransaccion.IngresoPropina,
+                        Monto = gananciaReceptor,
+                        Comision = comision,
+                        MontoNeto = gananciaReceptor,
+                        FechaTransaccion = DateTime.Now,
+                        Descripcion = $"Propina de @{usuario.UserName}"
+                    });
+                }
+
+                // Crear el mensaje
+                var mensaje = new MensajePrivado
+                {
+                    RemitenteId = usuario.Id,
+                    DestinatarioId = receptor.Id,
+                    Contenido = request.Mensaje.Trim(),
+                    FechaEnvio = DateTime.Now,
+                    Leido = false
+                };
+
+                // Si tiene propina, agregar indicador al mensaje
+                if (request.Monto > 0)
+                {
+                    mensaje.Contenido = $"💰 Propina de ${request.Monto:N0}\n\n{mensaje.Contenido}";
+                }
+
+                _context.MensajesPrivados.Add(mensaje);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Mensaje enviado de {Remitente} a {Destinatario}, propina: ${Monto}",
+                    usuario.UserName, receptor.UserName, request.Monto);
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al enviar mensaje directo");
+                return Json(new { success = false, message = "Error al enviar el mensaje" });
+            }
+        }
     }
 
     // ========================================
     // VIEW MODEL
     // ========================================
+
+    public class EnviarMensajeDirectoRequest
+    {
+        public string ReceptorId { get; set; } = string.Empty;
+        public string Mensaje { get; set; } = string.Empty;
+        public decimal Monto { get; set; } = 0;
+    }
 
     public class ConversacionViewModel
     {

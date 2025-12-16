@@ -165,16 +165,6 @@
             transform: translateY(-1px);
         }
 
-    /* Animación pulse para wallet - igual que en Billetera */
-    @@keyframes pulse {
-        0%, 100% {
-            transform: scale(1) rotate(0deg);
-        }
-
-        50% {
-            transform: scale(1.1) rotate(180deg);
-        }
-    }
 
     /* WALLET CARD - Diseño Premium */
     .wallet-card {
@@ -192,16 +182,27 @@
         overflow: hidden;
     }
 
-        .wallet-card::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            animation: pulse 15s ease-in-out infinite;
-        }
+    .wallet-blob {
+        position: absolute;
+        border-radius: 50%;
+        pointer-events: none;
+    }
+
+    .wallet-blob-1 {
+        width: 300px;
+        height: 300px;
+        background: rgba(255,255,255,0.15);
+        top: -100px;
+        right: -50px;
+    }
+
+    .wallet-blob-2 {
+        width: 200px;
+        height: 200px;
+        background: rgba(255,255,255,0.12);
+        bottom: -80px;
+        left: -40px;
+    }
 
     .wallet-balance-section {
         display: flex;
@@ -872,6 +873,8 @@
 
 <!-- Billetera/Ganancias -->
 <div class="wallet-card">
+    <div class="wallet-blob wallet-blob-1"></div>
+    <div class="wallet-blob wallet-blob-2"></div>
     <div class="wallet-balance-section">
         <div class="wallet-icon">
             <svg width="24" height="24" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
@@ -1026,7 +1029,8 @@
         <h3 class="card-title">Compartir perfil</h3>
     </div>
     @{
-        var perfilUrl = $"https://Ladodemo.com/{Model.UserName}";
+        var baseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+        var perfilUrl = $"{baseUrl}/@{Model.UserName}";
     }
     <div class="link-share">
         <input type="text" class="link-input" id="linkPerfil" value="@perfilUrl" readonly>
@@ -1173,5 +1177,34 @@
             });
         });
         observer.observe(document.documentElement, { attributes: true });
+    }
+
+    // Animación suave de los blobs decorativos de la billetera
+    var blob1 = document.querySelector('.wallet-blob-1');
+    var blob2 = document.querySelector('.wallet-blob-2');
+
+    if (blob1 && blob2) {
+        var startTime = Date.now();
+
+        function animateWalletBlobs() {
+            var elapsed = (Date.now() - startTime) / 1000;
+
+            // Ciclo completo cada 12 y 15 segundos
+            var cycle1 = (elapsed / 12) * Math.PI * 2;
+            var cycle2 = (elapsed / 15) * Math.PI * 2;
+
+            // Desplazamiento máximo de 15px
+            var x1 = Math.sin(cycle1) * 15;
+            var y1 = Math.cos(cycle1) * 12;
+            var x2 = Math.cos(cycle2) * 12;
+            var y2 = Math.sin(cycle2) * 15;
+
+            blob1.style.transform = 'translate(' + x1 + 'px, ' + y1 + 'px)';
+            blob2.style.transform = 'translate(' + x2 + 'px, ' + y2 + 'px)';
+
+            requestAnimationFrame(animateWalletBlobs);
+        }
+
+        animateWalletBlobs();
     }
 </script>

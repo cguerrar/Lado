@@ -29,12 +29,63 @@
 <html lang="es" data-theme="light">
 <head>
 	<meta charset="utf-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+	<!-- iOS PWA Support -->
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<!-- PWA Manifest -->
+	<link rel="manifest" href="/manifest.json">
+	<meta name="theme-color" content="#4682B4">
+	<link rel="apple-touch-icon" href="/images/icons/icon-192x192.png">
 	<title>@ViewData["Title"] - Lado</title>
+
+	<!-- Open Graph Meta Tags para compartir en redes sociales -->
+	<meta property="og:site_name" content="Lado" />
+	<meta property="og:locale" content="es_ES" />
+	@if (ViewData["OgTitle"] != null)
+	{
+		<meta property="og:title" content="@ViewData["OgTitle"]" />
+	}
+	else
+	{
+		<meta property="og:title" content="@ViewData["Title"] - Lado" />
+	}
+	@if (ViewData["OgDescription"] != null)
+	{
+		<meta property="og:description" content="@ViewData["OgDescription"]" />
+	}
+	else
+	{
+		<meta name="description" content="Lado - Plataforma de contenido exclusivo" />
+		<meta property="og:description" content="Lado - Plataforma de contenido exclusivo" />
+	}
+	@if (ViewData["OgImage"] != null)
+	{
+		<meta property="og:image" content="@ViewData["OgImage"]" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:image" content="@ViewData["OgImage"]" />
+	}
+	else
+	{
+		<meta property="og:image" content="https://ladoapp.com/images/og-default.jpg" />
+		<meta name="twitter:card" content="summary" />
+	}
+	@if (ViewData["OgUrl"] != null)
+	{
+		<meta property="og:url" content="@ViewData["OgUrl"]" />
+	}
+	<meta property="og:type" content="@(ViewData["OgType"] ?? "website")" />
+	<meta name="twitter:title" content="@(ViewData["OgTitle"] ?? ViewData["Title"])" />
+	<meta name="twitter:description" content="@(ViewData["OgDescription"] ?? "Lado - Plataforma de contenido exclusivo")" />
+
 	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 	<link rel="stylesheet" href="~/css/reels-creator.css" asp-append-version="true">
+	<!-- iOS Safari Compatibility Fixes -->
+	<link rel="stylesheet" href="~/css/ios-fixes.css" asp-append-version="true">
 	<style>
 		/* ========================================
 		   SISTEMA DE TEMAS - MODO CLARO/OSCURO
@@ -293,6 +344,15 @@
 			z-index: 1 !important;
 		}
 
+		/* Sin sidebar para usuarios no autenticados */
+		body.no-sidebar .main-content {
+			margin-left: 0;
+		}
+
+		body.no-sidebar .hamburger-btn {
+			display: none;
+		}
+
 		/* TOP NAVBAR - DEBE ESTAR SOBRE TODO */
 		.top-navbar {
 			background: var(--surface);
@@ -418,6 +478,286 @@
 			padding: 2px 6px;
 			font-size: 10px;
 			font-weight: 600;
+		}
+
+		/* ========================================
+		   DROPDOWN DE NOTIFICACIONES
+		   ======================================== */
+		.notification-wrapper {
+			position: relative;
+		}
+
+		.notifications-dropdown {
+			position: absolute;
+			top: calc(100% + 12px);
+			right: 0;
+			width: 380px;
+			max-height: 500px;
+			background: var(--surface);
+			border: 1px solid var(--line);
+			border-radius: var(--radius-lg);
+			box-shadow: var(--shadow-xl);
+			z-index: 1070;
+			display: none;
+			flex-direction: column;
+			overflow: hidden;
+		}
+
+		.notifications-dropdown.active {
+			display: flex;
+			animation: notifSlideIn 0.2s ease;
+		}
+
+		@@keyframes notifSlideIn {
+			from {
+				opacity: 0;
+				transform: translateY(-10px);
+			}
+			to {
+				opacity: 1;
+				transform: translateY(0);
+			}
+		}
+
+		.notifications-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 16px 20px;
+			border-bottom: 1px solid var(--line);
+			background: var(--bg-tertiary);
+		}
+
+		.notifications-header h4 {
+			margin: 0;
+			font-size: 1rem;
+			font-weight: 600;
+			color: var(--fg);
+		}
+
+		.mark-all-read {
+			background: none;
+			border: none;
+			color: var(--muted);
+			cursor: pointer;
+			padding: 6px;
+			border-radius: var(--radius-sm);
+			transition: all 0.2s;
+		}
+
+		.mark-all-read:hover {
+			background: var(--primary-light);
+			color: var(--primary);
+		}
+
+		.notifications-list {
+			flex: 1;
+			overflow-y: auto;
+			max-height: 380px;
+		}
+
+		.notifications-loading {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			padding: 40px;
+			color: var(--muted);
+			gap: 12px;
+		}
+
+		.notifications-loading .spinner {
+			width: 24px;
+			height: 24px;
+			border: 2px solid var(--line);
+			border-top-color: var(--primary);
+			border-radius: 50%;
+			animation: spin 0.8s linear infinite;
+		}
+
+		@@keyframes spin {
+			to { transform: rotate(360deg); }
+		}
+
+		.notification-item {
+			display: flex;
+			align-items: center;
+			border-bottom: 1px solid var(--line-light);
+			transition: background 0.2s;
+			position: relative;
+		}
+
+		.notification-item:hover {
+			background: var(--bg-tertiary);
+		}
+
+		.notification-item.unread {
+			background: var(--primary-light);
+		}
+
+		.notification-item.unread:hover {
+			background: rgba(70, 130, 180, 0.15);
+		}
+
+		.notification-link {
+			display: flex;
+			gap: 12px;
+			padding: 14px 20px;
+			padding-right: 45px;
+			flex: 1;
+			text-decoration: none;
+			color: var(--fg);
+			cursor: pointer;
+		}
+
+		.notification-delete {
+			position: absolute;
+			right: 8px;
+			top: 50%;
+			transform: translateY(-50%);
+			width: 28px;
+			height: 28px;
+			border: none;
+			background: transparent;
+			border-radius: 50%;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			opacity: 0;
+			transition: all 0.2s;
+		}
+
+		.notification-delete svg {
+			width: 14px;
+			height: 14px;
+			stroke: var(--muted);
+		}
+
+		.notification-item:hover .notification-delete {
+			opacity: 1;
+		}
+
+		.notification-delete:hover {
+			background: rgba(239, 68, 68, 0.1);
+		}
+
+		.notification-delete:hover svg {
+			stroke: #ef4444;
+		}
+
+		.notification-avatar {
+			width: 44px;
+			height: 44px;
+			border-radius: 50%;
+			background: var(--bg-tertiary);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			flex-shrink: 0;
+			overflow: hidden;
+		}
+
+		.notification-avatar img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+		}
+
+		.notification-avatar svg {
+			width: 22px;
+			height: 22px;
+			stroke: var(--muted);
+		}
+
+		.notification-avatar.type-mensaje { background: rgba(59, 130, 246, 0.1); }
+		.notification-avatar.type-mensaje svg { stroke: #3b82f6; }
+
+		.notification-avatar.type-seguidor { background: rgba(168, 85, 247, 0.1); }
+		.notification-avatar.type-seguidor svg { stroke: #a855f7; }
+
+		.notification-avatar.type-like { background: rgba(239, 68, 68, 0.1); }
+		.notification-avatar.type-like svg { stroke: #ef4444; }
+
+		.notification-avatar.type-comentario { background: rgba(16, 185, 129, 0.1); }
+		.notification-avatar.type-comentario svg { stroke: #10b981; }
+
+		.notification-avatar.type-contenido { background: rgba(70, 130, 180, 0.1); }
+		.notification-avatar.type-contenido svg { stroke: #4682B4; }
+
+		.notification-avatar.type-pago { background: rgba(245, 158, 11, 0.1); }
+		.notification-avatar.type-pago svg { stroke: #f59e0b; }
+
+		.notification-content {
+			flex: 1;
+			min-width: 0;
+		}
+
+		.notification-text {
+			font-size: 0.875rem;
+			color: var(--fg);
+			line-height: 1.4;
+			margin-bottom: 4px;
+		}
+
+		.notification-text strong {
+			font-weight: 600;
+		}
+
+		.notification-time {
+			font-size: 0.75rem;
+			color: var(--muted);
+		}
+
+		.notification-empty {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			padding: 50px 20px;
+			color: var(--muted);
+			text-align: center;
+		}
+
+		.notification-empty svg {
+			width: 48px;
+			height: 48px;
+			stroke: var(--muted-light);
+			margin-bottom: 12px;
+		}
+
+		.notification-empty p {
+			margin: 0;
+			font-size: 0.9375rem;
+		}
+
+		.notifications-footer {
+			padding: 12px 20px;
+			border-top: 1px solid var(--line);
+			text-align: center;
+			background: var(--bg-tertiary);
+		}
+
+		.notifications-footer a {
+			color: var(--primary);
+			font-size: 0.875rem;
+			font-weight: 500;
+			text-decoration: none;
+		}
+
+		.notifications-footer a:hover {
+			text-decoration: underline;
+		}
+
+		@@media (max-width: 480px) {
+			.notifications-dropdown {
+				position: fixed;
+				top: 60px;
+				left: 10px;
+				right: 10px;
+				width: auto;
+				max-height: calc(100vh - 80px);
+			}
 		}
 
 		.user-avatar {
@@ -890,13 +1230,43 @@
 				}
 		}
 
+		/* ========================================
+		   FIX GLOBAL: Modales Bootstrap siempre encima
+		   ======================================== */
+		.modal {
+			z-index: 10000000 !important;
+		}
+		.modal-backdrop {
+			z-index: 9999999 !important;
+		}
+		.modal.show {
+			display: flex !important;
+			align-items: center;
+			justify-content: center;
+		}
+		.modal-dialog {
+			pointer-events: auto !important;
+		}
+		.modal-content {
+			pointer-events: auto !important;
+		}
+		.modal input,
+		.modal textarea,
+		.modal button,
+		.modal select,
+		.modal a {
+			pointer-events: auto !important;
+		}
+
 	</style>
 </head>
-<body>
-	<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+<body class="@(User.Identity?.IsAuthenticated != true ? "no-sidebar" : "")">
+	@if (User.Identity?.IsAuthenticated == true)
+	{
+		<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
-	<!-- SIDEBAR -->
-	<div class="sidebar" id="sidebar">
+		<!-- SIDEBAR -->
+		<div class="sidebar" id="sidebar">
 		<div class="sidebar-brand" style="display: flex; flex-direction: column; align-items: center; padding: 20px 12px; position: relative;">
 			<a href="/Feed" class="brand">
 				<img src="/images/logo.png" alt="Lado" style="height: 96px; width: auto; border-radius: 8px;">
@@ -1066,7 +1436,7 @@
 				</li>
 
 				<li class="nav-item">
-					<a class="nav-link" href="#">
+					<a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Ayuda" ? "active" : "")" href="/Ayuda">
 						<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 							<circle cx="12" cy="12" r="10"></circle>
 							<path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
@@ -1089,6 +1459,7 @@
 			</ul>
 		</nav>
 	</div>
+	}
 
 	<!-- MAIN CONTENT -->
 	<div class="main-content">
@@ -1145,15 +1516,35 @@
 					</svg>
 				</button>
 
-				<div class="notification-icon">
-					<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-						<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-						<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-					</svg>
-					@if (mensajesNoLeidos > 0)
-					{
-						<span class="notification-badge">@mensajesNoLeidos</span>
-					}
+				<div class="notification-wrapper">
+					<div class="notification-icon" onclick="toggleNotificaciones()" id="notificationBell">
+						<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+							<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+						</svg>
+						<span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+					</div>
+					<!-- Dropdown de Notificaciones -->
+					<div class="notifications-dropdown" id="notificationsDropdown">
+						<div class="notifications-header">
+							<h4>Notificaciones</h4>
+							<button type="button" class="mark-all-read" onclick="marcarTodasLeidas()" title="Marcar todas como leídas">
+								<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<polyline points="9 11 12 14 22 4"></polyline>
+									<path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+								</svg>
+							</button>
+						</div>
+						<div class="notifications-list" id="notificationsList">
+							<div class="notifications-loading">
+								<div class="spinner"></div>
+								<span>Cargando...</span>
+							</div>
+						</div>
+						<div class="notifications-footer">
+							<a href="/Usuario/Notificaciones">Ver todas las notificaciones</a>
+						</div>
+					</div>
 				</div>
 
 				<div class="dropdown">
@@ -1204,6 +1595,8 @@
 	</div>
 
 	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+	<!-- iOS Audio/Video Compatibility Fix -->
+	<script src="~/js/ios-audio-fix.js" asp-append-version="true"></script>
 	<script>
 		// ========================================
 		// THEME TOGGLE - Modo Oscuro/Claro
@@ -1288,6 +1681,306 @@
 			if (dropdown) {
 				dropdown.style.zIndex = '1060';
 			}
+		});
+
+		// ========================================
+		// SISTEMA DE NOTIFICACIONES
+		// ========================================
+		let notificacionesDropdownAbierto = false;
+
+		function toggleNotificaciones() {
+			const dropdown = document.getElementById('notificationsDropdown');
+			const bell = document.getElementById('notificationBell');
+
+			notificacionesDropdownAbierto = !notificacionesDropdownAbierto;
+
+			if (notificacionesDropdownAbierto) {
+				dropdown.classList.add('active');
+				bell.style.color = 'var(--primary)';
+				// Siempre recargar al abrir para mostrar nuevas notificaciones
+				cargarNotificaciones();
+			} else {
+				dropdown.classList.remove('active');
+				bell.style.color = '';
+			}
+		}
+
+		// Cerrar dropdown al hacer clic fuera
+		document.addEventListener('click', function(e) {
+			const wrapper = document.querySelector('.notification-wrapper');
+			if (wrapper && !wrapper.contains(e.target)) {
+				const dropdown = document.getElementById('notificationsDropdown');
+				const bell = document.getElementById('notificationBell');
+				if (dropdown && dropdown.classList.contains('active')) {
+					dropdown.classList.remove('active');
+					bell.style.color = '';
+					notificacionesDropdownAbierto = false;
+				}
+			}
+		});
+
+		async function cargarNotificaciones() {
+			const lista = document.getElementById('notificationsList');
+
+			// Mostrar loading mientras carga
+			lista.innerHTML = `
+				<div class="notification-empty">
+					<div class="spinner-border spinner-border-sm" role="status"></div>
+					<p>Cargando...</p>
+				</div>
+			`;
+
+			try {
+				const response = await fetch('/Usuario/ObtenerNotificaciones');
+				const data = await response.json();
+
+				if (data.success && data.notificaciones && data.notificaciones.length > 0) {
+					lista.innerHTML = data.notificaciones.map(n => renderizarNotificacion(n)).join('');
+					// Actualizar badge
+					actualizarBadgeNotificaciones(data.noLeidas || 0);
+				} else if (data.success) {
+					lista.innerHTML = `
+						<div class="notification-empty">
+							<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">
+								<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+								<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+							</svg>
+							<p>No tienes notificaciones</p>
+						</div>
+					`;
+					actualizarBadgeNotificaciones(0);
+				} else {
+					console.error('Error del servidor:', data.message);
+					lista.innerHTML = `
+						<div class="notification-empty">
+							<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">
+								<circle cx="12" cy="12" r="10"></circle>
+								<line x1="12" y1="8" x2="12" y2="12"></line>
+								<line x1="12" y1="16" x2="12.01" y2="16"></line>
+							</svg>
+							<p>No tienes notificaciones</p>
+						</div>
+					`;
+				}
+			} catch (error) {
+				console.error('Error cargando notificaciones:', error);
+				lista.innerHTML = `
+					<div class="notification-empty">
+						<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">
+							<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+							<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+						</svg>
+						<p>No tienes notificaciones</p>
+					</div>
+				`;
+			}
+		}
+
+		function renderizarNotificacion(n) {
+			const tipoClase = obtenerClaseTipo(n.tipo);
+			const iconoSvg = obtenerIconoTipo(n.tipo);
+			const unreadClass = n.leida ? '' : 'unread';
+
+			const avatarHtml = n.imagenUrl
+				? `<img src="${n.imagenUrl}" alt="">`
+				: iconoSvg;
+
+			return `
+				<div class="notification-item ${unreadClass}" data-id="${n.id}">
+					<a href="${n.urlDestino || '#'}" class="notification-link"
+					   onclick="marcarNotificacionLeida(${n.id}, event)">
+						<div class="notification-avatar ${tipoClase}">
+							${avatarHtml}
+						</div>
+						<div class="notification-content">
+							<div class="notification-text">${n.mensaje}</div>
+							<div class="notification-time">${n.tiempoRelativo}</div>
+						</div>
+					</a>
+					<button class="notification-delete" onclick="eliminarNotificacion(${n.id}, event)" title="Eliminar">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<line x1="18" y1="6" x2="6" y2="18"></line>
+							<line x1="6" y1="6" x2="18" y2="18"></line>
+						</svg>
+					</button>
+				</div>
+			`;
+		}
+
+		function obtenerClaseTipo(tipo) {
+			const clases = {
+				0: 'type-mensaje',      // NuevoMensaje
+				1: 'type-seguidor',     // NuevoSeguidor
+				2: 'type-contenido',    // NuevoContenido
+				3: 'type-like',         // NuevoLike
+				4: 'type-comentario',   // NuevoComentario
+				5: 'type-seguidor',     // NuevaSuscripcion
+				6: 'type-contenido',    // NuevoDesafio
+				7: 'type-contenido',    // PropuestaDesafio
+				8: 'type-pago',         // PagoRecibido
+				9: 'type-pago',         // RetiroCompletado
+				10: 'type-contenido'    // Sistema
+			};
+			return clases[tipo] || '';
+		}
+
+		function obtenerIconoTipo(tipo) {
+			const iconos = {
+				0: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>',
+				1: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>',
+				2: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>',
+				3: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>',
+				4: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>',
+				5: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
+				6: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>',
+				7: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>',
+				8: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>',
+				9: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+				10: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
+			};
+			return iconos[tipo] || iconos[10];
+		}
+
+		async function marcarNotificacionLeida(id, event) {
+			// No prevenir navegación, solo marcar como leída
+			try {
+				await fetch('/Usuario/MarcarNotificacionLeida', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ notificacionId: id })
+				});
+
+				// Marcar visualmente como leída (buscar el contenedor padre)
+				const item = document.querySelector(`.notification-item[data-id="${id}"]`);
+				if (item && item.classList.contains('unread')) {
+					item.classList.remove('unread');
+
+					// Actualizar badge
+					const badge = document.getElementById('notificationBadge');
+					let count = parseInt(badge.textContent) || 0;
+					if (count > 0) {
+						actualizarBadgeNotificaciones(count - 1);
+					}
+				}
+			} catch (error) {
+				console.error('Error marcando notificación:', error);
+			}
+		}
+
+		async function marcarTodasLeidas() {
+			try {
+				const response = await fetch('/Usuario/MarcarTodasLeidas', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' }
+				});
+
+				const data = await response.json();
+
+				if (data.success) {
+					// Quitar clase unread de todas las notificaciones
+					document.querySelectorAll('.notification-item.unread').forEach(item => {
+						item.classList.remove('unread');
+					});
+
+					// Actualizar badge
+					actualizarBadgeNotificaciones(0);
+
+					if (window.showToast) {
+						showToast('success', 'Listo', 'Todas las notificaciones marcadas como leídas');
+					}
+				}
+			} catch (error) {
+				console.error('Error marcando todas:', error);
+			}
+		}
+
+		async function eliminarNotificacion(id, event) {
+			event.preventDefault();
+			event.stopPropagation();
+
+			const item = document.querySelector(`.notification-item[data-id="${id}"]`);
+			if (!item) return;
+
+			// Animación de salida
+			item.style.transition = 'all 0.3s ease';
+			item.style.opacity = '0';
+			item.style.transform = 'translateX(100%)';
+
+			try {
+				const response = await fetch('/Usuario/EliminarNotificacion', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ notificacionId: id })
+				});
+
+				const data = await response.json();
+
+				if (data.success) {
+					// Si la notificación no estaba leída, actualizar badge
+					if (item.classList.contains('unread')) {
+						const badge = document.getElementById('notificationBadge');
+						let count = parseInt(badge.textContent) || 0;
+						if (count > 0) {
+							actualizarBadgeNotificaciones(count - 1);
+						}
+					}
+
+					// Remover del DOM después de la animación
+					setTimeout(() => {
+						item.remove();
+						// Si no quedan notificaciones, mostrar mensaje vacío
+						const lista = document.getElementById('notificationsList');
+						if (!lista.querySelector('.notification-item')) {
+							lista.innerHTML = `
+								<div class="notification-empty">
+									<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">
+										<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+										<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+									</svg>
+									<p>No tienes notificaciones</p>
+								</div>
+							`;
+						}
+					}, 300);
+				} else {
+					// Revertir animación si falla
+					item.style.opacity = '1';
+					item.style.transform = 'translateX(0)';
+				}
+			} catch (error) {
+				console.error('Error eliminando notificación:', error);
+				item.style.opacity = '1';
+				item.style.transform = 'translateX(0)';
+			}
+		}
+
+		function actualizarBadgeNotificaciones(count) {
+			const badge = document.getElementById('notificationBadge');
+			if (badge) {
+				if (count > 0) {
+					badge.textContent = count > 99 ? '99+' : count;
+					badge.style.display = 'block';
+				} else {
+					badge.style.display = 'none';
+				}
+			}
+		}
+
+		// Cargar contador de notificaciones al iniciar
+		async function cargarContadorNotificaciones() {
+			try {
+				const response = await fetch('/Usuario/ContarNotificacionesNoLeidas');
+				const data = await response.json();
+				actualizarBadgeNotificaciones(data.count || 0);
+			} catch (error) {
+				console.error('Error cargando contador:', error);
+			}
+		}
+
+		// Actualizar contador cada 30 segundos
+		document.addEventListener('DOMContentLoaded', function() {
+			cargarContadorNotificaciones();
+			setInterval(cargarContadorNotificaciones, 30000);
 		});
 
 
@@ -1398,7 +2091,7 @@
 			};
 		</script>
 		<!-- Hammer.js para gestos táctiles -->
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js" integrity="sha512-UXumZrZNiOwnTcZSHLOfcTs0aos2MzBWsXOvOuA9g9ajanPzGaw+5mZssgj62WvxVAs/JlG89B+s8SomQO2c1HA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 		<!-- Reels Creator Modules -->
 		<script src="~/js/reels/FilterEngine.js" asp-append-version="true"></script>
 		<script src="~/js/reels/ExportManager.js" asp-append-version="true"></script>
@@ -1412,7 +2105,360 @@
 		<script src="~/js/reels/TouchGestures.js" asp-append-version="true"></script>
 		<script src="~/js/reels/CameraCapture.js" asp-append-version="true"></script>
 		<script src="~/js/reels/FileUpload.js" asp-append-version="true"></script>
+		<script src="~/js/reels/MemeMode.js" asp-append-version="true"></script>
+		<script src="~/js/reels/TransformTools.js" asp-append-version="true"></script>
+		<script src="~/js/reels/DraggablePanel.js" asp-append-version="true"></script>
 		<script src="~/js/reels/ReelsCreator.js" asp-append-version="true"></script>
 	}
+
+	<!-- ========================================
+	     POPUP BETA - ADVERTENCIA
+	     ======================================== -->
+	<div id="betaPopupOverlay" class="beta-popup-overlay">
+		<div class="beta-popup">
+			<button class="beta-popup-close" onclick="closeBetaPopup()" aria-label="Cerrar">
+				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<line x1="18" y1="6" x2="6" y2="18"></line>
+					<line x1="6" y1="6" x2="18" y2="18"></line>
+				</svg>
+			</button>
+
+			<div class="beta-popup-icon">
+				<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="1.5">
+					<path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+				</svg>
+			</div>
+
+			<h3 class="beta-popup-title">LADO está en fase Beta</h3>
+
+			<div class="beta-popup-content">
+				<div class="beta-info-item">
+					<div class="beta-info-icon safe">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+							<polyline points="9 12 11 14 15 10"/>
+						</svg>
+					</div>
+					<div class="beta-info-text">
+						<strong>Tu contenido está seguro</strong>
+						<p>La información de tu <b>LadoA</b> (público) NO será eliminada. Tu perfil, fotos y publicaciones se mantendrán cuando lancemos la versión final.</p>
+					</div>
+				</div>
+
+				<div class="beta-info-item">
+					<div class="beta-info-icon money">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<circle cx="12" cy="12" r="10"/>
+							<path d="M12 6v12m-4-8h8"/>
+						</svg>
+					</div>
+					<div class="beta-info-text">
+						<strong>Dinero ficticio</strong>
+						<p>Todo el dinero mostrado es <b>de prueba</b>. No se realizan cobros reales. Disfruta explorando todas las funciones sin preocupaciones.</p>
+					</div>
+				</div>
+
+				<div class="beta-info-item">
+					<div class="beta-info-icon beta">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+						</svg>
+					</div>
+					<div class="beta-info-text">
+						<strong>Estamos mejorando</strong>
+						<p>Puedes encontrar errores o funciones incompletas. Tu feedback es valioso para construir una mejor plataforma.</p>
+					</div>
+				</div>
+			</div>
+
+			<button class="beta-popup-btn" onclick="closeBetaPopup()">
+				Entendido
+			</button>
+
+			<label class="beta-popup-checkbox">
+				<input type="checkbox" id="betaDontShowAgain">
+				<span>No mostrar de nuevo por un tiempo</span>
+			</label>
+		</div>
+	</div>
+
+	<style>
+		.beta-popup-overlay {
+			display: none;
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: rgba(0, 0, 0, 0.5);
+			z-index: 99999;
+			align-items: center;
+			justify-content: center;
+			padding: 20px;
+			animation: betaFadeIn 0.3s ease;
+		}
+
+		.beta-popup-overlay.active {
+			display: flex;
+		}
+
+		@@keyframes betaFadeIn {
+			from { opacity: 0; }
+			to { opacity: 1; }
+		}
+
+		@@keyframes betaSlideIn {
+			from { opacity: 0; transform: scale(0.9) translateY(-20px); }
+			to { opacity: 1; transform: scale(1) translateY(0); }
+		}
+
+		.beta-popup {
+			background: white;
+			border-radius: 20px;
+			padding: 32px;
+			max-width: 440px;
+			width: 100%;
+			position: relative;
+			border: 3px solid #4682B4;
+			box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+			animation: betaSlideIn 0.3s ease;
+		}
+
+		.beta-popup-close {
+			position: absolute;
+			top: 16px;
+			right: 16px;
+			width: 36px;
+			height: 36px;
+			border: none;
+			background: #f1f5f9;
+			border-radius: 50%;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: #64748b;
+			transition: all 0.2s;
+		}
+
+		.beta-popup-close:hover {
+			background: #e2e8f0;
+			color: #334155;
+		}
+
+		.beta-popup-icon {
+			text-align: center;
+			margin-bottom: 16px;
+		}
+
+		.beta-popup-title {
+			text-align: center;
+			font-size: 22px;
+			font-weight: 700;
+			color: #1e293b;
+			margin: 0 0 24px 0;
+		}
+
+		.beta-popup-content {
+			display: flex;
+			flex-direction: column;
+			gap: 16px;
+			margin-bottom: 24px;
+		}
+
+		.beta-info-item {
+			display: flex;
+			gap: 14px;
+			align-items: flex-start;
+		}
+
+		.beta-info-icon {
+			width: 40px;
+			height: 40px;
+			border-radius: 10px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			flex-shrink: 0;
+		}
+
+		.beta-info-icon.safe {
+			background: rgba(16, 185, 129, 0.1);
+			color: #10b981;
+		}
+
+		.beta-info-icon.money {
+			background: rgba(245, 158, 11, 0.1);
+			color: #f59e0b;
+		}
+
+		.beta-info-icon.beta {
+			background: rgba(70, 130, 180, 0.1);
+			color: #4682B4;
+		}
+
+		.beta-info-text strong {
+			display: block;
+			font-size: 14px;
+			font-weight: 600;
+			color: #1e293b;
+			margin-bottom: 4px;
+		}
+
+		.beta-info-text p {
+			font-size: 13px;
+			color: #64748b;
+			margin: 0;
+			line-height: 1.5;
+		}
+
+		.beta-info-text b {
+			color: #4682B4;
+			font-weight: 600;
+		}
+
+		.beta-popup-btn {
+			width: 100%;
+			padding: 14px;
+			background: linear-gradient(135deg, #4682B4 0%, #36648B 100%);
+			color: white;
+			border: none;
+			border-radius: 12px;
+			font-size: 15px;
+			font-weight: 600;
+			cursor: pointer;
+			transition: all 0.2s;
+		}
+
+		.beta-popup-btn:hover {
+			transform: translateY(-2px);
+			box-shadow: 0 8px 20px rgba(70, 130, 180, 0.3);
+		}
+
+		.beta-popup-checkbox {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 8px;
+			margin-top: 16px;
+			cursor: pointer;
+			font-size: 13px;
+			color: #64748b;
+		}
+
+		.beta-popup-checkbox input {
+			width: 16px;
+			height: 16px;
+			accent-color: #4682B4;
+		}
+
+		@@media (max-width: 480px) {
+			.beta-popup {
+				padding: 24px;
+				border-radius: 16px;
+			}
+
+			.beta-popup-title {
+				font-size: 18px;
+			}
+
+			.beta-info-icon {
+				width: 36px;
+				height: 36px;
+			}
+
+			.beta-info-text strong {
+				font-size: 13px;
+			}
+
+			.beta-info-text p {
+				font-size: 12px;
+			}
+		}
+	</style>
+
+	<script>
+		(function() {
+			const BETA_POPUP_KEY = 'lado_beta_popup';
+			const DAYS_TO_HIDE = 5; // Días que no se mostrará después de "No mostrar de nuevo"
+			const RANDOM_CHANCE = 0.15; // 15% de probabilidad de aparecer en cada visita
+
+			function shouldShowBetaPopup() {
+				const stored = localStorage.getItem(BETA_POPUP_KEY);
+
+				if (stored) {
+					const data = JSON.parse(stored);
+					const now = Date.now();
+
+					// Si el usuario marcó "no mostrar de nuevo" y aún no pasó el tiempo
+					if (data.dontShow && data.hideUntil > now) {
+						return false;
+					}
+
+					// Si ya se mostró hoy, no mostrar de nuevo
+					const today = new Date().toDateString();
+					if (data.lastShown === today) {
+						return false;
+					}
+				}
+
+				// Mostrar con probabilidad aleatoria
+				return Math.random() < RANDOM_CHANCE;
+			}
+
+			function showBetaPopup() {
+				const overlay = document.getElementById('betaPopupOverlay');
+				if (overlay) {
+					overlay.classList.add('active');
+					document.body.style.overflow = 'hidden';
+
+					// Registrar que se mostró hoy
+					const stored = localStorage.getItem(BETA_POPUP_KEY);
+					const data = stored ? JSON.parse(stored) : {};
+					data.lastShown = new Date().toDateString();
+					localStorage.setItem(BETA_POPUP_KEY, JSON.stringify(data));
+				}
+			}
+
+			window.closeBetaPopup = function() {
+				const overlay = document.getElementById('betaPopupOverlay');
+				const checkbox = document.getElementById('betaDontShowAgain');
+
+				if (checkbox && checkbox.checked) {
+					const hideUntil = Date.now() + (DAYS_TO_HIDE * 24 * 60 * 60 * 1000);
+					const data = {
+						dontShow: true,
+						hideUntil: hideUntil,
+						lastShown: new Date().toDateString()
+					};
+					localStorage.setItem(BETA_POPUP_KEY, JSON.stringify(data));
+				}
+
+				if (overlay) {
+					overlay.classList.remove('active');
+					document.body.style.overflow = '';
+				}
+			};
+
+			// Cerrar con Escape
+			document.addEventListener('keydown', function(e) {
+				if (e.key === 'Escape') {
+					closeBetaPopup();
+				}
+			});
+
+			// Cerrar al hacer clic fuera
+			document.getElementById('betaPopupOverlay')?.addEventListener('click', function(e) {
+				if (e.target === this) {
+					closeBetaPopup();
+				}
+			});
+
+			// Mostrar después de un pequeño delay si corresponde
+			if (shouldShowBetaPopup()) {
+				setTimeout(showBetaPopup, 2000); // Esperar 2 segundos después de cargar la página
+			}
+		})();
+	</script>
 </body>
 </html>

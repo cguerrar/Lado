@@ -1,0 +1,679 @@
+@{
+    ViewData["Title"] = "Preguntas Frecuentes";
+    Layout = "_Layout";
+}
+
+<style>
+    .faq-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 30px 20px;
+    }
+
+    .faq-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    .faq-header h1 {
+        color: #4682B4;
+        font-size: 2.5rem;
+        margin-bottom: 15px;
+    }
+
+    .faq-header p {
+        color: #666;
+        font-size: 1.1rem;
+    }
+
+    .faq-search {
+        max-width: 500px;
+        margin: 0 auto 40px;
+    }
+
+    .faq-search input {
+        width: 100%;
+        padding: 15px 20px;
+        border: 2px solid #e0e0e0;
+        border-radius: 30px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .faq-search input:focus {
+        outline: none;
+        border-color: #4682B4;
+        box-shadow: 0 0 0 3px rgba(70, 130, 180, 0.1);
+    }
+
+    .faq-categories {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+        margin-bottom: 30px;
+    }
+
+    .faq-category-btn {
+        padding: 10px 20px;
+        border: 2px solid #e0e0e0;
+        background: white;
+        border-radius: 25px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 500;
+    }
+
+    .faq-category-btn:hover,
+    .faq-category-btn.active {
+        border-color: #4682B4;
+        background: #4682B4;
+        color: white;
+    }
+
+    .faq-section {
+        margin-bottom: 40px;
+    }
+
+    .faq-section-title {
+        color: #4682B4;
+        font-size: 1.5rem;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e0e0e0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .faq-item {
+        background: white;
+        border-radius: 12px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        overflow: hidden;
+    }
+
+    .faq-question {
+        padding: 20px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 600;
+        color: #333;
+        transition: background 0.3s ease;
+    }
+
+    .faq-question:hover {
+        background: #f8f9fa;
+    }
+
+    .faq-question i {
+        color: #4682B4;
+        transition: transform 0.3s ease;
+    }
+
+    .faq-item.open .faq-question i {
+        transform: rotate(180deg);
+    }
+
+    .faq-answer {
+        padding: 0 20px;
+        max-height: 0;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        color: #666;
+        line-height: 1.7;
+    }
+
+    .faq-item.open .faq-answer {
+        padding: 0 20px 20px;
+        max-height: 500px;
+    }
+
+    .faq-answer ul {
+        margin: 10px 0;
+        padding-left: 20px;
+    }
+
+    .faq-answer li {
+        margin-bottom: 8px;
+    }
+
+    .faq-contact {
+        background: linear-gradient(135deg, #4682B4 0%, #5a9fd4 100%);
+        color: white;
+        padding: 40px;
+        border-radius: 16px;
+        text-align: center;
+        margin-top: 40px;
+    }
+
+    .faq-contact h3 {
+        margin-bottom: 15px;
+        font-size: 1.5rem;
+    }
+
+    .faq-contact p {
+        margin-bottom: 20px;
+        opacity: 0.9;
+    }
+
+    .faq-contact .btn-contact {
+        background: white;
+        color: #4682B4;
+        padding: 12px 30px;
+        border-radius: 25px;
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-block;
+        transition: transform 0.3s ease;
+    }
+
+    .faq-contact .btn-contact:hover {
+        transform: translateY(-2px);
+    }
+
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #4682B4;
+        text-decoration: none;
+        margin-bottom: 20px;
+        font-weight: 500;
+    }
+
+    .back-link:hover {
+        text-decoration: underline;
+    }
+
+    @@media (max-width: 768px) {
+        .faq-header h1 {
+            font-size: 2rem;
+        }
+
+        .faq-question {
+            font-size: 0.95rem;
+        }
+
+        .faq-contact {
+            padding: 30px 20px;
+        }
+    }
+</style>
+
+<div class="faq-container">
+    <a href="@Url.Action("Index", "Ayuda")" class="back-link">
+        <i class="fas fa-arrow-left"></i> Volver al Centro de Ayuda
+    </a>
+
+    <div class="faq-header">
+        <h1><i class="fas fa-question-circle"></i> Preguntas Frecuentes</h1>
+        <p>Encuentra respuestas rapidas a las dudas mas comunes</p>
+    </div>
+
+    <div class="faq-search">
+        <input type="text" id="faqSearch" placeholder="Buscar en las preguntas..." oninput="filterFAQ(this.value)">
+    </div>
+
+    <div class="faq-categories">
+        <button class="faq-category-btn active" onclick="filterCategory('all')">Todas</button>
+        <button class="faq-category-btn" onclick="filterCategory('cuenta')">Cuenta</button>
+        <button class="faq-category-btn" onclick="filterCategory('contenido')">Contenido</button>
+        <button class="faq-category-btn" onclick="filterCategory('dinero')">Dinero</button>
+        <button class="faq-category-btn" onclick="filterCategory('seguridad')">Seguridad</button>
+        <button class="faq-category-btn" onclick="filterCategory('tecnico')">Tecnico</button>
+    </div>
+
+    <!-- Cuenta y Perfil -->
+    <div class="faq-section" data-category="cuenta">
+        <h2 class="faq-section-title">
+            <i class="fas fa-user-circle"></i> Cuenta y Perfil
+        </h2>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Como creo una cuenta en LadoA?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Crear una cuenta es muy sencillo:
+                <ul>
+                    <li>Haz clic en "Registrarse" en la pagina principal</li>
+                    <li>Completa el formulario con tu nombre de usuario, email y contrasena</li>
+                    <li>Verifica tu correo electronico</li>
+                    <li>Completa tu perfil con foto y biografia</li>
+                </ul>
+                Una vez verificado, podras empezar a crear y compartir contenido.
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Como cambio mi foto de perfil?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Para cambiar tu foto de perfil:
+                <ul>
+                    <li>Ve a tu perfil haciendo clic en tu nombre de usuario</li>
+                    <li>Haz clic en el boton "Editar Perfil"</li>
+                    <li>Selecciona la nueva imagen desde tu dispositivo</li>
+                    <li>Ajusta el encuadre si es necesario y guarda</li>
+                </ul>
+                Recomendamos usar imagenes cuadradas de al menos 400x400 pixeles para mejor calidad.
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Puedo cambiar mi nombre de usuario?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Si, puedes cambiar tu nombre de usuario desde la seccion de Configuracion. Ten en cuenta que:
+                <ul>
+                    <li>El nuevo nombre debe estar disponible</li>
+                    <li>Solo puedes cambiarlo cada 30 dias</li>
+                    <li>Los enlaces antiguos a tu perfil dejaran de funcionar</li>
+                    <li>Tus seguidores seran notificados del cambio</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Como elimino mi cuenta?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Si deseas eliminar tu cuenta permanentemente:
+                <ul>
+                    <li>Ve a Configuracion > Privacidad y Seguridad</li>
+                    <li>Desplazate hasta "Eliminar Cuenta"</li>
+                    <li>Confirma tu decision ingresando tu contrasena</li>
+                </ul>
+                <strong>Importante:</strong> Esta accion es irreversible. Todo tu contenido, mensajes y datos seran eliminados permanentemente.
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido -->
+    <div class="faq-section" data-category="contenido">
+        <h2 class="faq-section-title">
+            <i class="fas fa-photo-video"></i> Contenido
+        </h2>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Que tipo de contenido puedo publicar?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                En LadoA puedes publicar:
+                <ul>
+                    <li><strong>Fotos:</strong> JPG, PNG, GIF (max 10MB)</li>
+                    <li><strong>Videos:</strong> MP4, MOV (max 100MB, hasta 10 minutos)</li>
+                    <li><strong>Reels:</strong> Videos cortos verticales con musica</li>
+                    <li><strong>Historias:</strong> Contenido que desaparece en 24 horas</li>
+                </ul>
+                Recuerda seguir nuestras normas de comunidad al publicar contenido.
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Como uso el creador de Reels?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                El creador de Reels te permite crear videos creativos:
+                <ul>
+                    <li>Haz clic en el boton "+" y selecciona "Crear Reel"</li>
+                    <li>Sube tu video o graba uno nuevo</li>
+                    <li>Anade musica de nuestra biblioteca</li>
+                    <li>Usa stickers, texto y efectos</li>
+                    <li>Ajusta los tiempos y transiciones</li>
+                    <li>Publica o guarda como borrador</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Puedo editar una publicacion despues de subirla?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Si, puedes editar:
+                <ul>
+                    <li>La descripcion y hashtags</li>
+                    <li>La ubicacion</li>
+                    <li>Las etiquetas de personas</li>
+                    <li>La configuracion de privacidad</li>
+                </ul>
+                <strong>Nota:</strong> No es posible cambiar la foto o video original. Si necesitas hacerlo, deberas eliminar la publicacion y crear una nueva.
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Que son los desafios?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Los desafios son una forma interactiva de interactuar con creadores:
+                <ul>
+                    <li>Puedes enviar desafios a tus creadores favoritos</li>
+                    <li>Incluyen una recompensa en Monedas LadoA</li>
+                    <li>El creador decide si acepta o rechaza</li>
+                    <li>Si acepta, tiene un tiempo limite para completarlo</li>
+                    <li>El contenido del desafio puede ser publico o privado</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dinero y Monetizacion -->
+    <div class="faq-section" data-category="dinero">
+        <h2 class="faq-section-title">
+            <i class="fas fa-coins"></i> Dinero y Monetizacion
+        </h2>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Que son las Monedas LadoA?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Las Monedas LadoA son nuestra moneda virtual interna:
+                <ul>
+                    <li>Se usan para propinas, desafios y contenido exclusivo</li>
+                    <li>Puedes comprarlas desde tu billetera</li>
+                    <li>Los creadores pueden convertirlas en dinero real</li>
+                    <li>1 Moneda LadoA = $0.01 USD (aproximado)</li>
+                </ul>
+                <strong>Beta:</strong> Durante la fase beta, las monedas son ficticias y no tienen valor real.
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Como me convierto en creador verificado?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Para ser creador verificado necesitas:
+                <ul>
+                    <li>Tener al menos 18 anos</li>
+                    <li>Verificar tu identidad con documento oficial</li>
+                    <li>Tener una cuenta bancaria o PayPal vinculada</li>
+                    <li>Aceptar los terminos de creador</li>
+                </ul>
+                Ve a Configuracion > Verificacion de Creador para iniciar el proceso.
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Como retiro mis ganancias?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Para retirar tus ganancias:
+                <ul>
+                    <li>Debes ser creador verificado</li>
+                    <li>Tener un minimo de $50 USD en tu billetera</li>
+                    <li>Ve a Billetera > Retirar</li>
+                    <li>Selecciona tu metodo de pago</li>
+                    <li>Los retiros se procesan en 3-5 dias habiles</li>
+                </ul>
+                LadoA cobra una comision del 20% sobre las ganancias.
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Cuanto gana LadoA por cada transaccion?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Nuestras comisiones son:
+                <ul>
+                    <li><strong>Suscripciones:</strong> 20% de comision</li>
+                    <li><strong>Propinas:</strong> 15% de comision</li>
+                    <li><strong>Desafios:</strong> 20% de comision</li>
+                    <li><strong>Contenido PPV:</strong> 20% de comision</li>
+                </ul>
+                Estas comisiones nos permiten mantener la plataforma y mejorar continuamente.
+            </div>
+        </div>
+    </div>
+
+    <!-- Seguridad -->
+    <div class="faq-section" data-category="seguridad">
+        <h2 class="faq-section-title">
+            <i class="fas fa-shield-alt"></i> Seguridad y Privacidad
+        </h2>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Como protejo mi cuenta?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Recomendaciones de seguridad:
+                <ul>
+                    <li>Usa una contrasena fuerte y unica</li>
+                    <li>Activa la autenticacion de dos factores (2FA)</li>
+                    <li>No compartas tus credenciales con nadie</li>
+                    <li>Revisa regularmente las sesiones activas</li>
+                    <li>Desconfia de enlaces sospechosos en mensajes</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Puedo hacer mi perfil privado?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Si, tienes control total sobre tu privacidad:
+                <ul>
+                    <li><strong>Perfil privado:</strong> Solo seguidores aprobados ven tu contenido</li>
+                    <li><strong>Ocultar actividad:</strong> Tu actividad no aparece en el feed de otros</li>
+                    <li><strong>Bloquear usuarios:</strong> Impide que ciertas personas te contacten</li>
+                    <li><strong>Restringir comentarios:</strong> Limita quien puede comentar</li>
+                </ul>
+                Configura todo desde Configuracion > Privacidad.
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Que hago si alguien esta usando mi contenido sin permiso?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Si encuentras uso no autorizado de tu contenido:
+                <ul>
+                    <li>Reporta el contenido usando el boton de reporte</li>
+                    <li>Selecciona "Violacion de derechos de autor"</li>
+                    <li>Proporciona prueba de que eres el propietario original</li>
+                    <li>Nuestro equipo revisara y actuara en 24-48 horas</li>
+                </ul>
+                Para casos graves, puedes enviar una solicitud DMCA formal.
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Como bloqueo a alguien?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Para bloquear a un usuario:
+                <ul>
+                    <li>Ve al perfil de la persona</li>
+                    <li>Haz clic en los tres puntos (...)</li>
+                    <li>Selecciona "Bloquear"</li>
+                    <li>Confirma la accion</li>
+                </ul>
+                El usuario bloqueado no podra ver tu perfil, enviarte mensajes ni interactuar con tu contenido.
+            </div>
+        </div>
+    </div>
+
+    <!-- Tecnico -->
+    <div class="faq-section" data-category="tecnico">
+        <h2 class="faq-section-title">
+            <i class="fas fa-cog"></i> Problemas Tecnicos
+        </h2>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                No puedo subir mi contenido, que hago?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Si tienes problemas al subir contenido:
+                <ul>
+                    <li>Verifica tu conexion a internet</li>
+                    <li>Asegurate de que el archivo no excede el limite de tamano</li>
+                    <li>Comprueba que el formato sea compatible</li>
+                    <li>Intenta con un navegador diferente</li>
+                    <li>Limpia la cache de tu navegador</li>
+                </ul>
+                Si el problema persiste, contactanos a traves del formulario de feedback.
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                La app va muy lenta, como la mejoro?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Para mejorar el rendimiento:
+                <ul>
+                    <li>Cierra otras pestanas o aplicaciones</li>
+                    <li>Limpia la cache del navegador</li>
+                    <li>Usa la ultima version de tu navegador</li>
+                    <li>Desactiva extensiones que puedan interferir</li>
+                    <li>Verifica que tu dispositivo cumpla los requisitos minimos</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                No recibo notificaciones, como las activo?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                Para activar las notificaciones:
+                <ul>
+                    <li>Ve a Configuracion > Notificaciones</li>
+                    <li>Activa los tipos de notificacion que desees</li>
+                    <li>Permite las notificaciones en tu navegador si se te solicita</li>
+                    <li>Verifica que no esten bloqueadas en la configuracion del dispositivo</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question" onclick="toggleFAQ(this)">
+                Que navegadores son compatibles?
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="faq-answer">
+                LadoA funciona mejor en:
+                <ul>
+                    <li><strong>Google Chrome</strong> (recomendado) - Version 90+</li>
+                    <li><strong>Mozilla Firefox</strong> - Version 88+</li>
+                    <li><strong>Safari</strong> - Version 14+</li>
+                    <li><strong>Microsoft Edge</strong> - Version 90+</li>
+                </ul>
+                Para la mejor experiencia, mantén tu navegador actualizado.
+            </div>
+        </div>
+    </div>
+
+    <div class="faq-contact">
+        <h3><i class="fas fa-envelope"></i> No encontraste tu respuesta?</h3>
+        <p>Nuestro equipo de soporte esta aqui para ayudarte</p>
+        <a href="@Url.Action("Feedback", "Ayuda")" class="btn-contact">
+            <i class="fas fa-paper-plane"></i> Envianos tu pregunta
+        </a>
+    </div>
+</div>
+
+<script>
+    function toggleFAQ(element) {
+        const item = element.parentElement;
+        const wasOpen = item.classList.contains('open');
+
+        // Cerrar todos
+        document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+
+        // Abrir el clickeado si estaba cerrado
+        if (!wasOpen) {
+            item.classList.add('open');
+        }
+    }
+
+    function filterFAQ(searchTerm) {
+        const items = document.querySelectorAll('.faq-item');
+        const term = searchTerm.toLowerCase();
+
+        items.forEach(item => {
+            const question = item.querySelector('.faq-question').textContent.toLowerCase();
+            const answer = item.querySelector('.faq-answer').textContent.toLowerCase();
+
+            if (question.includes(term) || answer.includes(term)) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+
+        // Mostrar todas las secciones durante busqueda
+        if (term) {
+            document.querySelectorAll('.faq-section').forEach(section => {
+                section.style.display = 'block';
+            });
+        }
+    }
+
+    function filterCategory(category) {
+        // Actualizar botones
+        document.querySelectorAll('.faq-category-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+
+        // Filtrar secciones
+        const sections = document.querySelectorAll('.faq-section');
+
+        if (category === 'all') {
+            sections.forEach(section => section.style.display = 'block');
+        } else {
+            sections.forEach(section => {
+                if (section.dataset.category === category) {
+                    section.style.display = 'block';
+                } else {
+                    section.style.display = 'none';
+                }
+            });
+        }
+
+        // Mostrar todas las preguntas de las secciones visibles
+        document.querySelectorAll('.faq-item').forEach(item => item.style.display = 'block');
+
+        // Limpiar busqueda
+        document.getElementById('faqSearch').value = '';
+    }
+</script>

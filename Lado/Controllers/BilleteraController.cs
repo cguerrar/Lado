@@ -103,7 +103,59 @@ namespace Lado.Controllers
             ViewBag.MetodoPago = "Transferencia Bancaria"; // Ejemplo
             ViewBag.CuentaBancaria = "**** **** **** 1234"; // Ejemplo
 
+            // Obtener retención de impuestos para el usuario
+            ViewBag.RetencionImpuestos = await ObtenerRetencionUsuarioAsync(usuario);
+            ViewBag.NombrePais = await ObtenerNombrePaisAsync(usuario.Pais);
+
             return View(usuario);
+        }
+
+        // Método helper para obtener la retención de un usuario
+        private async Task<decimal> ObtenerRetencionUsuarioAsync(ApplicationUser usuario)
+        {
+            // Si no usa retención del país, devolver la retención personalizada
+            if (!usuario.UsarRetencionPais && usuario.RetencionImpuestos.HasValue)
+            {
+                return usuario.RetencionImpuestos.Value;
+            }
+
+            // Buscar la retención del país del usuario
+            if (!string.IsNullOrEmpty(usuario.Pais))
+            {
+                var retencionPais = await _context.RetencionesPaises
+                    .FirstOrDefaultAsync(r => r.CodigoPais == usuario.Pais && r.Activo);
+
+                if (retencionPais != null)
+                {
+                    return retencionPais.PorcentajeRetencion;
+                }
+
+                // Si no está en la BD, usar las predeterminadas
+                if (RetencionesPredeterminadas.Paises.ContainsKey(usuario.Pais))
+                {
+                    return RetencionesPredeterminadas.Paises[usuario.Pais].Retencion;
+                }
+            }
+
+            // Si no hay país configurado o no existe la retención, devolver 0
+            return 0;
+        }
+
+        private async Task<string> ObtenerNombrePaisAsync(string? codigoPais)
+        {
+            if (string.IsNullOrEmpty(codigoPais))
+                return "No definido";
+
+            var retencionPais = await _context.RetencionesPaises
+                .FirstOrDefaultAsync(r => r.CodigoPais == codigoPais);
+
+            if (retencionPais != null)
+                return retencionPais.NombrePais;
+
+            if (RetencionesPredeterminadas.Paises.ContainsKey(codigoPais))
+                return RetencionesPredeterminadas.Paises[codigoPais].Nombre;
+
+            return codigoPais;
         }
 
         // POST: /Billetera/SolicitarRetiro
@@ -117,7 +169,6 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-          
             // Validaciones
             if (monto <= 0)
             {
@@ -131,26 +182,48 @@ namespace Lado.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
+            // Validar monto mínimo de retiro
+            if (monto < usuario.MontoMinimoRetiro)
+            {
+                TempData["Error"] = $"El monto mínimo de retiro es ${usuario.MontoMinimoRetiro:N2}";
+                return RedirectToAction(nameof(Index));
+            }
+
+            // Calcular comisión LadoApp
+            var comision = monto * (usuario.ComisionRetiro / 100);
+
+            // Calcular retención de impuestos
+            var retencionImpuestos = await ObtenerRetencionUsuarioAsync(usuario);
+            var montoRetencion = monto * (retencionImpuestos / 100);
+
+            // Calcular monto neto (bruto - comisión - impuestos)
+            var montoNeto = monto - comision - montoRetencion;
+
             // Crear transacción de retiro
             var transaccion = new Transaccion
             {
                 UsuarioId = usuario.Id,
                 Monto = monto,
+                MontoNeto = montoNeto,
+                Comision = comision,
+                RetencionImpuestos = montoRetencion,
                 TipoTransaccion = TipoTransaccion.Retiro,
-                Descripcion = $"Retiro vía {metodoPago}",
+                Descripcion = $"Retiro vía {metodoPago} (Comisión: {usuario.ComisionRetiro}%, Impuestos: {retencionImpuestos}%)",
                 EstadoPago = "Pendiente",
-                FechaTransaccion = DateTime.Now
+                MetodoPago = metodoPago,
+                FechaTransaccion = DateTime.Now,
+                Notas = detalles
             };
 
             _context.Transacciones.Add(transaccion);
 
-            // Restar del saldo disponible
+            // Restar del saldo disponible (el monto bruto)
             usuario.Saldo -= monto;
             _context.Users.Update(usuario);
 
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = $"Retiro de ${monto:N2} solicitado correctamente. Se procesará en 3-5 días hábiles.";
+            TempData["Success"] = $"Retiro solicitado: ${monto:N2} bruto → Comisión ${comision:N2} ({usuario.ComisionRetiro}%) + Impuestos ${montoRetencion:N2} ({retencionImpuestos}%) = Neto ${montoNeto:N2}. Se procesará en 3-5 días hábiles.";
             return RedirectToAction(nameof(Index));
         }
 

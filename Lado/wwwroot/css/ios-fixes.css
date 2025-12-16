@@ -1,0 +1,286 @@
+/**
+ * iOS Safari Compatibility Fixes
+ * Soluciona problemas de CSS específicos de iOS
+ */
+
+/* ========================================
+   FIX: 100vh en iOS Safari
+   iOS Safari incluye la barra de direccion en 100vh
+   ======================================== */
+
+/* Variables CSS para altura segura */
+:root {
+    --vh: 1vh;
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+}
+
+/* Fullscreen containers */
+.fullscreen-mode,
+.fullscreen-slides-container,
+.fullscreen-viewer {
+    height: 100vh;
+    height: 100dvh; /* Dynamic viewport height - iOS 15+ */
+    height: calc(var(--vh, 1vh) * 100); /* Fallback calculado por JS */
+
+    /* Prevenir scroll bounce en iOS */
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: auto;
+
+    /* Fix para position fixed en iOS */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    /* Prevenir seleccion de texto */
+    -webkit-user-select: none;
+    user-select: none;
+
+    /* Mejor rendering */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+}
+
+/* ========================================
+   FIX: Safe Area para notch de iPhone X+
+   ======================================== */
+
+.main-content {
+    padding-left: max(16px, var(--safe-area-inset-left));
+    padding-right: max(16px, var(--safe-area-inset-right));
+}
+
+.bottom-nav,
+.action-buttons-bottom {
+    padding-bottom: max(16px, var(--safe-area-inset-bottom));
+}
+
+.top-header,
+.navbar {
+    padding-top: max(16px, var(--safe-area-inset-top));
+}
+
+/* ========================================
+   FIX: Input zoom en iOS
+   iOS hace zoom al focus en inputs < 16px
+   ======================================== */
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+textarea,
+select {
+    font-size: 16px !important; /* Prevenir zoom */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    border-radius: 8px;
+}
+
+/* ========================================
+   FIX: Touch callout y text selection
+   ======================================== */
+
+/* Prevenir menu contextual en imagenes/videos */
+img,
+video,
+.media-container,
+.post-media {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* Permitir seleccion en areas de texto */
+.post-text-content,
+.description,
+.bio,
+p,
+h1, h2, h3, h4, h5, h6 {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+/* ========================================
+   FIX: Scroll momentum en iOS
+   ======================================== */
+
+.scrollable,
+.feed-scroll,
+.stories-scroll,
+.modal-body {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    overscroll-behavior-y: contain;
+}
+
+/* ========================================
+   FIX: Backdrop filter en iOS
+   ======================================== */
+
+.modal-overlay,
+.blur-background {
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Fallback para iOS < 14 */
+@supports not (-webkit-backdrop-filter: blur(10px)) {
+    .modal-overlay,
+    .blur-background {
+        background-color: rgba(0, 0, 0, 0.8);
+    }
+}
+
+/* ========================================
+   FIX: Videos en iOS
+   ======================================== */
+
+video {
+    /* Permitir reproduccion inline (no fullscreen nativo) */
+    -webkit-playsinline: true;
+    playsinline: true;
+
+    /* Prevenir controles nativos de iOS */
+    -webkit-media-playback-requires-user-action: false;
+
+    /* Fix para object-fit en iOS */
+    object-fit: cover;
+    width: 100%;
+    height: 100%;
+}
+
+/* ========================================
+   FIX: Audio en iOS
+   ======================================== */
+
+audio {
+    -webkit-playsinline: true;
+    playsinline: true;
+}
+
+/* Badge de musica - mejorado para touch */
+.music-badge {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    cursor: pointer;
+    min-height: 44px; /* Tamaño minimo de touch target */
+    min-width: 44px;
+}
+
+/* ========================================
+   FIX: Buttons y tap highlights
+   ======================================== */
+
+button,
+a,
+.btn,
+.clickable,
+[onclick] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+/* Tamaño minimo de touch target (44x44px segun Apple) */
+.action-btn,
+.nav-link,
+.btn {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+/* ========================================
+   FIX: Position sticky en iOS
+   ======================================== */
+
+.sticky-header {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+/* ========================================
+   FIX: Flexbox gap en iOS Safari < 14.5
+   ======================================== */
+
+@supports not (gap: 1px) {
+    .flex-container > * {
+        margin-right: 8px;
+        margin-bottom: 8px;
+    }
+    .flex-container > *:last-child {
+        margin-right: 0;
+    }
+}
+
+/* ========================================
+   FIX: Landscape mode en iPhone
+   ======================================== */
+
+@media screen and (orientation: landscape) and (max-height: 500px) {
+    .fullscreen-slides-container {
+        height: 100vh;
+        height: 100dvh;
+    }
+
+    /* Reducir padding en landscape */
+    .action-buttons {
+        padding: 4px 0;
+    }
+
+    .music-badge {
+        font-size: 12px;
+    }
+}
+
+/* ========================================
+   FIX: Dark mode en iOS
+   ======================================== */
+
+@media (prefers-color-scheme: dark) {
+    /* iOS puede tener tema oscuro del sistema */
+    :root[data-theme="light"] {
+        /* Respetar tema del usuario si esta explicitamente en light */
+    }
+}
+
+/* ========================================
+   FIX: Reduce motion para usuarios con sensibilidad
+   ======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ========================================
+   JAVASCRIPT HELPER: Calcular vh real
+   Incluir este script en tu JS:
+
+   function setVH() {
+       let vh = window.innerHeight * 0.01;
+       document.documentElement.style.setProperty('--vh', `${vh}px`);
+   }
+   setVH();
+   window.addEventListener('resize', setVH);
+   window.addEventListener('orientationchange', setVH);
+
+   ======================================== */

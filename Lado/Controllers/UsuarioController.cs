@@ -462,6 +462,9 @@ namespace Lado.Controllers
             ViewBag.ProximoPago = inicioMes.AddMonths(1);
             ViewBag.MontoEstimado = (int)ViewBag.SuscriptoresActivos * usuario.PrecioSuscripcion;
 
+            // Visitas al perfil
+            ViewBag.VisitasPerfil = usuario.VisitasPerfil;
+
             return View(usuario);
         }
 
@@ -983,6 +986,226 @@ namespace Lado.Controllers
 
             return Json(new { ids = bloqueados });
         }
+
+        // ========================================
+        // SISTEMA DE NOTIFICACIONES
+        // ========================================
+
+        /// <summary>
+        /// Página de notificaciones del usuario
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> Notificaciones()
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            var notificaciones = await _context.Notificaciones
+                .Where(n => n.UsuarioId == usuario.Id && n.EstaActiva)
+                .OrderByDescending(n => n.FechaCreacion)
+                .Take(100)
+                .ToListAsync();
+
+            ViewBag.TotalNoLeidas = notificaciones.Count(n => !n.Leida);
+
+            return View(notificaciones);
+        }
+
+        /// <summary>
+        /// API: Obtener notificaciones del usuario
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ObtenerNotificaciones(int pagina = 1, int cantidad = 20)
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
+                {
+                    return Json(new { success = false, message = "No autenticado" });
+                }
+
+                var skip = (pagina - 1) * cantidad;
+
+                // Primero obtenemos los datos de la base de datos
+                var notificacionesDb = await _context.Notificaciones
+                    .Where(n => n.UsuarioId == usuario.Id && n.EstaActiva)
+                    .OrderByDescending(n => n.FechaCreacion)
+                    .Skip(skip)
+                    .Take(cantidad)
+                    .Select(n => new
+                    {
+                        n.Id,
+                        n.Tipo,
+                        n.Titulo,
+                        n.Mensaje,
+                        n.UrlDestino,
+                        n.ImagenUrl,
+                        n.FechaCreacion,
+                        n.Leida
+                    })
+                    .ToListAsync();
+
+                // Luego proyectamos en memoria para calcular el tiempo relativo
+                var notificaciones = notificacionesDb.Select(n => new NotificacionDto
+                {
+                    Id = n.Id,
+                    Tipo = n.Tipo,
+                    Titulo = n.Titulo,
+                    Mensaje = n.Mensaje,
+                    UrlDestino = n.UrlDestino,
+                    ImagenUrl = n.ImagenUrl,
+                    FechaCreacion = n.FechaCreacion,
+                    Leida = n.Leida,
+                    TiempoRelativo = ObtenerTiempoRelativo(n.FechaCreacion)
+                }).ToList();
+
+                var totalNoLeidas = await _context.Notificaciones
+                    .CountAsync(n => n.UsuarioId == usuario.Id && n.EstaActiva && !n.Leida);
+
+                return Json(new {
+                    success = true,
+                    notificaciones,
+                    noLeidas = totalNoLeidas,
+                    hayMas = notificaciones.Count == cantidad
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Error: " + ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// API: Contar notificaciones no leídas
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ContarNotificacionesNoLeidas()
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
+                {
+                    return Json(new { count = 0 });
+                }
+
+                var count = await _context.Notificaciones
+                    .CountAsync(n => n.UsuarioId == usuario.Id && n.EstaActiva && !n.Leida);
+
+                return Json(new { count });
+            }
+            catch
+            {
+                return Json(new { count = 0 });
+            }
+        }
+
+        /// <summary>
+        /// API: Marcar notificación como leída
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> MarcarNotificacionLeida([FromBody] MarcarNotificacionRequest request)
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            var notificacion = await _context.Notificaciones
+                .FirstOrDefaultAsync(n => n.Id == request.NotificacionId && n.UsuarioId == usuario.Id);
+
+            if (notificacion == null)
+            {
+                return Json(new { success = false, message = "Notificación no encontrada" });
+            }
+
+            notificacion.Leida = true;
+            notificacion.FechaLectura = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true });
+        }
+
+        /// <summary>
+        /// API: Marcar todas las notificaciones como leídas
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> MarcarTodasLeidas()
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            var notificacionesNoLeidas = await _context.Notificaciones
+                .Where(n => n.UsuarioId == usuario.Id && !n.Leida && n.EstaActiva)
+                .ToListAsync();
+
+            foreach (var notificacion in notificacionesNoLeidas)
+            {
+                notificacion.Leida = true;
+                notificacion.FechaLectura = DateTime.Now;
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, marcadas = notificacionesNoLeidas.Count });
+        }
+
+        /// <summary>
+        /// API: Eliminar una notificación
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> EliminarNotificacion([FromBody] MarcarNotificacionRequest request)
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            var notificacion = await _context.Notificaciones
+                .FirstOrDefaultAsync(n => n.Id == request.NotificacionId && n.UsuarioId == usuario.Id);
+
+            if (notificacion == null)
+            {
+                return Json(new { success = false, message = "Notificación no encontrada" });
+            }
+
+            notificacion.EstaActiva = false;
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true });
+        }
+
+        /// <summary>
+        /// Método auxiliar para obtener tiempo relativo
+        /// </summary>
+        private static string ObtenerTiempoRelativo(DateTime fecha)
+        {
+            var diferencia = DateTime.Now - fecha;
+
+            if (diferencia.TotalMinutes < 1)
+                return "Ahora";
+            if (diferencia.TotalMinutes < 60)
+                return $"Hace {(int)diferencia.TotalMinutes}m";
+            if (diferencia.TotalHours < 24)
+                return $"Hace {(int)diferencia.TotalHours}h";
+            if (diferencia.TotalDays < 7)
+                return $"Hace {(int)diferencia.TotalDays}d";
+            if (diferencia.TotalDays < 30)
+                return $"Hace {(int)(diferencia.TotalDays / 7)}sem";
+            if (diferencia.TotalDays < 365)
+                return $"Hace {(int)(diferencia.TotalDays / 30)}mes";
+
+            return $"Hace {(int)(diferencia.TotalDays / 365)}año";
+        }
     }
 
     // ========================================
@@ -1012,5 +1235,24 @@ namespace Lado.Controllers
     public class CambiarIdiomaRequest
     {
         public string Idioma { get; set; } = "es";
+    }
+
+    // DTO para notificaciones
+    public class NotificacionDto
+    {
+        public int Id { get; set; }
+        public TipoNotificacion Tipo { get; set; }
+        public string? Titulo { get; set; }
+        public string Mensaje { get; set; } = string.Empty;
+        public string? UrlDestino { get; set; }
+        public string? ImagenUrl { get; set; }
+        public DateTime FechaCreacion { get; set; }
+        public bool Leida { get; set; }
+        public string TiempoRelativo { get; set; } = string.Empty;
+    }
+
+    public class MarcarNotificacionRequest
+    {
+        public int NotificacionId { get; set; }
     }
 }

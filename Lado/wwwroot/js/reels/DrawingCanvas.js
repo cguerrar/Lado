@@ -280,12 +280,10 @@ class DrawingCanvas {
 
     getCanvasCoordinates(e) {
         const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
-        const scaleY = this.canvas.height / rect.height;
-
+        // No multiplicar por devicePixelRatio ya que el ctx ya tiene scale aplicado
         return {
-            x: (e.clientX - rect.left) * scaleX,
-            y: (e.clientY - rect.top) * scaleY
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
         };
     }
 
@@ -417,12 +415,11 @@ class DrawingCanvas {
     }
 
     clearCanvas() {
-        if (confirm('¿Estás seguro de que quieres borrar todo el dibujo?')) {
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            this.history = [];
-            this.historyIndex = -1;
-            this.updateUndoRedoButtons();
-        }
+        // Borrar sin confirmar - acción directa
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.history = [];
+        this.historyIndex = -1;
+        this.updateUndoRedoButtons();
     }
 
     toggleDrawingMode() {
@@ -498,8 +495,9 @@ class DrawingCanvas {
     }
 
     show(container) {
-        if (!this.panel.parentElement) {
-            container.appendChild(this.panel);
+        // Agregar al body para que position:fixed funcione correctamente
+        if (!this.panel.parentElement || this.panel.parentElement !== document.body) {
+            document.body.appendChild(this.panel);
         }
         this.panel.classList.add('visible');
         this.isVisible = true;

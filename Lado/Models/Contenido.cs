@@ -68,6 +68,38 @@ namespace Lado.Models
         public string? RutaPreview { get; set; }
 
         // ========================================
+        // MÚSICA ASOCIADA (para fotos con audio)
+        // ========================================
+
+        /// <summary>
+        /// ID de la pista musical asociada (para fotos con música estilo Reels/TikTok)
+        /// </summary>
+        public int? PistaMusicalId { get; set; }
+
+        [ForeignKey("PistaMusicalId")]
+        public virtual PistaMusical? PistaMusical { get; set; }
+
+        /// <summary>
+        /// Volumen de la música (0.0 a 1.0)
+        /// </summary>
+        public decimal? MusicaVolumen { get; set; }
+
+        /// <summary>
+        /// Volumen del audio original del video (0.0 a 1.0)
+        /// </summary>
+        public decimal? AudioOriginalVolumen { get; set; }
+
+        /// <summary>
+        /// Segundo de inicio del recorte de audio
+        /// </summary>
+        public int? AudioTrimInicio { get; set; }
+
+        /// <summary>
+        /// Duración del audio en segundos (desde AudioTrimInicio)
+        /// </summary>
+        public int? AudioDuracion { get; set; }
+
+        // ========================================
         // ESTADO DEL CONTENIDO
         // ========================================
 
@@ -75,6 +107,11 @@ namespace Lado.Models
         public bool EstaActivo { get; set; } = true;
         public bool Censurado { get; set; } = false;
         public string? RazonCensura { get; set; }
+
+        /// <summary>
+        /// Si es true, el contenido solo es visible para el creador (privado)
+        /// </summary>
+        public bool EsPrivado { get; set; } = false;
 
         // ========================================
         // MÉTRICAS

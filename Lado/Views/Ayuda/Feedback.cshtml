@@ -1,0 +1,384 @@
+@{
+    ViewData["Title"] = "Enviar Feedback";
+    Layout = "_Layout";
+}
+
+<style>
+    .feedback-container {
+        max-width: 700px;
+        margin: 0 auto;
+        padding: 30px 20px;
+    }
+
+    .feedback-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    .feedback-header h1 {
+        color: #4682B4;
+        font-size: 2.2rem;
+        margin-bottom: 15px;
+    }
+
+    .feedback-header p {
+        color: #666;
+        font-size: 1.1rem;
+    }
+
+    .feedback-card {
+        background: white;
+        border-radius: 16px;
+        padding: 40px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    .form-group {
+        margin-bottom: 25px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .form-group label .required {
+        color: #dc3545;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 14px 18px;
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #4682B4;
+        box-shadow: 0 0 0 3px rgba(70, 130, 180, 0.1);
+    }
+
+    textarea.form-control {
+        min-height: 150px;
+        resize: vertical;
+    }
+
+    .tipo-feedback-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+    }
+
+    .tipo-option {
+        position: relative;
+    }
+
+    .tipo-option input {
+        position: absolute;
+        opacity: 0;
+        cursor: pointer;
+    }
+
+    .tipo-option label {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 15px 10px;
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-align: center;
+    }
+
+    .tipo-option label i {
+        font-size: 1.5rem;
+        margin-bottom: 8px;
+        color: #666;
+    }
+
+    .tipo-option label span {
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .tipo-option input:checked + label {
+        border-color: #4682B4;
+        background: rgba(70, 130, 180, 0.1);
+    }
+
+    .tipo-option input:checked + label i {
+        color: #4682B4;
+    }
+
+    .tipo-option:hover label {
+        border-color: #4682B4;
+    }
+
+    .btn-submit {
+        width: 100%;
+        padding: 16px;
+        background: linear-gradient(135deg, #4682B4 0%, #5a9fd4 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .btn-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(70, 130, 180, 0.4);
+    }
+
+    .btn-submit:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .alert {
+        padding: 15px 20px;
+        border-radius: 10px;
+        margin-bottom: 25px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .alert-success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .alert-danger {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    .info-box {
+        background: #e7f3ff;
+        border: 1px solid #b8daff;
+        border-radius: 10px;
+        padding: 15px 20px;
+        margin-bottom: 25px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .info-box i {
+        color: #4682B4;
+        font-size: 1.2rem;
+        margin-top: 2px;
+    }
+
+    .info-box p {
+        color: #004085;
+        margin: 0;
+        line-height: 1.5;
+    }
+
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #4682B4;
+        text-decoration: none;
+        margin-bottom: 20px;
+        font-weight: 500;
+    }
+
+    .back-link:hover {
+        text-decoration: underline;
+    }
+
+    .char-count {
+        text-align: right;
+        font-size: 0.85rem;
+        color: #999;
+        margin-top: 5px;
+    }
+
+    .char-count.warning {
+        color: #ffc107;
+    }
+
+    .char-count.danger {
+        color: #dc3545;
+    }
+
+    @@media (max-width: 768px) {
+        .feedback-card {
+            padding: 25px 20px;
+        }
+
+        .feedback-header h1 {
+            font-size: 1.8rem;
+        }
+
+        .tipo-feedback-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+</style>
+
+<div class="feedback-container">
+    <a href="@Url.Action("Index", "Ayuda")" class="back-link">
+        <i class="fas fa-arrow-left"></i> Volver al Centro de Ayuda
+    </a>
+
+    <div class="feedback-header">
+        <h1><i class="fas fa-comment-dots"></i> Enviar Feedback</h1>
+        <p>Tu opinion nos ayuda a mejorar LadoA</p>
+    </div>
+
+    <div class="feedback-card">
+        @if (TempData["Success"] != null)
+        {
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i>
+                @TempData["Success"]
+            </div>
+        }
+
+        @if (TempData["Error"] != null)
+        {
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle"></i>
+                @TempData["Error"]
+            </div>
+        }
+
+        <div class="info-box">
+            <i class="fas fa-info-circle"></i>
+            <p>
+                Leemos cada mensaje que recibimos. Tu feedback es valioso para nosotros
+                y nos ayuda a crear una mejor experiencia para todos los usuarios de LadoA.
+            </p>
+        </div>
+
+        <form asp-action="Feedback" method="post" id="feedbackForm">
+            @Html.AntiForgeryToken()
+
+            <div class="form-group">
+                <label>Tipo de Feedback <span class="required">*</span></label>
+                <div class="tipo-feedback-grid">
+                    <div class="tipo-option">
+                        <input type="radio" id="tipoSugerencia" name="tipo" value="0" checked>
+                        <label for="tipoSugerencia">
+                            <i class="fas fa-lightbulb"></i>
+                            <span>Sugerencia</span>
+                        </label>
+                    </div>
+                    <div class="tipo-option">
+                        <input type="radio" id="tipoError" name="tipo" value="1">
+                        <label for="tipoError">
+                            <i class="fas fa-bug"></i>
+                            <span>Error/Bug</span>
+                        </label>
+                    </div>
+                    <div class="tipo-option">
+                        <input type="radio" id="tipoPregunta" name="tipo" value="2">
+                        <label for="tipoPregunta">
+                            <i class="fas fa-question-circle"></i>
+                            <span>Pregunta</span>
+                        </label>
+                    </div>
+                    <div class="tipo-option">
+                        <input type="radio" id="tipoQueja" name="tipo" value="3">
+                        <label for="tipoQueja">
+                            <i class="fas fa-frown"></i>
+                            <span>Queja</span>
+                        </label>
+                    </div>
+                    <div class="tipo-option">
+                        <input type="radio" id="tipoOtro" name="tipo" value="4">
+                        <label for="tipoOtro">
+                            <i class="fas fa-ellipsis-h"></i>
+                            <span>Otro</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="nombre">Tu Nombre <span class="required">*</span></label>
+                <input type="text" class="form-control" id="nombre" name="nombre"
+                       value="@ViewBag.NombreUsuario" required
+                       placeholder="Como te llamas?">
+            </div>
+
+            <div class="form-group">
+                <label for="email">Correo Electronico <span class="required">*</span></label>
+                <input type="email" class="form-control" id="email" name="email"
+                       value="@ViewBag.Email" required
+                       placeholder="Para poder responderte">
+            </div>
+
+            <div class="form-group">
+                <label for="asunto">Asunto <span class="required">*</span></label>
+                <input type="text" class="form-control" id="asunto" name="asunto" required
+                       placeholder="Describe brevemente tu mensaje" maxlength="200">
+                <div class="char-count"><span id="asuntoCount">0</span>/200</div>
+            </div>
+
+            <div class="form-group">
+                <label for="mensaje">Mensaje <span class="required">*</span></label>
+                <textarea class="form-control" id="mensaje" name="mensaje" required
+                          placeholder="Cuentanos los detalles de tu feedback. Cuanta mas informacion nos des, mejor podremos ayudarte." maxlength="2000"></textarea>
+                <div class="char-count"><span id="mensajeCount">0</span>/2000</div>
+            </div>
+
+            <button type="submit" class="btn-submit" id="submitBtn">
+                <i class="fas fa-paper-plane"></i>
+                Enviar Feedback
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Contador de caracteres
+    document.getElementById('asunto').addEventListener('input', function() {
+        const count = this.value.length;
+        const counter = document.getElementById('asuntoCount');
+        counter.textContent = count;
+
+        const parent = counter.parentElement;
+        parent.classList.remove('warning', 'danger');
+        if (count > 180) parent.classList.add('danger');
+        else if (count > 150) parent.classList.add('warning');
+    });
+
+    document.getElementById('mensaje').addEventListener('input', function() {
+        const count = this.value.length;
+        const counter = document.getElementById('mensajeCount');
+        counter.textContent = count;
+
+        const parent = counter.parentElement;
+        parent.classList.remove('warning', 'danger');
+        if (count > 1900) parent.classList.add('danger');
+        else if (count > 1500) parent.classList.add('warning');
+    });
+
+    // Validacion del formulario
+    document.getElementById('feedbackForm').addEventListener('submit', function(e) {
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+    });
+</script>

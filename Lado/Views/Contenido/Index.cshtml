@@ -256,15 +256,12 @@
                                 </svg>
                                 Editar
                             </a>
-                            <form asp-action="Eliminar" asp-route-id="@contenido.Id" method="post" class="action-form">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn-danger" onclick="return confirm('¿Eliminar este borrador?')">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
-                                    </svg>
-                                    Eliminar
-                                </button>
-                            </form>
+                            <button type="button" class="btn-danger" onclick="showDeleteModal(@contenido.Id, 'borrador')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                                </svg>
+                                Eliminar
+                            </button>
                         }
                         else
                         {
@@ -274,15 +271,12 @@
                                 </svg>
                                 Editar
                             </a>
-                            <form asp-action="Eliminar" asp-route-id="@contenido.Id" method="post" class="action-form">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn-danger" onclick="return confirm('¿Eliminar este contenido?')">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
-                                    </svg>
-                                    Eliminar
-                                </button>
-                            </form>
+                            <button type="button" class="btn-danger" onclick="showDeleteModal(@contenido.Id, 'contenido')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                                </svg>
+                                Eliminar
+                            </button>
                         }
                     </div>
                 </div>
@@ -323,6 +317,31 @@
             </a>
         </div>
     }
+</div>
+
+<!-- Modal de Confirmación de Eliminación -->
+<div class="delete-modal-overlay" id="deleteModal">
+    <div class="delete-modal">
+        <div class="delete-modal-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM8 9h8v10H8V9zm7.5-5l-1-1h-5l-1 1H5v2h14V4h-3.5z"/>
+            </svg>
+        </div>
+        <h3 class="delete-modal-title">Eliminar <span id="deleteType">contenido</span></h3>
+        <p class="delete-modal-text">Esta accion no se puede deshacer. El contenido sera eliminado permanentemente.</p>
+        <div class="delete-modal-actions">
+            <button type="button" class="btn-modal-cancel" onclick="hideDeleteModal()">Cancelar</button>
+            <form id="deleteForm" method="post" style="display: inline;">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn-modal-delete">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                    </svg>
+                    Eliminar
+                </button>
+            </form>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -500,7 +519,7 @@
         flex-shrink: 0;
     }
 
-    .nav-link {
+    .contenido-manager .nav-link {
         display: flex;
         align-items: center;
         gap: 6px;
@@ -516,17 +535,17 @@
         white-space: nowrap;
     }
 
-    .nav-link svg {
+    .contenido-manager .nav-link svg {
         width: 14px;
         height: 14px;
     }
 
-    .nav-link:hover {
+    .contenido-manager .nav-link:hover {
         color: var(--cm-primary);
         background: rgba(70, 130, 180, 0.1);
     }
 
-    .nav-link.active {
+    .contenido-manager .nav-link.active {
         color: white;
         background: var(--cm-primary);
     }
@@ -829,12 +848,12 @@
             gap: 6px;
         }
 
-        .nav-link {
+        .contenido-manager .nav-link {
             padding: 6px 12px;
             font-size: 12px;
         }
 
-        .nav-link svg {
+        .contenido-manager .nav-link svg {
             width: 12px;
             height: 12px;
         }
@@ -909,7 +928,7 @@
             padding: 10px;
         }
 
-        .nav-link {
+        .contenido-manager .nav-link {
             padding: 5px 10px;
             font-size: 11px;
         }
@@ -971,42 +990,226 @@
             font-size: 12px;
         }
     }
+
+    /* ========================================
+       MODAL DE ELIMINACIÓN
+       ======================================== */
+    .delete-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.25s ease;
+        padding: 20px;
+    }
+
+    .delete-modal-overlay.show {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .delete-modal {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 28px;
+        max-width: 380px;
+        width: 100%;
+        text-align: center;
+        transform: scale(0.9) translateY(20px);
+        transition: all 0.25s ease;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
+
+    [data-theme="dark"] .delete-modal {
+        background: #1a1a2e;
+    }
+
+    .delete-modal-overlay.show .delete-modal {
+        transform: scale(1) translateY(0);
+    }
+
+    .delete-modal-icon {
+        width: 72px;
+        height: 72px;
+        background: #FEE2E2;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+    }
+
+    .delete-modal-icon svg {
+        color: #EF4444;
+    }
+
+    .delete-modal-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--cm-text);
+        margin: 0 0 10px 0;
+    }
+
+    .delete-modal-text {
+        font-size: 14px;
+        color: var(--cm-text-muted);
+        margin: 0 0 24px 0;
+        line-height: 1.5;
+    }
+
+    .delete-modal-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+    }
+
+    .btn-modal-cancel {
+        flex: 1;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: var(--cm-bg-secondary);
+        color: var(--cm-text);
+        border: 1px solid var(--cm-border);
+    }
+
+    .btn-modal-cancel:hover {
+        background: var(--cm-border);
+    }
+
+    .btn-modal-delete {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: #EF4444;
+        color: white;
+        border: none;
+    }
+
+    .btn-modal-delete:hover {
+        background: #DC2626;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+    }
+
+    .btn-modal-delete svg {
+        fill: white;
+    }
+
+    @@media (max-width: 480px) {
+        .delete-modal {
+            padding: 24px 20px;
+        }
+
+        .delete-modal-icon {
+            width: 64px;
+            height: 64px;
+        }
+
+        .delete-modal-icon svg {
+            width: 40px;
+            height: 40px;
+        }
+
+        .delete-modal-title {
+            font-size: 18px;
+        }
+
+        .delete-modal-actions {
+            flex-direction: column;
+        }
+
+        .btn-modal-cancel,
+        .btn-modal-delete {
+            width: 100%;
+        }
+    }
 </style>
 
-@section Scripts {
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Navegación de tabs
-            document.querySelectorAll('#filtroTabs .nav-link').forEach(tab => {
-                tab.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const filtro = this.dataset.filtro;
-                    window.location.href = `/Contenido/Index?filtro=${filtro}`;
-                });
+<script>
+    // Modal de eliminación
+    function showDeleteModal(id, tipo) {
+        const modal = document.getElementById('deleteModal');
+        const form = document.getElementById('deleteForm');
+        const typeSpan = document.getElementById('deleteType');
+
+        form.action = '/Contenido/Eliminar/' + id;
+        typeSpan.textContent = tipo;
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function hideDeleteModal() {
+        const modal = document.getElementById('deleteModal');
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+
+    // Cerrar modal al hacer clic fuera
+    document.getElementById('deleteModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            hideDeleteModal();
+        }
+    });
+
+    // Cerrar modal con tecla Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            hideDeleteModal();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Navegación de tabs
+        document.querySelectorAll('#filtroTabs .nav-link').forEach(tab => {
+            tab.addEventListener('click', function(e) {
+                e.preventDefault();
+                const filtro = this.dataset.filtro;
+                window.location.href = `/Contenido/Index?filtro=${filtro}`;
             });
-
-            // Búsqueda
-            const searchInput = document.getElementById('searchInput');
-            const tipoFilter = document.getElementById('tipoFilter');
-            const cards = document.querySelectorAll('.content-card');
-
-            function filterCards() {
-                const searchTerm = searchInput.value.toLowerCase();
-                const tipoSelected = tipoFilter.value;
-
-                cards.forEach(card => {
-                    const description = card.querySelector('.content-description')?.textContent.toLowerCase() || '';
-                    const tipo = card.dataset.tipo;
-
-                    const matchesSearch = description.includes(searchTerm);
-                    const matchesTipo = !tipoSelected || tipo === tipoSelected;
-
-                    card.style.display = matchesSearch && matchesTipo ? '' : 'none';
-                });
-            }
-
-            searchInput?.addEventListener('input', filterCards);
-            tipoFilter?.addEventListener('change', filterCards);
         });
-    </script>
-}
+
+        // Búsqueda
+        const searchInput = document.getElementById('searchInput');
+        const tipoFilter = document.getElementById('tipoFilter');
+        const cards = document.querySelectorAll('.content-card');
+
+        function filterCards() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const tipoSelected = tipoFilter.value;
+
+            cards.forEach(card => {
+                const description = card.querySelector('.content-description')?.textContent.toLowerCase() || '';
+                const tipo = card.dataset.tipo;
+
+                const matchesSearch = description.includes(searchTerm);
+                const matchesTipo = !tipoSelected || tipo === tipoSelected;
+
+                card.style.display = matchesSearch && matchesTipo ? '' : 'none';
+            });
+        }
+
+        searchInput?.addEventListener('input', filterCards);
+        tipoFilter?.addEventListener('change', filterCards);
+    });
+</script>

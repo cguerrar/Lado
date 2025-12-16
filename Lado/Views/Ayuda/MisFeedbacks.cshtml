@@ -1,0 +1,355 @@
+@model List<Lado.Models.Feedback>
+@{
+    ViewData["Title"] = "Mis Feedbacks";
+    Layout = "_Layout";
+}
+
+<style>
+    .feedbacks-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 30px 20px;
+    }
+
+    .feedbacks-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .feedbacks-header h1 {
+        color: #333;
+        font-size: 1.8rem;
+        margin: 0;
+    }
+
+    .btn-new-feedback {
+        background: linear-gradient(135deg, #4682B4 0%, #5a9fd4 100%);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 25px;
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-new-feedback:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(70, 130, 180, 0.4);
+        color: white;
+    }
+
+    .feedback-list {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .feedback-item {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        transition: transform 0.3s ease;
+    }
+
+    .feedback-item:hover {
+        transform: translateY(-2px);
+    }
+
+    .feedback-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 15px;
+        gap: 15px;
+    }
+
+    .feedback-tipo {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .tipo-sugerencia {
+        background: #e7f3ff;
+        color: #0066cc;
+    }
+
+    .tipo-error {
+        background: #ffebee;
+        color: #c62828;
+    }
+
+    .tipo-pregunta {
+        background: #fff3e0;
+        color: #ef6c00;
+    }
+
+    .tipo-queja {
+        background: #fce4ec;
+        color: #c2185b;
+    }
+
+    .tipo-otro {
+        background: #f3e5f5;
+        color: #7b1fa2;
+    }
+
+    .feedback-estado {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .estado-pendiente {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .estado-enrevision {
+        background: #cce5ff;
+        color: #004085;
+    }
+
+    .estado-respondido {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .estado-cerrado {
+        background: #e2e3e5;
+        color: #383d41;
+    }
+
+    .feedback-asunto {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 10px;
+    }
+
+    .feedback-mensaje {
+        color: #666;
+        line-height: 1.6;
+        margin-bottom: 15px;
+    }
+
+    .feedback-fecha {
+        color: #999;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .feedback-respuesta {
+        background: #f8f9fa;
+        border-left: 4px solid #4682B4;
+        padding: 15px;
+        margin-top: 15px;
+        border-radius: 0 8px 8px 0;
+    }
+
+    .feedback-respuesta-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+        font-weight: 600;
+        color: #4682B4;
+    }
+
+    .feedback-respuesta-texto {
+        color: #333;
+        line-height: 1.6;
+    }
+
+    .feedback-respuesta-fecha {
+        color: #999;
+        font-size: 0.85rem;
+        margin-top: 10px;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: #ddd;
+        margin-bottom: 20px;
+    }
+
+    .empty-state h3 {
+        color: #666;
+        margin-bottom: 10px;
+    }
+
+    .empty-state p {
+        color: #999;
+        margin-bottom: 25px;
+    }
+
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #4682B4;
+        text-decoration: none;
+        margin-bottom: 20px;
+        font-weight: 500;
+    }
+
+    .back-link:hover {
+        text-decoration: underline;
+    }
+
+    @@media (max-width: 576px) {
+        .feedbacks-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .feedback-header {
+            flex-direction: column;
+        }
+
+        .feedback-item {
+            padding: 20px;
+        }
+    }
+</style>
+
+<div class="feedbacks-container">
+    <a href="@Url.Action("Index", "Ayuda")" class="back-link">
+        <i class="fas fa-arrow-left"></i> Volver al Centro de Ayuda
+    </a>
+
+    <div class="feedbacks-header">
+        <h1><i class="fas fa-comments"></i> Mis Feedbacks</h1>
+        <a href="@Url.Action("Feedback", "Ayuda")" class="btn-new-feedback">
+            <i class="fas fa-plus"></i> Nuevo Feedback
+        </a>
+    </div>
+
+    @if (Model == null || Model.Count == 0)
+    {
+        <div class="empty-state">
+            <i class="fas fa-inbox"></i>
+            <h3>No tienes feedbacks enviados</h3>
+            <p>Cuando envies un feedback, podras ver su estado aqui</p>
+            <a href="@Url.Action("Feedback", "Ayuda")" class="btn-new-feedback">
+                <i class="fas fa-paper-plane"></i> Enviar Feedback
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="feedback-list">
+            @foreach (var feedback in Model)
+            {
+                <div class="feedback-item">
+                    <div class="feedback-header">
+                        <div>
+                            @switch (feedback.Tipo)
+                            {
+                                case Lado.Models.TipoFeedback.Sugerencia:
+                                    <span class="feedback-tipo tipo-sugerencia">
+                                        <i class="fas fa-lightbulb"></i> Sugerencia
+                                    </span>
+                                    break;
+                                case Lado.Models.TipoFeedback.Error:
+                                    <span class="feedback-tipo tipo-error">
+                                        <i class="fas fa-bug"></i> Error/Bug
+                                    </span>
+                                    break;
+                                case Lado.Models.TipoFeedback.Pregunta:
+                                    <span class="feedback-tipo tipo-pregunta">
+                                        <i class="fas fa-question-circle"></i> Pregunta
+                                    </span>
+                                    break;
+                                case Lado.Models.TipoFeedback.Queja:
+                                    <span class="feedback-tipo tipo-queja">
+                                        <i class="fas fa-frown"></i> Queja
+                                    </span>
+                                    break;
+                                default:
+                                    <span class="feedback-tipo tipo-otro">
+                                        <i class="fas fa-ellipsis-h"></i> Otro
+                                    </span>
+                                    break;
+                            }
+                        </div>
+                        <div>
+                            @switch (feedback.Estado)
+                            {
+                                case Lado.Models.EstadoFeedback.Pendiente:
+                                    <span class="feedback-estado estado-pendiente">
+                                        <i class="fas fa-clock"></i> Pendiente
+                                    </span>
+                                    break;
+                                case Lado.Models.EstadoFeedback.EnRevision:
+                                    <span class="feedback-estado estado-enrevision">
+                                        <i class="fas fa-search"></i> En Revision
+                                    </span>
+                                    break;
+                                case Lado.Models.EstadoFeedback.Respondido:
+                                    <span class="feedback-estado estado-respondido">
+                                        <i class="fas fa-check-circle"></i> Respondido
+                                    </span>
+                                    break;
+                                case Lado.Models.EstadoFeedback.Cerrado:
+                                    <span class="feedback-estado estado-cerrado">
+                                        <i class="fas fa-lock"></i> Cerrado
+                                    </span>
+                                    break;
+                            }
+                        </div>
+                    </div>
+
+                    <h3 class="feedback-asunto">@feedback.Asunto</h3>
+                    <p class="feedback-mensaje">@feedback.Mensaje</p>
+                    <div class="feedback-fecha">
+                        <i class="fas fa-calendar-alt"></i>
+                        @feedback.FechaEnvio.ToString("dd/MM/yyyy HH:mm")
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(feedback.RespuestaAdmin))
+                    {
+                        <div class="feedback-respuesta">
+                            <div class="feedback-respuesta-header">
+                                <i class="fas fa-reply"></i> Respuesta del equipo LadoA
+                            </div>
+                            <p class="feedback-respuesta-texto">@feedback.RespuestaAdmin</p>
+                            @if (feedback.FechaRespuesta.HasValue)
+                            {
+                                <div class="feedback-respuesta-fecha">
+                                    <i class="fas fa-clock"></i> @feedback.FechaRespuesta.Value.ToString("dd/MM/yyyy HH:mm")
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>

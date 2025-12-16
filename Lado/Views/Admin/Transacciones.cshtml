@@ -1,0 +1,334 @@
+@model List<Lado.Models.Transaccion>
+@using Lado.Models
+@{
+    ViewData["Title"] = "Transacciones";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+<div class="container-fluid px-0">
+    <!-- Header con estadísticas -->
+    <div class="row g-4 mb-4">
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-primary">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                        <line x1="1" y1="10" x2="23" y2="10"></line>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p class="stat-label">Total Transacciones</p>
+                    <h3 class="stat-value">@ViewBag.TotalTransacciones</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-success">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                        <polyline points="17 6 23 6 23 12"></polyline>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p class="stat-label">Ingresos Totales</p>
+                    <h3 class="stat-value">$@(((decimal)ViewBag.IngresosTotales).ToString("N2"))</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-danger">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+                        <polyline points="17 18 23 18 23 12"></polyline>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p class="stat-label">Retiros Pagados</p>
+                    <h3 class="stat-value">$@(((decimal)ViewBag.RetirosTotales).ToString("N2"))</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-info">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <line x1="12" y1="1" x2="12" y2="23"></line>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p class="stat-label">Comisiones Lado</p>
+                    <h3 class="stat-value">$@(((decimal)ViewBag.ComisionesTotales).ToString("N2"))</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label small">Buscar usuario</label>
+                    <input type="text" name="buscar" class="form-control" placeholder="Nombre, email o username" value="@ViewBag.Buscar">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Tipo</label>
+                    <select name="tipo" class="form-select">
+                        <option value="">Todos</option>
+                        @foreach (var tipo in (IEnumerable<dynamic>)ViewBag.TiposTransaccion)
+                        {
+                            <option value="@tipo.Valor" selected="@(ViewBag.Tipo == tipo.Valor)">@tipo.Nombre</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Estado</label>
+                    <select name="estado" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="Completado" selected="@(ViewBag.Estado == "Completado")">Completado</option>
+                        <option value="Pendiente" selected="@(ViewBag.Estado == "Pendiente")">Pendiente</option>
+                        <option value="Rechazado" selected="@(ViewBag.Estado == "Rechazado")">Rechazado</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Desde</label>
+                    <input type="date" name="desde" class="form-control" value="@ViewBag.Desde">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Hasta</label>
+                    <input type="date" name="hasta" class="form-control" value="@ViewBag.Hasta">
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabla de transacciones -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Historial de Transacciones</h5>
+            <div class="d-flex gap-2 align-items-center">
+                <span class="badge bg-secondary">@ViewBag.TotalItems resultados</span>
+                <a href="@Url.Action("ExportarTransacciones", new { tipo = ViewBag.Tipo, estado = ViewBag.Estado, desde = ViewBag.Desde, hasta = ViewBag.Hasta })" class="btn btn-sm btn-outline-success">
+                    <i class="fas fa-file-csv me-1"></i> Exportar CSV
+                </a>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            @if (!Model.Any())
+            {
+                <div class="text-center py-5">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5" class="mb-3">
+                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                        <line x1="1" y1="10" x2="23" y2="10"></line>
+                    </svg>
+                    <h5 class="text-muted">No se encontraron transacciones</h5>
+                    <p class="text-muted">Ajusta los filtros para ver resultados</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Usuario</th>
+                                <th>Tipo</th>
+                                <th>Monto</th>
+                                <th>Comision</th>
+                                <th>Neto</th>
+                                <th>Estado</th>
+                                <th>Metodo</th>
+                                <th>Fecha</th>
+                                <th>Descripcion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in Model)
+                            {
+                                var esRetiro = t.TipoTransaccion == TipoTransaccion.Retiro;
+                                <tr class="@(esRetiro ? "table-light" : "")">
+                                    <td><strong>#@t.Id</strong></td>
+                                    <td>
+                                        @if (t.Usuario != null)
+                                        {
+                                            <div class="d-flex align-items-center gap-2">
+                                                @if (!string.IsNullOrEmpty(t.Usuario.FotoPerfil))
+                                                {
+                                                    <img src="@t.Usuario.FotoPerfil" class="rounded-circle" style="width: 28px; height: 28px; object-fit: cover;">
+                                                }
+                                                <div>
+                                                    <div class="fw-semibold small">@t.Usuario.NombreCompleto</div>
+                                                    <small class="text-muted">@t.Usuario.UserName</small>
+                                                </div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">N/A</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @{
+                                            var badgeClass = t.TipoTransaccion switch
+                                            {
+                                                TipoTransaccion.Retiro => "bg-danger",
+                                                TipoTransaccion.Suscripcion => "bg-success",
+                                                TipoTransaccion.IngresoSuscripcion => "bg-success",
+                                                TipoTransaccion.Propina => "bg-info",
+                                                TipoTransaccion.IngresoPropina => "bg-info",
+                                                TipoTransaccion.CompraContenido => "bg-primary",
+                                                TipoTransaccion.VentaContenido => "bg-primary",
+                                                TipoTransaccion.Recarga => "bg-warning text-dark",
+                                                _ => "bg-secondary"
+                                            };
+                                        }
+                                        <span class="badge @badgeClass">@t.TipoTransaccion</span>
+                                    </td>
+                                    <td class="@(esRetiro ? "text-danger" : "text-success")">
+                                        @(esRetiro ? "-" : "+")$@t.Monto.ToString("N2")
+                                    </td>
+                                    <td>
+                                        @if (t.Comision.HasValue && t.Comision > 0)
+                                        {
+                                            <span class="text-muted">$@t.Comision.Value.ToString("N2")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (t.MontoNeto.HasValue)
+                                        {
+                                            <span class="fw-semibold">$@t.MontoNeto.Value.ToString("N2")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @switch (t.EstadoPago)
+                                        {
+                                            case "Completado":
+                                            case "Aprobado":
+                                                <span class="badge bg-success">Completado</span>
+                                                break;
+                                            case "Pendiente":
+                                                <span class="badge bg-warning text-dark">Pendiente</span>
+                                                break;
+                                            case "Rechazado":
+                                                <span class="badge bg-danger">Rechazado</span>
+                                                break;
+                                            default:
+                                                <span class="badge bg-secondary">@(t.EstadoPago ?? "N/A")</span>
+                                                break;
+                                        }
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">@(t.MetodoPago ?? "-")</small>
+                                    </td>
+                                    <td>
+                                        <small>@t.FechaTransaccion.ToString("dd/MM/yy HH:mm")</small>
+                                    </td>
+                                    <td style="max-width: 200px;">
+                                        <small class="text-muted text-truncate d-block" title="@t.Descripcion">
+                                            @(t.Descripcion?.Length > 40 ? t.Descripcion.Substring(0, 40) + "..." : t.Descripcion ?? "-")
+                                        </small>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Paginación -->
+                @if ((int)ViewBag.TotalPaginas > 1)
+                {
+                    <div class="card-footer d-flex justify-content-between align-items-center">
+                        <div class="text-muted small">
+                            Mostrando pagina @ViewBag.PaginaActual de @ViewBag.TotalPaginas
+                        </div>
+                        <nav>
+                            <ul class="pagination pagination-sm mb-0">
+                                @{
+                                    var paginaActual = (int)ViewBag.PaginaActual;
+                                    var totalPaginas = (int)ViewBag.TotalPaginas;
+                                    var queryParams = new Dictionary<string, string?>
+                                    {
+                                        { "buscar", ViewBag.Buscar },
+                                        { "tipo", ViewBag.Tipo },
+                                        { "estado", ViewBag.Estado },
+                                        { "desde", ViewBag.Desde },
+                                        { "hasta", ViewBag.Hasta }
+                                    };
+                                }
+
+                                @if (paginaActual > 1)
+                                {
+                                    queryParams["pagina"] = (paginaActual - 1).ToString();
+                                    <li class="page-item">
+                                        <a class="page-link" href="?@string.Join("&", queryParams.Where(kv => kv.Value != null).Select(kv => $"{kv.Key}={kv.Value}"))">
+                                            <i class="fas fa-chevron-left"></i>
+                                        </a>
+                                    </li>
+                                }
+
+                                @for (int i = Math.Max(1, paginaActual - 2); i <= Math.Min(totalPaginas, paginaActual + 2); i++)
+                                {
+                                    queryParams["pagina"] = i.ToString();
+                                    <li class="page-item @(i == paginaActual ? "active" : "")">
+                                        <a class="page-link" href="?@string.Join("&", queryParams.Where(kv => kv.Value != null).Select(kv => $"{kv.Key}={kv.Value}"))">@i</a>
+                                    </li>
+                                }
+
+                                @if (paginaActual < totalPaginas)
+                                {
+                                    queryParams["pagina"] = (paginaActual + 1).ToString();
+                                    <li class="page-item">
+                                        <a class="page-link" href="?@string.Join("&", queryParams.Where(kv => kv.Value != null).Select(kv => $"{kv.Key}={kv.Value}"))">
+                                            <i class="fas fa-chevron-right"></i>
+                                        </a>
+                                    </li>
+                                }
+                            </ul>
+                        </nav>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .table th {
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: var(--text-gray);
+        border-bottom-width: 2px;
+    }
+
+    .table td {
+        vertical-align: middle;
+        font-size: 0.875rem;
+    }
+
+    .pagination .page-link {
+        color: var(--primary);
+    }
+
+    .pagination .page-item.active .page-link {
+        background-color: var(--primary);
+        border-color: var(--primary);
+    }
+</style>

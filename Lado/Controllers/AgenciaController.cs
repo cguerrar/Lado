@@ -126,50 +126,70 @@ namespace Lado.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
+            // Remover validacion de campos que se asignan automaticamente
+            ModelState.Remove("UsuarioId");
+            ModelState.Remove("Usuario");
+
             if (!ModelState.IsValid)
             {
+                var errors = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .ToList();
+
+                _logger.LogWarning($"Validacion fallida al registrar agencia: {string.Join(", ", errors)}");
+                TempData["Error"] = "Por favor corrige los errores en el formulario.";
                 return View(model);
             }
 
-            // Procesar logo si se subio
-            if (logo != null && logo.Length > 0)
+            try
             {
-                var uploadsPath = Path.Combine(_webHostEnvironment.WebRootPath, "uploads", "agencias");
-                if (!Directory.Exists(uploadsPath))
+                // Procesar logo si se subio
+                if (logo != null && logo.Length > 0)
                 {
-                    Directory.CreateDirectory(uploadsPath);
+                    var uploadsPath = Path.Combine(_webHostEnvironment.WebRootPath, "uploads", "agencias");
+                    if (!Directory.Exists(uploadsPath))
+                    {
+                        Directory.CreateDirectory(uploadsPath);
+                    }
+
+                    var fileName = $"{Guid.NewGuid()}{Path.GetExtension(logo.FileName)}";
+                    var filePath = Path.Combine(uploadsPath, fileName);
+
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await logo.CopyToAsync(stream);
+                    }
+
+                    model.LogoUrl = $"/uploads/agencias/{fileName}";
                 }
 
-                var fileName = $"{Guid.NewGuid()}{Path.GetExtension(logo.FileName)}";
-                var filePath = Path.Combine(uploadsPath, fileName);
+                model.UsuarioId = usuarioId;
+                model.FechaRegistro = DateTime.Now;
+                model.Estado = EstadoAgencia.Pendiente;
 
-                using (var stream = new FileStream(filePath, FileMode.Create))
+                _context.Agencias.Add(model);
+
+                // Actualizar tipo de usuario
+                var usuario = await _userManager.FindByIdAsync(usuarioId);
+                if (usuario != null)
                 {
-                    await logo.CopyToAsync(stream);
+                    usuario.TipoUsuario = 2; // Agencia
                 }
 
-                model.LogoUrl = $"/uploads/agencias/{fileName}";
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation($"Nueva agencia registrada: {model.NombreEmpresa} por usuario {usuarioId}");
+
+                TempData["Success"] = "Tu solicitud de agencia ha sido enviada. Te notificaremos cuando sea aprobada.";
+                return RedirectToAction(nameof(Index));
             }
-
-            model.UsuarioId = usuarioId;
-            model.FechaRegistro = DateTime.Now;
-            model.Estado = EstadoAgencia.Pendiente;
-
-            _context.Agencias.Add(model);
-
-            // Actualizar tipo de usuario
-            var usuario = await _userManager.FindByIdAsync(usuarioId);
-            if (usuario != null)
+            catch (Exception ex)
             {
-                usuario.TipoUsuario = 2; // Agencia
+                _logger.LogError(ex, $"Error al registrar agencia para usuario {usuarioId}: {ex.Message}");
+                TempData["Error"] = "Ocurrio un error al registrar tu agencia. Por favor intenta nuevamente.";
+                return View(model);
             }
-
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation($"Nueva agencia registrada: {model.NombreEmpresa} por usuario {usuarioId}");
-
-            TempData["Success"] = "Tu solicitud de agencia ha sido enviada. Te notificaremos cuando sea aprobada.";
-            return RedirectToAction(nameof(Index));
         }
 
         // ========================================
@@ -206,11 +226,18 @@ namespace Lado.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CrearAnuncio(Anuncio model, IFormFile? creativo,
             int? edadMinima, int? edadMaxima, GeneroUsuario? genero,
-            string? paises, string? intereses)
+            string? paises, string? intereses, string? accion)
         {
             var agencia = await ObtenerAgenciaActual();
             if (agencia == null) return RedirectToAction(nameof(Registrar));
             if (!EsAgenciaActiva(agencia)) return RedirectToAction(nameof(Index));
+
+            // Remover campos que se asignan en el servidor del ModelState
+            ModelState.Remove("AgenciaId");
+            ModelState.Remove("Agencia");
+            ModelState.Remove("FechaCreacion");
+            ModelState.Remove("UltimaActualizacion");
+            ModelState.Remove("Estado");
 
             // Validar presupuesto minimo
             if (model.PresupuestoDiario < 5)
@@ -260,7 +287,7 @@ namespace Lado.Controllers
             model.AgenciaId = agencia.Id;
             model.FechaCreacion = DateTime.Now;
             model.UltimaActualizacion = DateTime.Now;
-            model.Estado = EstadoAnuncio.Borrador;
+            model.Estado = accion == "revision" ? EstadoAnuncio.EnRevision : EstadoAnuncio.Borrador;
 
             // Valores por defecto para CPM y CPC si no se especificaron
             if (model.CostoPorMilImpresiones == 0)
@@ -290,8 +317,16 @@ namespace Lado.Controllers
 
             _logger.LogInformation($"Anuncio creado: {model.Titulo} por agencia {agencia.Id}");
 
-            TempData["Success"] = "Anuncio creado exitosamente. Puedes enviarlo a revision cuando estes listo.";
-            return RedirectToAction(nameof(EditarAnuncio), new { id = model.Id });
+            if (accion == "revision")
+            {
+                TempData["Success"] = "Anuncio creado y enviado a revision exitosamente. Te notificaremos cuando sea aprobado.";
+                return RedirectToAction(nameof(Anuncios));
+            }
+            else
+            {
+                TempData["Success"] = "Anuncio guardado como borrador. Puedes enviarlo a revision cuando estes listo.";
+                return RedirectToAction(nameof(EditarAnuncio), new { id = model.Id });
+            }
         }
 
         [HttpGet]
@@ -632,7 +667,7 @@ namespace Lado.Controllers
                 .Take(20)
                 .ToListAsync();
 
-            return View();
+            return View(agencia);
         }
 
         [HttpPost]

@@ -14,6 +14,8 @@
 
         public decimal? Comision { get; set; }
 
+        public decimal? RetencionImpuestos { get; set; }
+
         public string? Descripcion { get; set; }
 
         public DateTime FechaTransaccion { get; set; } = DateTime.Now;

@@ -1,109 +1,38 @@
 @model IEnumerable<Lado.Models.ApplicationUser>
 @{
-    ViewData["Title"] = "Explorar Creadores";
-    var creadoresLadoA = Model.Where(c => !c.TieneLadoB()).ToList();
-    var creadoresLadoB = Model.Where(c => c.TieneLadoB()).ToList();
+    ViewData["Title"] = "Explorar";
+    var creadoresLadoA = ViewBag.CreadoresLadoA as List<Lado.Models.ApplicationUser> ?? new List<Lado.Models.ApplicationUser>();
+    var creadoresLadoB = ViewBag.CreadoresLadoB as List<Lado.Models.ApplicationUser> ?? new List<Lado.Models.ApplicationUser>();
+    var suscripcionesActivas = ViewBag.SuscripcionesActivas as List<string> ?? new List<string>();
+    var contenidoExplorar = ViewBag.ContenidoExplorar as List<Lado.Models.Contenido> ?? new List<Lado.Models.Contenido>();
 }
 
 <style>
+    /* ========================================
+       CONTENEDOR PRINCIPAL
+       ======================================== */
     .explorar-container {
-        padding: 24px 16px;
-        max-width: 1200px;
+        max-width: 935px;
         margin: 0 auto;
+        padding: 20px 16px;
     }
 
-    .explorar-header {
-        margin-bottom: 24px;
+    /* ========================================
+       BARRA DE BÚSQUEDA
+       ======================================== */
+    .search-header {
+        margin-bottom: 20px;
     }
 
-    .explorar-header h2 {
-        font-size: 26px;
-        font-weight: 700;
-        color: var(--fg);
-        margin-bottom: 4px;
-    }
-
-    .explorar-header p {
-        color: var(--muted);
-        font-size: 14px;
-        margin: 0;
-    }
-
-    /* Tabs */
-    .explorar-tabs {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 24px;
-        border-bottom: 1px solid var(--line);
-        padding-bottom: 0;
-    }
-
-    .explorar-tab {
-        padding: 12px 20px;
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--muted);
-        background: transparent;
-        border: none;
-        cursor: pointer;
-        position: relative;
-        transition: all 0.2s ease;
-    }
-
-    .explorar-tab:hover {
-        color: var(--fg);
-    }
-
-    .explorar-tab.active {
-        color: var(--primary);
-    }
-
-    .explorar-tab.active::after {
-        content: '';
-        position: absolute;
-        bottom: -1px;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: var(--primary);
-        border-radius: 2px 2px 0 0;
-    }
-
-    .explorar-tab .tab-count {
-        margin-left: 8px;
-        padding: 2px 8px;
-        font-size: 12px;
-        font-weight: 600;
-        border-radius: 10px;
-        background: var(--bg-tertiary);
-        color: var(--muted);
-    }
-
-    .explorar-tab.active .tab-count {
-        background: var(--primary);
-        color: white;
-    }
-
-    /* Tab content */
-    .tab-content {
-        display: none;
-    }
-
-    .tab-content.active {
-        display: block;
-    }
-
-    /* Search */
     .search-box {
         position: relative;
-        margin-bottom: 24px;
     }
 
     .search-box input {
         width: 100%;
         padding: 12px 16px 12px 44px;
         border: 1px solid var(--line);
-        border-radius: var(--radius-md);
+        border-radius: 10px;
         font-size: 14px;
         background: var(--surface);
         color: var(--fg);
@@ -124,212 +53,430 @@
         color: var(--muted);
     }
 
-    /* Grid de creadores */
-    .creators-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 20px;
-    }
-
-    /* Card de creador */
-    .creator-card {
-        background: var(--surface);
-        border-radius: var(--radius-lg);
-        overflow: hidden;
-        border: 1px solid var(--line);
-        transition: all 0.2s ease;
-        position: relative;
-    }
-
-    .creator-card:hover {
-        transform: translateY(-4px);
-        box-shadow: var(--shadow-lg);
-        border-color: var(--primary-light);
-    }
-
-    .creator-cover {
-        height: 100px;
-        background: var(--primary-gradient);
-        position: relative;
-    }
-
-    .creator-cover img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-    .creator-avatar-wrapper {
+    /* ========================================
+       TABS DE NAVEGACIÓN
+       ======================================== */
+    .explorar-tabs {
         display: flex;
-        justify-content: center;
-        margin-top: -40px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 16px;
+        gap: 0;
+    }
+
+    .explorar-tab {
+        flex: 1;
+        padding: 14px 16px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--muted);
+        background: transparent;
+        border: none;
+        cursor: pointer;
         position: relative;
-        z-index: 2;
-    }
-
-    .creator-avatar {
-        width: 80px;
-        height: 80px;
-        border-radius: 50%;
-        border: 4px solid var(--surface);
-        overflow: hidden;
-        background: var(--bg-tertiary);
-    }
-
-    .creator-avatar img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-    .creator-avatar-placeholder {
-        width: 100%;
-        height: 100%;
+        transition: all 0.2s ease;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 28px;
-        font-weight: 700;
-        color: var(--primary);
-        background: var(--primary-light);
+        gap: 6px;
     }
 
-    .creator-info {
-        padding: 12px 16px 16px;
-        text-align: center;
-    }
-
-    .creator-name {
-        font-size: 16px;
-        font-weight: 700;
-        color: var(--fg);
-        margin: 0 0 4px;
-    }
-
-    .creator-username {
-        font-size: 13px;
-        color: var(--muted);
-        margin: 0 0 8px;
-    }
-
-    .creator-bio {
-        font-size: 13px;
-        color: var(--fg-secondary);
-        margin: 0 0 12px;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-        line-height: 1.4;
-    }
-
-    .creator-stats {
-        display: flex;
-        justify-content: center;
-        gap: 20px;
-        padding: 10px 0;
-        border-top: 1px solid var(--line);
-        margin-bottom: 12px;
-    }
-
-    .creator-stat {
-        text-align: center;
-    }
-
-    .creator-stat-value {
-        font-size: 15px;
-        font-weight: 700;
+    .explorar-tab:hover {
         color: var(--fg);
     }
 
-    .creator-stat-label {
-        font-size: 11px;
+    .explorar-tab.active {
+        color: var(--fg);
+    }
+
+    .explorar-tab.active::after {
+        content: '';
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--fg);
+    }
+
+    .tab-count {
+        font-size: 12px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        background: var(--bg-tertiary);
         color: var(--muted);
-        text-transform: uppercase;
     }
 
-    .creator-action {
-        display: block;
-        width: calc(100% - 32px);
-        margin: 0 16px 16px;
-        padding: 10px 16px;
-        text-align: center;
-        text-decoration: none;
-        border-radius: var(--radius-sm);
-        font-size: 14px;
-        font-weight: 600;
-        transition: all 0.2s ease;
-    }
-
-    /* Card LadoA - Gratuito */
-    .creator-card.ladoA .creator-action {
+    .explorar-tab.active .tab-count {
         background: var(--primary);
         color: white;
     }
 
-    .creator-card.ladoA .creator-action:hover {
-        background: var(--primary-dark);
+    .tab-content {
+        display: none;
     }
 
-    /* Card LadoB - Premium */
-    .creator-card.ladoB {
-        border-color: var(--accent);
+    .tab-content.active {
+        display: block;
     }
 
-    .creator-card.ladoB:hover {
-        border-color: var(--accent);
-        box-shadow: 0 8px 24px rgba(139, 92, 246, 0.15);
+    /* ========================================
+       FILTROS DE CONTENIDO
+       ======================================== */
+    .filters-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
     }
 
-    .creator-card.ladoB .creator-cover {
-        background: var(--accent-gradient);
+    .filter-chips {
+        display: flex;
+        gap: 8px;
+    }
+
+    .filter-chip {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--fg);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .filter-chip:hover {
+        border-color: var(--primary);
+    }
+
+    .filter-chip.active {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+
+    .order-select {
+        padding: 8px 32px 8px 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--fg);
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+    }
+
+    .order-select:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+
+    /* ========================================
+       GRID DE CONTENIDO (ESTILO INSTAGRAM)
+       ======================================== */
+    .explore-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4px;
+    }
+
+    .explore-item {
+        position: relative;
+        aspect-ratio: 1;
+        overflow: hidden;
+        cursor: pointer;
+        background: var(--bg-tertiary);
+    }
+
+    .explore-item img,
+    .explore-item video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        transition: transform 0.3s ease;
+    }
+
+    .explore-item:hover img,
+    .explore-item:hover video {
+        transform: scale(1.05);
+    }
+
+    .explore-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+
+    .explore-item:hover .explore-overlay {
+        opacity: 1;
+    }
+
+    .explore-stat {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .explore-stat i {
+        font-size: 16px;
+    }
+
+    .video-badge {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        color: white;
+        filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
+    }
+
+    .video-badge i {
+        font-size: 16px;
     }
 
     .premium-badge {
         position: absolute;
-        top: 12px;
-        right: 12px;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        padding: 4px 10px;
-        background: rgba(139, 92, 246, 0.95);
+        top: 8px;
+        left: 8px;
+        background: linear-gradient(135deg, #f59e0b, #d97706);
         color: white;
+        padding: 4px 8px;
+        border-radius: 6px;
         font-size: 11px;
-        font-weight: 700;
-        border-radius: 20px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        z-index: 3;
+        filter: drop-shadow(0 1px 3px rgba(0,0,0,0.3));
     }
 
     .premium-badge i {
         font-size: 10px;
     }
 
-    .creator-price {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 4px 12px;
-        background: var(--accent-light);
-        color: var(--accent);
-        font-size: 13px;
-        font-weight: 700;
-        border-radius: 20px;
-        margin-bottom: 12px;
+    /* ========================================
+       LOADING SPINNER
+       ======================================== */
+    .loading-container {
+        display: flex;
+        justify-content: center;
+        padding: 30px 0;
     }
 
-    .creator-card.ladoB .creator-action {
-        background: var(--accent);
+    .loading-spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid var(--line);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .no-more-content {
+        text-align: center;
+        padding: 30px;
+        color: var(--muted);
+        font-size: 14px;
+    }
+
+    /* ========================================
+       TARJETAS DE CREADORES (HORIZONTALES)
+       ======================================== */
+    .creators-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .creator-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .creator-row:hover {
+        background: var(--bg-tertiary);
+        border-color: var(--primary-light);
+    }
+
+    .creator-row-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        overflow: hidden;
+        flex-shrink: 0;
+        background: var(--bg-tertiary);
+    }
+
+    .creator-row-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .creator-row-avatar-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--primary);
+        background: var(--primary-light);
+    }
+
+    .creator-row-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .creator-row-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 2px;
+    }
+
+    .creator-row-username {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg);
+    }
+
+    .creator-row-verified {
+        color: var(--primary);
+        font-size: 14px;
+    }
+
+    .creator-row-name {
+        font-size: 13px;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .creator-row-bio {
+        font-size: 13px;
+        color: var(--fg-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-top: 2px;
+    }
+
+    .creator-row-stats {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 4px;
+    }
+
+    .creator-row-stats i {
+        font-size: 11px;
+    }
+
+    .creator-row-action {
+        flex-shrink: 0;
+    }
+
+    .btn-follow {
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: var(--primary);
         color: white;
     }
 
-    .creator-card.ladoB .creator-action:hover {
+    .btn-follow:hover {
+        background: var(--primary-dark);
+    }
+
+    .btn-follow.following {
+        background: transparent;
+        border: 1px solid var(--line);
+        color: var(--fg);
+    }
+
+    .btn-follow.following:hover {
+        border-color: #ed4956;
+        color: #ed4956;
+    }
+
+    /* ========================================
+       CREADORES PREMIUM
+       ======================================== */
+    .creator-row.premium {
+        border-color: var(--accent-light);
+    }
+
+    .creator-row.premium:hover {
+        border-color: var(--accent);
+    }
+
+    .premium-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        background: var(--accent);
+        color: white;
+        font-size: 10px;
+        font-weight: 700;
+        border-radius: 10px;
+        text-transform: uppercase;
+    }
+
+    .creator-row-price {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--accent);
+    }
+
+    .creator-row.premium .btn-follow {
+        background: var(--accent);
+    }
+
+    .creator-row.premium .btn-follow:hover {
         background: #7c3aed;
     }
 
-    /* Empty state */
+    /* Avatar blur para no suscritos */
+    .creator-row.premium.not-subscribed .creator-row-avatar img {
+        filter: blur(8px);
+    }
+
+    /* ========================================
+       EMPTY STATE
+       ======================================== */
     .empty-state {
         text-align: center;
         padding: 60px 20px;
@@ -354,100 +501,227 @@
         margin: 0;
     }
 
+    /* ========================================
+       RESPONSIVE
+       ======================================== */
     @@media (max-width: 768px) {
         .explorar-container {
-            padding: 16px 12px;
+            padding: 12px 8px;
         }
 
-        .creators-grid {
-            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        .explore-grid {
+            gap: 2px;
+        }
+
+        .filters-bar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .filter-chips {
+            justify-content: center;
+        }
+
+        .order-select {
+            width: 100%;
+        }
+
+        .creator-row {
+            padding: 10px;
+        }
+
+        .creator-row-avatar {
+            width: 44px;
+            height: 44px;
+        }
+
+        .btn-follow {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .explore-overlay {
             gap: 16px;
         }
 
+        .explore-stat {
+            font-size: 13px;
+        }
+    }
+
+    @@media (max-width: 480px) {
         .explorar-tabs {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
         }
 
         .explorar-tab {
+            padding: 12px 10px;
+            font-size: 13px;
             white-space: nowrap;
+        }
+
+        .filter-chip {
+            padding: 6px 12px;
+            font-size: 12px;
         }
     }
 </style>
 
 <div class="explorar-container">
-    <div class="explorar-header">
-        <h2>Explorar Creadores</h2>
-        <p>Descubre nuevos creadores y su contenido</p>
+    <!-- Barra de búsqueda -->
+    <div class="search-header">
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchGlobal" placeholder="Buscar creadores o contenido...">
+        </div>
     </div>
 
     <!-- Tabs -->
     <div class="explorar-tabs">
-        <button class="explorar-tab active" onclick="switchTab('creadores')">
-            <i class="fas fa-users"></i> Creadores
+        <button class="explorar-tab active" onclick="switchTab('contenido', this)">
+            <i class="fas fa-th"></i>
+            <span>Contenido</span>
+            <span class="tab-count">@contenidoExplorar.Count</span>
+        </button>
+        <button class="explorar-tab" onclick="switchTab('creadores', this)">
+            <i class="fas fa-users"></i>
+            <span>Creadores</span>
             <span class="tab-count">@creadoresLadoA.Count</span>
         </button>
-        <button class="explorar-tab" onclick="switchTab('premium')">
-            <i class="fas fa-crown"></i> Premium
+        <button class="explorar-tab" onclick="switchTab('premium', this)">
+            <i class="fas fa-crown"></i>
+            <span>Premium</span>
             <span class="tab-count">@creadoresLadoB.Count</span>
         </button>
     </div>
 
-    <!-- Tab: Creadores LadoA -->
-    <div id="tab-creadores" class="tab-content active">
-        <!-- Buscador -->
-        <div class="search-box">
+    <!-- Tab: Contenido -->
+    <div id="tab-contenido" class="tab-content active">
+        <!-- Filtros -->
+        <div class="filters-bar">
+            <div class="filter-chips">
+                <button class="filter-chip active" data-tipo="todos" onclick="filterContent('todos', this)">Todos</button>
+                <button class="filter-chip" data-tipo="fotos" onclick="filterContent('fotos', this)">
+                    <i class="fas fa-image"></i> Fotos
+                </button>
+                <button class="filter-chip" data-tipo="videos" onclick="filterContent('videos', this)">
+                    <i class="fas fa-video"></i> Videos
+                </button>
+            </div>
+            <select class="order-select" id="orderSelect" onchange="changeOrder()">
+                <option value="popular">Más popular</option>
+                <option value="reciente">Más reciente</option>
+            </select>
+        </div>
+
+        <!-- Grid de contenido -->
+        <div class="explore-grid" id="exploreGrid">
+            @foreach (var item in contenidoExplorar)
+            {
+                var esVideo = (int)item.TipoContenido == 2;
+                var esPremium = item.TipoLado == Lado.Models.TipoLado.LadoB;
+                <div class="explore-item" onclick="window.location.href='/Feed/Detalle/@item.Id'" data-tipo="@((int)item.TipoContenido)">
+                    @if (esVideo)
+                    {
+                        <video src="@item.RutaArchivo" muted preload="metadata"></video>
+                        <div class="video-badge">
+                            <i class="fas fa-play"></i>
+                        </div>
+                    }
+                    else
+                    {
+                        <img src="@item.RutaArchivo" alt="" loading="lazy">
+                    }
+                    @if (esPremium)
+                    {
+                        <div class="premium-badge">
+                            <i class="fas fa-crown"></i>
+                        </div>
+                    }
+                    <div class="explore-overlay">
+                        <div class="explore-stat">
+                            <i class="fas fa-heart"></i>
+                            <span>@item.NumeroLikes</span>
+                        </div>
+                        <div class="explore-stat">
+                            <i class="fas fa-comment"></i>
+                            <span>@item.NumeroComentarios</span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Loading spinner -->
+        <div class="loading-container" id="loadingSpinner" style="display: none;">
+            <div class="loading-spinner"></div>
+        </div>
+
+        <!-- No more content message -->
+        <div class="no-more-content" id="noMoreContent" style="display: none;">
+            No hay más contenido para mostrar
+        </div>
+
+        @if (!contenidoExplorar.Any())
+        {
+            <div class="empty-state">
+                <i class="fas fa-image"></i>
+                <h3>No hay contenido disponible</h3>
+                <p>Vuelve pronto para descubrir nuevo contenido</p>
+            </div>
+        }
+    </div>
+
+    <!-- Tab: Creadores -->
+    <div id="tab-creadores" class="tab-content">
+        <div class="search-box" style="margin-bottom: 16px;">
             <i class="fas fa-search"></i>
-            <input type="text" id="searchLadoA" placeholder="Buscar creadores..." onkeyup="filterCreators('ladoA')">
+            <input type="text" id="searchCreadores" placeholder="Buscar creadores..." onkeyup="filterCreators('creadores')">
         </div>
 
         @if (creadoresLadoA.Any())
         {
-            <div class="creators-grid" id="gridLadoA">
+            <div class="creators-list" id="creatorsListA">
                 @foreach (var creador in creadoresLadoA)
                 {
-                    <div class="creator-card ladoA" data-name="@creador.NombreCompleto?.ToLower()" data-username="@creador.UserName?.ToLower()">
-                        <div class="creator-cover">
-                            @if (!string.IsNullOrEmpty(creador.FotoPortada))
+                    var estaSuscrito = suscripcionesActivas.Contains(creador.Id);
+                    <div class="creator-row" data-name="@creador.NombreCompleto?.ToLower()" data-username="@creador.UserName?.ToLower()">
+                        <div class="creator-row-avatar" onclick="window.location.href='/Feed/Perfil/@creador.Id'">
+                            @if (!string.IsNullOrEmpty(creador.FotoPerfil))
                             {
-                                <img src="@creador.FotoPortada" alt="Portada">
+                                <img src="@creador.FotoPerfil" alt="@creador.NombreCompleto">
+                            }
+                            else
+                            {
+                                <div class="creator-row-avatar-placeholder">
+                                    @(creador.NombreCompleto?.Substring(0, 1).ToUpper() ?? "?")
+                                </div>
                             }
                         </div>
-
-                        <div class="creator-avatar-wrapper">
-                            <div class="creator-avatar">
-                                @if (!string.IsNullOrEmpty(creador.FotoPerfil))
+                        <div class="creator-row-info" onclick="window.location.href='/Feed/Perfil/@creador.Id'">
+                            <div class="creator-row-header">
+                                <span class="creator-row-username">@@@creador.UserName</span>
+                                @if (creador.CreadorVerificado)
                                 {
-                                    <img src="@creador.FotoPerfil" alt="@creador.NombreCompleto">
-                                }
-                                else
-                                {
-                                    <div class="creator-avatar-placeholder">
-                                        @(creador.NombreCompleto?.Substring(0, 1).ToUpper() ?? "?")
-                                    </div>
+                                    <i class="fas fa-check-circle creator-row-verified"></i>
                                 }
                             </div>
-                        </div>
-
-                        <div class="creator-info">
-                            <h3 class="creator-name">@creador.NombreCompleto</h3>
-                            <p class="creator-username">@@@creador.UserName</p>
-
+                            <div class="creator-row-name">@creador.NombreCompleto</div>
                             @if (!string.IsNullOrEmpty(creador.Biografia))
                             {
-                                <p class="creator-bio">@creador.Biografia</p>
+                                <div class="creator-row-bio">@creador.Biografia</div>
                             }
-
-                            <div class="creator-stats">
-                                <div class="creator-stat">
-                                    <div class="creator-stat-value">@creador.NumeroSeguidores</div>
-                                    <div class="creator-stat-label">Seguidores</div>
-                                </div>
+                            <div class="creator-row-stats">
+                                <i class="fas fa-users"></i>
+                                <span>@FormatNumber(creador.NumeroSeguidores) seguidores</span>
                             </div>
-
-                            <a href="/Feed/Perfil/@creador.Id" class="creator-action">
-                                Ver Perfil
-                            </a>
+                        </div>
+                        <div class="creator-row-action">
+                            <button class="btn-follow @(estaSuscrito ? "following" : "")"
+                                    onclick="event.stopPropagation(); toggleFollow('@creador.Id', this, 0)">
+                                @(estaSuscrito ? "Siguiendo" : "Seguir")
+                            </button>
                         </div>
                     </div>
                 }
@@ -458,82 +732,66 @@
             <div class="empty-state">
                 <i class="fas fa-users"></i>
                 <h3>No hay creadores disponibles</h3>
-                <p>Vuelve pronto para descubrir nuevo contenido</p>
+                <p>Vuelve pronto para descubrir nuevos creadores</p>
             </div>
         }
     </div>
 
-    <!-- Tab: Creadores LadoB (Premium) -->
+    <!-- Tab: Premium -->
     <div id="tab-premium" class="tab-content">
-        <!-- Buscador -->
-        <div class="search-box">
+        <div class="search-box" style="margin-bottom: 16px;">
             <i class="fas fa-search"></i>
-            <input type="text" id="searchLadoB" placeholder="Buscar creadores premium..." onkeyup="filterCreators('ladoB')">
+            <input type="text" id="searchPremium" placeholder="Buscar creadores premium..." onkeyup="filterCreators('premium')">
         </div>
 
         @if (creadoresLadoB.Any())
         {
-            <div class="creators-grid" id="gridLadoB">
+            <div class="creators-list" id="creatorsListB">
                 @foreach (var creador in creadoresLadoB)
                 {
-                    <div class="creator-card ladoB" data-name="@(creador.Seudonimo ?? creador.NombreCompleto)?.ToLower()" data-username="@creador.UserName?.ToLower()">
-                        <span class="premium-badge">
-                            <i class="fas fa-crown"></i> Premium
-                        </span>
-
-                        <div class="creator-cover">
-                            @if (!string.IsNullOrEmpty(creador.FotoPortada))
+                    var estaSuscrito = suscripcionesActivas.Contains(creador.Id);
+                    var cardClass = estaSuscrito ? "creator-row premium" : "creator-row premium not-subscribed";
+                    <div class="@cardClass" data-name="@(creador.Seudonimo ?? creador.NombreCompleto)?.ToLower()" data-username="@creador.UserName?.ToLower()">
+                        <div class="creator-row-avatar" onclick="window.location.href='/Feed/Perfil/@creador.Id?verSeudonimo=true'">
+                            @if (!string.IsNullOrEmpty(creador.FotoPerfilLadoB))
                             {
-                                <img src="@creador.FotoPortada" alt="Portada">
+                                <img src="@creador.FotoPerfilLadoB" alt="@creador.Seudonimo">
+                            }
+                            else if (!string.IsNullOrEmpty(creador.FotoPerfil))
+                            {
+                                <img src="@creador.FotoPerfil" alt="@creador.Seudonimo">
+                            }
+                            else
+                            {
+                                <div class="creator-row-avatar-placeholder">
+                                    @((creador.Seudonimo ?? creador.NombreCompleto)?.Substring(0, 1).ToUpper() ?? "?")
+                                </div>
                             }
                         </div>
-
-                        <div class="creator-avatar-wrapper">
-                            <div class="creator-avatar">
-                                @if (!string.IsNullOrEmpty(creador.FotoPerfilLadoB))
-                                {
-                                    <img src="@creador.FotoPerfilLadoB" alt="@creador.Seudonimo">
-                                }
-                                else if (!string.IsNullOrEmpty(creador.FotoPerfil))
-                                {
-                                    <img src="@creador.FotoPerfil" alt="@creador.Seudonimo">
-                                }
-                                else
-                                {
-                                    <div class="creator-avatar-placeholder">
-                                        @((creador.Seudonimo ?? creador.NombreCompleto)?.Substring(0, 1).ToUpper() ?? "?")
-                                    </div>
-                                }
+                        <div class="creator-row-info" onclick="window.location.href='/Feed/Perfil/@creador.Id?verSeudonimo=true'">
+                            <div class="creator-row-header">
+                                <span class="creator-row-username">@@@(creador.Seudonimo ?? creador.UserName)</span>
+                                <span class="premium-tag"><i class="fas fa-crown"></i> VIP</span>
                             </div>
-                        </div>
-
-                        <div class="creator-info">
-                            <h3 class="creator-name">@(creador.Seudonimo ?? creador.NombreCompleto)</h3>
-                            <p class="creator-username">@@@creador.UserName</p>
-
+                            <div class="creator-row-name">@(creador.Seudonimo ?? creador.NombreCompleto)</div>
                             @if (!string.IsNullOrEmpty(creador.BiografiaLadoB))
                             {
-                                <p class="creator-bio">@creador.BiografiaLadoB</p>
+                                <div class="creator-row-bio">@creador.BiografiaLadoB</div>
                             }
                             else if (!string.IsNullOrEmpty(creador.Biografia))
                             {
-                                <p class="creator-bio">@creador.Biografia</p>
+                                <div class="creator-row-bio">@creador.Biografia</div>
                             }
-
-                            <div class="creator-price">
-                                <i class="fas fa-tag"></i>
-                                $@creador.PrecioSuscripcion.ToString("N2")/mes
+                            <div class="creator-row-stats">
+                                <span class="creator-row-price">$@creador.PrecioSuscripcion.ToString("N2")/mes</span>
+                                <span style="margin: 0 6px;">•</span>
+                                <i class="fas fa-users"></i>
+                                <span>@FormatNumber(creador.NumeroSeguidores)</span>
                             </div>
-
-                            <div class="creator-stats">
-                                <div class="creator-stat">
-                                    <div class="creator-stat-value">@creador.NumeroSeguidores</div>
-                                    <div class="creator-stat-label">Seguidores</div>
-                                </div>
-                            </div>
-
-                            <a href="/Feed/Perfil/@creador.Id?verSeudonimo=true" class="creator-action">
-                                Ver Contenido Premium
+                        </div>
+                        <div class="creator-row-action">
+                            <a href="/Feed/Perfil/@creador.Id?verSeudonimo=true" class="btn-follow" style="text-decoration: none;">
+                                @(estaSuscrito ? "Ver" : "Suscribirse")
                             </a>
                         </div>
                     </div>
@@ -551,9 +809,27 @@
     </div>
 </div>
 
-@section Scripts {
-    <script>
-        function switchTab(tabName) {
+@functions {
+    string FormatNumber(int number)
+    {
+        if (number >= 1000000)
+            return (number / 1000000.0).ToString("0.#") + "M";
+        if (number >= 1000)
+            return (number / 1000.0).ToString("0.#") + "K";
+        return number.ToString();
+    }
+}
+
+<script>
+        // Estado de la aplicación
+        let currentPage = 1;
+        let currentTipo = 'todos';
+        let currentOrden = 'popular';
+        let isLoading = false;
+        let hasMore = true;
+
+        // Cambiar tabs
+        function switchTab(tabName, btn) {
             // Ocultar todos los contenidos
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
@@ -565,31 +841,271 @@
             });
 
             // Mostrar contenido seleccionado
-            document.getElementById('tab-' + tabName).classList.add('active');
+            const tabContent = document.getElementById('tab-' + tabName);
+            if (tabContent) {
+                tabContent.classList.add('active');
+            }
 
             // Activar tab seleccionado
-            event.target.closest('.explorar-tab').classList.add('active');
+            if (btn) {
+                btn.classList.add('active');
+            }
         }
 
-        function filterCreators(tipo) {
-            const searchInput = tipo === 'ladoA' ? document.getElementById('searchLadoA') : document.getElementById('searchLadoB');
-            const grid = tipo === 'ladoA' ? document.getElementById('gridLadoA') : document.getElementById('gridLadoB');
+        // Filtrar contenido por tipo
+        function filterContent(tipo, btn) {
+            currentTipo = tipo;
+            currentPage = 1;
+            hasMore = true;
 
-            if (!searchInput || !grid) return;
+            // Actualizar chips activos
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.classList.remove('active');
+            });
+            btn.classList.add('active');
+
+            // Recargar contenido
+            reloadContent();
+        }
+
+        // Cambiar orden
+        function changeOrder() {
+            currentOrden = document.getElementById('orderSelect').value;
+            currentPage = 1;
+            hasMore = true;
+            reloadContent();
+        }
+
+        // Recargar contenido desde cero
+        async function reloadContent() {
+            const grid = document.getElementById('exploreGrid');
+            grid.innerHTML = '';
+            document.getElementById('noMoreContent').style.display = 'none';
+            await loadMoreContent();
+        }
+
+        // Cargar más contenido (infinite scroll)
+        async function loadMoreContent() {
+            if (isLoading || !hasMore) return;
+
+            isLoading = true;
+            document.getElementById('loadingSpinner').style.display = 'flex';
+
+            try {
+                const response = await fetch(`/Feed/ExplorarContenido?page=${currentPage}&tipo=${currentTipo}&orden=${currentOrden}`);
+                const data = await response.json();
+
+                if (data.success && data.items.length > 0) {
+                    const grid = document.getElementById('exploreGrid');
+
+                    data.items.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'explore-item';
+                        div.setAttribute('data-tipo', item.tipoContenido);
+                        div.onclick = () => window.location.href = '/Feed/Detalle/' + item.id;
+
+                        const isVideo = item.tipoContenido === 2;
+                        const premiumBadge = item.esPremium ? '<div class="premium-badge"><i class="fas fa-crown"></i></div>' : '';
+
+                        if (isVideo) {
+                            div.innerHTML = `
+                                <video src="${item.rutaArchivo}" muted preload="metadata"></video>
+                                <div class="video-badge"><i class="fas fa-play"></i></div>
+                                ${premiumBadge}
+                                <div class="explore-overlay">
+                                    <div class="explore-stat"><i class="fas fa-heart"></i><span>${item.numeroLikes}</span></div>
+                                    <div class="explore-stat"><i class="fas fa-comment"></i><span>${item.numeroComentarios}</span></div>
+                                </div>
+                            `;
+                        } else {
+                            div.innerHTML = `
+                                <img src="${item.rutaArchivo}" alt="" loading="lazy">
+                                ${premiumBadge}
+                                <div class="explore-overlay">
+                                    <div class="explore-stat"><i class="fas fa-heart"></i><span>${item.numeroLikes}</span></div>
+                                    <div class="explore-stat"><i class="fas fa-comment"></i><span>${item.numeroComentarios}</span></div>
+                                </div>
+                            `;
+                        }
+
+                        grid.appendChild(div);
+                    });
+
+                    currentPage++;
+                    hasMore = data.hasMore;
+
+                    if (!hasMore) {
+                        document.getElementById('noMoreContent').style.display = 'block';
+                    }
+                } else {
+                    hasMore = false;
+                    if (currentPage === 1) {
+                        document.getElementById('exploreGrid').innerHTML = `
+                            <div class="empty-state" style="grid-column: 1/-1;">
+                                <i class="fas fa-image"></i>
+                                <h3>No hay contenido disponible</h3>
+                                <p>Prueba con otros filtros</p>
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('noMoreContent').style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                console.error('Error cargando contenido:', error);
+            } finally {
+                isLoading = false;
+                document.getElementById('loadingSpinner').style.display = 'none';
+            }
+        }
+
+        // Infinite scroll con Intersection Observer
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && document.getElementById('tab-contenido').classList.contains('active')) {
+                    loadMoreContent();
+                }
+            });
+        }, {
+            rootMargin: '200px'
+        });
+
+        // Observar el spinner
+        observer.observe(document.getElementById('loadingSpinner'));
+
+        // Filtrar creadores
+        function filterCreators(tipo) {
+            const searchInput = tipo === 'creadores'
+                ? document.getElementById('searchCreadores')
+                : document.getElementById('searchPremium');
+
+            const list = tipo === 'creadores'
+                ? document.getElementById('creatorsListA')
+                : document.getElementById('creatorsListB');
+
+            if (!searchInput || !list) return;
 
             const filter = searchInput.value.toLowerCase();
-            const cards = grid.querySelectorAll('.creator-card');
+            const rows = list.querySelectorAll('.creator-row');
 
-            cards.forEach(card => {
-                const name = card.getAttribute('data-name') || '';
-                const username = card.getAttribute('data-username') || '';
+            rows.forEach(row => {
+                const name = row.getAttribute('data-name') || '';
+                const username = row.getAttribute('data-username') || '';
 
                 if (name.includes(filter) || username.includes(filter)) {
-                    card.style.display = '';
+                    row.style.display = '';
                 } else {
-                    card.style.display = 'none';
+                    row.style.display = 'none';
                 }
             });
         }
-    </script>
-}
+
+        // Toggle follow
+        async function toggleFollow(userId, btn, tipoLado) {
+            try {
+                const response = await fetch('/Feed/Seguir', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                    },
+                    body: `id=${userId}&tipoLado=${tipoLado}`
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    if (data.siguiendo) {
+                        btn.classList.add('following');
+                        btn.textContent = 'Siguiendo';
+                    } else {
+                        btn.classList.remove('following');
+                        btn.textContent = 'Seguir';
+                    }
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Búsqueda global (debounced)
+        let searchTimeout;
+        document.getElementById('searchGlobal').addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.toLowerCase();
+
+            searchTimeout = setTimeout(() => {
+                // Filtrar contenido visible
+                document.querySelectorAll('.explore-item').forEach(item => {
+                    // Por ahora solo ocultamos si hay búsqueda
+                    // En una implementación completa, buscaríamos por API
+                    item.style.display = query.length > 0 ? 'none' : '';
+                });
+
+                // Filtrar creadores en ambas listas
+                document.querySelectorAll('.creator-row').forEach(row => {
+                    const name = row.getAttribute('data-name') || '';
+                    const username = row.getAttribute('data-username') || '';
+
+                    if (query.length === 0 || name.includes(query) || username.includes(query)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }, 300);
+        });
+
+        // Video hover play (sin audio)
+        function initVideoHover() {
+            document.querySelectorAll('.explore-item').forEach(item => {
+                const video = item.querySelector('video');
+                if (video) {
+                    // Asegurar que esté muted
+                    video.muted = true;
+                    video.loop = true;
+
+                    item.addEventListener('mouseenter', () => {
+                        video.play().catch(() => {});
+                    });
+
+                    item.addEventListener('mouseleave', () => {
+                        video.pause();
+                        video.currentTime = 0;
+                    });
+                }
+            });
+        }
+
+        // Inicializar para los videos existentes
+        initVideoHover();
+
+        // Re-inicializar después de cargar más contenido (MutationObserver)
+        const gridObserver = new MutationObserver((mutations) => {
+            mutations.forEach(mutation => {
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === 1 && node.classList.contains('explore-item')) {
+                        const video = node.querySelector('video');
+                        if (video) {
+                            video.muted = true;
+                            video.loop = true;
+
+                            node.addEventListener('mouseenter', () => {
+                                video.play().catch(() => {});
+                            });
+
+                            node.addEventListener('mouseleave', () => {
+                                video.pause();
+                                video.currentTime = 0;
+                            });
+                        }
+                    }
+                });
+            });
+        });
+
+        const exploreGrid = document.getElementById('exploreGrid');
+        if (exploreGrid) {
+            gridObserver.observe(exploreGrid, { childList: true });
+        }
+</script>

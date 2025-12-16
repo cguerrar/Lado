@@ -1,7 +1,10 @@
-﻿@model Lado.Models.ViewModels.AgeVerificationViewModel
+@model Lado.Models.ViewModels.AgeVerificationViewModel
 @{
-    ViewData["Title"] = "Verificación de Edad";
+    ViewData["Title"] = "Verificacion de Edad";
     Layout = null;
+    var currentYear = DateTime.Now.Year;
+    var minYear = currentYear - 100;
+    var maxYear = currentYear - 18;
 }
 
 <!DOCTYPE html>
@@ -10,158 +13,846 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Lado</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: #4682B4;
+            --primary-dark: #36648B;
+            --primary-darker: #2C5278;
+            --primary-light: #B0C4DE;
+            --primary-pale: rgba(70, 130, 180, 0.08);
+            --primary-gradient: linear-gradient(145deg, #4682B4 0%, #36648B 50%, #2C5278 100%);
+            --text-dark: #1a1a2e;
+            --text-gray: #64748b;
+            --text-light: #94a3b8;
+            --text-white: #ffffff;
+            --bg-body: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 50%, #cbd5e1 100%);
+            --bg-light: #f8fafc;
+            --bg-white: #ffffff;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+            --shadow-md: 0 4px 20px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 40px rgba(0,0,0,0.15);
+            --shadow-xl: 0 25px 60px rgba(0,0,0,0.2);
+            --shadow-primary: 0 8px 30px rgba(70, 130, 180, 0.35);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+            --radius-2xl: 24px;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-body);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-
-        .verification-container {
-            max-width: 500px;
-            width: 100%;
             padding: 20px;
+            color: var(--text-dark);
+            -webkit-font-smoothing: antialiased;
         }
 
+        .verification-wrapper {
+            width: 100%;
+            max-width: 480px;
+        }
+
+        /* Card Principal */
         .verification-card {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            padding: 40px;
+            background: var(--bg-white);
+            border-radius: var(--radius-2xl);
+            box-shadow: var(--shadow-xl);
+            overflow: hidden;
         }
 
-        .icon-container {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        /* Header con gradiente */
+        .card-header {
+            background: var(--primary-gradient);
+            padding: 40px 32px 48px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 60%);
+            pointer-events: none;
+        }
+
+        .card-header::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -30%;
+            width: 80%;
+            height: 80%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .header-icon {
+            width: 72px;
+            height: 72px;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header-icon svg {
+            width: 36px;
+            height: 36px;
+            color: var(--text-white);
+        }
+
+        .card-header h1 {
+            color: var(--text-white);
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin: 0 0 8px;
+            letter-spacing: -0.02em;
+            position: relative;
+            z-index: 1;
+        }
+
+        .card-header p {
+            color: rgba(255,255,255,0.85);
+            font-size: 0.9375rem;
+            margin: 0;
+            font-weight: 500;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Card Body */
+        .card-body {
+            padding: 32px;
+        }
+
+        /* Alert de advertencia */
+        .warning-alert {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            margin-bottom: 28px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .warning-alert svg {
+            width: 20px;
+            height: 20px;
+            color: var(--warning);
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .warning-alert p {
+            color: #92400e;
+            font-size: 0.875rem;
+            margin: 0;
+            line-height: 1.5;
+            font-weight: 500;
+        }
+
+        /* Error Alert */
+        .error-alert {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            margin-bottom: 24px;
+            color: #b91c1c;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        /* Fecha de nacimiento - Selector simplificado */
+        .date-section {
+            margin-bottom: 24px;
+        }
+
+        .date-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 12px;
+        }
+
+        .date-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr 1fr;
+            gap: 12px;
+        }
+
+        .date-field {
+            position: relative;
+        }
+
+        .date-field label {
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+        }
+
+        .date-field select,
+        .date-field input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            background: var(--bg-white);
+            transition: all 0.2s;
+            font-family: inherit;
+            appearance: none;
+            cursor: pointer;
+        }
+
+        .date-field select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 18px;
+            padding-right: 40px;
+        }
+
+        .date-field select:focus,
+        .date-field input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px var(--primary-pale);
+        }
+
+        .date-field select:hover,
+        .date-field input:hover {
+            border-color: var(--primary-light);
+        }
+
+        /* Selector de Pais */
+        .country-section {
+            margin-bottom: 24px;
+        }
+
+        .country-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 10px;
+        }
+
+        .country-select {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-md);
+            font-size: 0.9375rem;
+            font-weight: 500;
+            color: var(--text-dark);
+            background: var(--bg-white);
+            transition: all 0.2s;
+            font-family: inherit;
+            appearance: none;
+            cursor: pointer;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            background-size: 20px;
+            padding-right: 44px;
+        }
+
+        .country-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px var(--primary-pale);
+        }
+
+        .country-select:hover {
+            border-color: var(--primary-light);
+        }
+
+        /* Checkbox de terminos */
+        .terms-section {
+            margin-bottom: 28px;
+        }
+
+        .terms-checkbox {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            cursor: pointer;
+        }
+
+        .terms-checkbox input {
+            display: none;
+        }
+
+        .checkbox-custom {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.2s;
+            margin-top: 2px;
+        }
+
+        .checkbox-custom svg {
+            width: 14px;
+            height: 14px;
+            color: var(--text-white);
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.2s;
+        }
+
+        .terms-checkbox input:checked + .checkbox-custom {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .terms-checkbox input:checked + .checkbox-custom svg {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .terms-checkbox:hover .checkbox-custom {
+            border-color: var(--primary);
+        }
+
+        .terms-text {
+            font-size: 0.875rem;
+            color: var(--text-gray);
+            line-height: 1.5;
+        }
+
+        .terms-text a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .terms-text a:hover {
+            text-decoration: underline;
+        }
+
+        /* Boton de verificar */
+        .btn-verify {
+            width: 100%;
+            padding: 18px;
+            background: var(--primary-gradient);
+            color: var(--text-white);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.25s;
+            box-shadow: var(--shadow-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-family: inherit;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-verify::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn-verify:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(70, 130, 180, 0.45);
+        }
+
+        .btn-verify:hover::before {
+            left: 100%;
+        }
+
+        .btn-verify:active {
+            transform: translateY(-1px);
+        }
+
+        .btn-verify:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-verify svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Footer */
+        .card-footer {
+            padding: 20px 32px 28px;
+            text-align: center;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .security-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-light);
+            font-size: 0.8125rem;
+            font-weight: 500;
+        }
+
+        .security-badge svg {
+            width: 16px;
+            height: 16px;
+            color: var(--success);
+        }
+
+        /* Quick Age Buttons - Alternativa rapida */
+        .quick-verify {
+            margin-bottom: 28px;
+            text-align: center;
+        }
+
+        .quick-verify-label {
+            font-size: 0.8125rem;
+            color: var(--text-gray);
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+
+        .quick-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .quick-btn {
+            flex: 1;
+            padding: 16px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-white);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .quick-btn:hover {
+            border-color: var(--primary);
+            background: var(--primary-pale);
+        }
+
+        .quick-btn.selected {
+            border-color: var(--primary);
+            background: var(--primary-pale);
+        }
+
+        .quick-btn-icon {
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 30px;
+            margin: 0 auto 10px;
         }
 
-        .form-control:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        .quick-btn-yes .quick-btn-icon {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
         }
 
-        .btn-verify {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            padding: 14px;
+        .quick-btn-no .quick-btn-icon {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+        }
+
+        .quick-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .quick-btn span {
+            display: block;
+            font-size: 0.9375rem;
             font-weight: 600;
-            letter-spacing: 0.5px;
-            transition: transform 0.2s;
+            color: var(--text-dark);
         }
 
-            .btn-verify:hover {
-                background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
-                transform: translateY(-2px);
+        .quick-btn small {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-gray);
+            margin-top: 4px;
+        }
+
+        /* Divider */
+        .divider {
+            position: relative;
+            text-align: center;
+            margin: 28px 0;
+        }
+
+        .divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: var(--border-color);
+        }
+
+        .divider span {
+            position: relative;
+            background: var(--bg-white);
+            padding: 0 16px;
+            color: var(--text-light);
+            font-size: 0.8125rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Validation error */
+        .text-danger {
+            color: var(--danger);
+            font-size: 0.8125rem;
+            margin-top: 6px;
+            display: block;
+            font-weight: 500;
+        }
+
+        /* Responsive */
+        @@media (max-width: 480px) {
+            .verification-wrapper {
+                max-width: 100%;
             }
 
-        .warning-text {
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 12px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            font-size: 14px;
+            .card-header {
+                padding: 32px 24px 40px;
+            }
+
+            .card-body {
+                padding: 24px;
+            }
+
+            .card-footer {
+                padding: 16px 24px 24px;
+            }
+
+            .date-inputs {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+
+            .date-inputs .date-field:last-child {
+                grid-column: span 2;
+            }
+
+            .quick-buttons {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="verification-container">
+    <div class="verification-wrapper">
         <div class="verification-card">
-            <div class="icon-container">
-                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" />
-                    <path d="M12 6v6l4 2" />
-                </svg>
-            </div>
-
-            <h2 class="text-center mb-2">Verificación de Edad</h2>
-            <p class="text-center text-muted mb-4">Confirma que cumples con los requisitos legales</p>
-
-            <div class="warning-text">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#856404" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; margin-right: 8px;">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-                Esta plataforma contiene contenido exclusivo para adultos. Debes ser mayor de edad según las leyes de tu país.
-            </div>
-
-            @if (!ViewData.ModelState.IsValid)
-            {
-                <div class="alert alert-danger" role="alert">
-                    @Html.ValidationSummary(false, "", new { @class = "mb-0" })
-                </div>
-            }
-
-            <form asp-action="Verify" method="post">
-                @Html.AntiForgeryToken()
-
-                <div class="mb-3">
-                    <label asp-for="FechaNacimiento" class="form-label">Fecha de Nacimiento</label>
-                    <input asp-for="FechaNacimiento" type="date" class="form-control" max="@DateTime.Today.ToString("yyyy-MM-dd")" required />
-                    <span asp-validation-for="FechaNacimiento" class="text-danger"></span>
-                </div>
-
-                <div class="mb-3">
-                    <label asp-for="Pais" class="form-label">País de Residencia</label>
-                    <select asp-for="Pais" class="form-select" required>
-                        <option value="">Selecciona tu país</option>
-                        <option value="CL">Chile</option>
-                        <option value="US">Estados Unidos</option>
-                        <option value="MX">México</option>
-                        <option value="AR">Argentina</option>
-                        <option value="CO">Colombia</option>
-                        <option value="ES">España</option>
-                        <option value="PE">Perú</option>
-                        <option value="VE">Venezuela</option>
-                        <option value="EC">Ecuador</option>
-                        <option value="UY">Uruguay</option>
-                        <option value="BO">Bolivia</option>
-                        <option value="PY">Paraguay</option>
-                        <option value="BR">Brasil</option>
-                        <option value="OTHER">Otro</option>
-                    </select>
-                    <span asp-validation-for="Pais" class="text-danger"></span>
-                </div>
-
-                <div class="mb-4">
-                    <div class="form-check">
-                        <input asp-for="AceptoTerminos" type="checkbox" class="form-check-input" required />
-                        <label asp-for="AceptoTerminos" class="form-check-label">
-                            Confirmo que tengo la edad mínima requerida y acepto los <a href="/Home/Terms" target="_blank">Términos de Servicio</a>
-                        </label>
-                    </div>
-                    <span asp-validation-for="AceptoTerminos" class="text-danger"></span>
-                </div>
-
-                <button type="submit" class="btn btn-primary btn-verify w-100">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
-                        <polyline points="20 6 9 17 4 12" />
+            <!-- Header -->
+            <div class="card-header">
+                <div class="header-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                     </svg>
-                    Verificar y Continuar
-                </button>
-            </form>
+                </div>
+                <h1>Verificacion de Edad</h1>
+                <p>Confirma que eres mayor de edad para continuar</p>
+            </div>
 
-            <p class="text-center text-muted mt-4 mb-0" style="font-size: 12px;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-                Tus datos están protegidos y encriptados
-            </p>
+            <!-- Body -->
+            <div class="card-body">
+                <!-- Warning -->
+                <div class="warning-alert">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <p>Este sitio contiene contenido exclusivo para adultos. Debes tener al menos 18 años para acceder.</p>
+                </div>
+
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="error-alert">
+                        @Html.ValidationSummary(false, "", new { @class = "mb-0" })
+                    </div>
+                }
+
+                <form asp-action="Verify" method="post" id="verifyForm">
+                    @Html.AntiForgeryToken()
+
+                    <!-- Quick Verify -->
+                    <div class="quick-verify">
+                        <p class="quick-verify-label">¿Tienes 18 años o mas?</p>
+                        <div class="quick-buttons">
+                            <button type="button" class="quick-btn quick-btn-yes" onclick="selectQuickOption(true)">
+                                <div class="quick-btn-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                    </svg>
+                                </div>
+                                <span>Si, soy mayor</span>
+                                <small>Tengo 18+ años</small>
+                            </button>
+                            <button type="button" class="quick-btn quick-btn-no" onclick="selectQuickOption(false)">
+                                <div class="quick-btn-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"/>
+                                        <line x1="6" y1="6" x2="18" y2="18"/>
+                                    </svg>
+                                </div>
+                                <span>No, soy menor</span>
+                                <small>Tengo menos de 18</small>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="divider">
+                        <span>Completa tus datos</span>
+                    </div>
+
+                    <!-- Fecha de nacimiento -->
+                    <div class="date-section">
+                        <label class="date-label">Fecha de nacimiento</label>
+                        <div class="date-inputs">
+                            <div class="date-field">
+                                <label>Dia</label>
+                                <select id="birthDay" required>
+                                    <option value="">--</option>
+                                    @for (int d = 1; d <= 31; d++)
+                                    {
+                                        <option value="@d">@d</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="date-field">
+                                <label>Mes</label>
+                                <select id="birthMonth" required>
+                                    <option value="">--</option>
+                                    <option value="1">Enero</option>
+                                    <option value="2">Febrero</option>
+                                    <option value="3">Marzo</option>
+                                    <option value="4">Abril</option>
+                                    <option value="5">Mayo</option>
+                                    <option value="6">Junio</option>
+                                    <option value="7">Julio</option>
+                                    <option value="8">Agosto</option>
+                                    <option value="9">Septiembre</option>
+                                    <option value="10">Octubre</option>
+                                    <option value="11">Noviembre</option>
+                                    <option value="12">Diciembre</option>
+                                </select>
+                            </div>
+                            <div class="date-field">
+                                <label>Año</label>
+                                <select id="birthYear" required>
+                                    <option value="">--</option>
+                                    @for (int y = maxYear; y >= minYear; y--)
+                                    {
+                                        <option value="@y">@y</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                        <input type="hidden" asp-for="FechaNacimiento" id="fechaNacimientoHidden" />
+                        <span asp-validation-for="FechaNacimiento" class="text-danger"></span>
+                    </div>
+
+                    <!-- Pais -->
+                    <div class="country-section">
+                        <label class="country-label">Pais de residencia</label>
+                        <select asp-for="Pais" class="country-select" required>
+                            <option value="">Selecciona tu pais</option>
+                            <option value="CL">Chile</option>
+                            <option value="AR">Argentina</option>
+                            <option value="MX">Mexico</option>
+                            <option value="CO">Colombia</option>
+                            <option value="PE">Peru</option>
+                            <option value="ES">España</option>
+                            <option value="US">Estados Unidos</option>
+                            <option value="VE">Venezuela</option>
+                            <option value="EC">Ecuador</option>
+                            <option value="UY">Uruguay</option>
+                            <option value="BO">Bolivia</option>
+                            <option value="PY">Paraguay</option>
+                            <option value="BR">Brasil</option>
+                            <option value="OTHER">Otro</option>
+                        </select>
+                        <span asp-validation-for="Pais" class="text-danger"></span>
+                    </div>
+
+                    <!-- Terminos -->
+                    <div class="terms-section">
+                        <label class="terms-checkbox">
+                            <input asp-for="AceptoTerminos" type="checkbox" id="termsCheckbox" required />
+                            <span class="checkbox-custom">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                            </span>
+                            <span class="terms-text">
+                                Confirmo que tengo la edad minima requerida y acepto los
+                                <a href="/Home/Terms" target="_blank">Terminos de Servicio</a> y
+                                <a href="/Home/Privacy" target="_blank">Politica de Privacidad</a>
+                            </span>
+                        </label>
+                        <span asp-validation-for="AceptoTerminos" class="text-danger"></span>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit" class="btn-verify" id="submitBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            <polyline points="9 12 12 15 16 10"/>
+                        </svg>
+                        Verificar y Continuar
+                    </button>
+                </form>
+            </div>
+
+            <!-- Footer -->
+            <div class="card-footer">
+                <span class="security-badge">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    Tus datos estan protegidos y encriptados
+                </span>
+            </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Actualizar campo oculto de fecha
+        function updateHiddenDate() {
+            const day = document.getElementById('birthDay').value;
+            const month = document.getElementById('birthMonth').value;
+            const year = document.getElementById('birthYear').value;
+
+            if (day && month && year) {
+                const paddedDay = day.padStart(2, '0');
+                const paddedMonth = month.padStart(2, '0');
+                document.getElementById('fechaNacimientoHidden').value = `${year}-${paddedMonth}-${paddedDay}`;
+            }
+        }
+
+        document.getElementById('birthDay').addEventListener('change', updateHiddenDate);
+        document.getElementById('birthMonth').addEventListener('change', updateHiddenDate);
+        document.getElementById('birthYear').addEventListener('change', updateHiddenDate);
+
+        // Quick option selection
+        function selectQuickOption(isAdult) {
+            const buttons = document.querySelectorAll('.quick-btn');
+            buttons.forEach(btn => btn.classList.remove('selected'));
+
+            if (isAdult) {
+                document.querySelector('.quick-btn-yes').classList.add('selected');
+                // Pre-seleccionar un año que los haga mayores de edad
+                const currentYear = new Date().getFullYear();
+                document.getElementById('birthYear').value = currentYear - 25;
+                document.getElementById('birthMonth').value = '6';
+                document.getElementById('birthDay').value = '15';
+                updateHiddenDate();
+            } else {
+                document.querySelector('.quick-btn-no').classList.add('selected');
+                // Mostrar mensaje de que no pueden continuar
+                alert('Lo sentimos, debes ser mayor de edad para acceder a este sitio.');
+                window.location.href = 'https://www.google.com';
+            }
+        }
+
+        // Validar antes de enviar
+        document.getElementById('verifyForm').addEventListener('submit', function(e) {
+            const day = document.getElementById('birthDay').value;
+            const month = document.getElementById('birthMonth').value;
+            const year = document.getElementById('birthYear').value;
+            const terms = document.getElementById('termsCheckbox').checked;
+
+            if (!day || !month || !year) {
+                e.preventDefault();
+                alert('Por favor completa tu fecha de nacimiento');
+                return false;
+            }
+
+            if (!terms) {
+                e.preventDefault();
+                alert('Debes aceptar los terminos para continuar');
+                return false;
+            }
+
+            // Verificar edad
+            const birthDate = new Date(year, month - 1, day);
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+
+            if (age < 18) {
+                e.preventDefault();
+                alert('Lo sentimos, debes ser mayor de 18 años para acceder a este sitio.');
+                window.location.href = 'https://www.google.com';
+                return false;
+            }
+
+            updateHiddenDate();
+        });
+    </script>
 </body>
 </html>

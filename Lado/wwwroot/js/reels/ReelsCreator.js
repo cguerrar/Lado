@@ -27,6 +27,13 @@ class ReelsCreator {
         this.touchGestures = null;
         this.mobileOptimizer = null;
         this.orientationHandler = null;
+        // Fase 7: Modo Meme
+        this.memeMode = null;
+        // Fase 8: Herramientas de Transformación
+        this.transformTools = null;
+
+        // Música confirmada para el contenido
+        this.confirmedAudioData = null;
 
         // Tracking de Object URLs para evitar memory leaks
         this.objectURLs = [];
@@ -249,7 +256,8 @@ class ReelsCreator {
                     <!-- Editor Preview -->
                     <div class="editor-preview-area">
                         <div class="editor-media-container" id="editorMediaContainer">
-                            <!-- Media for editing -->
+                            <!-- Media for editing (se llena dinámicamente) -->
+                            <!-- Music Indicator se agrega dinámicamente en setupEditor() -->
                         </div>
 
                         <!-- Editor Toolbar -->
@@ -288,6 +296,32 @@ class ReelsCreator {
                                 </svg>
                                 <span>Música</span>
                             </button>
+                            <button class="toolbar-btn" id="transformToolBtn" title="Recortar y Voltear">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M6 2v4h12V2"></path>
+                                    <path d="M6 22v-4h12v4"></path>
+                                    <path d="M2 6h4v12H2"></path>
+                                    <path d="M22 6h-4v12h4"></path>
+                                    <rect x="6" y="6" width="12" height="12" rx="1"></rect>
+                                </svg>
+                                <span>Ajustar</span>
+                            </button>
+                            <button class="toolbar-btn" id="memeToolBtn" title="Modo Meme">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                                    <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                                    <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                                    <text x="12" y="7" text-anchor="middle" font-size="6" fill="currentColor">M</text>
+                                </svg>
+                                <span>Meme</span>
+                            </button>
+                            <button class="toolbar-btn" id="filterToolBtn" title="Filtros">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                                </svg>
+                                <span>Filtros</span>
+                            </button>
                         </div>
 
                         <!-- Panels Container -->
@@ -321,9 +355,12 @@ class ReelsCreator {
                         </div>
                     </div>
 
-                    <!-- Filter Selection -->
-                    <div class="editor-filters-section">
-                        <h4 class="editor-section-title">Filtros</h4>
+                    <!-- Filter Panel (hidden by default) -->
+                    <div class="filter-panel" id="filterPanel">
+                        <div class="filter-panel-header">
+                            <span class="filter-panel-title">Filtros</span>
+                            <button class="filter-panel-close" id="closeFilterPanel">&times;</button>
+                        </div>
                         <div class="filters-scroll" id="filtersScroll">
                             <!-- Filters will be generated here -->
                         </div>
@@ -387,6 +424,17 @@ class ReelsCreator {
                             </label>
                         </div>
 
+                        <div class="publish-toggle">
+                            <span class="publish-toggle-label">
+                                Visible para todos
+                                <span class="toggle-hint">Cualquier persona puede verlo</span>
+                            </span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="esPublicoGeneral">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
                         <button type="submit" class="publish-submit-btn" id="publishBtn">
                             Publicar
                         </button>
@@ -427,11 +475,15 @@ class ReelsCreator {
         document.getElementById('editorBackBtn').addEventListener('click', () => this.showScreen('preview'));
         document.getElementById('editorDoneBtn').addEventListener('click', () => this.finishEditing());
 
-        // Text, Sticker, Drawing and Music tools
+        // Text, Sticker, Drawing, Music, Transform and Meme tools
         document.getElementById('textToolBtn').addEventListener('click', () => this.toggleTextPanel());
         document.getElementById('stickerToolBtn').addEventListener('click', () => this.toggleStickerPanel());
         document.getElementById('drawToolBtn').addEventListener('click', () => this.toggleDrawingPanel());
         document.getElementById('musicToolBtn').addEventListener('click', () => this.toggleAudioPanel());
+        document.getElementById('transformToolBtn').addEventListener('click', () => this.toggleTransformPanel());
+        document.getElementById('memeToolBtn').addEventListener('click', () => this.toggleMemePanel());
+        document.getElementById('filterToolBtn').addEventListener('click', () => this.toggleFilterPanel());
+        document.getElementById('closeFilterPanel').addEventListener('click', () => this.hideFilterPanel());
 
         // Lado selector
         document.querySelectorAll('.lado-option').forEach(option => {
@@ -454,6 +506,9 @@ class ReelsCreator {
     }
 
     open() {
+        // Pausar cualquier audio/video del feed
+        this.pauseFeedMedia();
+
         this.overlay.classList.add('active');
         document.body.style.overflow = 'hidden';
         this.showScreen('selection');
@@ -465,6 +520,33 @@ class ReelsCreator {
         this.cameraCapture.stopCamera();
         this.videoEditor.reset();
         this.reset();
+    }
+
+    /**
+     * Pausa cualquier audio/video que esté reproduciéndose en el feed
+     */
+    pauseFeedMedia() {
+        // Pausar todos los videos del feed
+        document.querySelectorAll('.post-media video, .feed-video, video').forEach(video => {
+            if (!video.paused) {
+                video.pause();
+            }
+        });
+
+        // Pausar todos los audios del feed (música de fotos)
+        document.querySelectorAll('.photo-audio-player, audio').forEach(audio => {
+            if (!audio.paused) {
+                audio.pause();
+            }
+        });
+
+        // Cerrar el Fullscreen Viewer si está abierto
+        const fullscreenViewer = document.getElementById('fullscreenViewer');
+        if (fullscreenViewer && fullscreenViewer.classList.contains('active')) {
+            if (typeof closeFullscreenViewer === 'function') {
+                closeFullscreenViewer();
+            }
+        }
     }
 
     /**
@@ -514,6 +596,18 @@ class ReelsCreator {
         if (this.audioMixer) {
             this.audioMixer.reset();
             this.audioMixer.hide();
+        }
+        // Reset confirmed audio data
+        this.confirmedAudioData = null;
+        // Reset meme mode
+        if (this.memeMode) {
+            this.memeMode.reset();
+            this.memeMode.hide();
+        }
+        // Reset transform tools
+        if (this.transformTools) {
+            this.transformTools.reset();
+            this.transformTools.hide();
         }
 
         this.showScreen('selection');
@@ -637,6 +731,24 @@ class ReelsCreator {
             await this.videoEditor.loadVideo(video);
         }
 
+        // Agregar indicador de música
+        const musicIndicator = document.createElement('div');
+        musicIndicator.className = 'music-indicator';
+        musicIndicator.id = 'musicIndicator';
+        musicIndicator.style.display = 'none';
+        musicIndicator.innerHTML = `
+            <div class="music-indicator-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                </svg>
+            </div>
+            <div class="music-indicator-info">
+                <span class="music-indicator-title" id="musicIndicatorTitle">-</span>
+                <span class="music-indicator-artist" id="musicIndicatorArtist">-</span>
+            </div>
+        `;
+        container.appendChild(musicIndicator);
+
         // Inicializar sistema de capas
         this.layerManager = new LayerManager(container);
         this.textLayer = new TextLayer(this.layerManager);
@@ -654,6 +766,19 @@ class ReelsCreator {
             this.audioMixer.destroy();
         }
         this.audioMixer = new AudioMixer();
+        console.log('🎵 AudioMixer inicializado:', this.audioMixer);
+
+        // Callback cuando cambia la música seleccionada
+        this.audioMixer.onTrackChange = (track) => {
+            this.updateMusicIndicator();
+        };
+
+        // Callback cuando se confirma la música (botón "Usar esta música")
+        this.audioMixer.onMusicConfirmed = (audioData) => {
+            console.log('🎵 Música confirmada:', audioData);
+            this.confirmedAudioData = audioData;
+            this.updateMusicIndicator();
+        };
 
         // Sincronizar audio con video si es video
         if (this.mediaType === 'video') {
@@ -661,6 +786,36 @@ class ReelsCreator {
             if (videoElement) {
                 this.audioMixer.syncWithVideo(videoElement);
             }
+        }
+
+        // Inicializar modo meme
+        try {
+            if (this.memeMode) {
+                this.memeMode.destroy();
+            }
+            if (typeof MemeMode !== 'undefined') {
+                this.memeMode = new MemeMode(this.layerManager, this.filterEngine);
+                console.log('MemeMode inicializado correctamente');
+            } else {
+                console.warn('MemeMode no está definido - verificar que MemeMode.js se cargue');
+            }
+        } catch (e) {
+            console.error('Error inicializando MemeMode:', e);
+        }
+
+        // Inicializar herramientas de transformación
+        try {
+            if (this.transformTools) {
+                this.transformTools.destroy();
+            }
+            if (typeof TransformTools !== 'undefined') {
+                this.transformTools = new TransformTools(container);
+                console.log('TransformTools inicializado correctamente');
+            } else {
+                console.warn('TransformTools no está definido - verificar que TransformTools.js se cargue');
+            }
+        } catch (e) {
+            console.error('Error inicializando TransformTools:', e);
         }
 
         // Configurar gestos táctiles para el editor
@@ -679,6 +834,62 @@ class ReelsCreator {
 
         // Generar selectores de filtros
         this.generateFilterSelectors();
+
+        // Hacer paneles arrastrables
+        this.setupDraggablePanels();
+    }
+
+    /**
+     * Configura los paneles para que sean arrastrables
+     */
+    setupDraggablePanels() {
+        if (typeof DraggablePanel === 'undefined') {
+            console.warn('DraggablePanel no disponible');
+            return;
+        }
+
+        this.draggablePanel = new DraggablePanel();
+
+        // Esperar a que los paneles estén en el DOM
+        setTimeout(() => {
+            // Panel de texto
+            if (this.textLayer?.panel) {
+                this.draggablePanel.makeDraggable(this.textLayer.panel, '.text-panel-header');
+            }
+
+            // Panel de stickers
+            if (this.stickerLayer?.panel) {
+                this.draggablePanel.makeDraggable(this.stickerLayer.panel, '.sticker-panel-header');
+            }
+
+            // Panel de dibujo
+            if (this.drawingCanvas?.panel) {
+                this.draggablePanel.makeDraggable(this.drawingCanvas.panel, '.drawing-panel-header');
+            }
+
+            // Panel de audio/música
+            if (this.audioMixer?.panel) {
+                this.draggablePanel.makeDraggable(this.audioMixer.panel, '.audio-panel-header');
+            }
+
+            // Panel de meme
+            if (this.memeMode?.panel) {
+                this.draggablePanel.makeDraggable(this.memeMode.panel, '.meme-panel-header');
+            }
+
+            // Panel de transformación
+            if (this.transformTools?.panel) {
+                this.draggablePanel.makeDraggable(this.transformTools.panel, '.transform-panel-header');
+            }
+
+            // Panel de filtros
+            const filterPanel = document.getElementById('filterPanel');
+            if (filterPanel) {
+                this.draggablePanel.makeDraggable(filterPanel, '.filter-panel-header');
+            }
+
+            console.log('Paneles configurados como arrastrables');
+        }, 500);
     }
 
     /**
@@ -689,6 +900,9 @@ class ReelsCreator {
         if (this.stickerLayer) this.stickerLayer.hide();
         if (this.drawingCanvas) this.drawingCanvas.hide();
         if (this.audioMixer) this.audioMixer.hide();
+        if (this.memeMode) this.memeMode.hide();
+        if (this.transformTools) this.transformTools.hide();
+        this.hideFilterPanel();
         this.textLayer.toggle(panelsContainer);
 
         // Toggle button active state
@@ -696,6 +910,9 @@ class ReelsCreator {
         document.getElementById('stickerToolBtn').classList.remove('active');
         document.getElementById('drawToolBtn').classList.remove('active');
         document.getElementById('musicToolBtn').classList.remove('active');
+        document.getElementById('memeToolBtn').classList.remove('active');
+        document.getElementById('transformToolBtn').classList.remove('active');
+        document.getElementById('filterToolBtn').classList.remove('active');
     }
 
     /**
@@ -706,6 +923,9 @@ class ReelsCreator {
         if (this.textLayer) this.textLayer.hide();
         if (this.drawingCanvas) this.drawingCanvas.hide();
         if (this.audioMixer) this.audioMixer.hide();
+        if (this.memeMode) this.memeMode.hide();
+        if (this.transformTools) this.transformTools.hide();
+        this.hideFilterPanel();
         this.stickerLayer.toggle(panelsContainer);
 
         // Toggle button active state
@@ -713,6 +933,9 @@ class ReelsCreator {
         document.getElementById('textToolBtn').classList.remove('active');
         document.getElementById('drawToolBtn').classList.remove('active');
         document.getElementById('musicToolBtn').classList.remove('active');
+        document.getElementById('memeToolBtn').classList.remove('active');
+        document.getElementById('transformToolBtn').classList.remove('active');
+        document.getElementById('filterToolBtn').classList.remove('active');
     }
 
     /**
@@ -723,6 +946,9 @@ class ReelsCreator {
         if (this.textLayer) this.textLayer.hide();
         if (this.stickerLayer) this.stickerLayer.hide();
         if (this.audioMixer) this.audioMixer.hide();
+        if (this.memeMode) this.memeMode.hide();
+        if (this.transformTools) this.transformTools.hide();
+        this.hideFilterPanel();
         this.drawingCanvas.toggle(panelsContainer);
 
         // Toggle button active state
@@ -730,6 +956,9 @@ class ReelsCreator {
         document.getElementById('textToolBtn').classList.remove('active');
         document.getElementById('stickerToolBtn').classList.remove('active');
         document.getElementById('musicToolBtn').classList.remove('active');
+        document.getElementById('memeToolBtn').classList.remove('active');
+        document.getElementById('transformToolBtn').classList.remove('active');
+        document.getElementById('filterToolBtn').classList.remove('active');
     }
 
     /**
@@ -740,6 +969,9 @@ class ReelsCreator {
         if (this.textLayer) this.textLayer.hide();
         if (this.stickerLayer) this.stickerLayer.hide();
         if (this.drawingCanvas) this.drawingCanvas.hide();
+        if (this.memeMode) this.memeMode.hide();
+        if (this.transformTools) this.transformTools.hide();
+        this.hideFilterPanel();
         this.audioMixer.toggle(panelsContainer);
 
         // Toggle button active state
@@ -747,6 +979,125 @@ class ReelsCreator {
         document.getElementById('textToolBtn').classList.remove('active');
         document.getElementById('stickerToolBtn').classList.remove('active');
         document.getElementById('drawToolBtn').classList.remove('active');
+        document.getElementById('memeToolBtn').classList.remove('active');
+        document.getElementById('transformToolBtn').classList.remove('active');
+        document.getElementById('filterToolBtn').classList.remove('active');
+    }
+
+    /**
+     * Toggle panel de modo meme
+     */
+    toggleMemePanel() {
+        console.log('toggleMemePanel llamado, memeMode:', this.memeMode);
+        if (!this.memeMode) {
+            console.warn('MemeMode no inicializado');
+            return;
+        }
+        const panelsContainer = document.getElementById('editorPanelsContainer');
+        console.log('panelsContainer:', panelsContainer);
+        if (this.textLayer) this.textLayer.hide();
+        if (this.stickerLayer) this.stickerLayer.hide();
+        if (this.drawingCanvas) this.drawingCanvas.hide();
+        if (this.audioMixer) this.audioMixer.hide();
+        if (this.transformTools) this.transformTools.hide();
+        this.hideFilterPanel();
+        this.memeMode.toggle(panelsContainer);
+
+        // Toggle button active state
+        document.getElementById('memeToolBtn').classList.toggle('active', this.memeMode.isVisible);
+        document.getElementById('textToolBtn').classList.remove('active');
+        document.getElementById('stickerToolBtn').classList.remove('active');
+        document.getElementById('drawToolBtn').classList.remove('active');
+        document.getElementById('musicToolBtn').classList.remove('active');
+        document.getElementById('transformToolBtn').classList.remove('active');
+        document.getElementById('filterToolBtn').classList.remove('active');
+    }
+
+    /**
+     * Toggle panel de herramientas de transformación (crop, flip, rotate)
+     */
+    toggleTransformPanel() {
+        console.log('toggleTransformPanel llamado, transformTools:', this.transformTools);
+        if (!this.transformTools) {
+            console.warn('TransformTools no inicializado');
+            return;
+        }
+        const panelsContainer = document.getElementById('editorPanelsContainer');
+        console.log('panelsContainer:', panelsContainer);
+        if (this.textLayer) this.textLayer.hide();
+        if (this.stickerLayer) this.stickerLayer.hide();
+        if (this.drawingCanvas) this.drawingCanvas.hide();
+        if (this.audioMixer) this.audioMixer.hide();
+        if (this.memeMode) this.memeMode.hide();
+        this.hideFilterPanel();
+        this.transformTools.toggle(panelsContainer);
+
+        // Toggle button active state
+        document.getElementById('transformToolBtn').classList.toggle('active', this.transformTools.isVisible);
+        document.getElementById('textToolBtn').classList.remove('active');
+        document.getElementById('stickerToolBtn').classList.remove('active');
+        document.getElementById('drawToolBtn').classList.remove('active');
+        document.getElementById('musicToolBtn').classList.remove('active');
+        document.getElementById('memeToolBtn').classList.remove('active');
+        document.getElementById('filterToolBtn').classList.remove('active');
+    }
+
+    /**
+     * Toggle panel de filtros
+     */
+    toggleFilterPanel() {
+        const filterPanel = document.getElementById('filterPanel');
+        const isVisible = filterPanel.classList.contains('visible');
+
+        // Ocultar otros paneles
+        if (this.textLayer) this.textLayer.hide();
+        if (this.stickerLayer) this.stickerLayer.hide();
+        if (this.drawingCanvas) this.drawingCanvas.hide();
+        if (this.audioMixer) this.audioMixer.hide();
+        if (this.memeMode) this.memeMode.hide();
+        if (this.transformTools) this.transformTools.hide();
+
+        // Toggle filter panel
+        filterPanel.classList.toggle('visible');
+
+        // Toggle button active state
+        document.getElementById('filterToolBtn').classList.toggle('active', !isVisible);
+        document.getElementById('textToolBtn').classList.remove('active');
+        document.getElementById('stickerToolBtn').classList.remove('active');
+        document.getElementById('drawToolBtn').classList.remove('active');
+        document.getElementById('musicToolBtn').classList.remove('active');
+        document.getElementById('memeToolBtn').classList.remove('active');
+        document.getElementById('transformToolBtn').classList.remove('active');
+    }
+
+    hideFilterPanel() {
+        document.getElementById('filterPanel').classList.remove('visible');
+        document.getElementById('filterToolBtn').classList.remove('active');
+    }
+
+    /**
+     * Actualiza el indicador de música en el editor
+     */
+    updateMusicIndicator() {
+        const indicator = document.getElementById('musicIndicator');
+        const titleEl = document.getElementById('musicIndicatorTitle');
+        const artistEl = document.getElementById('musicIndicatorArtist');
+
+        // Usar la música confirmada (cuando se usa el botón "Usar esta música")
+        const audioData = this.confirmedAudioData || (this.audioMixer ? this.audioMixer.getAudioData() : null);
+
+        if (!indicator || !titleEl || !artistEl) {
+            console.warn('Music indicator elements not found in DOM');
+            return;
+        }
+
+        if (audioData) {
+            titleEl.textContent = audioData.trackTitle;
+            artistEl.textContent = audioData.trackArtist;
+            indicator.style.display = 'flex';
+        } else {
+            indicator.style.display = 'none';
+        }
     }
 
     /**
@@ -812,7 +1163,12 @@ class ReelsCreator {
             const mediaElement = document.getElementById('editorMedia');
             const hasLayers = this.layerManager && this.layerManager.layers.length > 0;
             const hasDrawing = this.drawingCanvas && this.drawingCanvas.hasDrawing();
-            const audioData = this.audioMixer ? this.audioMixer.getAudioData() : null;
+
+            // Usar solo música confirmada (cuando se presiona "Usar esta música")
+            const audioData = this.confirmedAudioData;
+
+            console.log('🎵 finishEditing - confirmedAudioData:', this.confirmedAudioData);
+            console.log('🎵 finishEditing - audioData:', audioData);
 
             if (this.mediaType === 'photo') {
                 // Exportar imagen con filtro, capas y dibujo
@@ -892,6 +1248,11 @@ class ReelsCreator {
                 // Renderizar dibujo
                 if (this.drawingCanvas && this.drawingCanvas.hasDrawing()) {
                     this.drawingCanvas.renderToCanvas(canvas);
+                }
+
+                // Renderizar elementos meme (textos, props, watermark)
+                if (this.memeMode) {
+                    this.memeMode.renderToCanvas(canvas);
                 }
 
                 // Convertir a blob
@@ -975,10 +1336,13 @@ class ReelsCreator {
 
             formData.append('esGratis', document.getElementById('esGratis').checked);
             formData.append('permitirComentarios', document.getElementById('permitirComentarios').checked);
+            formData.append('esPublicoGeneral', document.getElementById('esPublicoGeneral').checked);
             formData.append('tipo', this.mediaType === 'photo' ? 'Imagen' : 'Video');
 
             // Add edit metadata if available
             if (this.editMetadata) {
+                console.log('📊 Edit metadata:', this.editMetadata);
+
                 if (this.editMetadata.trimStart !== undefined) {
                     formData.append('trimStart', this.editMetadata.trimStart);
                 }
@@ -990,12 +1354,18 @@ class ReelsCreator {
                 }
                 // Add audio metadata
                 if (this.editMetadata.audio) {
+                    console.log('🎵 Enviando datos de audio:', this.editMetadata.audio);
                     formData.append('audioTrackId', this.editMetadata.audio.trackId);
                     formData.append('audioTrackTitle', this.editMetadata.audio.trackTitle);
-                    formData.append('audioStartTime', this.editMetadata.audio.startTime);
-                    formData.append('audioVolume', this.editMetadata.audio.musicVolume);
-                    formData.append('originalVolume', this.editMetadata.audio.originalVolume);
+                    formData.append('audioStartTime', this.editMetadata.audio.startTime || 0);
+                    formData.append('audioVolume', this.editMetadata.audio.musicVolume || 0.7);
+                    formData.append('originalVolume', this.editMetadata.audio.originalVolume || 1.0);
+                    console.log('✅ Audio metadata agregado al FormData');
+                } else {
+                    console.log('⚠️ No hay datos de audio en editMetadata');
                 }
+            } else {
+                console.log('⚠️ editMetadata es null/undefined');
             }
 
             const response = await fetch('/Contenido/CrearDesdeReels', {

@@ -1,0 +1,241 @@
+@model List<Lado.Controllers.UsuarioBloqueadoDto>
+@{
+    ViewData["Title"] = "Usuarios Bloqueados";
+}
+
+<style>
+    .blocked-users-container {
+        max-width: 700px;
+        margin: 0 auto;
+    }
+
+    .blocked-users-header {
+        margin-bottom: 24px;
+    }
+
+    .blocked-users-header h1 {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--fg);
+        margin-bottom: 8px;
+    }
+
+    .blocked-users-header p {
+        color: var(--muted);
+        font-size: 14px;
+    }
+
+    .blocked-user-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 12px;
+        transition: all 0.2s ease;
+    }
+
+    .blocked-user-card:hover {
+        box-shadow: var(--shadow-md);
+    }
+
+    .blocked-user-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        object-fit: cover;
+        flex-shrink: 0;
+    }
+
+    .blocked-user-avatar-placeholder {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 20px;
+        flex-shrink: 0;
+    }
+
+    .blocked-user-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .blocked-user-name {
+        font-weight: 600;
+        font-size: 16px;
+        color: var(--fg);
+        margin-bottom: 2px;
+    }
+
+    .blocked-user-username {
+        font-size: 14px;
+        color: var(--muted);
+        margin-bottom: 4px;
+    }
+
+    .blocked-user-date {
+        font-size: 12px;
+        color: var(--muted-light);
+    }
+
+    .unblock-btn {
+        background: transparent;
+        border: 1px solid var(--primary);
+        color: var(--primary);
+        padding: 8px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+    }
+
+    .unblock-btn:hover {
+        background: var(--primary);
+        color: white;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+    }
+
+    .empty-state-icon {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 16px;
+        color: var(--muted-light);
+    }
+
+    .empty-state h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--fg);
+        margin-bottom: 8px;
+    }
+
+    .empty-state p {
+        color: var(--muted);
+        font-size: 14px;
+    }
+
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 14px;
+        margin-bottom: 20px;
+        transition: color 0.2s;
+    }
+
+    .back-link:hover {
+        color: var(--primary);
+    }
+
+    .back-link svg {
+        width: 18px;
+        height: 18px;
+    }
+</style>
+
+<div class="blocked-users-container">
+    <a href="/Usuario/Configuracion" class="back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5"></path>
+            <path d="M12 19l-7-7 7-7"></path>
+        </svg>
+        Volver a Configuracion
+    </a>
+
+    <div class="blocked-users-header">
+        <h1>Usuarios Bloqueados</h1>
+        <p>Los usuarios bloqueados no pueden ver tu contenido ni enviarte mensajes.</p>
+    </div>
+
+    @if (Model != null && Model.Any())
+    {
+        foreach (var usuario in Model)
+        {
+            <div class="blocked-user-card" id="blocked-@usuario.Id">
+                @if (!string.IsNullOrEmpty(usuario.FotoPerfil))
+                {
+                    <img src="@usuario.FotoPerfil" alt="@usuario.NombreCompleto" class="blocked-user-avatar">
+                }
+                else
+                {
+                    <div class="blocked-user-avatar-placeholder">
+                        @usuario.NombreCompleto.Substring(0, 1).ToUpper()
+                    </div>
+                }
+                <div class="blocked-user-info">
+                    <div class="blocked-user-name">@usuario.NombreCompleto</div>
+                    <div class="blocked-user-username">@@@usuario.UserName</div>
+                    <div class="blocked-user-date">Bloqueado el @usuario.FechaBloqueo.ToString("dd MMM yyyy")</div>
+                </div>
+                <button class="unblock-btn" onclick="desbloquearUsuario('@usuario.Id', '@usuario.NombreCompleto')">
+                    Desbloquear
+                </button>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-state">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M8 15h8"></path>
+                <circle cx="9" cy="9" r="1" fill="currentColor"></circle>
+                <circle cx="15" cy="9" r="1" fill="currentColor"></circle>
+            </svg>
+            <h3>No tienes usuarios bloqueados</h3>
+            <p>Cuando bloquees a alguien, apareceran aqui</p>
+        </div>
+    }
+</div>
+
+@section Scripts {
+<script>
+    async function desbloquearUsuario(userId, nombreUsuario) {
+        const confirmar = confirm(`¿Desbloquear a ${nombreUsuario}?\n\nPodras volver a ver su contenido y enviarse mensajes.`);
+        if (!confirmar) return;
+
+        try {
+            const res = await fetch('/Usuario/DesbloquearUsuario', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usuarioId: userId })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                showToast('success', 'Usuario desbloqueado', `Has desbloqueado a ${nombreUsuario}`);
+                document.getElementById(`blocked-${userId}`).remove();
+
+                // Si no quedan mas usuarios, mostrar estado vacio
+                if (document.querySelectorAll('.blocked-user-card').length === 0) {
+                    location.reload();
+                }
+            } else {
+                showToast('error', 'Error', data.message || 'Error al desbloquear usuario');
+            }
+        } catch (err) {
+            console.error('Error:', err);
+            showToast('error', 'Error', 'Error al desbloquear usuario');
+        }
+    }
+</script>
+}

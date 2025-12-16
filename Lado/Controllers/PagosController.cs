@@ -45,11 +45,13 @@ namespace Lado.Controllers
                     return RedirectToAction("Index", "Feed");
                 }
 
-                // SEGURIDAD: Obtener precio desde el servidor, NO del cliente
+                // Determinar tipo de suscripción
                 var tipo = tipoLado.HasValue ? (TipoLado)tipoLado.Value : TipoLado.LadoA;
+
+                // IMPORTANTE: Solo LadoB cobra, LadoA es GRATIS (seguir)
                 var precio = tipo == TipoLado.LadoB
                     ? (creador.PrecioSuscripcionLadoB ?? creador.PrecioSuscripcion)
-                    : creador.PrecioSuscripcion;
+                    : 0m; // LadoA es gratis
 
                 // Verificar si ya está suscrito a este TipoLado específico
                 var suscripcionExistente = await _context.Suscripciones
@@ -61,8 +63,8 @@ namespace Lado.Controllers
                     return RedirectToAction("Perfil", "Feed", new { id = creadorId });
                 }
 
-                // Verificar saldo
-                if (usuario.Saldo < precio)
+                // Solo verificar saldo si es LadoB (tiene costo)
+                if (precio > 0 && usuario.Saldo < precio)
                 {
                     TempData["Error"] = $"Saldo insuficiente. Necesitas ${(precio - usuario.Saldo):N2} más";
                     return RedirectToAction("Perfil", "Feed", new { id = creadorId });
@@ -72,16 +74,26 @@ namespace Lado.Controllers
 
                 try
                 {
-                    // 1. Descontar saldo del fan
-                    usuario.Saldo -= precio;
+                    // Variables para transacciones (solo aplica si hay cobro)
+                    decimal comision = 0;
+                    decimal gananciaCreador = 0;
 
-                    // 2. Calcular comisión (20%)
-                    var comision = precio * 0.20m;
-                    var gananciaCreador = precio - comision;
+                    // Solo procesar cobro si es LadoB (precio > 0)
+                    if (precio > 0)
+                    {
+                        // 1. Descontar saldo del fan
+                        usuario.Saldo -= precio;
 
-                    // 3. Agregar ganancia al creador
-                    creador.Saldo += gananciaCreador;
-                    creador.TotalGanancias += gananciaCreador;
+                        // 2. Calcular comisión (20%)
+                        comision = precio * 0.20m;
+                        gananciaCreador = precio - comision;
+
+                        // 3. Agregar ganancia al creador
+                        creador.Saldo += gananciaCreador;
+                        creador.TotalGanancias += gananciaCreador;
+                    }
+
+                    // Incrementar seguidores siempre
                     creador.NumeroSeguidores++;
 
                     // 4. Crear suscripción
@@ -97,35 +109,43 @@ namespace Lado.Controllers
 
                     _context.Suscripciones.Add(suscripcion);
 
-                    // 5. Registrar transacciones
-                    var transaccionFan = new Transaccion
+                    // 5. Registrar transacciones solo si hubo cobro
+                    if (precio > 0)
                     {
-                        UsuarioId = usuarioId,
-                        TipoTransaccion = TipoTransaccion.Suscripcion,
-                        Monto = -precio,
-                        FechaTransaccion = DateTime.Now,
-                        Descripcion = $"Suscripción a {creador.NombreCompleto}"
-                    };
+                        var transaccionFan = new Transaccion
+                        {
+                            UsuarioId = usuarioId,
+                            TipoTransaccion = TipoTransaccion.Suscripcion,
+                            Monto = -precio,
+                            FechaTransaccion = DateTime.Now,
+                            Descripcion = $"Suscripción Premium a {creador.Seudonimo ?? creador.NombreCompleto}"
+                        };
 
-                    var transaccionCreador = new Transaccion
-                    {
-                        UsuarioId = creadorId,
-                        TipoTransaccion = TipoTransaccion.IngresoSuscripcion,
-                        Monto = gananciaCreador,
-                        Comision = comision,
-                        MontoNeto = gananciaCreador,
-                        FechaTransaccion = DateTime.Now,
-                        Descripcion = $"Nueva suscripción de @{usuario.UserName}"
-                    };
+                        var transaccionCreador = new Transaccion
+                        {
+                            UsuarioId = creadorId,
+                            TipoTransaccion = TipoTransaccion.IngresoSuscripcion,
+                            Monto = gananciaCreador,
+                            Comision = comision,
+                            MontoNeto = gananciaCreador,
+                            FechaTransaccion = DateTime.Now,
+                            Descripcion = $"Nueva suscripción premium de @{usuario.UserName}"
+                        };
 
-                    _context.Transacciones.AddRange(transaccionFan, transaccionCreador);
+                        _context.Transacciones.AddRange(transaccionFan, transaccionCreador);
+                    }
 
                     await _context.SaveChangesAsync();
                     await transaction.CommitAsync();
 
-                    _logger.LogInformation($"Suscripción creada: Fan {usuarioId} -> Creador {creadorId}");
+                    var mensaje = tipo == TipoLado.LadoB
+                        ? $"¡Te has suscrito al contenido premium de {creador.Seudonimo ?? creador.NombreCompleto}!"
+                        : $"¡Ahora sigues a {creador.NombreCompleto}!";
 
-                    TempData["Success"] = $"¡Te has suscrito a {creador.NombreCompleto}!";
+                    _logger.LogInformation("Suscripción creada: Fan {FanId} -> Creador {CreadorId}, Tipo: {Tipo}, Precio: {Precio}",
+                        usuarioId, creadorId, tipo, precio);
+
+                    TempData["Success"] = mensaje;
                     return RedirectToAction("Perfil", "Feed", new { id = creadorId });
                 }
                 catch (Exception ex)
@@ -324,15 +344,36 @@ namespace Lado.Controllers
         // ============================================
 
         [HttpPost]
+        [IgnoreAntiforgeryToken]
         public async Task<IActionResult> EnviarTip([FromBody] EnviarTipRequest request)
         {
             try
             {
                 var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 var usuario = await _userManager.FindByIdAsync(usuarioId);
+
+                if (usuario == null)
+                {
+                    return Json(new { success = false, message = "Usuario no encontrado. Inicia sesión de nuevo." });
+                }
+
+                if (string.IsNullOrEmpty(request?.CreadorId))
+                {
+                    return Json(new { success = false, message = "ID del creador no especificado." });
+                }
+
                 var creador = await _userManager.FindByIdAsync(request.CreadorId);
 
-         
+                if (creador == null)
+                {
+                    return Json(new { success = false, message = "El creador no existe." });
+                }
+
+                if (creador.Id == usuarioId)
+                {
+                    return Json(new { success = false, message = "No puedes enviarte una propina a ti mismo." });
+                }
+
                 // Validar monto
                 if (request.Monto < 1)
                 {

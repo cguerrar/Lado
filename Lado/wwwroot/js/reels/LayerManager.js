@@ -55,7 +55,7 @@ class LayerManager {
         const rect = this.container.getBoundingClientRect();
         this.canvas.width = rect.width;
         this.canvas.height = rect.height;
-        this.render();
+        // Las capas DOM se ajustan automáticamente
     }
 
     /**

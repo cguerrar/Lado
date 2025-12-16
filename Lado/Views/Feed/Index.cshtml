@@ -8,6 +8,9 @@
     var usuarioActual = ViewBag.UsuarioActual as ApplicationUser;
     var creadoresSugeridos = ViewBag.CreadoresSugeridos as List<ApplicationUser> ?? new List<ApplicationUser>();
     var contenidoBloqueadoIds = ViewBag.ContenidoBloqueadoIds as List<int> ?? new List<int>();
+    var anuncios = ViewBag.Anuncios as List<Lado.Models.Anuncio> ?? new List<Lado.Models.Anuncio>();
+    var algoritmoActual = ViewBag.AlgoritmoActual as AlgoritmoFeed;
+    var algoritmosDisponibles = ViewBag.AlgoritmosDisponibles as List<AlgoritmoFeed> ?? new List<AlgoritmoFeed>();
 }
 
 <style>
@@ -39,6 +42,69 @@
     .feed-container {
         max-width: 630px;
         margin: 0 auto;
+    }
+
+    /* ========================================
+       ALGORITHM SELECTOR (SELECT NATIVO)
+       ======================================== */
+    .algorithm-selector {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .algorithm-label {
+        font-size: 13px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .algorithm-label svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .algorithm-select {
+        padding: 8px 32px 8px 12px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--fg);
+        background-color: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        cursor: pointer;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        min-width: 160px;
+        transition: all 0.2s;
+    }
+
+    .algorithm-select:hover {
+        border-color: var(--primary);
+    }
+
+    .algorithm-select:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(70, 130, 180, 0.15);
+    }
+
+    .algorithm-select option {
+        padding: 8px;
+        background: var(--surface);
+        color: var(--fg);
     }
 
     /* ========================================
@@ -627,6 +693,7 @@
     .share-option-icon.telegram { background: #0088cc; }
     .share-option-icon.twitter { background: #1DA1F2; }
     .share-option-icon.copy { background: var(--fg); }
+    .share-option-icon.friends { background: var(--primary); }
 
     .share-option-label {
         font-size: 12px;
@@ -645,6 +712,179 @@
         font-size: 13px;
         background: var(--bg-tertiary);
         color: var(--fg);
+    }
+
+    /* Friends Panel en Share Modal */
+    .share-friends-panel {
+        display: none;
+        border-top: 1px solid var(--line);
+    }
+
+    .share-friends-panel.active {
+        display: block;
+    }
+
+    .friends-panel-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .friends-panel-back {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: var(--bg);
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--fg);
+    }
+
+    .friends-panel-back:hover {
+        background: var(--line);
+    }
+
+    .friends-panel-title {
+        font-weight: 600;
+        font-size: 15px;
+        color: var(--fg);
+    }
+
+    .friends-search {
+        padding: 12px 16px;
+    }
+
+    .friends-search input {
+        width: 100%;
+        padding: 10px 14px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        font-size: 14px;
+        background: var(--bg);
+        color: var(--fg);
+    }
+
+    .friends-search input:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+
+    .friends-list {
+        max-height: 280px;
+        overflow-y: auto;
+        padding: 0 8px 12px;
+    }
+
+    .friend-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 8px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+
+    .friend-item:hover {
+        background: var(--bg);
+    }
+
+    .friend-item.selected {
+        background: rgba(70, 130, 180, 0.1);
+    }
+
+    .friend-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: var(--line);
+    }
+
+    .friend-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .friend-name {
+        font-weight: 500;
+        font-size: 14px;
+        color: var(--fg);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .friend-username {
+        font-size: 13px;
+        color: var(--muted);
+    }
+
+    .friend-check {
+        width: 24px;
+        height: 24px;
+        border: 2px solid var(--line);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: all 0.15s;
+    }
+
+    .friend-item.selected .friend-check {
+        background: var(--primary);
+        border-color: var(--primary);
+    }
+
+    .friend-check svg {
+        display: none;
+        color: white;
+    }
+
+    .friend-item.selected .friend-check svg {
+        display: block;
+    }
+
+    .friends-empty {
+        text-align: center;
+        padding: 32px 16px;
+        color: var(--muted);
+        font-size: 14px;
+    }
+
+    .friends-loading {
+        text-align: center;
+        padding: 32px 16px;
+        color: var(--muted);
+    }
+
+    .send-friends-btn {
+        margin: 0 16px 16px;
+        padding: 12px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        width: calc(100% - 32px);
+        transition: all 0.15s;
+    }
+
+    .send-friends-btn:hover:not(:disabled) {
+        background: var(--primary-dark);
+    }
+
+    .send-friends-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
 
     /* TOAST */
@@ -673,6 +913,113 @@
     #feedPageToast.visible {
         transform: translateX(-50%) translateY(0);
         opacity: 1;
+    }
+
+    /* ========================================
+       ANUNCIO EN FEED (ESTILO POST)
+       ======================================== */
+    .post-ad {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin-bottom: 24px;
+        overflow: hidden;
+    }
+
+    .post-ad-header {
+        display: flex;
+        align-items: center;
+        padding: 14px 16px;
+        gap: 12px;
+    }
+
+    .post-ad-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        flex-shrink: 0;
+    }
+
+    .post-ad-icon svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .post-ad-info {
+        flex: 1;
+    }
+
+    .post-ad-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg);
+    }
+
+    .post-ad-badge {
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .post-ad-badge i {
+        font-size: 10px;
+    }
+
+    .post-ad-media {
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+        display: block;
+        background: #f8f9fa;
+    }
+
+    .post-ad-media img,
+    .post-ad-media video {
+        width: 100%;
+        height: auto;
+        display: block;
+        transition: transform 0.3s ease;
+    }
+
+    .post-ad:hover .post-ad-media img,
+    .post-ad:hover .post-ad-media video {
+        transform: scale(1.02);
+    }
+
+    .post-ad-content {
+        padding: 14px 16px;
+    }
+
+    .post-ad-cta {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: var(--primary);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s;
+        width: 100%;
+    }
+
+    .post-ad-cta:hover {
+        background: var(--primary-dark);
+        transform: translateY(-1px);
+    }
+
+    .post-ad-cta i {
+        font-size: 12px;
     }
 
     /* EMPTY STATE */
@@ -1162,6 +1509,26 @@
     }
 
     /* ========================================
+       FULLSCREEN MODE - Ocultar header y sidebar
+       ======================================== */
+    body.fullscreen-mode .top-navbar,
+    body.fullscreen-mode .sidebar,
+    body.fullscreen-mode .sidebar-overlay,
+    body.fullscreen-mode header,
+    body.fullscreen-mode nav {
+        display: none !important;
+    }
+
+    body.fullscreen-mode {
+        overflow: hidden !important;
+    }
+
+    body.fullscreen-mode .main-content {
+        margin-left: 0 !important;
+        padding-top: 0 !important;
+    }
+
+    /* ========================================
        FULLSCREEN MEDIA VIEWER (TikTok-style)
        ======================================== */
     .fullscreen-viewer {
@@ -1352,6 +1719,68 @@
         max-width: 400px;
     }
 
+    /* Music badge in fullscreen for images with audio */
+    .fullscreen-music-badge {
+        position: absolute;
+        bottom: 80px;
+        left: 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(10px);
+        padding: 12px 16px;
+        border-radius: 30px;
+        cursor: pointer;
+        z-index: 20;
+        max-width: calc(100% - 40px);
+    }
+
+    .fullscreen-music-icon {
+        width: 40px;
+        height: 40px;
+        background: var(--primary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .fullscreen-music-badge.playing .fullscreen-music-icon {
+        animation: musicSpin 20s linear infinite !important;
+    }
+
+    .fullscreen-music-icon svg {
+        width: 22px;
+        height: 22px;
+    }
+
+    .fullscreen-music-info {
+        overflow: hidden;
+        color: white;
+    }
+
+    .fullscreen-music-title {
+        font-size: 14px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .fullscreen-music-artist {
+        font-size: 12px;
+        opacity: 0.8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .fullscreen-audio-player {
+        display: none;
+    }
+
     /* Text content in fullscreen */
     .fullscreen-text-content {
         max-width: 600px;
@@ -1362,19 +1791,9 @@
         text-align: center;
     }
 
-    /* Post counter */
+    /* Post counter - oculto en feed infinito */
     .fullscreen-counter {
-        position: fixed;
-        top: 24px;
-        left: 50%;
-        transform: translateX(-50%);
-        color: rgba(255, 255, 255, 0.7);
-        font-size: 14px;
-        font-weight: 500;
-        z-index: 10000;
-        background: rgba(0, 0, 0, 0.4);
-        padding: 6px 14px;
-        border-radius: 20px;
+        display: none;
     }
 
     /* Loading indicator */
@@ -1419,6 +1838,169 @@
         opacity: 1;
     }
 
+    /* Fullscreen Viewer - Estilos para pantallas grandes (PC) */
+    @@media (min-width: 992px) {
+        .fullscreen-viewer {
+            background: rgba(0, 0, 0, 0.95);
+        }
+
+        .fullscreen-slide {
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .fullscreen-slide img,
+        .fullscreen-slide video {
+            max-width: 90%;
+            max-height: 90vh;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .fullscreen-slide.media-loaded img,
+        .fullscreen-slide.media-loaded video {
+            opacity: 1;
+        }
+
+        .fullscreen-music-badge {
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 400px;
+        }
+
+        .fullscreen-viewer-close {
+            top: 30px;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .fullscreen-viewer-close:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+    }
+
+    /* Fullscreen Viewer - Estilos para pantallas muy grandes */
+    @@media (min-width: 1400px) {
+        .fullscreen-slide img,
+        .fullscreen-slide video {
+            max-width: 70%;
+            max-height: 85vh;
+        }
+    }
+
+    /* Music Badge - Estilo Instagram/TikTok */
+    .music-badge {
+        position: absolute;
+        bottom: 16px;
+        left: 16px;
+        right: 60px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        padding: 8px 12px;
+        border-radius: 20px;
+        color: white;
+        font-size: 13px;
+        z-index: 5;
+        overflow: hidden;
+    }
+
+    .music-badge-icon {
+        width: 28px;
+        height: 28px;
+        flex-shrink: 0;
+        background: linear-gradient(135deg, var(--primary), #ff6b6b);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: musicSpin 20s linear infinite !important;
+    }
+
+    .music-badge-icon svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    @@keyframes musicSpin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .music-badge-info {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .music-badge-title {
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 180px;
+    }
+
+    .music-badge-artist {
+        font-size: 11px;
+        opacity: 0.8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 180px;
+    }
+
+    .photo-audio-player {
+        display: none;
+    }
+
+    /* Badge playing state */
+    .music-badge.playing .music-badge-icon {
+        animation: musicSpin 10s linear infinite !important;
+        box-shadow: 0 0 12px rgba(var(--primary-rgb), 0.6);
+    }
+
+    .music-badge.playing {
+        background: rgba(var(--primary-rgb), 0.3);
+    }
+
+    /* Fullscreen Mute Button */
+    .fullscreen-mute-btn {
+        position: absolute;
+        bottom: 80px;
+        right: 20px;
+        width: 44px;
+        height: 44px;
+        background: rgba(0, 0, 0, 0.6);
+        border: none;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 10;
+        transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    .fullscreen-mute-btn:hover {
+        background: rgba(0, 0, 0, 0.8);
+        transform: scale(1.1);
+    }
+
+    .fullscreen-mute-btn svg {
+        width: 24px;
+        height: 24px;
+    }
+
 </style>
 
 <div class="feed-page-layout">
@@ -1454,9 +2036,41 @@
                 </div>
             }
 
+            <!-- ALGORITHM SELECTOR -->
+            @if (algoritmosDisponibles.Any())
+            {
+                var algoritmoActualId = algoritmoActual?.Id ?? 0;
+
+                <div class="algorithm-selector">
+                    <span class="algorithm-label">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                        </svg>
+                        Ordenar por
+                    </span>
+                    <select class="algorithm-select" id="algorithmSelect" onchange="cambiarAlgoritmoSelect(this.value)">
+                        @foreach (var alg in algoritmosDisponibles)
+                        {
+                            if (alg.Id == algoritmoActualId)
+                            {
+                                <option value="@alg.Id" selected>@alg.Nombre</option>
+                            }
+                            else
+                            {
+                                <option value="@alg.Id">@alg.Nombre</option>
+                            }
+                        }
+                    </select>
+                </div>
+            }
+
     <!-- POSTS -->
     @if (Model.Any())
     {
+        var postIndex = 0;
+        var anuncioIndex = 0;
+        var insertarAnuncioCada = 5; // Insertar anuncio cada 5 posts
+
         @foreach (var post in Model)
         {
             var tiempoTexto = GetTimeAgo(post.FechaPublicacion);
@@ -1617,11 +2231,43 @@
                          data-post-id="@post.Id"
                          data-media-type="@(esVideo ? "video" : (esAudio ? "audio" : "image"))"
                          data-media-src="@post.RutaArchivo"
+                         @if (post.PistaMusical != null)
+                         {
+                             <text>data-audio-src="@post.PistaMusical.RutaArchivo"</text>
+                             <text>data-audio-title="@post.PistaMusical.Titulo"</text>
+                             <text>data-audio-artist="@post.PistaMusical.Artista"</text>
+                             <text>data-audio-start="@(post.AudioTrimInicio ?? 0)"</text>
+                             <text>data-audio-volume="@(((double)(post.MusicaVolumen ?? 0.7m)).ToString(System.Globalization.CultureInfo.InvariantCulture))"</text>
+                         }
                          onclick="openFullscreenViewer(event, @post.Id)"
                          style="cursor: pointer;">
                         @if (esImagen)
                         {
                             <img src="@post.RutaArchivo" alt="" loading="lazy">
+                            @if (post.PistaMusical != null)
+                            {
+                                <!-- Badge de música estilo Instagram para foto -->
+                                <div class="music-badge" data-post-id="@post.Id">
+                                    <div class="music-badge-icon">
+                                        <svg viewBox="0 0 24 24" fill="white">
+                                            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                                        </svg>
+                                    </div>
+                                    <div class="music-badge-info">
+                                        <div class="music-badge-title">@post.PistaMusical.Titulo</div>
+                                        <div class="music-badge-artist">@post.PistaMusical.Artista</div>
+                                    </div>
+                                </div>
+                                <!-- Audio oculto para reproducción -->
+                                <audio class="photo-audio-player"
+                                       data-post-id="@post.Id"
+                                       src="@post.PistaMusical.RutaArchivo"
+                                       preload="metadata"
+                                       loop
+                                       data-start="@(post.AudioTrimInicio ?? 0)"
+                                       data-volume="@(((double)(post.MusicaVolumen ?? 0.7m)).ToString(System.Globalization.CultureInfo.InvariantCulture))">
+                                </audio>
+                            }
                         }
                         else if (esVideo)
                         {
@@ -1637,6 +2283,14 @@
                                 <div class="video-play-icon">
                                     <svg viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
                                 </div>
+                                <button class="video-mute-btn" onclick="toggleVideoMute(event, this)" title="Activar/Desactivar sonido">
+                                    <svg class="muted-icon" viewBox="0 0 24 24" fill="white">
+                                        <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                                    </svg>
+                                    <svg class="unmuted-icon" viewBox="0 0 24 24" fill="white" style="display:none;">
+                                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                                    </svg>
+                                </button>
                             </div>
                         }
                         else if (esAudio)
@@ -1651,6 +2305,30 @@
                         else
                         {
                             <img src="@post.RutaArchivo" alt="" loading="lazy" onerror="this.style.display='none'">
+                            @if (post.PistaMusical != null)
+                            {
+                                <!-- Badge de música estilo Instagram -->
+                                <div class="music-badge" data-post-id="@post.Id">
+                                    <div class="music-badge-icon">
+                                        <svg viewBox="0 0 24 24" fill="white">
+                                            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                                        </svg>
+                                    </div>
+                                    <div class="music-badge-info">
+                                        <div class="music-badge-title">@post.PistaMusical.Titulo</div>
+                                        <div class="music-badge-artist">@post.PistaMusical.Artista</div>
+                                    </div>
+                                </div>
+                                <!-- Audio oculto para reproducción -->
+                                <audio class="photo-audio-player"
+                                       data-post-id="@post.Id"
+                                       src="@post.PistaMusical.RutaArchivo"
+                                       preload="metadata"
+                                       loop
+                                       data-start="@(post.AudioTrimInicio ?? 0)"
+                                       data-volume="@(((double)(post.MusicaVolumen ?? 0.7m)).ToString(System.Globalization.CultureInfo.InvariantCulture))">
+                                </audio>
+                            }
                         }
                     </div>
                 }
@@ -1739,6 +2417,47 @@
                     @post.FechaPublicacion.ToString("dd MMMM yyyy").ToUpper()
                 </div>
             </article>
+
+            @* Insertar anuncio cada N posts *@
+            postIndex++;
+            if (postIndex % insertarAnuncioCada == 0 && anuncioIndex < anuncios.Count)
+            {
+                var anuncioFeed = anuncios[anuncioIndex];
+                anuncioIndex++;
+
+                <article class="post-ad">
+                    <div class="post-ad-header">
+                        <div class="post-ad-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                            </svg>
+                        </div>
+                        <div class="post-ad-info">
+                            <div class="post-ad-label">Patrocinado</div>
+                            <div class="post-ad-badge">
+                                <i class="fas fa-ad"></i>
+                                <span>Publicidad</span>
+                            </div>
+                        </div>
+                    </div>
+                    <a href="@Url.Action("RedirectAnuncio", "FeedPublico", new { id = anuncioFeed.Id })" target="_blank" class="post-ad-media">
+                        @if (anuncioFeed.TipoCreativo == TipoCreativo.Video && !string.IsNullOrEmpty(anuncioFeed.UrlCreativo))
+                        {
+                            <video src="@Url.Content($"~{anuncioFeed.UrlCreativo}")" muted autoplay loop playsinline></video>
+                        }
+                        else if (!string.IsNullOrEmpty(anuncioFeed.UrlCreativo))
+                        {
+                            <img src="@Url.Content($"~{anuncioFeed.UrlCreativo}")" alt="Anuncio">
+                        }
+                    </a>
+                    <div class="post-ad-content">
+                        <a href="@Url.Action("RedirectAnuncio", "FeedPublico", new { id = anuncioFeed.Id })" target="_blank" class="post-ad-cta">
+                            @anuncioFeed.TextoBotonDisplay
+                            <i class="fas fa-external-link-alt"></i>
+                        </a>
+                    </div>
+                </article>
+            }
         }
     }
     else
@@ -1839,43 +2558,76 @@
             Compartir
             <button class="share-modal-close" onclick="closeShareModal()">&times;</button>
         </div>
-        <div class="share-options">
-            <a class="share-option" id="shareWhatsApp" target="_blank">
-                <div class="share-option-icon whatsapp">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-                    </svg>
+
+        <!-- Vista principal de opciones -->
+        <div id="shareMainView">
+            <div class="share-options">
+                <div class="share-option" id="shareFriends" onclick="openFriendsPanel()">
+                    <div class="share-option-icon friends">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                        </svg>
+                    </div>
+                    <span class="share-option-label">Amigos</span>
                 </div>
-                <span class="share-option-label">WhatsApp</span>
-            </a>
-            <a class="share-option" id="shareTelegram" target="_blank">
-                <div class="share-option-icon telegram">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-                    </svg>
+                <a class="share-option" id="shareWhatsApp" target="_blank">
+                    <div class="share-option-icon whatsapp">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                        </svg>
+                    </div>
+                    <span class="share-option-label">WhatsApp</span>
+                </a>
+                <a class="share-option" id="shareTelegram" target="_blank">
+                    <div class="share-option-icon telegram">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                        </svg>
+                    </div>
+                    <span class="share-option-label">Telegram</span>
+                </a>
+                <a class="share-option" id="shareTwitter" target="_blank">
+                    <div class="share-option-icon twitter">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
+                        </svg>
+                    </div>
+                    <span class="share-option-label">Twitter</span>
+                </a>
+                <div class="share-option" id="shareCopy" onclick="copyShareUrl()">
+                    <div class="share-option-icon copy">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                    </div>
+                    <span class="share-option-label">Copiar</span>
                 </div>
-                <span class="share-option-label">Telegram</span>
-            </a>
-            <a class="share-option" id="shareTwitter" target="_blank">
-                <div class="share-option-icon twitter">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
-                    </svg>
-                </div>
-                <span class="share-option-label">Twitter</span>
-            </a>
-            <div class="share-option" id="shareCopy" onclick="copyShareUrl()">
-                <div class="share-option-icon copy">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                </div>
-                <span class="share-option-label">Copiar</span>
+            </div>
+            <div class="share-url-section">
+                <input type="text" class="share-url-input" id="shareUrlInput" readonly>
             </div>
         </div>
-        <div class="share-url-section">
-            <input type="text" class="share-url-input" id="shareUrlInput" readonly>
+
+        <!-- Panel de amigos -->
+        <div class="share-friends-panel" id="friendsPanel">
+            <div class="friends-panel-header">
+                <button class="friends-panel-back" onclick="closeFriendsPanel()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+                    </svg>
+                </button>
+                <span class="friends-panel-title">Enviar a amigos</span>
+            </div>
+            <div class="friends-search">
+                <input type="text" id="friendsSearchInput" placeholder="Buscar amigos...">
+            </div>
+            <div class="friends-list" id="friendsList">
+                <div class="friends-loading">Cargando amigos...</div>
+            </div>
+            <button class="send-friends-btn" id="sendToFriendsBtn" disabled onclick="sendToSelectedFriends()">
+                Enviar
+            </button>
         </div>
     </div>
 </div>
@@ -1905,6 +2657,122 @@
         toast.classList.add('visible');
         setTimeout(() => toast.classList.remove('visible'), 2500);
     }
+
+    // ========================================
+    // PHOTO MUSIC PLAYER - Reproducción automática
+    // ========================================
+    let currentPhotoAudio = null;
+
+    // Variable para controlar si el fullscreen está activo
+    let isFullscreenActive = false;
+
+    // Intersection Observer para detectar fotos con música visibles
+    const photoMusicObserver = new IntersectionObserver((entries) => {
+        // NO reproducir audio del feed si el fullscreen está activo
+        if (isFullscreenActive) {
+            return;
+        }
+
+        entries.forEach(entry => {
+            const postMedia = entry.target;
+            const audio = postMedia.querySelector('.photo-audio-player');
+
+            if (!audio) return;
+
+            if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+                // Verificar de nuevo que fullscreen no esté activo
+                if (isFullscreenActive) return;
+
+                // La foto está visible - reproducir música
+                if (currentPhotoAudio && currentPhotoAudio !== audio) {
+                    currentPhotoAudio.pause();
+                }
+
+                const startTime = parseFloat(audio.dataset.start) || 0;
+                let volume = parseFloat(audio.dataset.volume) || 0.7;
+
+                // Normalizar volumen al rango [0, 1]
+                if (volume > 1) {
+                    volume = volume / 10; // Si es 7, convertir a 0.7
+                }
+                volume = Math.min(1, Math.max(0, volume));
+
+                audio.currentTime = startTime;
+                audio.volume = volume;
+                audio.play().catch(() => {
+                    // Autoplay bloqueado - requiere interacción del usuario
+                    console.log('Autoplay bloqueado - haga click para reproducir');
+                });
+
+                currentPhotoAudio = audio;
+
+                // Animar el badge de música
+                const badge = postMedia.querySelector('.music-badge');
+                if (badge) {
+                    badge.classList.add('playing');
+                }
+            } else {
+                // La foto no está visible - pausar música
+                if (currentPhotoAudio === audio) {
+                    audio.pause();
+                    currentPhotoAudio = null;
+                }
+
+                // Detener animación del badge
+                const badge = postMedia.querySelector('.music-badge');
+                if (badge) {
+                    badge.classList.remove('playing');
+                }
+            }
+        });
+    }, {
+        threshold: [0.5]
+    });
+
+    // Observar todas las fotos con música
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.post-media').forEach(media => {
+            if (media.querySelector('.photo-audio-player')) {
+                photoMusicObserver.observe(media);
+            }
+        });
+    });
+
+    // Click en badge de música para reproducir manualmente
+    document.addEventListener('click', (e) => {
+        const badge = e.target.closest('.music-badge');
+        if (!badge) return;
+
+        // NO reproducir si fullscreen está activo
+        if (isFullscreenActive) return;
+
+        e.stopPropagation();
+        const postId = badge.dataset.postId;
+        const audio = document.querySelector(`.photo-audio-player[data-post-id="${postId}"]`);
+
+        if (!audio) return;
+
+        if (audio.paused) {
+            if (currentPhotoAudio && currentPhotoAudio !== audio) {
+                currentPhotoAudio.pause();
+            }
+            const startTime = parseFloat(audio.dataset.start) || 0;
+            let volume = parseFloat(audio.dataset.volume) || 0.7;
+            // Normalizar volumen al rango [0, 1]
+            if (volume > 1) volume = volume / 10;
+            volume = Math.min(1, Math.max(0, volume));
+
+            audio.currentTime = startTime;
+            audio.volume = volume;
+            audio.play();
+            currentPhotoAudio = audio;
+            badge.classList.add('playing');
+        } else {
+            audio.pause();
+            currentPhotoAudio = null;
+            badge.classList.remove('playing');
+        }
+    });
 
     // Like
     document.querySelectorAll('.like-btn').forEach(btn => {
@@ -2044,6 +2912,7 @@
 
                 if (data.success) {
                     currentShareUrl = data.url;
+                    currentSharePostId = postId; // Guardar para enviar a amigos
                     document.getElementById('shareUrlInput').value = data.url;
                     document.getElementById('shareWhatsApp').href = `https://wa.me/?text=${encodeURIComponent('Mira esto: ' + data.url)}`;
                     document.getElementById('shareTelegram').href = `https://t.me/share/url?url=${encodeURIComponent(data.url)}`;
@@ -2058,6 +2927,10 @@
 
     function closeShareModal() {
         document.getElementById('shareModal').classList.remove('active');
+        // Resetear panel de amigos
+        closeFriendsPanel();
+        selectedFriends.clear();
+        updateSendButton();
     }
 
     function copyShareUrl() {
@@ -2066,6 +2939,142 @@
         document.execCommand('copy');
         showToast('URL copiada');
     }
+
+    // ========================================
+    // ENVIAR A AMIGOS
+    // ========================================
+    let allFriends = [];
+    let selectedFriends = new Set();
+    let currentSharePostId = null;
+
+    function openFriendsPanel() {
+        document.getElementById('shareMainView').style.display = 'none';
+        document.getElementById('friendsPanel').classList.add('active');
+        loadFriends();
+    }
+
+    function closeFriendsPanel() {
+        document.getElementById('friendsPanel').classList.remove('active');
+        document.getElementById('shareMainView').style.display = 'block';
+        document.getElementById('friendsSearchInput').value = '';
+    }
+
+    async function loadFriends() {
+        const friendsList = document.getElementById('friendsList');
+        friendsList.innerHTML = '<div class="friends-loading">Cargando amigos...</div>';
+
+        try {
+            const res = await fetch('/Feed/ObtenerSiguiendo');
+            if (!res.ok) throw new Error('Error al cargar amigos');
+
+            allFriends = await res.json();
+            renderFriendsList(allFriends);
+        } catch (err) {
+            console.error('Error:', err);
+            friendsList.innerHTML = '<div class="friends-empty">Error al cargar amigos</div>';
+        }
+    }
+
+    function renderFriendsList(friends) {
+        const friendsList = document.getElementById('friendsList');
+
+        if (friends.length === 0) {
+            friendsList.innerHTML = '<div class="friends-empty">No sigues a nadie aún</div>';
+            return;
+        }
+
+        friendsList.innerHTML = friends.map(friend => `
+            <div class="friend-item ${selectedFriends.has(friend.id) ? 'selected' : ''}"
+                 data-id="${friend.id}" onclick="toggleFriendSelection('${friend.id}')">
+                ${friend.fotoPerfil
+                    ? `<img src="${friend.fotoPerfil}" alt="" class="friend-avatar">`
+                    : `<div class="friend-avatar" style="display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--fg);">${friend.nombre.charAt(0).toUpperCase()}</div>`
+                }
+                <div class="friend-info">
+                    <div class="friend-name">${friend.nombre}</div>
+                    <div class="friend-username">@@${friend.username}</div>
+                </div>
+                <div class="friend-check">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function toggleFriendSelection(friendId) {
+        if (selectedFriends.has(friendId)) {
+            selectedFriends.delete(friendId);
+        } else {
+            selectedFriends.add(friendId);
+        }
+
+        // Actualizar visual
+        const item = document.querySelector(`.friend-item[data-id="${friendId}"]`);
+        if (item) {
+            item.classList.toggle('selected', selectedFriends.has(friendId));
+        }
+
+        updateSendButton();
+    }
+
+    function updateSendButton() {
+        const btn = document.getElementById('sendToFriendsBtn');
+        const count = selectedFriends.size;
+        btn.disabled = count === 0;
+        btn.textContent = count > 0 ? `Enviar (${count})` : 'Enviar';
+    }
+
+    async function sendToSelectedFriends() {
+        if (selectedFriends.size === 0) return;
+
+        const btn = document.getElementById('sendToFriendsBtn');
+        btn.disabled = true;
+        btn.textContent = 'Enviando...';
+
+        try {
+            const friendIds = Array.from(selectedFriends);
+            const res = await fetch('/Feed/EnviarAAmigos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contenidoId: currentSharePostId,
+                    amigosIds: friendIds,
+                    url: currentShareUrl
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                showToast(`Enviado a ${data.enviados} amigo${data.enviados !== 1 ? 's' : ''}`);
+                closeShareModal();
+            } else {
+                showToast(data.message || 'Error al enviar');
+            }
+        } catch (err) {
+            console.error('Error:', err);
+            showToast('Error al enviar');
+        } finally {
+            btn.disabled = false;
+            updateSendButton();
+        }
+    }
+
+    // Búsqueda de amigos
+    document.getElementById('friendsSearchInput').addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        if (query === '') {
+            renderFriendsList(allFriends);
+        } else {
+            const filtered = allFriends.filter(f =>
+                f.nombre.toLowerCase().includes(query) ||
+                f.username.toLowerCase().includes(query)
+            );
+            renderFriendsList(filtered);
+        }
+    });
 
     // Close modal on background click
     document.getElementById('shareModal').addEventListener('click', function(e) {
@@ -3057,9 +4066,111 @@
     let lastTapTime = 0;
     let tapTimeout = null;
 
+    // iOS Audio Unlock - Desbloquear audio en dispositivos iOS/Safari
+    let audioUnlocked = false;
+
+    function unlockAudio() {
+        if (audioUnlocked) return;
+
+        // Crear un AudioContext y reproducir un sonido silencioso
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const buffer = audioCtx.createBuffer(1, 1, 22050);
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioCtx.destination);
+            source.start(0);
+
+            // Tambien intentar con un elemento de audio
+            const silentAudio = document.createElement('audio');
+            silentAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+            silentAudio.play().then(() => {
+                silentAudio.pause();
+                silentAudio.remove();
+            }).catch(() => {});
+
+            audioUnlocked = true;
+            console.log('Audio desbloqueado para iOS');
+        } catch (e) {
+            console.log('Error al desbloquear audio:', e);
+        }
+    }
+
+    // Desbloquear audio en el primer touch/click
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('click', unlockAudio, { once: true });
+
     // Cache de medios precargados
     const preloadedMedia = new Map();
     const PRELOAD_RANGE = 3; // Precargar N slides adelante y atras
+
+    // Pausar cualquier audio/video del feed
+    function pauseFeedMedia() {
+        // Pausar todos los videos del feed
+        document.querySelectorAll('.post-media video, .feed-video').forEach(video => {
+            if (!video.paused) {
+                video.pause();
+            }
+        });
+
+        // Pausar todos los audios del feed (música de fotos)
+        document.querySelectorAll('.photo-audio-player, .post-media audio').forEach(audio => {
+            if (!audio.paused) {
+                audio.pause();
+            }
+        });
+    }
+
+    // CORREGIDO: Pausar TODOS los audios y videos del fullscreen viewer
+    // Esto evita el bug donde la música no coincide con la foto al navegar
+    let currentPlayingAudioId = null; // Rastrear qué audio está reproduciéndose
+
+    function pauseAllFullscreenMedia() {
+        console.log('[DEBUG] pauseAllFullscreenMedia llamado');
+
+        // Pausar todos los videos del visor
+        document.querySelectorAll('.fullscreen-slide video').forEach(video => {
+            video.pause();
+            video.currentTime = 0;
+        });
+
+        // Pausar TODOS los audios del visor - selector más específico
+        const audios = document.querySelectorAll('#fullscreenSlidesContainer audio');
+        console.log('[DEBUG] Audios encontrados para pausar:', audios.length);
+        audios.forEach(audio => {
+            if (!audio.paused) {
+                console.log('[DEBUG] Pausando audio:', audio.dataset.postId);
+            }
+            audio.pause();
+        });
+
+        // Quitar clase playing de todos los badges de música
+        document.querySelectorAll('.fullscreen-music-badge').forEach(badge => {
+            badge.classList.remove('playing');
+            badge.classList.remove('tap-to-play');
+        });
+
+        currentPlayingAudioId = null;
+    }
+
+    // Toggle Fullscreen Video Mute
+    function toggleFullscreenMute(btn) {
+        const slide = btn.closest('.fullscreen-slide');
+        const video = slide ? slide.querySelector('video') : null;
+        if (!video) return;
+
+        video.muted = !video.muted;
+
+        // Actualizar todos los botones de mute (por si hay varios slides)
+        document.querySelectorAll('.fullscreen-mute-btn').forEach(muteBtn => {
+            const iconMuted = muteBtn.querySelector('.icon-muted');
+            const iconUnmuted = muteBtn.querySelector('.icon-unmuted');
+            if (iconMuted && iconUnmuted) {
+                iconMuted.style.display = video.muted ? 'block' : 'none';
+                iconUnmuted.style.display = video.muted ? 'none' : 'block';
+            }
+        });
+    }
 
     // Recolectar todos los posts con media al cargar
     function collectMediaPosts() {
@@ -3069,12 +4180,23 @@
             const mediaType = media.dataset.mediaType;
             const mediaSrc = media.dataset.mediaSrc;
             if (postId && mediaSrc) {
-                fullscreenPosts.push({
+                const postData = {
                     id: postId,
                     type: mediaType,
                     src: mediaSrc,
                     loaded: false
-                });
+                };
+                // Capturar datos de audio si existen
+                if (media.dataset.audioSrc) {
+                    postData.audioSrc = media.dataset.audioSrc;
+                    postData.audioTitle = media.dataset.audioTitle || '';
+                    postData.audioArtist = media.dataset.audioArtist || '';
+                    postData.audioStart = parseFloat(media.dataset.audioStart) || 0;
+                    let vol = parseFloat(media.dataset.audioVolume) || 0.7;
+                    if (vol > 1) vol = vol / 10;
+                    postData.audioVolume = Math.min(1, Math.max(0, vol));
+                }
+                fullscreenPosts.push(postData);
             }
         });
     }
@@ -3138,6 +4260,24 @@
         event.preventDefault();
         event.stopPropagation();
 
+        console.log('[DEBUG] openFullscreenViewer para postId:', postId);
+
+        // IMPORTANTE: Marcar fullscreen como activo para bloquear el IntersectionObserver del feed
+        isFullscreenActive = true;
+
+        // Pausar cualquier audio/video del feed antes de abrir el viewer
+        pauseFeedMedia();
+        // También pausar el audio actual del feed si existe
+        if (currentPhotoAudio) {
+            currentPhotoAudio.pause();
+            currentPhotoAudio = null;
+        }
+
+        // Resetear estado de scroll
+        isScrolling = false;
+        lastScrollIndex = -1;
+        currentPlayingAudioId = null;
+
         // Recolectar posts
         collectMediaPosts();
 
@@ -3146,6 +4286,7 @@
         if (currentFullscreenIndex === -1) {
             currentFullscreenIndex = 0;
         }
+        console.log('[DEBUG] currentFullscreenIndex:', currentFullscreenIndex);
 
         // Iniciar precarga inmediatamente
         preloadAdjacentMedia(currentFullscreenIndex);
@@ -3158,14 +4299,25 @@
         viewer.classList.add('active');
         document.body.style.overflow = 'hidden';
 
-        // Scroll al slide actual
-        setTimeout(() => {
-            scrollToSlide(currentFullscreenIndex, false);
-            updateCounter();
-        }, 50);
+        // Ocultar sidebar y header
+        document.body.classList.add('fullscreen-mode');
 
-        // Reproducir video si es el slide actual
-        playCurrentVideo();
+        // Scroll al slide actual Y LUEGO reproducir
+        // IMPORTANTE: NO reproducir antes del scroll para evitar audio duplicado
+        setTimeout(() => {
+            // Scroll sin animación para evitar múltiples llamadas a onFullscreenScroll
+            const container = document.getElementById('fullscreenSlidesContainer');
+            const slideHeight = window.innerHeight;
+            container.scrollTop = slideHeight * currentFullscreenIndex;
+
+            updateCounter();
+
+            // Ahora sí reproducir después de que el scroll terminó
+            setTimeout(() => {
+                lastScrollIndex = currentFullscreenIndex; // Evitar que onFullscreenScroll lo pause
+                playCurrentVideo();
+            }, 50);
+        }, 50);
     }
 
     // Generar los slides
@@ -3198,6 +4350,14 @@
                            muted
                            preload="auto">
                     </video>
+                    <button class="fullscreen-mute-btn" onclick="event.stopPropagation(); toggleFullscreenMute(this)" title="Activar/Desactivar sonido">
+                        <svg class="icon-muted" viewBox="0 0 24 24" fill="white">
+                            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                        </svg>
+                        <svg class="icon-unmuted" viewBox="0 0 24 24" fill="white" style="display:none;">
+                            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                        </svg>
+                    </button>
                     <div class="fullscreen-heart-animation">
                         <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
                     </div>
@@ -3218,11 +4378,36 @@
                 `;
                 slide.classList.add('media-loaded'); // Audio siempre listo
             } else {
+                // Imagen - verificar si tiene audio
+                let audioHtml = '';
+                if (post.audioSrc) {
+                    audioHtml = `
+                        <div class="fullscreen-music-badge" data-post-id="${post.id}">
+                            <div class="fullscreen-music-icon">
+                                <svg viewBox="0 0 24 24" fill="white">
+                                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                                </svg>
+                            </div>
+                            <div class="fullscreen-music-info">
+                                <div class="fullscreen-music-title">${post.audioTitle}</div>
+                                <div class="fullscreen-music-artist">${post.audioArtist}</div>
+                            </div>
+                        </div>
+                        <audio class="fullscreen-audio-player"
+                               data-post-id="${post.id}"
+                               src="${post.audioSrc}"
+                               loop
+                               data-start="${post.audioStart}"
+                               data-volume="${post.audioVolume}">
+                        </audio>
+                    `;
+                }
                 slide.innerHTML = `
                     <div class="fullscreen-loading-indicator">
                         <div class="loading-spinner"></div>
                     </div>
                     <img src="${post.src}" alt="" draggable="false">
+                    ${audioHtml}
                     <div class="fullscreen-heart-animation">
                         <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
                     </div>
@@ -3326,27 +4511,43 @@
 
     // Scroll handler para detectar el slide actual
     let scrollTimeout;
+    let isScrolling = false;
+    let lastScrollIndex = -1;
+
     function onFullscreenScroll() {
+        const container = document.getElementById('fullscreenSlidesContainer');
+        if (!container) return;
+
+        const slideHeight = window.innerHeight;
+        const newIndex = Math.round(container.scrollTop / slideHeight);
+
+        // Validar índice
+        if (newIndex < 0 || newIndex >= fullscreenPosts.length) return;
+
+        // INMEDIATAMENTE pausar todo cuando se detecta un cambio de slide durante scroll
+        if (newIndex !== lastScrollIndex) {
+            console.log('[DEBUG] onFullscreenScroll: cambio de', lastScrollIndex, 'a', newIndex);
+            if (!isScrolling) {
+                isScrolling = true;
+                pauseAllFullscreenMedia();
+            }
+            lastScrollIndex = newIndex;
+        }
+
+        // Debounce para detectar cuando el scroll termina
         clearTimeout(scrollTimeout);
         scrollTimeout = setTimeout(() => {
-            const container = document.getElementById('fullscreenSlidesContainer');
-            const slideHeight = window.innerHeight;
-            const newIndex = Math.round(container.scrollTop / slideHeight);
+            isScrolling = false;
 
-            if (newIndex !== currentFullscreenIndex && newIndex >= 0 && newIndex < fullscreenPosts.length) {
-                // Pausar video anterior
-                pauseVideoAtIndex(currentFullscreenIndex);
-
+            // Solo reproducir si cambió el índice actual
+            if (newIndex !== currentFullscreenIndex) {
+                console.log('[DEBUG] onFullscreenScroll fin: actualizando a índice', newIndex);
                 currentFullscreenIndex = newIndex;
                 updateCounter();
-
-                // Precargar medios adyacentes al nuevo indice
                 preloadAdjacentMedia(currentFullscreenIndex);
-
-                // Reproducir video nuevo
                 playCurrentVideo();
             }
-        }, 100);
+        }, 150);
     }
 
     // Scroll al slide
@@ -3365,44 +4566,173 @@
         counter.textContent = `${currentFullscreenIndex + 1} / ${fullscreenPosts.length}`;
     }
 
-    // Reproducir video del slide actual
+    // Reproducir video o audio del slide actual
     function playCurrentVideo() {
-        const slides = document.querySelectorAll('.fullscreen-slide');
-        if (slides[currentFullscreenIndex]) {
-            const video = slides[currentFullscreenIndex].querySelector('video');
-            if (video) {
-                video.muted = false;
-                video.play().catch(() => {
-                    // Si falla (autoplay policy), intentar con mute
+        // IMPORTANTE: Pausar TODOS los medios primero para evitar audio superpuesto
+        pauseAllFullscreenMedia();
+
+        // USAR data-index para buscar el slide correcto - más confiable que índices de array
+        const container = document.getElementById('fullscreenSlidesContainer');
+        if (!container) {
+            console.log('[DEBUG] No se encontró container');
+            return;
+        }
+
+        const slide = container.querySelector(`.fullscreen-slide[data-index="${currentFullscreenIndex}"]`);
+
+        if (!slide) {
+            console.log('[DEBUG] No se encontró slide con data-index:', currentFullscreenIndex);
+            return;
+        }
+
+        const postId = slide.dataset.postId;
+        console.log('[DEBUG] playCurrentVideo - índice:', currentFullscreenIndex, 'postId:', postId);
+
+        // Intentar desbloquear audio primero (iOS)
+        unlockAudio();
+
+        // Reproducir video si existe
+        const video = slide.querySelector('video');
+        if (video) {
+            // En iOS, primero intentar con mute, luego sin mute
+            const playVideo = async () => {
+                try {
+                    video.muted = false;
+                    await video.play();
+                } catch (e) {
+                    // Si falla, intentar con mute
+                    console.log('Reproduciendo video con mute debido a politica de autoplay');
                     video.muted = true;
-                    video.play();
+                    try {
+                        await video.play();
+                        // Mostrar indicador de que esta muteado
+                        const muteBtn = slide.querySelector('.fullscreen-mute-btn');
+                        if (muteBtn) {
+                            const iconMuted = muteBtn.querySelector('.icon-muted');
+                            const iconUnmuted = muteBtn.querySelector('.icon-unmuted');
+                            if (iconMuted) iconMuted.style.display = 'block';
+                            if (iconUnmuted) iconUnmuted.style.display = 'none';
+                        }
+                    } catch (e2) {
+                        console.log('No se pudo reproducir el video:', e2);
+                    }
+                }
+            };
+            playVideo();
+            return; // Videos no tienen audio adicional
+        }
+
+        // Reproducir audio si existe (para imagenes con musica)
+        const audio = slide.querySelector('audio.fullscreen-audio-player');
+        const musicBadge = slide.querySelector('.fullscreen-music-badge');
+
+        console.log('[DEBUG] Buscando audio en slide', postId, '- encontrado:', !!audio, 'badge:', !!musicBadge);
+
+        if (audio && musicBadge) {
+            const audioPostId = audio.dataset.postId;
+            const audioSrc = audio.src;
+            console.log('[DEBUG] Audio encontrado - postId:', audioPostId, 'src:', audioSrc);
+
+            // Evitar reproducir si ya es el audio actual
+            if (currentPlayingAudioId === audioPostId && !audio.paused) {
+                console.log('[DEBUG] Audio ya reproduciéndose, saltando');
+                return;
+            }
+
+            const startTime = parseFloat(audio.dataset.start) || 0;
+            const volume = parseFloat(audio.dataset.volume) || 0.7;
+            audio.currentTime = startTime;
+            audio.volume = volume;
+
+            const playAudio = async () => {
+                try {
+                    await audio.play();
+                    currentPlayingAudioId = audioPostId;
+                    musicBadge.classList.add('playing');
+                    console.log('[DEBUG] Audio REPRODUCIÉNDOSE - postId:', audioPostId);
+                } catch (e) {
+                    console.log('Autoplay de audio bloqueado, esperando interaccion');
+                    // Mostrar indicador de que necesita tap para reproducir
+                    musicBadge.classList.add('tap-to-play');
+                }
+            };
+            playAudio();
+
+            // Click en badge para toggle - usar dataset para evitar duplicados
+            if (!musicBadge.dataset.handlerAttached) {
+                musicBadge.dataset.handlerAttached = 'true';
+                musicBadge.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const thisAudio = musicBadge.parentElement.querySelector('audio.fullscreen-audio-player');
+                    if (!thisAudio) return;
+
+                    musicBadge.classList.remove('tap-to-play');
+                    if (thisAudio.paused) {
+                        // Pausar todos los otros audios primero
+                        pauseAllFullscreenMedia();
+                        const st = parseFloat(thisAudio.dataset.start) || 0;
+                        thisAudio.currentTime = st;
+                        thisAudio.play().then(() => {
+                            currentPlayingAudioId = thisAudio.dataset.postId;
+                            musicBadge.classList.add('playing');
+                        }).catch(() => {});
+                    } else {
+                        thisAudio.pause();
+                        currentPlayingAudioId = null;
+                        musicBadge.classList.remove('playing');
+                    }
                 });
             }
         }
     }
 
-    // Pausar video en indice
+    // Pausar video y audio en indice
     function pauseVideoAtIndex(index) {
         const slides = document.querySelectorAll('.fullscreen-slide');
         if (slides[index]) {
-            const video = slides[index].querySelector('video');
+            const slide = slides[index];
+
+            // Pausar video
+            const video = slide.querySelector('video');
             if (video) {
                 video.pause();
+            }
+
+            // Pausar audio
+            const audio = slide.querySelector('.fullscreen-audio-player');
+            const musicBadge = slide.querySelector('.fullscreen-music-badge');
+            if (audio) {
+                audio.pause();
+                if (musicBadge) {
+                    musicBadge.classList.remove('playing');
+                }
             }
         }
     }
 
     // Cerrar fullscreen viewer
     function closeFullscreenViewer() {
+        console.log('[DEBUG] closeFullscreenViewer llamado');
+
+        // Pausar todo primero
+        pauseAllFullscreenMedia();
+
         const viewer = document.getElementById('fullscreenViewer');
         viewer.classList.remove('active');
+        document.body.classList.remove('fullscreen-mode');
         document.body.style.overflow = '';
 
-        // Pausar todos los videos
-        document.querySelectorAll('.fullscreen-slide video').forEach(v => v.pause());
-
-        // Limpiar
+        // Limpiar container
         document.getElementById('fullscreenSlidesContainer').innerHTML = '';
+
+        // Resetear estado
+        currentPlayingAudioId = null;
+        currentFullscreenIndex = 0;
+        isScrolling = false;
+        lastScrollIndex = -1;
+
+        // IMPORTANTE: Marcar fullscreen como inactivo para permitir que el IntersectionObserver del feed funcione
+        isFullscreenActive = false;
     }
 
     // Keyboard navigation
@@ -3415,21 +4745,21 @@
         } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
             e.preventDefault();
             if (currentFullscreenIndex < fullscreenPosts.length - 1) {
-                pauseVideoAtIndex(currentFullscreenIndex);
                 currentFullscreenIndex++;
                 scrollToSlide(currentFullscreenIndex);
                 updateCounter();
                 preloadAdjacentMedia(currentFullscreenIndex);
+                // playCurrentVideo() ya llama a pauseAllFullscreenMedia()
                 playCurrentVideo();
             }
         } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
             e.preventDefault();
             if (currentFullscreenIndex > 0) {
-                pauseVideoAtIndex(currentFullscreenIndex);
                 currentFullscreenIndex--;
                 scrollToSlide(currentFullscreenIndex);
                 updateCounter();
                 preloadAdjacentMedia(currentFullscreenIndex);
+                // playCurrentVideo() ya llama a pauseAllFullscreenMedia()
                 playCurrentVideo();
             }
         } else if (e.key === ' ') {
@@ -3521,4 +4851,62 @@
 
         swipeDirection = null;
     }, { passive: true });
+
+    // ========================================
+    // ALGORITHM SELECTOR
+    // ========================================
+
+    // Exponer globalmente para el onchange
+    window.cambiarAlgoritmoSelect = async function(algoritmoId) {
+        console.log('cambiarAlgoritmoSelect llamado con:', algoritmoId);
+
+        if (!algoritmoId) {
+            console.log('algoritmoId es vacío, saliendo');
+            return;
+        }
+
+        const select = document.getElementById('algorithmSelect');
+        if (select) {
+            select.disabled = true; // Deshabilitar mientras procesa
+        }
+
+        try {
+            console.log('Enviando POST a /Feed/CambiarAlgoritmo');
+
+            const response = await fetch('/Feed/CambiarAlgoritmo', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: `algoritmoId=${algoritmoId}`
+            });
+
+            console.log('Respuesta recibida, status:', response.status);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('Data recibida:', data);
+
+            if (data.success) {
+                showToast(data.message || 'Algoritmo actualizado');
+                console.log('Recargando página en 500ms...');
+                // Recargar pagina para aplicar nuevo algoritmo
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
+            } else {
+                console.error('Error del servidor:', data.message);
+                showToast(data.message || 'Error al cambiar algoritmo');
+                if (select) select.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error en cambiarAlgoritmoSelect:', error);
+            showToast('Error al cambiar algoritmo: ' + error.message);
+            if (select) select.disabled = false;
+        }
+    };
 </script>

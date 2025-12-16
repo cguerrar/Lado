@@ -129,6 +129,8 @@ builder.Services.AddScoped<Lado.Services.IAdService, Lado.Services.AdService>();
 builder.Services.AddSingleton<Lado.Services.IServerMetricsService, Lado.Services.ServerMetricsService>();
 builder.Services.AddScoped<Lado.Services.IEmailService, Lado.Services.EmailService>();
 builder.Services.AddScoped<Lado.Services.IVisitasService, Lado.Services.VisitasService>();
+builder.Services.AddScoped<Lado.Services.INotificationService, Lado.Services.NotificationService>();
+builder.Services.AddScoped<Lado.Services.IFeedAlgorithmService, Lado.Services.FeedAlgorithmService>();
 
 // ========================================
 // CONFIGURACIÓN DE CACHING
@@ -254,6 +256,58 @@ try
             }
         }
 
+        // ✅ VERIFICAR Y ARREGLAR TABLA NOTIFICACIONES
+        try
+        {
+            var dbContext = services.GetRequiredService<ApplicationDbContext>();
+
+            // Verificar si la tabla existe y tiene todas las columnas
+            await dbContext.Database.ExecuteSqlRawAsync(@"
+                -- Agregar columnas faltantes si no existen
+                IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Notificaciones')
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notificaciones' AND COLUMN_NAME = 'EstaActiva')
+                        ALTER TABLE [Notificaciones] ADD [EstaActiva] bit NOT NULL DEFAULT 1
+
+                    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notificaciones' AND COLUMN_NAME = 'ComentarioId')
+                        ALTER TABLE [Notificaciones] ADD [ComentarioId] int NULL
+
+                    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notificaciones' AND COLUMN_NAME = 'ContenidoId')
+                        ALTER TABLE [Notificaciones] ADD [ContenidoId] int NULL
+
+                    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notificaciones' AND COLUMN_NAME = 'DesafioId')
+                        ALTER TABLE [Notificaciones] ADD [DesafioId] int NULL
+
+                    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notificaciones' AND COLUMN_NAME = 'FechaLectura')
+                        ALTER TABLE [Notificaciones] ADD [FechaLectura] datetime2 NULL
+
+                    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notificaciones' AND COLUMN_NAME = 'ImagenUrl')
+                        ALTER TABLE [Notificaciones] ADD [ImagenUrl] nvarchar(500) NULL
+
+                    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notificaciones' AND COLUMN_NAME = 'MensajeId')
+                        ALTER TABLE [Notificaciones] ADD [MensajeId] int NULL
+
+                    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notificaciones' AND COLUMN_NAME = 'UrlDestino')
+                        ALTER TABLE [Notificaciones] ADD [UrlDestino] nvarchar(500) NULL
+
+                    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notificaciones' AND COLUMN_NAME = 'UsuarioOrigenId')
+                        ALTER TABLE [Notificaciones] ADD [UsuarioOrigenId] nvarchar(450) NULL
+                END
+
+                -- Registrar migración si no existe
+                IF NOT EXISTS (SELECT 1 FROM [__EFMigrationsHistory] WHERE [MigrationId] = '20251216175610_AgregarNotificaciones')
+                BEGIN
+                    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+                    VALUES ('20251216175610_AgregarNotificaciones', '8.0.0')
+                END
+            ");
+            logger.LogInformation("✅ Tabla Notificaciones verificada y actualizada");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("⚠️ No se pudo verificar tabla Notificaciones: {Message}", ex.Message);
+        }
+
         // Crear usuario admin si no existe
         var adminEmail = "admin@ladoapp.com";
         var adminUser = await userManager.FindByEmailAsync(adminEmail);
@@ -368,6 +422,25 @@ try
             {
                 logger.LogWarning("   ID {Id}: {Ruta}", contenido.Id, contenido.RutaArchivo);
             }
+        }
+
+        // ⭐ ACTUALIZAR COMISIONES Y MONTOS MÍNIMOS DE USUARIOS EXISTENTES
+        var usuariosSinComision = await context.Users
+            .Where(u => u.ComisionRetiro == 0)
+            .ToListAsync();
+
+        if (usuariosSinComision.Any())
+        {
+            foreach (var usuario in usuariosSinComision)
+            {
+                usuario.ComisionRetiro = 20; // 20% por defecto
+                if (usuario.MontoMinimoRetiro == 0)
+                {
+                    usuario.MontoMinimoRetiro = 50; // $50 mínimo por defecto
+                }
+            }
+            await context.SaveChangesAsync();
+            logger.LogInformation("✅ Actualizados {Count} usuarios con comisión por defecto (20%)", usuariosSinComision.Count);
         }
 
         // ⭐ NUEVO: Listar archivos existentes para debug

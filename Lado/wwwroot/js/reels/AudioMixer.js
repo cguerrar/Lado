@@ -24,8 +24,10 @@ class AudioMixer {
 
         // Biblioteca de música
         this.tracks = [];
+        this.trendingTracks = [];
         this.genres = [];
         this.currentGenre = 'todos';
+        this.currentTab = 'todos'; // 'todos', 'trending'
         this.searchQuery = '';
 
         // Tiempos de recorte de audio
@@ -42,19 +44,28 @@ class AudioMixer {
 
     async loadLibrary() {
         try {
-            // Cargar géneros
-            const generosResponse = await fetch('/api/Musica/generos');
+            // Cargar en paralelo: géneros, pistas y trending
+            const [generosResponse, pistasResponse, trendingResponse] = await Promise.all([
+                fetch('/api/Musica/generos'),
+                fetch('/api/Musica/biblioteca'),
+                fetch('/api/Musica/trending')
+            ]);
+
             if (generosResponse.ok) {
                 this.genres = await generosResponse.json();
             }
 
-            // Cargar todas las pistas
-            const pistasResponse = await fetch('/api/Musica/biblioteca');
             if (pistasResponse.ok) {
                 this.tracks = await pistasResponse.json();
-                this.renderTracks();
-                this.renderGenres();
             }
+
+            if (trendingResponse.ok) {
+                this.trendingTracks = await trendingResponse.json();
+            }
+
+            this.renderTabs();
+            this.renderGenres();
+            this.renderTracks();
         } catch (error) {
             console.error('Error loading music library:', error);
             this.showMessage('Error al cargar la biblioteca de música', 'error');
@@ -66,21 +77,51 @@ class AudioMixer {
         this.panel.className = 'audio-mixer-panel';
         this.panel.innerHTML = `
             <div class="audio-panel-header">
-                <span class="audio-panel-title">Música</span>
+                <span class="audio-panel-title">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                        <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                    </svg>
+                    Música
+                </span>
                 <button class="audio-panel-close" id="closeAudioPanel">&times;</button>
             </div>
 
             <div class="audio-panel-content">
-                <!-- Search Bar -->
-                <div class="audio-search-bar">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <path d="M21 21l-4.35-4.35"></path>
-                    </svg>
-                    <input type="text" id="musicSearchInput" placeholder="Buscar música...">
+                <!-- Search Bar Mejorado -->
+                <div class="audio-search-container">
+                    <div class="audio-search-bar">
+                        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="M21 21l-4.35-4.35"></path>
+                        </svg>
+                        <input type="text" id="musicSearchInput" placeholder="Buscar por título, artista...">
+                        <button class="search-clear-btn" id="searchClearBtn" style="display: none;">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="search-results-count" id="searchResultsCount"></div>
                 </div>
 
-                <!-- Genre Filter -->
+                <!-- Tabs: Todos / Más usados -->
+                <div class="audio-tabs" id="audioTabs">
+                    <button class="audio-tab active" data-tab="todos">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                            <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/>
+                        </svg>
+                        Todos
+                    </button>
+                    <button class="audio-tab" data-tab="trending">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                            <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/>
+                        </svg>
+                        Más usados
+                        <span class="tab-badge" id="trendingCount">0</span>
+                    </button>
+                </div>
+
+                <!-- Genre Filter (solo visible en tab Todos) -->
                 <div class="genre-filter" id="genreFilter">
                     <button class="genre-btn active" data-genre="todos">Todos</button>
                     <!-- Genres will be rendered here -->
@@ -139,9 +180,12 @@ class AudioMixer {
 
                 <!-- Audio Trim Section -->
                 <div class="audio-trim-section" id="audioTrimSection" style="display: none;">
-                    <label>Recorte de Audio</label>
+                    <label>Recorte de Audio <span class="trim-hint">(arrastra los bordes)</span></label>
                     <div class="audio-waveform" id="audioWaveform">
-                        <div class="audio-trim-region" id="audioTrimRegion"></div>
+                        <div class="audio-trim-region" id="audioTrimRegion">
+                            <div class="trim-handle trim-handle-left" id="trimHandleLeft"></div>
+                            <div class="trim-handle trim-handle-right" id="trimHandleRight"></div>
+                        </div>
                         <div class="audio-playhead" id="audioPlayhead"></div>
                     </div>
                     <div class="audio-trim-times">
@@ -164,6 +208,16 @@ class AudioMixer {
                         <span id="previewBtnText">Previsualizar</span>
                     </button>
                 </div>
+
+                <!-- Use Music Button -->
+                <div class="audio-action-buttons" id="audioActionButtons" style="display: none;">
+                    <button class="use-music-btn" id="useMusicBtn">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                        </svg>
+                        Usar esta música
+                    </button>
+                </div>
             </div>
         `;
 
@@ -176,13 +230,40 @@ class AudioMixer {
 
         // Search
         const searchInput = this.panel.querySelector('#musicSearchInput');
+        const clearBtn = this.panel.querySelector('#searchClearBtn');
         let searchTimeout;
+
         searchInput.addEventListener('input', () => {
             clearTimeout(searchTimeout);
+            const value = searchInput.value;
+
+            // Mostrar/ocultar botón de limpiar
+            clearBtn.style.display = value ? 'flex' : 'none';
+
             searchTimeout = setTimeout(() => {
-                this.searchQuery = searchInput.value;
+                this.searchQuery = value;
                 this.filterTracks();
+                this.updateSearchResultsCount();
             }, 300);
+        });
+
+        // Focus en el buscador
+        searchInput.addEventListener('focus', () => {
+            searchInput.parentElement.classList.add('focused');
+        });
+
+        searchInput.addEventListener('blur', () => {
+            searchInput.parentElement.classList.remove('focused');
+        });
+
+        // Clear search
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            clearBtn.style.display = 'none';
+            this.searchQuery = '';
+            this.filterTracks();
+            this.updateSearchResultsCount();
+            searchInput.focus();
         });
 
         // Volume sliders
@@ -205,6 +286,139 @@ class AudioMixer {
 
         // Preview button
         this.panel.querySelector('#audioPreviewBtn').addEventListener('click', () => this.togglePreview());
+
+        // Use music button
+        this.panel.querySelector('#useMusicBtn').addEventListener('click', () => this.confirmMusicSelection());
+
+        // Initialize trim controls
+        this.initTrimControls();
+    }
+
+    initTrimControls() {
+        const waveform = this.panel.querySelector('#audioWaveform');
+        const trimRegion = this.panel.querySelector('#audioTrimRegion');
+        const leftHandle = this.panel.querySelector('#trimHandleLeft');
+        const rightHandle = this.panel.querySelector('#trimHandleRight');
+
+        let isDragging = null; // 'left', 'right', or 'region'
+        let startX = 0;
+        let startLeft = 0;
+        let startRight = 0;
+
+        const getPercent = (clientX) => {
+            const rect = waveform.getBoundingClientRect();
+            return Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+        };
+
+        const updateTrimFromPercent = (leftPercent, rightPercent) => {
+            if (!this.selectedTrack) return;
+
+            const trackDuration = this.selectedTrack.duracion || 180; // default 3 min
+            this.audioStartTime = (leftPercent / 100) * trackDuration;
+            const endTime = (rightPercent / 100) * trackDuration;
+            this.audioDuration = endTime - this.audioStartTime;
+
+            // Min duration 5 seconds
+            if (this.audioDuration < 5) {
+                this.audioDuration = 5;
+            }
+
+            // Update visual
+            trimRegion.style.left = `${leftPercent}%`;
+            trimRegion.style.right = `${100 - rightPercent}%`;
+
+            this.updateTrimDisplay();
+        };
+
+        // Left handle drag
+        const onMouseDown = (e, type) => {
+            e.preventDefault();
+            e.stopPropagation();
+            isDragging = type;
+            startX = e.clientX || e.touches?.[0]?.clientX;
+            startLeft = parseFloat(trimRegion.style.left) || 10;
+            startRight = 100 - (parseFloat(trimRegion.style.right) || 10);
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            document.addEventListener('touchmove', onMouseMove, { passive: false });
+            document.addEventListener('touchend', onMouseUp);
+        };
+
+        const onMouseMove = (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+
+            const clientX = e.clientX || e.touches?.[0]?.clientX;
+            const percent = getPercent(clientX);
+
+            if (isDragging === 'left') {
+                const maxLeft = startRight - 5; // min 5% width
+                const newLeft = Math.min(percent, maxLeft);
+                updateTrimFromPercent(newLeft, startRight);
+            } else if (isDragging === 'right') {
+                const minRight = startLeft + 5; // min 5% width
+                const newRight = Math.max(percent, minRight);
+                updateTrimFromPercent(startLeft, newRight);
+            }
+        };
+
+        const onMouseUp = () => {
+            isDragging = null;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            document.removeEventListener('touchmove', onMouseMove);
+            document.removeEventListener('touchend', onMouseUp);
+        };
+
+        // Attach events
+        leftHandle.addEventListener('mousedown', (e) => onMouseDown(e, 'left'));
+        leftHandle.addEventListener('touchstart', (e) => onMouseDown(e, 'left'), { passive: false });
+        rightHandle.addEventListener('mousedown', (e) => onMouseDown(e, 'right'));
+        rightHandle.addEventListener('touchstart', (e) => onMouseDown(e, 'right'), { passive: false });
+
+        // Click on waveform to set position
+        waveform.addEventListener('click', (e) => {
+            if (e.target === leftHandle || e.target === rightHandle) return;
+            const percent = getPercent(e.clientX);
+            const currentLeft = parseFloat(trimRegion.style.left) || 10;
+            const currentRight = 100 - (parseFloat(trimRegion.style.right) || 10);
+
+            // Move closest handle
+            const distToLeft = Math.abs(percent - currentLeft);
+            const distToRight = Math.abs(percent - currentRight);
+
+            if (distToLeft < distToRight) {
+                updateTrimFromPercent(Math.min(percent, currentRight - 5), currentRight);
+            } else {
+                updateTrimFromPercent(currentLeft, Math.max(percent, currentLeft + 5));
+            }
+        });
+    }
+
+    renderTabs() {
+        const tabsContainer = this.panel.querySelector('#audioTabs');
+        const trendingCountBadge = this.panel.querySelector('#trendingCount');
+
+        // Actualizar contador de trending
+        if (trendingCountBadge) {
+            trendingCountBadge.textContent = this.trendingTracks.length;
+        }
+
+        // Bind tab buttons
+        tabsContainer.querySelectorAll('.audio-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                tabsContainer.querySelectorAll('.audio-tab').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.currentTab = btn.dataset.tab;
+
+                // Mostrar/ocultar filtro de géneros según tab
+                const genreFilter = this.panel.querySelector('#genreFilter');
+                genreFilter.style.display = this.currentTab === 'todos' ? 'flex' : 'none';
+
+                this.filterTracks();
+            });
+        });
     }
 
     renderGenres() {
@@ -214,7 +428,9 @@ class AudioMixer {
         let html = '<button class="genre-btn active" data-genre="todos">Todos</button>';
 
         this.genres.forEach(genre => {
-            html += `<button class="genre-btn" data-genre="${genre.Nombre}">${genre.Nombre}</button>`;
+            // Soportar tanto camelCase (nombre) como PascalCase (Nombre)
+            const genreName = genre.nombre || genre.Nombre || 'Sin género';
+            html += `<button class="genre-btn" data-genre="${genreName}">${genreName}</button>`;
         });
 
         container.innerHTML = html;
@@ -230,25 +446,44 @@ class AudioMixer {
         });
     }
 
+    updateSearchResultsCount() {
+        const container = this.panel.querySelector('#searchResultsCount');
+        if (!this.searchQuery) {
+            container.textContent = '';
+            container.style.display = 'none';
+            return;
+        }
+
+        const filtered = this.getFilteredTracks();
+        container.textContent = `${filtered.length} resultado${filtered.length !== 1 ? 's' : ''}`;
+        container.style.display = 'block';
+    }
+
     renderTracks(tracks = null) {
         const container = this.panel.querySelector('#trackList');
-        const tracksToRender = tracks || this.tracks;
+        const tracksToRender = tracks || this.getFilteredTracks();
+        const isTrending = this.currentTab === 'trending';
 
         if (tracksToRender.length === 0) {
+            const message = this.searchQuery
+                ? `No se encontraron resultados para "${this.searchQuery}"`
+                : 'No se encontraron pistas';
+
             container.innerHTML = `
                 <div class="no-tracks">
                     <svg viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
                     </svg>
-                    <span>No se encontraron pistas</span>
+                    <span>${message}</span>
                 </div>
             `;
             return;
         }
 
-        container.innerHTML = tracksToRender.map(track => `
-            <div class="track-item ${this.selectedTrack?.id === track.id ? 'selected' : ''}"
+        container.innerHTML = tracksToRender.map((track, index) => `
+            <div class="track-item ${this.selectedTrack?.id === track.id ? 'selected' : ''} ${isTrending ? 'trending-item' : ''}"
                  data-track-id="${track.id}">
+                ${isTrending ? `<div class="track-rank">${index + 1}</div>` : ''}
                 <div class="track-cover">
                     <img src="${track.rutaPortada || '/images/music-placeholder.svg'}" alt="${track.titulo}">
                     <button class="track-play-btn" data-track-id="${track.id}">
@@ -263,6 +498,7 @@ class AudioMixer {
                     <div class="track-meta">
                         <span class="track-duration">${track.duracionFormateada}</span>
                         <span class="track-genre">${track.genero}</span>
+                        ${isTrending && track.contadorUsos ? `<span class="track-uses">${track.contadorUsos} usos</span>` : ''}
                     </div>
                 </div>
                 <button class="track-select-btn" data-track-id="${track.id}" title="Usar esta pista">
@@ -299,10 +535,16 @@ class AudioMixer {
     }
 
     filterTracks() {
-        let filtered = this.tracks;
+        const filtered = this.getFilteredTracks();
+        this.renderTracks(filtered);
+    }
 
-        // Filter by genre
-        if (this.currentGenre !== 'todos') {
+    getFilteredTracks() {
+        // Seleccionar la lista base según la pestaña
+        let filtered = this.currentTab === 'trending' ? [...this.trendingTracks] : [...this.tracks];
+
+        // Filter by genre (solo en pestaña Todos)
+        if (this.currentTab === 'todos' && this.currentGenre !== 'todos') {
             filtered = filtered.filter(t => t.genero === this.currentGenre);
         }
 
@@ -316,12 +558,18 @@ class AudioMixer {
             );
         }
 
-        this.renderTracks(filtered);
+        return filtered;
     }
 
     async previewTrack(trackId) {
-        const track = this.tracks.find(t => t.id === trackId);
-        if (!track) return;
+        // Buscar en ambas listas
+        const track = this.tracks.find(t => t.id === trackId) || this.trendingTracks.find(t => t.id === trackId);
+        if (!track) {
+            console.warn('Track not found:', trackId);
+            return;
+        }
+
+        console.log('Previewing track:', track.titulo, 'Path:', track.rutaArchivo);
 
         // Stop current preview if playing
         if (this.previewAudio) {
@@ -330,6 +578,11 @@ class AudioMixer {
         }
 
         try {
+            if (!track.rutaArchivo) {
+                this.showMessage('Esta pista no tiene archivo de audio', 'error');
+                return;
+            }
+
             this.previewAudio = new Audio(track.rutaArchivo);
             this.previewAudio.volume = this.musicVolume;
 
@@ -337,7 +590,13 @@ class AudioMixer {
                 this.stopPreview();
             });
 
+            this.previewAudio.addEventListener('error', (e) => {
+                console.error('Audio error:', e);
+                this.showMessage('Error al cargar el archivo de audio', 'error');
+            });
+
             await this.previewAudio.play();
+            this.showMessage(`Reproduciendo: ${track.titulo}`, 'success');
 
             // Auto-stop after 15 seconds
             setTimeout(() => {
@@ -348,7 +607,7 @@ class AudioMixer {
 
         } catch (error) {
             console.error('Error previewing track:', error);
-            this.showMessage('Error al reproducir la pista', 'error');
+            this.showMessage('Error al reproducir la pista: ' + error.message, 'error');
         }
     }
 
@@ -360,7 +619,8 @@ class AudioMixer {
     }
 
     selectTrack(trackId) {
-        const track = this.tracks.find(t => t.id === trackId);
+        // Buscar en ambas listas
+        const track = this.tracks.find(t => t.id === trackId) || this.trendingTracks.find(t => t.id === trackId);
         if (!track) return;
 
         this.selectedTrack = track;
@@ -372,8 +632,9 @@ class AudioMixer {
         this.panel.querySelector('#selectedTrackArtist').textContent = track.artista;
         this.panel.querySelector('#selectedTrackCover').src = track.rutaPortada || '/images/music-placeholder.svg';
 
-        // Show trim section
+        // Show trim section and action buttons
         this.panel.querySelector('#audioTrimSection').style.display = 'block';
+        this.panel.querySelector('#audioActionButtons').style.display = 'block';
         this.audioDuration = track.duracion;
         this.audioStartTime = 0;
         this.updateTrimDisplay();
@@ -384,22 +645,10 @@ class AudioMixer {
         // Initialize audio for mixing
         this.initializeAudio(track);
 
-        this.showMessage(`Música seleccionada: ${track.titulo}`, 'success');
-    }
-
-    getFilteredTracks() {
-        let filtered = this.tracks;
-        if (this.currentGenre !== 'todos') {
-            filtered = filtered.filter(t => t.genero === this.currentGenre);
+        // Notificar al padre que se seleccionó una pista
+        if (this.onTrackChange) {
+            this.onTrackChange(track);
         }
-        if (this.searchQuery) {
-            const query = this.searchQuery.toLowerCase();
-            filtered = filtered.filter(t =>
-                t.titulo.toLowerCase().includes(query) ||
-                t.artista.toLowerCase().includes(query)
-            );
-        }
-        return filtered;
     }
 
     removeTrack() {
@@ -413,20 +662,49 @@ class AudioMixer {
 
         this.panel.querySelector('#selectedTrackInfo').style.display = 'none';
         this.panel.querySelector('#audioTrimSection').style.display = 'none';
+        this.panel.querySelector('#audioActionButtons').style.display = 'none';
 
         this.renderTracks(this.getFilteredTracks());
         this.showMessage('Música eliminada', 'info');
+
+        // Notificar al padre que se eliminó la pista
+        if (this.onTrackChange) {
+            this.onTrackChange(null);
+        }
+
+        // Notificar que se quitó la música confirmada
+        if (this.onMusicConfirmed) {
+            this.onMusicConfirmed(null);
+        }
     }
 
     initializeAudio(track) {
+        console.log('Initializing audio for track:', track.titulo, 'Path:', track.rutaArchivo);
+
         // Create new audio element
         if (this.musicAudio) {
             this.musicAudio.pause();
         }
 
+        if (!track.rutaArchivo) {
+            console.error('Track has no audio file path');
+            this.showMessage('Esta pista no tiene archivo de audio', 'error');
+            return;
+        }
+
         this.musicAudio = new Audio(track.rutaArchivo);
         this.musicAudio.volume = this.musicVolume;
         this.musicAudio.loop = true;
+
+        // Add error handler
+        this.musicAudio.addEventListener('error', (e) => {
+            console.error('Music audio error:', e, this.musicAudio.error);
+            this.showMessage('Error al cargar el archivo de audio', 'error');
+        });
+
+        this.musicAudio.addEventListener('canplaythrough', () => {
+            console.log('Audio ready to play');
+        });
 
         // Initialize Web Audio API if needed
         if (!this.audioContext) {
@@ -482,9 +760,14 @@ class AudioMixer {
     }
 
     async playPreview() {
-        if (!this.musicAudio) return;
+        if (!this.musicAudio) {
+            console.warn('No music audio loaded');
+            this.showMessage('Selecciona una pista primero', 'warning');
+            return;
+        }
 
         try {
+            console.log('Playing preview, start time:', this.audioStartTime);
             this.musicAudio.currentTime = this.audioStartTime;
             await this.musicAudio.play();
             this.isPlaying = true;
@@ -499,6 +782,7 @@ class AudioMixer {
             }
         } catch (error) {
             console.error('Error playing preview:', error);
+            this.showMessage('Error al reproducir: ' + error.message, 'error');
         }
     }
 
@@ -570,9 +854,30 @@ class AudioMixer {
         };
     }
 
+    // Confirm music selection and notify parent
+    confirmMusicSelection() {
+        if (!this.selectedTrack) {
+            this.showMessage('Selecciona una pista primero', 'warning');
+            return;
+        }
+
+        const audioData = this.getAudioData();
+
+        // Notificar al padre que se confirmó la música
+        if (this.onMusicConfirmed) {
+            this.onMusicConfirmed(audioData);
+        }
+
+        this.showMessage(`Música "${this.selectedTrack.titulo}" añadida`, 'success');
+
+        // Cerrar el panel
+        this.hide();
+    }
+
     show(container) {
-        if (!this.panel.parentElement) {
-            container.appendChild(this.panel);
+        // Agregar al body para que position:fixed funcione correctamente
+        if (!this.panel.parentElement || this.panel.parentElement !== document.body) {
+            document.body.appendChild(this.panel);
         }
         this.panel.classList.add('visible');
         this.isVisible = true;
@@ -611,6 +916,7 @@ class AudioMixer {
         if (this.panel) {
             this.panel.querySelector('#selectedTrackInfo').style.display = 'none';
             this.panel.querySelector('#audioTrimSection').style.display = 'none';
+            this.panel.querySelector('#audioActionButtons').style.display = 'none';
             this.panel.querySelector('#musicVolumeSlider').value = 70;
             this.panel.querySelector('#originalVolumeSlider').value = 100;
             this.panel.querySelector('#musicVolumeValue').textContent = '70%';

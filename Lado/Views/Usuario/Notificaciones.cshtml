@@ -1,0 +1,650 @@
+@model List<Lado.Models.Notificacion>
+@{
+    ViewData["Title"] = "Notificaciones";
+    var totalNoLeidas = ViewBag.TotalNoLeidas ?? 0;
+}
+
+<style>
+    .notifications-page {
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .notifications-header {
+        margin-bottom: 20px;
+    }
+
+    .notifications-header h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0 0 16px 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .badge-count {
+        background: var(--primary);
+        color: white;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 20px;
+    }
+
+    .notifications-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .filter-tabs {
+        display: flex;
+        gap: 4px;
+        background: var(--bg-tertiary);
+        padding: 4px;
+        border-radius: var(--radius-md);
+    }
+
+    .filter-tab {
+        padding: 8px 16px;
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        font-size: 0.875rem;
+        font-weight: 500;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .filter-tab:hover {
+        color: var(--fg);
+    }
+
+    .filter-tab.active {
+        background: var(--surface);
+        color: var(--fg);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .action-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--fg);
+        font-size: 0.8125rem;
+        font-weight: 500;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+        background: var(--bg-tertiary);
+        border-color: var(--primary);
+    }
+
+    .action-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .action-btn.danger:hover {
+        background: rgba(239, 68, 68, 0.1);
+        border-color: #ef4444;
+        color: #ef4444;
+    }
+
+    .notification-list {
+        display: flex;
+        flex-direction: column;
+        margin-top: 16px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+    }
+
+    .notification-item {
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid var(--line-light);
+        transition: all 0.2s;
+        position: relative;
+    }
+
+    .notification-item:last-child {
+        border-bottom: none;
+    }
+
+    .notification-item:hover {
+        background: var(--bg-tertiary);
+    }
+
+    .notification-item.unread {
+        background: rgba(70, 130, 180, 0.08);
+    }
+
+    .notification-item.unread::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: var(--primary);
+    }
+
+    .notification-link {
+        display: flex;
+        gap: 14px;
+        padding: 16px;
+        padding-right: 8px;
+        flex: 1;
+        text-decoration: none;
+        color: var(--fg);
+        min-width: 0;
+    }
+
+    .notification-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: var(--bg-tertiary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        overflow: hidden;
+    }
+
+    .notification-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .notification-avatar svg {
+        width: 24px;
+        height: 24px;
+        stroke: var(--muted);
+    }
+
+    /* Colores por tipo */
+    .notification-avatar.type-0 { background: rgba(59, 130, 246, 0.12); }
+    .notification-avatar.type-0 svg { stroke: #3b82f6; }
+
+    .notification-avatar.type-1,
+    .notification-avatar.type-5 { background: rgba(168, 85, 247, 0.12); }
+    .notification-avatar.type-1 svg,
+    .notification-avatar.type-5 svg { stroke: #a855f7; }
+
+    .notification-avatar.type-2,
+    .notification-avatar.type-6,
+    .notification-avatar.type-7,
+    .notification-avatar.type-10 { background: rgba(70, 130, 180, 0.12); }
+    .notification-avatar.type-2 svg,
+    .notification-avatar.type-6 svg,
+    .notification-avatar.type-7 svg,
+    .notification-avatar.type-10 svg { stroke: #4682B4; }
+
+    .notification-avatar.type-3 { background: rgba(239, 68, 68, 0.12); }
+    .notification-avatar.type-3 svg { stroke: #ef4444; }
+
+    .notification-avatar.type-4 { background: rgba(16, 185, 129, 0.12); }
+    .notification-avatar.type-4 svg { stroke: #10b981; }
+
+    .notification-avatar.type-8,
+    .notification-avatar.type-9 { background: rgba(245, 158, 11, 0.12); }
+    .notification-avatar.type-8 svg,
+    .notification-avatar.type-9 svg { stroke: #f59e0b; }
+
+    .notification-body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .notification-message {
+        font-size: 0.9375rem;
+        line-height: 1.45;
+        margin-bottom: 4px;
+        color: var(--fg);
+    }
+
+    .notification-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8125rem;
+        color: var(--muted);
+    }
+
+    .notification-type {
+        background: var(--bg-tertiary);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+    }
+
+    .notification-actions {
+        display: flex;
+        align-items: center;
+        padding-right: 12px;
+    }
+
+    .btn-delete {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        color: var(--muted);
+        transition: all 0.2s;
+        opacity: 0;
+    }
+
+    .notification-item:hover .btn-delete {
+        opacity: 1;
+    }
+
+    .btn-delete:hover {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+    }
+
+    .btn-delete svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Empty state */
+    .empty-notifications {
+        text-align: center;
+        padding: 80px 20px;
+        color: var(--muted);
+    }
+
+    .empty-notifications .empty-icon {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 20px;
+        background: var(--bg-tertiary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .empty-notifications .empty-icon svg {
+        width: 40px;
+        height: 40px;
+        stroke: var(--muted);
+    }
+
+    .empty-notifications h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--fg);
+    }
+
+    .empty-notifications p {
+        font-size: 0.9375rem;
+        max-width: 300px;
+        margin: 0 auto;
+    }
+
+    /* Responsive */
+    @@media (max-width: 640px) {
+        .notifications-page {
+            padding: 16px;
+        }
+
+        .notifications-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .filter-tabs {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .action-buttons {
+            justify-content: flex-end;
+        }
+
+        .notification-link {
+            padding: 14px;
+            padding-right: 4px;
+        }
+
+        .notification-avatar {
+            width: 44px;
+            height: 44px;
+        }
+
+        .btn-delete {
+            opacity: 1;
+        }
+    }
+</style>
+
+<div class="notifications-page">
+    <div class="notifications-header">
+        <h1>
+            Notificaciones
+            @if (totalNoLeidas > 0)
+            {
+                <span class="badge-count">@totalNoLeidas</span>
+            }
+        </h1>
+
+        <div class="notifications-toolbar">
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-filter="all">Todas</button>
+                <button class="filter-tab" data-filter="unread">No leídas</button>
+            </div>
+
+            @if (Model.Any())
+            {
+                <div class="action-buttons">
+                    @if (Model.Any(n => !n.Leida))
+                    {
+                        <button class="action-btn" onclick="marcarTodasLeidas()" id="btnMarcarLeidas">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            Marcar leídas
+                        </button>
+                    }
+                    <button class="action-btn danger" onclick="eliminarTodas()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        Eliminar todas
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (Model.Any())
+    {
+        <div class="notification-list" id="notificationList">
+            @foreach (var notif in Model)
+            {
+                var tipoInt = (int)notif.Tipo;
+                <div class="notification-item @(!notif.Leida ? "unread" : "")" data-id="@notif.Id">
+                    <a href="@(notif.UrlDestino ?? "#")" class="notification-link" onclick="marcarLeida(@notif.Id)">
+                        <div class="notification-avatar type-@tipoInt">
+                            @if (!string.IsNullOrEmpty(notif.ImagenUrl))
+                            {
+                                <img src="@notif.ImagenUrl" alt="">
+                            }
+                            else
+                            {
+                                @switch (notif.Tipo)
+                                {
+                                    case Lado.Models.TipoNotificacion.NuevoMensaje:
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                                        break;
+                                    case Lado.Models.TipoNotificacion.NuevoSeguidor:
+                                    case Lado.Models.TipoNotificacion.NuevaSuscripcion:
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+                                        break;
+                                    case Lado.Models.TipoNotificacion.NuevoContenido:
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                                        break;
+                                    case Lado.Models.TipoNotificacion.NuevoLike:
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                                        break;
+                                    case Lado.Models.TipoNotificacion.NuevoComentario:
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                                        break;
+                                    case Lado.Models.TipoNotificacion.PagoRecibido:
+                                    case Lado.Models.TipoNotificacion.RetiroCompletado:
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                                        break;
+                                    default:
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                                        break;
+                                }
+                            }
+                        </div>
+                        <div class="notification-body">
+                            <div class="notification-message">@notif.Mensaje</div>
+                            <div class="notification-meta">
+                                <span>@ObtenerTiempoRelativo(notif.FechaCreacion)</span>
+                                @if (!string.IsNullOrEmpty(notif.Titulo))
+                                {
+                                    <span class="notification-type">@notif.Titulo</span>
+                                }
+                            </div>
+                        </div>
+                    </a>
+                    <div class="notification-actions">
+                        <button type="button" class="btn-delete" onclick="eliminarNotificacion(event, @notif.Id)" title="Eliminar notificación">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="empty-notifications">
+            <div class="empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+            </div>
+            <h3>No tienes notificaciones</h3>
+            <p>Cuando recibas likes, comentarios, seguidores o mensajes, aparecerán aquí.</p>
+        </div>
+    }
+</div>
+
+<script>
+    // Filtros
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+
+            const filter = this.dataset.filter;
+            const items = document.querySelectorAll('.notification-item');
+
+            items.forEach(item => {
+                if (filter === 'all') {
+                    item.style.display = 'flex';
+                } else if (filter === 'unread') {
+                    item.style.display = item.classList.contains('unread') ? 'flex' : 'none';
+                }
+            });
+
+            // Mostrar mensaje si no hay resultados
+            const visibleItems = document.querySelectorAll('.notification-item[style="display: flex"]');
+            const list = document.getElementById('notificationList');
+            const existingEmpty = document.getElementById('filterEmpty');
+
+            if (existingEmpty) existingEmpty.remove();
+
+            if (visibleItems.length === 0 && filter === 'unread') {
+                list.insertAdjacentHTML('beforeend', `
+                    <div id="filterEmpty" style="text-align: center; padding: 40px; color: var(--muted);">
+                        <p>No tienes notificaciones sin leer</p>
+                    </div>
+                `);
+            }
+        });
+    });
+
+    async function marcarLeida(id) {
+        try {
+            await fetch('/Usuario/MarcarNotificacionLeida', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notificacionId: id })
+            });
+            const item = document.querySelector(`.notification-item[data-id="${id}"]`);
+            if (item) item.classList.remove('unread');
+        } catch (e) {
+            console.error('Error:', e);
+        }
+    }
+
+    async function marcarTodasLeidas() {
+        try {
+            const response = await fetch('/Usuario/MarcarTodasLeidas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await response.json();
+            if (data.success) {
+                document.querySelectorAll('.notification-item.unread').forEach(item => {
+                    item.classList.remove('unread');
+                });
+                const badge = document.querySelector('.badge-count');
+                if (badge) badge.remove();
+                const btn = document.getElementById('btnMarcarLeidas');
+                if (btn) btn.remove();
+
+                if (window.showToast) {
+                    showToast('success', 'Listo', 'Todas marcadas como leídas');
+                }
+            }
+        } catch (e) {
+            console.error('Error:', e);
+        }
+    }
+
+    async function eliminarNotificacion(event, id) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const item = document.querySelector(`.notification-item[data-id="${id}"]`);
+        if (!item) return;
+
+        item.style.transition = 'all 0.3s ease';
+        item.style.opacity = '0';
+        item.style.transform = 'translateX(50px)';
+
+        try {
+            const response = await fetch('/Usuario/EliminarNotificacion', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notificacionId: id })
+            });
+            const data = await response.json();
+            if (data.success) {
+                setTimeout(() => {
+                    item.remove();
+                    verificarListaVacia();
+                }, 300);
+            } else {
+                item.style.opacity = '1';
+                item.style.transform = 'translateX(0)';
+            }
+        } catch (e) {
+            console.error('Error:', e);
+            item.style.opacity = '1';
+            item.style.transform = 'translateX(0)';
+        }
+    }
+
+    async function eliminarTodas() {
+        if (!confirm('¿Eliminar todas las notificaciones? Esta acción no se puede deshacer.')) {
+            return;
+        }
+
+        const items = document.querySelectorAll('.notification-item');
+        let eliminadas = 0;
+
+        for (const item of items) {
+            const id = item.dataset.id;
+            try {
+                await fetch('/Usuario/EliminarNotificacion', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notificacionId: parseInt(id) })
+                });
+                item.style.transition = 'all 0.2s ease';
+                item.style.opacity = '0';
+                eliminadas++;
+            } catch (e) {
+                console.error('Error eliminando:', e);
+            }
+        }
+
+        setTimeout(() => {
+            items.forEach(item => item.remove());
+            verificarListaVacia();
+            if (window.showToast) {
+                showToast('success', 'Listo', `${eliminadas} notificaciones eliminadas`);
+            }
+        }, 300);
+    }
+
+    function verificarListaVacia() {
+        const list = document.getElementById('notificationList');
+        if (list && list.querySelectorAll('.notification-item').length === 0) {
+            list.innerHTML = `
+                <div style="text-align: center; padding: 60px 20px; color: var(--muted);">
+                    <div style="width: 80px; height: 80px; margin: 0 auto 20px; background: var(--bg-tertiary); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                    </div>
+                    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 8px; color: var(--fg);">No tienes notificaciones</h3>
+                    <p style="font-size: 0.9375rem;">Todas las notificaciones han sido eliminadas.</p>
+                </div>
+            `;
+            // Ocultar botones de acción
+            document.querySelector('.action-buttons')?.remove();
+        }
+    }
+</script>
+
+@functions {
+    string ObtenerTiempoRelativo(DateTime fecha)
+    {
+        var diferencia = DateTime.Now - fecha;
+
+        if (diferencia.TotalMinutes < 1)
+            return "Ahora";
+        if (diferencia.TotalMinutes < 60)
+            return $"Hace {(int)diferencia.TotalMinutes} min";
+        if (diferencia.TotalHours < 24)
+            return $"Hace {(int)diferencia.TotalHours}h";
+        if (diferencia.TotalDays < 7)
+            return $"Hace {(int)diferencia.TotalDays} días";
+        if (diferencia.TotalDays < 30)
+            return $"Hace {(int)(diferencia.TotalDays / 7)} sem";
+
+        return fecha.ToString("dd MMM yyyy");
+    }
+}

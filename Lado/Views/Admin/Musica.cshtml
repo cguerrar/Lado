@@ -1,0 +1,1818 @@
+@model List<Lado.Models.PistaMusical>
+@{
+    ViewData["Title"] = "Biblioteca Musical";
+}
+
+<style>
+    /* Header Section */
+    .music-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 32px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .music-header h2 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: var(--text-dark);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .music-header h2 svg {
+        width: 32px;
+        height: 32px;
+        color: var(--primary);
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .btn-outline-primary {
+        background: transparent;
+        color: var(--primary);
+        border: 2px solid var(--primary);
+    }
+
+    .btn-outline-primary:hover {
+        background: var(--primary);
+        color: white;
+    }
+
+    /* Stats Grid */
+    .music-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-bottom: 32px;
+    }
+
+    /* Filters */
+    .filters-section {
+        background: var(--bg-white);
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        margin-bottom: 24px;
+        border: 1px solid var(--border-color);
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .filter-group label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-gray);
+        text-transform: uppercase;
+    }
+
+    .filter-group select,
+    .filter-group input {
+        padding: 10px 14px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+        background: var(--bg-light);
+        min-width: 160px;
+    }
+
+    .filter-group select:focus,
+    .filter-group input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-pale);
+    }
+
+    /* Music Table */
+    .music-table-container {
+        background: var(--bg-white);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-color);
+        overflow: hidden;
+    }
+
+    .music-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .music-table thead {
+        background: var(--bg-light);
+    }
+
+    .music-table th {
+        padding: 16px 20px;
+        text-align: left;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--text-gray);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .music-table td {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-color);
+        vertical-align: middle;
+    }
+
+    .music-table tbody tr:hover {
+        background: var(--primary-pale);
+    }
+
+    .music-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    /* Track Info Cell */
+    .track-info {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .track-cover {
+        width: 50px;
+        height: 50px;
+        border-radius: var(--radius-sm);
+        background: var(--primary-gradient);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        overflow: hidden;
+    }
+
+    .track-cover img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .track-cover svg {
+        width: 24px;
+        height: 24px;
+        color: white;
+    }
+
+    .track-details h4 {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--text-dark);
+        margin: 0 0 4px 0;
+    }
+
+    .track-details p {
+        font-size: 0.8125rem;
+        color: var(--text-gray);
+        margin: 0;
+    }
+
+    /* Genre Badge */
+    .genre-badge {
+        display: inline-flex;
+        padding: 6px 12px;
+        background: var(--primary-pale);
+        color: var(--primary);
+        border-radius: var(--radius-sm);
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    /* Duration */
+    .duration {
+        font-family: 'SF Mono', Monaco, monospace;
+        font-size: 0.875rem;
+        color: var(--text-gray);
+    }
+
+    /* Stats */
+    .usage-count {
+        font-weight: 600;
+        color: var(--text-dark);
+    }
+
+    /* Status Toggle */
+    .status-toggle {
+        position: relative;
+        width: 48px;
+        height: 26px;
+    }
+
+    .status-toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--text-light);
+        border-radius: 26px;
+        transition: var(--transition-fast);
+    }
+
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 20px;
+        width: 20px;
+        left: 3px;
+        bottom: 3px;
+        background: white;
+        border-radius: 50%;
+        transition: var(--transition-fast);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .status-toggle input:checked + .toggle-slider {
+        background: var(--success);
+    }
+
+    .status-toggle input:checked + .toggle-slider:before {
+        transform: translateX(22px);
+    }
+
+    /* Actions */
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-color);
+        background: var(--bg-light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: var(--transition-fast);
+        color: var(--text-gray);
+    }
+
+    .btn-icon:hover {
+        background: var(--primary-pale);
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .btn-icon.delete:hover {
+        background: rgba(239, 68, 68, 0.1);
+        border-color: var(--danger);
+        color: var(--danger);
+    }
+
+    .btn-icon svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Music Player Bar */
+    .music-player-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        padding: 12px 24px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        z-index: 1000;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+        transform: translateY(100%);
+        transition: transform 0.3s ease;
+    }
+
+    .music-player-bar.active {
+        transform: translateY(0);
+    }
+
+    .player-track-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 200px;
+    }
+
+    .player-track-info img {
+        width: 48px;
+        height: 48px;
+        border-radius: 6px;
+        object-fit: cover;
+    }
+
+    .player-track-details {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .player-track-title {
+        color: white;
+        font-weight: 600;
+        font-size: 14px;
+        max-width: 150px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .player-track-artist {
+        color: rgba(255,255,255,0.6);
+        font-size: 12px;
+    }
+
+    .player-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .player-btn {
+        background: transparent;
+        border: none;
+        color: white;
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+
+    .player-btn:hover {
+        background: rgba(255,255,255,0.1);
+    }
+
+    .player-btn svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .player-btn.player-play {
+        background: var(--primary);
+        width: 44px;
+        height: 44px;
+    }
+
+    .player-btn.player-play:hover {
+        background: var(--primary-dark, #4338ca);
+        transform: scale(1.05);
+    }
+
+    .player-btn.player-play svg {
+        width: 24px;
+        height: 24px;
+    }
+
+    .player-progress-section {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .player-time {
+        color: rgba(255,255,255,0.7);
+        font-size: 12px;
+        font-family: monospace;
+        min-width: 40px;
+    }
+
+    .player-progress-bar {
+        flex: 1;
+        height: 6px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 3px;
+        cursor: pointer;
+        overflow: hidden;
+    }
+
+    .player-progress {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary), #8b5cf6);
+        border-radius: 3px;
+        width: 0%;
+        transition: width 0.1s linear;
+    }
+
+    /* Ecualizador Animado */
+    .player-equalizer {
+        display: flex;
+        align-items: flex-end;
+        gap: 3px;
+        height: 32px;
+        padding: 0 12px;
+    }
+
+    .eq-bar {
+        width: 4px;
+        background: linear-gradient(to top, var(--primary), #8b5cf6, #ec4899);
+        border-radius: 2px;
+        height: 4px;
+        transition: height 0.05s ease-out;
+    }
+
+    .player-volume {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 120px;
+    }
+
+    .player-volume .volume-slider {
+        width: 80px;
+        height: 4px;
+        -webkit-appearance: none;
+        background: rgba(255,255,255,0.2);
+        border-radius: 2px;
+        outline: none;
+    }
+
+    .player-volume .volume-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: white;
+        cursor: pointer;
+    }
+
+    .player-volume .volume-slider::-moz-range-thumb {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: white;
+        cursor: pointer;
+        border: none;
+    }
+
+    /* Responsive player */
+    @@media (max-width: 768px) {
+        .music-player-bar {
+            flex-wrap: wrap;
+            padding: 10px 16px;
+            gap: 10px;
+        }
+
+        .player-track-info {
+            min-width: auto;
+            flex: 1;
+        }
+
+        .player-progress-section {
+            order: 3;
+            width: 100%;
+        }
+
+        .player-equalizer {
+            display: none;
+        }
+
+        .player-volume {
+            display: none;
+        }
+    }
+
+    /* Modal Styles */
+    .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+        z-index: 2000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .modal-backdrop.active {
+        display: flex;
+    }
+
+    .modal-content {
+        background: var(--bg-white);
+        border-radius: var(--radius-xl);
+        width: 100%;
+        max-width: 600px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: var(--shadow-xl);
+    }
+
+    .modal-header {
+        padding: 24px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .modal-header h3 svg {
+        width: 24px;
+        height: 24px;
+        color: var(--primary);
+    }
+
+    .modal-close {
+        width: 40px;
+        height: 40px;
+        border-radius: var(--radius-md);
+        border: none;
+        background: var(--bg-light);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-gray);
+        transition: var(--transition-fast);
+    }
+
+    .modal-close:hover {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--danger);
+    }
+
+    .modal-body {
+        padding: 24px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-dark);
+        margin-bottom: 8px;
+    }
+
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        font-size: 0.9375rem;
+        background: var(--bg-light);
+        transition: var(--transition-fast);
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-pale);
+        background: var(--bg-white);
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    .modal-footer {
+        padding: 20px 24px;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+
+    .btn-cancel {
+        padding: 12px 24px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-light);
+        border-radius: var(--radius-md);
+        font-weight: 600;
+        cursor: pointer;
+        transition: var(--transition-fast);
+    }
+
+    .btn-cancel:hover {
+        background: var(--bg-white);
+        border-color: var(--text-gray);
+    }
+
+    .btn-save {
+        padding: 12px 24px;
+        background: var(--primary-gradient);
+        color: white;
+        border: none;
+        border-radius: var(--radius-md);
+        font-weight: 600;
+        cursor: pointer;
+        transition: var(--transition-fast);
+        box-shadow: var(--shadow-primary);
+    }
+
+    .btn-save:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 35px rgba(70, 130, 180, 0.45);
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .empty-state svg {
+        width: 80px;
+        height: 80px;
+        color: var(--text-light);
+        margin-bottom: 20px;
+    }
+
+    .empty-state h3 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin-bottom: 8px;
+    }
+
+    .empty-state p {
+        color: var(--text-gray);
+        margin-bottom: 24px;
+    }
+
+    /* Audio Preview */
+    .audio-preview {
+        width: 100%;
+        height: 40px;
+        margin-top: 10px;
+    }
+
+    /* File Upload Zone */
+    .file-upload-zone {
+        border: 2px dashed var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 30px;
+        text-align: center;
+        cursor: pointer;
+        transition: var(--transition-fast);
+        background: var(--bg-light);
+    }
+
+    .file-upload-zone:hover,
+    .file-upload-zone.dragover {
+        border-color: var(--primary);
+        background: var(--primary-pale);
+    }
+
+    .file-upload-zone svg {
+        width: 48px;
+        height: 48px;
+        color: var(--text-light);
+        margin-bottom: 12px;
+    }
+
+    .file-upload-zone p {
+        color: var(--text-gray);
+        font-size: 0.875rem;
+        margin: 0;
+    }
+
+    .file-upload-zone .file-name {
+        color: var(--primary);
+        font-weight: 600;
+        margin-top: 8px;
+    }
+
+    /* Responsive */
+    @@media (max-width: 1200px) {
+        .music-stats {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .music-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .music-stats {
+            grid-template-columns: 1fr;
+        }
+
+        .filters-section {
+            flex-direction: column;
+        }
+
+        .filter-group {
+            width: 100%;
+        }
+
+        .filter-group select,
+        .filter-group input {
+            width: 100%;
+        }
+
+        .music-table-container {
+            overflow-x: auto;
+        }
+
+        .music-table {
+            min-width: 800px;
+        }
+
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<!-- Header -->
+<div class="music-header">
+    <h2>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5l12-2v13"></path>
+            <circle cx="6" cy="18" r="3"></circle>
+            <circle cx="18" cy="16" r="3"></circle>
+        </svg>
+        Biblioteca Musical
+    </h2>
+    <div class="header-actions">
+        <button class="btn btn-outline-primary" onclick="openExcelModal()" title="Actualizar desde Excel">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            Excel
+        </button>
+        <a href="/Admin/ImportarMusica" class="btn btn-outline-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Importar Musica
+        </a>
+        <button class="btn btn-primary" onclick="openAddModal()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Agregar Pista
+        </button>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="music-stats">
+    <div class="stat-card">
+        <div class="stat-icon bg-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18V5l12-2v13"></path>
+                <circle cx="6" cy="18" r="3"></circle>
+                <circle cx="18" cy="16" r="3"></circle>
+            </svg>
+        </div>
+        <div class="stat-content">
+            <p class="stat-label">Total Pistas</p>
+            <h2 class="stat-value">@ViewBag.TotalPistas</h2>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon bg-success">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+        </div>
+        <div class="stat-content">
+            <p class="stat-label">Pistas Activas</p>
+            <h2 class="stat-value">@ViewBag.PistasActivas</h2>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon bg-info">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            </svg>
+        </div>
+        <div class="stat-content">
+            <p class="stat-label">Generos</p>
+            <h2 class="stat-value">@ViewBag.TotalGeneros</h2>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon bg-warning">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                <polyline points="17 6 23 6 23 12"></polyline>
+            </svg>
+        </div>
+        <div class="stat-content">
+            <p class="stat-label">Usos Totales</p>
+            <h2 class="stat-value">@ViewBag.TotalUsos</h2>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="filters-section">
+    <div class="filter-group">
+        <label>Buscar</label>
+        <input type="text" id="searchInput" placeholder="Titulo o artista..." onkeyup="filterTracks()">
+    </div>
+    <div class="filter-group">
+        <label>Genero</label>
+        <select id="genreFilter" onchange="filterTracks()">
+            <option value="">Todos los generos</option>
+            @foreach (var genero in Lado.Models.GenerosMusica.Todos)
+            {
+                <option value="@genero">@genero</option>
+            }
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>Estado</label>
+        <select id="statusFilter" onchange="filterTracks()">
+            <option value="">Todos</option>
+            <option value="active">Activos</option>
+            <option value="inactive">Inactivos</option>
+        </select>
+    </div>
+</div>
+
+<!-- Music Table -->
+<div class="music-table-container">
+    @if (Model.Any())
+    {
+        <table class="music-table">
+            <thead>
+                <tr>
+                    <th>Pista</th>
+                    <th>Genero</th>
+                    <th>Duracion</th>
+                    <th>BPM</th>
+                    <th>Usos</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tracksTableBody">
+                @foreach (var pista in Model)
+                {
+                    <tr data-id="@pista.Id" data-title="@pista.Titulo.ToLower()" data-artist="@pista.Artista.ToLower()" data-genre="@pista.Genero" data-status="@(pista.Activo ? "active" : "inactive")">
+                        <td>
+                            <div class="track-info">
+                                <div class="track-cover">
+                                    @if (!string.IsNullOrEmpty(pista.RutaPortada))
+                                    {
+                                        <img src="@pista.RutaPortada" alt="@pista.Titulo">
+                                    }
+                                    else
+                                    {
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M9 18V5l12-2v13"></path>
+                                            <circle cx="6" cy="18" r="3"></circle>
+                                            <circle cx="18" cy="16" r="3"></circle>
+                                        </svg>
+                                    }
+                                </div>
+                                <div class="track-details">
+                                    <h4>@pista.Titulo</h4>
+                                    <p>@pista.Artista</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td><span class="genre-badge">@pista.Genero</span></td>
+                        <td class="duration">@(TimeSpan.FromSeconds(pista.Duracion).ToString(@"m\:ss"))</td>
+                        <td>@(pista.Bpm?.ToString() ?? "-")</td>
+                        <td class="usage-count">@pista.ContadorUsos</td>
+                        <td>
+                            <label class="status-toggle">
+                                <input type="checkbox" @(pista.Activo ? "checked" : "") onchange="toggleStatus(@pista.Id, this.checked)">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-icon" onclick="playPreview('@pista.RutaArchivo')" title="Escuchar">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                    </svg>
+                                </button>
+                                <button class="btn-icon" onclick="editTrack(@pista.Id)" title="Editar">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    </svg>
+                                </button>
+                                <form asp-action="EliminarPista" method="post" style="display:inline;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@pista.Id" />
+                                    <button type="submit" class="btn-icon delete" title="Eliminar" onclick="return confirm('¿Eliminar esta pista?')">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                        </svg>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="empty-state">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18V5l12-2v13"></path>
+                <circle cx="6" cy="18" r="3"></circle>
+                <circle cx="18" cy="16" r="3"></circle>
+            </svg>
+            <h3>No hay pistas musicales</h3>
+            <p>Agrega tu primera pista musical para el creador de contenido.</p>
+            <button class="btn btn-primary" onclick="openAddModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Agregar Pista
+            </button>
+        </div>
+    }
+</div>
+
+<!-- Audio Player con Ecualizador -->
+<div class="music-player-bar" id="musicPlayerBar">
+    <div class="player-track-info">
+        <img id="playerTrackCover" src="/images/music-placeholder.svg" alt="Cover">
+        <div class="player-track-details">
+            <span class="player-track-title" id="playerTrackTitle">Sin reproducir</span>
+            <span class="player-track-artist" id="playerTrackArtist">-</span>
+        </div>
+    </div>
+
+    <div class="player-controls">
+        <button class="player-btn player-prev" id="playerPrev" title="Anterior">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
+            </svg>
+        </button>
+        <button class="player-btn player-play" id="playerPlayBtn" title="Reproducir">
+            <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z"/>
+            </svg>
+            <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display:none;">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+            </svg>
+        </button>
+        <button class="player-btn player-next" id="playerNext" title="Siguiente">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+            </svg>
+        </button>
+        <button class="player-btn player-stop" id="playerStop" title="Detener">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 6h12v12H6z"/>
+            </svg>
+        </button>
+    </div>
+
+    <div class="player-progress-section">
+        <span class="player-time" id="playerCurrentTime">0:00</span>
+        <div class="player-progress-bar" id="playerProgressBar">
+            <div class="player-progress" id="playerProgress"></div>
+        </div>
+        <span class="player-time" id="playerDuration">0:00</span>
+    </div>
+
+    <div class="player-equalizer" id="playerEqualizer">
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+    </div>
+
+    <div class="player-volume">
+        <button class="player-btn player-mute" id="playerMute" title="Silenciar">
+            <svg class="volume-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+            </svg>
+            <svg class="mute-icon" viewBox="0 0 24 24" fill="currentColor" style="display:none;">
+                <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+            </svg>
+        </button>
+        <input type="range" id="playerVolume" min="0" max="100" value="80" class="volume-slider">
+    </div>
+</div>
+<audio id="audioPlayer" style="display:none;"></audio>
+
+<!-- Excel Import Modal -->
+<div class="modal-backdrop" id="excelModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                Actualizar desde Excel
+            </h3>
+            <button class="modal-close" onclick="closeExcelModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p style="color: var(--text-gray); margin-bottom: 16px;">
+                Sube un archivo Excel (.xlsx) para actualizar las pistas existentes con informacion de artista, popularidad (usos) y genero.
+            </p>
+            <p style="color: var(--text-gray); margin-bottom: 16px; font-size: 0.875rem;">
+                <strong>Columnas requeridas:</strong> track_name (col B), artist_name (col D), popularity (col H), genre (col W)
+            </p>
+            <div class="form-group">
+                <label>Archivo Excel (.xlsx)</label>
+                <div class="file-upload-zone" id="excelDropzone" onclick="document.getElementById('excelFile').click()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <p>Arrastra un archivo Excel o haz clic para seleccionar</p>
+                    <p class="file-name" id="excelFileName"></p>
+                </div>
+                <input type="file" id="excelFile" accept=".xlsx,.xls" style="display:none;" onchange="updateFileName(this, 'excelFileName')">
+            </div>
+            <div id="excelResults" style="display:none; margin-top: 16px; padding: 16px; background: var(--bg-light); border-radius: var(--radius-md);">
+                <h4 style="margin-bottom: 12px;">Resultados:</h4>
+                <div id="excelResultsContent"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-cancel" onclick="closeExcelModal()">Cancelar</button>
+            <button type="button" class="btn-save" onclick="uploadExcel()" id="btnUploadExcel">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;">
+                    <polyline points="16 16 12 12 8 16"></polyline>
+                    <line x1="12" y1="12" x2="12" y2="21"></line>
+                    <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path>
+                </svg>
+                Actualizar Pistas
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-backdrop" id="trackModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18V5l12-2v13"></path>
+                    <circle cx="6" cy="18" r="3"></circle>
+                    <circle cx="18" cy="16" r="3"></circle>
+                </svg>
+                <span id="modalTitle">Agregar Pista</span>
+            </h3>
+            <button class="modal-close" onclick="closeModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        <form asp-action="GuardarPista" method="post" enctype="multipart/form-data" id="trackForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="Id" id="trackId" value="0" />
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Titulo *</label>
+                        <input type="text" name="Titulo" id="trackTitulo" required placeholder="Nombre de la pista">
+                    </div>
+                    <div class="form-group">
+                        <label>Artista *</label>
+                        <input type="text" name="Artista" id="trackArtista" required placeholder="Nombre del artista">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Album</label>
+                        <input type="text" name="Album" id="trackAlbum" placeholder="Nombre del album">
+                    </div>
+                    <div class="form-group">
+                        <label>Genero *</label>
+                        <select name="Genero" id="trackGenero" required>
+                            @foreach (var genero in Lado.Models.GenerosMusica.Todos)
+                            {
+                                <option value="@genero">@genero</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Duracion (segundos) *</label>
+                        <input type="number" name="Duracion" id="trackDuracion" required min="1" placeholder="180">
+                    </div>
+                    <div class="form-group">
+                        <label>BPM</label>
+                        <input type="number" name="Bpm" id="trackBpm" min="1" max="300" placeholder="120">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Energia</label>
+                        <select name="Energia" id="trackEnergia">
+                            <option value="">Seleccionar...</option>
+                            <option value="baja">Baja</option>
+                            <option value="media">Media</option>
+                            <option value="alta">Alta</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Estado de Animo</label>
+                        <select name="EstadoAnimo" id="trackEstadoAnimo">
+                            <option value="">Seleccionar...</option>
+                            <option value="alegre">Alegre</option>
+                            <option value="triste">Triste</option>
+                            <option value="relajado">Relajado</option>
+                            <option value="intenso">Intenso</option>
+                            <option value="romantico">Romantico</option>
+                            <option value="misterioso">Misterioso</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Archivo de Audio (MP3) *</label>
+                    <div class="file-upload-zone" id="audioDropzone" onclick="document.getElementById('audioFile').click()">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <p>Arrastra un archivo MP3 o haz clic para seleccionar</p>
+                        <p class="file-name" id="audioFileName"></p>
+                    </div>
+                    <input type="file" name="ArchivoAudio" id="audioFile" accept=".mp3,audio/mpeg" style="display:none;" onchange="updateFileName(this, 'audioFileName')">
+                </div>
+
+                <div class="form-group">
+                    <label>Imagen de Portada (opcional)</label>
+                    <div class="file-upload-zone" id="coverDropzone" onclick="document.getElementById('coverFile').click()">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="9" cy="9" r="2"></circle>
+                            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+                        </svg>
+                        <p>Arrastra una imagen o haz clic para seleccionar</p>
+                        <p class="file-name" id="coverFileName"></p>
+                    </div>
+                    <input type="file" name="ImagenPortada" id="coverFile" accept="image/*" style="display:none;" onchange="updateFileName(this, 'coverFileName')">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-cancel" onclick="closeModal()">Cancelar</button>
+                <button type="submit" class="btn-save">Guardar Pista</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Filter tracks
+    function filterTracks() {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const genre = document.getElementById('genreFilter').value;
+        const status = document.getElementById('statusFilter').value;
+
+        const rows = document.querySelectorAll('#tracksTableBody tr');
+        rows.forEach(row => {
+            const title = row.dataset.title;
+            const artist = row.dataset.artist;
+            const rowGenre = row.dataset.genre;
+            const rowStatus = row.dataset.status;
+
+            const matchesSearch = title.includes(search) || artist.includes(search);
+            const matchesGenre = !genre || rowGenre === genre;
+            const matchesStatus = !status || rowStatus === status;
+
+            row.style.display = matchesSearch && matchesGenre && matchesStatus ? '' : 'none';
+        });
+    }
+
+    // Open add modal
+    function openAddModal() {
+        document.getElementById('modalTitle').textContent = 'Agregar Pista';
+        document.getElementById('trackId').value = '0';
+        document.getElementById('trackForm').reset();
+        document.getElementById('audioFileName').textContent = '';
+        document.getElementById('coverFileName').textContent = '';
+        document.getElementById('trackModal').classList.add('active');
+    }
+
+    // Edit track
+    async function editTrack(id) {
+        try {
+            const response = await fetch(`/Admin/ObtenerPista/${id}`);
+            const track = await response.json();
+
+            if (track) {
+                document.getElementById('modalTitle').textContent = 'Editar Pista';
+                document.getElementById('trackId').value = track.id;
+                document.getElementById('trackTitulo').value = track.titulo;
+                document.getElementById('trackArtista').value = track.artista;
+                document.getElementById('trackAlbum').value = track.album || '';
+                document.getElementById('trackGenero').value = track.genero;
+                document.getElementById('trackDuracion').value = track.duracion;
+                document.getElementById('trackBpm').value = track.bpm || '';
+                document.getElementById('trackEnergia').value = track.energia || '';
+                document.getElementById('trackEstadoAnimo').value = track.estadoAnimo || '';
+                document.getElementById('audioFileName').textContent = track.rutaArchivo ? 'Archivo existente' : '';
+                document.getElementById('coverFileName').textContent = track.rutaPortada ? 'Imagen existente' : '';
+                document.getElementById('trackModal').classList.add('active');
+            }
+        } catch (err) {
+            showToast('Error al cargar la pista', 'error');
+        }
+    }
+
+    // Close modal
+    function closeModal() {
+        document.getElementById('trackModal').classList.remove('active');
+    }
+
+    // Toggle status
+    async function toggleStatus(id, active) {
+        try {
+            const response = await fetch('/Admin/TogglePistaEstado', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                },
+                body: JSON.stringify({ id: id, activo: active })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                showToast(active ? 'Pista activada' : 'Pista desactivada', 'success');
+            } else {
+                showToast('Error al cambiar estado', 'error');
+            }
+        } catch (err) {
+            showToast('Error al cambiar estado', 'error');
+        }
+    }
+
+    // ========================================
+    // MUSIC PLAYER CONTROLLER WITH REAL EQUALIZER
+    // ========================================
+
+    const MusicPlayer = {
+        audio: null,
+        playerBar: null,
+        isPlaying: false,
+        currentTrackRow: null,
+        trackList: [],
+        currentIndex: -1,
+
+        // Web Audio API for real equalizer
+        audioContext: null,
+        analyser: null,
+        sourceNode: null,
+        dataArray: null,
+        animationId: null,
+        eqBars: [],
+
+        init() {
+            this.audio = document.getElementById('audioPlayer');
+            this.playerBar = document.getElementById('musicPlayerBar');
+            this.eqBars = Array.from(document.querySelectorAll('.eq-bar'));
+
+            // Collect all track rows
+            this.trackList = Array.from(document.querySelectorAll('#tracksTableBody tr'));
+
+            // Bind events
+            this.bindEvents();
+        },
+
+        initAudioContext() {
+            if (this.audioContext) return; // Already initialized
+
+            try {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                this.analyser = this.audioContext.createAnalyser();
+                this.analyser.fftSize = 64; // Smaller for fewer, more responsive bars
+                this.analyser.smoothingTimeConstant = 0.8;
+
+                // Connect audio element to analyser
+                this.sourceNode = this.audioContext.createMediaElementSource(this.audio);
+                this.sourceNode.connect(this.analyser);
+                this.analyser.connect(this.audioContext.destination);
+
+                // Create data array for frequency data
+                this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+            } catch (e) {
+                console.warn('Web Audio API not supported:', e);
+            }
+        },
+
+        bindEvents() {
+            const playBtn = document.getElementById('playerPlayBtn');
+            const prevBtn = document.getElementById('playerPrev');
+            const nextBtn = document.getElementById('playerNext');
+            const stopBtn = document.getElementById('playerStop');
+            const progressBar = document.getElementById('playerProgressBar');
+            const volumeSlider = document.getElementById('playerVolume');
+            const muteBtn = document.getElementById('playerMute');
+
+            playBtn.addEventListener('click', () => this.togglePlay());
+            prevBtn.addEventListener('click', () => this.playPrev());
+            nextBtn.addEventListener('click', () => this.playNext());
+            stopBtn.addEventListener('click', () => this.stop());
+
+            progressBar.addEventListener('click', (e) => this.seek(e));
+            volumeSlider.addEventListener('input', (e) => this.setVolume(e.target.value));
+            muteBtn.addEventListener('click', () => this.toggleMute());
+
+            // Audio events
+            this.audio.addEventListener('timeupdate', () => this.updateProgress());
+            this.audio.addEventListener('loadedmetadata', () => this.updateDuration());
+            this.audio.addEventListener('ended', () => this.onTrackEnd());
+            this.audio.addEventListener('play', () => this.onPlay());
+            this.audio.addEventListener('pause', () => this.onPause());
+
+            // Set initial volume
+            this.audio.volume = volumeSlider.value / 100;
+        },
+
+        playTrack(url, row) {
+            // Initialize audio context on first play (requires user interaction)
+            this.initAudioContext();
+
+            // Resume audio context if suspended
+            if (this.audioContext && this.audioContext.state === 'suspended') {
+                this.audioContext.resume();
+            }
+
+            // Find track info from row
+            const trackDetails = row.querySelector('.track-details');
+            const title = trackDetails.querySelector('h4').textContent;
+            const artist = trackDetails.querySelector('p').textContent;
+            const cover = row.querySelector('.track-cover img');
+            const coverSrc = cover ? cover.src : '/images/music-placeholder.svg';
+
+            // Update player UI
+            document.getElementById('playerTrackTitle').textContent = title;
+            document.getElementById('playerTrackArtist').textContent = artist;
+            document.getElementById('playerTrackCover').src = coverSrc;
+
+            // Find index in track list
+            this.currentIndex = this.trackList.indexOf(row);
+            this.currentTrackRow = row;
+
+            // Show player bar
+            this.playerBar.classList.add('active');
+
+            // Play audio
+            this.audio.src = url;
+            this.audio.play();
+        },
+
+        togglePlay() {
+            if (this.audio.paused) {
+                if (this.audioContext && this.audioContext.state === 'suspended') {
+                    this.audioContext.resume();
+                }
+                this.audio.play();
+            } else {
+                this.audio.pause();
+            }
+        },
+
+        onPlay() {
+            this.isPlaying = true;
+            this.playerBar.classList.add('playing');
+            document.querySelector('.play-icon').style.display = 'none';
+            document.querySelector('.pause-icon').style.display = 'block';
+
+            // Highlight current row
+            if (this.currentTrackRow) {
+                this.currentTrackRow.style.background = 'var(--primary-pale)';
+            }
+
+            // Start equalizer animation
+            this.startEqualizer();
+        },
+
+        onPause() {
+            this.isPlaying = false;
+            this.playerBar.classList.remove('playing');
+            document.querySelector('.play-icon').style.display = 'block';
+            document.querySelector('.pause-icon').style.display = 'none';
+
+            // Stop equalizer animation
+            this.stopEqualizer();
+        },
+
+        startEqualizer() {
+            if (!this.analyser || !this.dataArray) return;
+
+            const updateBars = () => {
+                if (!this.isPlaying) return;
+
+                this.analyser.getByteFrequencyData(this.dataArray);
+
+                // Map frequency data to our 10 bars
+                // Use lower frequencies for more visual impact
+                const barCount = this.eqBars.length;
+                const step = Math.floor(this.dataArray.length / barCount);
+
+                for (let i = 0; i < barCount; i++) {
+                    // Get average of frequency range for this bar
+                    let sum = 0;
+                    const start = i * step;
+                    for (let j = start; j < start + step && j < this.dataArray.length; j++) {
+                        sum += this.dataArray[j];
+                    }
+                    const average = sum / step;
+
+                    // Scale to bar height (4px min, 32px max)
+                    const height = Math.max(4, (average / 255) * 32);
+                    this.eqBars[i].style.height = height + 'px';
+                }
+
+                this.animationId = requestAnimationFrame(updateBars);
+            };
+
+            updateBars();
+        },
+
+        stopEqualizer() {
+            if (this.animationId) {
+                cancelAnimationFrame(this.animationId);
+                this.animationId = null;
+            }
+
+            // Reset bars to minimum height
+            this.eqBars.forEach(bar => {
+                bar.style.height = '4px';
+            });
+        },
+
+        stop() {
+            this.audio.pause();
+            this.audio.currentTime = 0;
+            this.playerBar.classList.remove('active', 'playing');
+            this.stopEqualizer();
+
+            // Reset UI
+            document.getElementById('playerTrackTitle').textContent = 'Sin reproducir';
+            document.getElementById('playerTrackArtist').textContent = '-';
+            document.getElementById('playerCurrentTime').textContent = '0:00';
+            document.getElementById('playerProgress').style.width = '0%';
+
+            // Remove highlight from row
+            if (this.currentTrackRow) {
+                this.currentTrackRow.style.background = '';
+            }
+
+            this.currentTrackRow = null;
+            this.currentIndex = -1;
+        },
+
+        playPrev() {
+            if (this.currentIndex > 0) {
+                const prevRow = this.trackList[this.currentIndex - 1];
+                if (prevRow.style.display !== 'none') {
+                    const playBtn = prevRow.querySelector('.btn-icon');
+                    const url = playBtn.getAttribute('onclick').match(/'([^']+)'/)[1];
+
+                    // Remove highlight from current
+                    if (this.currentTrackRow) {
+                        this.currentTrackRow.style.background = '';
+                    }
+
+                    this.playTrack(url, prevRow);
+                }
+            }
+        },
+
+        playNext() {
+            if (this.currentIndex < this.trackList.length - 1) {
+                const nextRow = this.trackList[this.currentIndex + 1];
+                if (nextRow.style.display !== 'none') {
+                    const playBtn = nextRow.querySelector('.btn-icon');
+                    const url = playBtn.getAttribute('onclick').match(/'([^']+)'/)[1];
+
+                    // Remove highlight from current
+                    if (this.currentTrackRow) {
+                        this.currentTrackRow.style.background = '';
+                    }
+
+                    this.playTrack(url, nextRow);
+                }
+            }
+        },
+
+        onTrackEnd() {
+            this.playNext();
+        },
+
+        seek(e) {
+            const bar = e.currentTarget;
+            const rect = bar.getBoundingClientRect();
+            const percent = (e.clientX - rect.left) / rect.width;
+            this.audio.currentTime = percent * this.audio.duration;
+        },
+
+        updateProgress() {
+            if (this.audio.duration) {
+                const percent = (this.audio.currentTime / this.audio.duration) * 100;
+                document.getElementById('playerProgress').style.width = percent + '%';
+                document.getElementById('playerCurrentTime').textContent = this.formatTime(this.audio.currentTime);
+            }
+        },
+
+        updateDuration() {
+            document.getElementById('playerDuration').textContent = this.formatTime(this.audio.duration);
+        },
+
+        setVolume(value) {
+            this.audio.volume = value / 100;
+            this.updateVolumeIcon();
+        },
+
+        toggleMute() {
+            this.audio.muted = !this.audio.muted;
+            this.updateVolumeIcon();
+        },
+
+        updateVolumeIcon() {
+            const volumeIcon = document.querySelector('.volume-icon');
+            const muteIcon = document.querySelector('.mute-icon');
+
+            if (this.audio.muted || this.audio.volume === 0) {
+                volumeIcon.style.display = 'none';
+                muteIcon.style.display = 'block';
+            } else {
+                volumeIcon.style.display = 'block';
+                muteIcon.style.display = 'none';
+            }
+        },
+
+        formatTime(seconds) {
+            if (isNaN(seconds)) return '0:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+    };
+
+    // Initialize player on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        MusicPlayer.init();
+    });
+
+    // Play preview - Updated to use MusicPlayer
+    function playPreview(url) {
+        const row = event.target.closest('tr');
+
+        if (MusicPlayer.audio.src.endsWith(url) && MusicPlayer.isPlaying) {
+            MusicPlayer.togglePlay();
+        } else {
+            // Remove highlight from previous row
+            if (MusicPlayer.currentTrackRow) {
+                MusicPlayer.currentTrackRow.style.background = '';
+            }
+            MusicPlayer.playTrack(url, row);
+        }
+    }
+
+    // Update file name display
+    function updateFileName(input, displayId) {
+        const display = document.getElementById(displayId);
+        if (input.files.length > 0) {
+            display.textContent = input.files[0].name;
+        } else {
+            display.textContent = '';
+        }
+    }
+
+    // Drag and drop for file zones
+    ['audioDropzone', 'coverDropzone'].forEach(id => {
+        const zone = document.getElementById(id);
+        const inputId = id === 'audioDropzone' ? 'audioFile' : 'coverFile';
+        const displayId = id === 'audioDropzone' ? 'audioFileName' : 'coverFileName';
+
+        zone.addEventListener('dragover', e => {
+            e.preventDefault();
+            zone.classList.add('dragover');
+        });
+
+        zone.addEventListener('dragleave', e => {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+        });
+
+        zone.addEventListener('drop', e => {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+            const input = document.getElementById(inputId);
+            input.files = e.dataTransfer.files;
+            updateFileName(input, displayId);
+        });
+    });
+
+    // Close modal on backdrop click
+    document.getElementById('trackModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeModal();
+        }
+    });
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeModal();
+            closeExcelModal();
+        }
+    });
+
+    // ========================================
+    // EXCEL IMPORT FUNCTIONS
+    // ========================================
+
+    function openExcelModal() {
+        document.getElementById('excelModal').classList.add('active');
+        document.getElementById('excelResults').style.display = 'none';
+        document.getElementById('excelFileName').textContent = '';
+        document.getElementById('excelFile').value = '';
+    }
+
+    function closeExcelModal() {
+        document.getElementById('excelModal').classList.remove('active');
+    }
+
+    async function uploadExcel() {
+        const fileInput = document.getElementById('excelFile');
+        if (!fileInput.files || fileInput.files.length === 0) {
+            showToast('Selecciona un archivo Excel', 'error');
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append('archivoExcel', file);
+
+        const btn = document.getElementById('btnUploadExcel');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Procesando...';
+        btn.disabled = true;
+
+        try {
+            const response = await fetch('/Admin/ActualizarPistasDesdeExcel', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                }
+            });
+
+            const result = await response.json();
+            const resultsDiv = document.getElementById('excelResults');
+            const resultsContent = document.getElementById('excelResultsContent');
+
+            if (result.success) {
+                let html = `<p style="color: var(--success); font-weight: 600;">Pistas actualizadas: ${result.actualizadas}</p>`;
+
+                if (result.noEncontradas && result.noEncontradas.length > 0) {
+                    html += `<p style="margin-top: 12px; color: var(--warning);">No encontradas (${result.totalNoEncontradas}):</p>`;
+                    html += `<ul style="font-size: 0.8rem; color: var(--text-gray); max-height: 150px; overflow-y: auto;">`;
+                    result.noEncontradas.forEach(track => {
+                        html += `<li>${track}</li>`;
+                    });
+                    html += `</ul>`;
+                }
+
+                if (result.errores && result.errores.length > 0) {
+                    html += `<p style="margin-top: 12px; color: var(--danger);">Errores:</p>`;
+                    html += `<ul style="font-size: 0.8rem; color: var(--text-gray);">`;
+                    result.errores.forEach(err => {
+                        html += `<li>${err}</li>`;
+                    });
+                    html += `</ul>`;
+                }
+
+                resultsContent.innerHTML = html;
+                showToast(result.message, 'success');
+
+                // Recargar la pagina despues de 2 segundos para ver los cambios
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
+            } else {
+                resultsContent.innerHTML = `<p style="color: var(--danger);">${result.message}</p>`;
+                showToast(result.message, 'error');
+            }
+
+            resultsDiv.style.display = 'block';
+        } catch (err) {
+            console.error('Error:', err);
+            showToast('Error al procesar el archivo', 'error');
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    // Drag and drop for Excel zone
+    const excelZone = document.getElementById('excelDropzone');
+    if (excelZone) {
+        excelZone.addEventListener('dragover', e => {
+            e.preventDefault();
+            excelZone.classList.add('dragover');
+        });
+
+        excelZone.addEventListener('dragleave', e => {
+            e.preventDefault();
+            excelZone.classList.remove('dragover');
+        });
+
+        excelZone.addEventListener('drop', e => {
+            e.preventDefault();
+            excelZone.classList.remove('dragover');
+            const input = document.getElementById('excelFile');
+            input.files = e.dataTransfer.files;
+            updateFileName(input, 'excelFileName');
+        });
+    }
+
+    // Close Excel modal on backdrop click
+    document.getElementById('excelModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeExcelModal();
+        }
+    });
+</script>
+}

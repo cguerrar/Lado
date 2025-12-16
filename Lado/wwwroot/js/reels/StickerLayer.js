@@ -198,8 +198,9 @@ class StickerLayer {
     }
 
     show(container) {
-        if (!this.panel.parentElement) {
-            container.appendChild(this.panel);
+        // Agregar al body para que position:fixed funcione correctamente
+        if (!this.panel.parentElement || this.panel.parentElement !== document.body) {
+            document.body.appendChild(this.panel);
         }
         this.panel.classList.add('visible');
         this.isVisible = true;
