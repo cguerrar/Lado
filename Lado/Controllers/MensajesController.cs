@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Lado.Data;
 using Lado.Models;
 using Lado.Hubs;
+using Lado.Services;
 
 namespace Lado.Controllers
 {
@@ -17,6 +18,7 @@ namespace Lado.Controllers
         private readonly ILogger<MensajesController> _logger;
         private readonly IHubContext<ChatHub> _hubContext;
         private readonly IWebHostEnvironment _environment;
+        private readonly IDateTimeService _dateTimeService;
 
         // Límite de archivo: 10 MB
         private const long MaxFileSize = 10 * 1024 * 1024;
@@ -28,13 +30,15 @@ namespace Lado.Controllers
             UserManager<ApplicationUser> userManager,
             ILogger<MensajesController> logger,
             IHubContext<ChatHub> hubContext,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            IDateTimeService dateTimeService)
         {
             _context = context;
             _userManager = userManager;
             _logger = logger;
             _hubContext = hubContext;
             _environment = environment;
+            _dateTimeService = dateTimeService;
         }
 
         // ========================================
@@ -66,9 +70,10 @@ namespace Lado.Controllers
                 .Select(s => s.FanId)
                 .ToListAsync();
 
-            // Obtener IDs de conversaciones existentes
+            // Obtener IDs de conversaciones existentes (excluyendo mensajes eliminados por el usuario)
             var conversacionesExistentes = await _context.MensajesPrivados
-                .Where(m => m.RemitenteId == usuario.Id || m.DestinatarioId == usuario.Id)
+                .Where(m => (m.RemitenteId == usuario.Id && !m.EliminadoPorRemitente) ||
+                           (m.DestinatarioId == usuario.Id && !m.EliminadoPorDestinatario))
                 .Select(m => m.RemitenteId == usuario.Id ? m.DestinatarioId : m.RemitenteId)
                 .Distinct()
                 .ToListAsync();
@@ -104,8 +109,8 @@ namespace Lado.Controllers
                 }
 
                 var ultimoMensaje = await _context.MensajesPrivados
-                    .Where(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == contactoId) ||
-                               (m.RemitenteId == contactoId && m.DestinatarioId == usuario.Id))
+                    .Where(m => ((m.RemitenteId == usuario.Id && m.DestinatarioId == contactoId && !m.EliminadoPorRemitente) ||
+                                (m.RemitenteId == contactoId && m.DestinatarioId == usuario.Id && !m.EliminadoPorDestinatario)))
                     .OrderByDescending(m => m.FechaEnvio)
                     .FirstOrDefaultAsync();
 
@@ -390,13 +395,17 @@ namespace Lado.Controllers
                         .FirstOrDefaultAsync(m => m.Id == mensaje.MensajeRespondidoId);
                 }
 
-                // Preparar DTO del mensaje
+                // Preparar DTO del mensaje - enviar timestamp para que el cliente formatee en su zona horaria
+                var fechaUtc = mensaje.FechaEnvio.Kind == DateTimeKind.Utc
+                    ? mensaje.FechaEnvio
+                    : DateTime.SpecifyKind(mensaje.FechaEnvio, DateTimeKind.Local).ToUniversalTime();
+                var timestamp = new DateTimeOffset(fechaUtc).ToUnixTimeMilliseconds();
+
                 var mensajeDto = new
                 {
                     id = mensaje.Id,
                     contenido = mensaje.Contenido,
-                    fechaEnvio = mensaje.FechaEnvio.ToString("HH:mm"),
-                    fechaCompleta = mensaje.FechaEnvio.ToString("dd/MM/yyyy HH:mm"),
+                    fechaEnvioTimestamp = timestamp,
                     remitenteId = mensaje.RemitenteId,
                     remitenteNombre = usuario.NombreCompleto ?? usuario.UserName,
                     remitenteFoto = usuario.FotoPerfil,
@@ -514,7 +523,7 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "Contacto no especificado" });
                 }
 
-                var mensajes = await _context.MensajesPrivados
+                var mensajesDb = await _context.MensajesPrivados
                     .Include(m => m.Remitente)
                     .Include(m => m.MensajeRespondido)
                         .ThenInclude(mr => mr!.Remitente)
@@ -523,14 +532,20 @@ namespace Lado.Controllers
                     .Where(m => (m.RemitenteId == usuario.Id && !m.EliminadoPorRemitente) ||
                                (m.DestinatarioId == usuario.Id && !m.EliminadoPorDestinatario))
                     .OrderBy(m => m.FechaEnvio)
-                    .Select(m => new
+                    .ToListAsync();
+
+                // Convertir a DTOs con timestamp para que el cliente formatee en su zona horaria
+                var mensajes = mensajesDb.Select(m => {
+                    var fechaUtc = m.FechaEnvio.Kind == DateTimeKind.Utc
+                        ? m.FechaEnvio
+                        : DateTime.SpecifyKind(m.FechaEnvio, DateTimeKind.Local).ToUniversalTime();
+                    return new
                     {
                         id = m.Id,
                         remitenteId = m.RemitenteId,
                         remitenteNombre = m.Remitente != null ? (m.Remitente.NombreCompleto ?? m.Remitente.UserName) : "Usuario",
                         contenido = m.Contenido,
-                        fechaEnvio = m.FechaEnvio.ToString("HH:mm"),
-                        fechaCompleta = m.FechaEnvio.ToString("dd/MM/yyyy HH:mm"),
+                        fechaEnvioTimestamp = new DateTimeOffset(fechaUtc).ToUnixTimeMilliseconds(),
                         leido = m.Leido,
                         fechaLectura = m.FechaLectura,
                         tipoMensaje = (int)m.TipoMensaje,
@@ -544,8 +559,8 @@ namespace Lado.Controllers
                                 : "Usuario",
                             tipoMensaje = (int)m.MensajeRespondido.TipoMensaje
                         } : null
-                    })
-                    .ToListAsync();
+                    };
+                }).ToList();
 
                 _logger.LogInformation("Cargados {Count} mensajes para contacto {ContactoId}",
                     mensajes.Count, contactoId);

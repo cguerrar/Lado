@@ -17,19 +17,25 @@ namespace Lado.Controllers
         private readonly IServerMetricsService _serverMetrics;
         private readonly IConfiguration _configuration;
         private readonly IVisitasService _visitasService;
+        private readonly IClaudeClassificationService _claudeService;
+        private readonly IEmailService _emailService;
 
         public AdminController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             IServerMetricsService serverMetrics,
             IConfiguration configuration,
-            IVisitasService visitasService)
+            IVisitasService visitasService,
+            IClaudeClassificationService claudeService,
+            IEmailService emailService)
         {
             _context = context;
             _userManager = userManager;
             _serverMetrics = serverMetrics;
             _configuration = configuration;
             _visitasService = visitasService;
+            _claudeService = claudeService;
+            _emailService = emailService;
         }
 
         public override void OnActionExecuting(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext context)
@@ -115,6 +121,122 @@ namespace Lado.Controllers
             }
 
             return RedirectToAction(nameof(Usuarios));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CrearUsuario(
+            string nombreCompleto,
+            string userName,
+            string email,
+            string password,
+            string rol,
+            bool esCreador = true,
+            bool emailConfirmado = true,
+            bool creadorVerificado = false,
+            bool enviarEmailBienvenida = false)
+        {
+            try
+            {
+                // Validaciones basicas
+                if (string.IsNullOrWhiteSpace(nombreCompleto) ||
+                    string.IsNullOrWhiteSpace(userName) ||
+                    string.IsNullOrWhiteSpace(email) ||
+                    string.IsNullOrWhiteSpace(password))
+                {
+                    TempData["Error"] = "Todos los campos obligatorios deben estar completos.";
+                    return RedirectToAction(nameof(Usuarios));
+                }
+
+                // Verificar que el email no exista
+                var existeEmail = await _userManager.FindByEmailAsync(email);
+                if (existeEmail != null)
+                {
+                    TempData["Error"] = $"Ya existe un usuario con el email {email}.";
+                    return RedirectToAction(nameof(Usuarios));
+                }
+
+                // Verificar que el username no exista
+                var existeUserName = await _userManager.FindByNameAsync(userName);
+                if (existeUserName != null)
+                {
+                    TempData["Error"] = $"Ya existe un usuario con el nombre de usuario {userName}.";
+                    return RedirectToAction(nameof(Usuarios));
+                }
+
+                // Crear el usuario
+                var usuario = new ApplicationUser
+                {
+                    UserName = userName,
+                    Email = email,
+                    NombreCompleto = nombreCompleto,
+                    EmailConfirmed = emailConfirmado,
+                    FechaRegistro = DateTime.UtcNow,
+                    EstaActivo = true,
+                    Saldo = 0,
+                    ComisionRetiro = 20, // Comision por defecto
+                    MontoMinimoRetiro = 50, // Minimo por defecto
+                    UsarRetencionPais = true
+                };
+
+                // Si es rol Creador o Admin con esCreador=true, marcar como creador
+                if (rol == "Creador" || (rol == "Admin" && esCreador))
+                {
+                    usuario.EsCreador = true;
+                    usuario.CreadorVerificado = creadorVerificado;
+                    usuario.PrecioSuscripcion = 5.99m; // Precio por defecto
+                }
+
+                var result = await _userManager.CreateAsync(usuario, password);
+
+                if (!result.Succeeded)
+                {
+                    var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                    TempData["Error"] = $"Error al crear usuario: {errors}";
+                    return RedirectToAction(nameof(Usuarios));
+                }
+
+                // Asignar rol
+                string rolAsignar = rol switch
+                {
+                    "Admin" => "Admin",
+                    "Creador" => "Creador",
+                    _ => "Usuario"
+                };
+
+                // Verificar que el rol existe, si no crearlo
+                var roleManager = HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole>>();
+                if (!await roleManager.RoleExistsAsync(rolAsignar))
+                {
+                    await roleManager.CreateAsync(new Microsoft.AspNetCore.Identity.IdentityRole(rolAsignar));
+                }
+
+                await _userManager.AddToRoleAsync(usuario, rolAsignar);
+
+                // Enviar email de bienvenida si se solicito
+                if (enviarEmailBienvenida)
+                {
+                    var emailEnviado = await _emailService.SendWelcomeEmailAsync(email, nombreCompleto, userName, password);
+                    if (emailEnviado)
+                    {
+                        TempData["Success"] = $"Usuario {nombreCompleto} (@{userName}) creado exitosamente con rol {rolAsignar}. Email de bienvenida enviado.";
+                    }
+                    else
+                    {
+                        TempData["Success"] = $"Usuario {nombreCompleto} (@{userName}) creado exitosamente con rol {rolAsignar}. (Error al enviar email)";
+                    }
+                }
+                else
+                {
+                    TempData["Success"] = $"Usuario {nombreCompleto} (@{userName}) creado exitosamente con rol {rolAsignar}.";
+                }
+                return RedirectToAction(nameof(Usuarios));
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error inesperado: {ex.Message}";
+                return RedirectToAction(nameof(Usuarios));
+            }
         }
 
         [HttpPost]
@@ -396,11 +518,109 @@ namespace Lado.Controllers
                 .Include(c => c.Usuario)
                 .Include(c => c.Likes)
                 .Include(c => c.Comentarios)
+                .Include(c => c.CategoriaInteres)
                 .OrderByDescending(c => c.FechaPublicacion)
                 .Take(100)
                 .ToListAsync();
 
             return View(contenidos);
+        }
+
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> ReclasificarContenido(int id)
+        {
+            try
+            {
+                var contenido = await _context.Contenidos.FindAsync(id);
+                if (contenido == null)
+                {
+                    return Json(new { success = false, message = "Contenido no encontrado", detalle = "El ID no existe en la base de datos" });
+                }
+
+                // Obtener la imagen del contenido
+                byte[]? imagenBytes = null;
+                string? mimeType = null;
+                string? rutaUsada = null;
+
+                if (!string.IsNullOrEmpty(contenido.RutaArchivo) || !string.IsNullOrEmpty(contenido.Thumbnail))
+                {
+                    var rutaArchivo = !string.IsNullOrEmpty(contenido.Thumbnail)
+                        ? contenido.Thumbnail
+                        : contenido.RutaArchivo;
+
+                    rutaUsada = rutaArchivo;
+
+                    // Convertir ruta relativa a absoluta
+                    var rutaFisica = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", rutaArchivo?.TrimStart('/').Replace("/", "\\") ?? "");
+
+                    if (System.IO.File.Exists(rutaFisica))
+                    {
+                        imagenBytes = await System.IO.File.ReadAllBytesAsync(rutaFisica);
+                        var extension = Path.GetExtension(rutaFisica).ToLower();
+                        mimeType = extension switch
+                        {
+                            ".jpg" or ".jpeg" => "image/jpeg",
+                            ".png" => "image/png",
+                            ".gif" => "image/gif",
+                            ".webp" => "image/webp",
+                            _ => "image/jpeg"
+                        };
+                    }
+                    else
+                    {
+                        return Json(new {
+                            success = false,
+                            message = "Archivo no encontrado",
+                            detalle = $"No existe el archivo: {rutaArchivo}"
+                        });
+                    }
+                }
+
+                // Usar el metodo detallado para obtener informacion de error
+                var resultado = await _claudeService.ClasificarContenidoDetalladoAsync(
+                    imagenBytes,
+                    contenido.Descripcion,
+                    mimeType);
+
+                if (resultado.Exito && resultado.CategoriaId.HasValue)
+                {
+                    contenido.CategoriaInteresId = resultado.CategoriaId.Value;
+                    await _context.SaveChangesAsync();
+
+                    var categoria = await _context.CategoriasIntereses
+                        .Where(c => c.Id == resultado.CategoriaId.Value)
+                        .Select(c => new { c.Id, c.Nombre, c.Icono, c.Color })
+                        .FirstOrDefaultAsync();
+
+                    var mensaje = resultado.CategoriaCreada
+                        ? $"Nueva categoria creada: {categoria?.Nombre}"
+                        : "Contenido reclasificado correctamente";
+
+                    return Json(new
+                    {
+                        success = true,
+                        message = mensaje,
+                        categoriaId = resultado.CategoriaId,
+                        categoriaNombre = categoria?.Nombre,
+                        categoriaIcono = categoria?.Icono,
+                        categoriaColor = categoria?.Color,
+                        categoriaCreada = resultado.CategoriaCreada,
+                        tiempoMs = resultado.TiempoMs
+                    });
+                }
+
+                return Json(new {
+                    success = false,
+                    message = resultado.Error ?? "Error desconocido",
+                    detalle = resultado.DetalleError,
+                    tiempoMs = resultado.TiempoMs
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Error interno", detalle = ex.Message });
+            }
         }
 
         [HttpPost]
@@ -844,15 +1064,16 @@ namespace Lado.Controllers
         // ========================================
         public async Task<IActionResult> Configuracion()
         {
-            // Cargar configuraciones de billetera
+            // Cargar configuraciones de billetera y regional
             var configuraciones = await _context.ConfiguracionesPlataforma
-                .Where(c => c.Categoria == "Billetera" || c.Categoria == "General")
+                .Where(c => c.Categoria == "Billetera" || c.Categoria == "General" || c.Categoria == "Regional")
                 .ToDictionaryAsync(c => c.Clave, c => c.Valor);
 
             ViewBag.ComisionBilleteraElectronica = configuraciones.TryGetValue(ConfiguracionPlataforma.COMISION_BILLETERA_ELECTRONICA, out var comision) ? comision : "2.5";
             ViewBag.TiempoProcesoRetiro = configuraciones.TryGetValue(ConfiguracionPlataforma.TIEMPO_PROCESO_RETIRO, out var tiempo) ? tiempo : "3-5 dias habiles";
             ViewBag.MontoMinimoRecarga = configuraciones.TryGetValue(ConfiguracionPlataforma.MONTO_MINIMO_RECARGA, out var minRecarga) ? minRecarga : "5";
             ViewBag.MontoMaximoRecarga = configuraciones.TryGetValue(ConfiguracionPlataforma.MONTO_MAXIMO_RECARGA, out var maxRecarga) ? maxRecarga : "1000";
+            ViewBag.ZonaHoraria = configuraciones.TryGetValue(ConfiguracionPlataforma.ZONA_HORARIA, out var zonaHoraria) ? zonaHoraria : "America/Bogota";
 
             return View();
         }
@@ -893,7 +1114,26 @@ namespace Lado.Controllers
             return RedirectToAction(nameof(Configuracion));
         }
 
-        private async Task ActualizarConfiguracionAsync(string clave, string valor, DateTime fecha)
+        [HttpPost]
+        public async Task<IActionResult> ActualizarZonaHoraria(string zonaHoraria)
+        {
+            try
+            {
+                var ahora = DateTime.Now;
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.ZONA_HORARIA, zonaHoraria, ahora, "Regional");
+                await _context.SaveChangesAsync();
+
+                TempData["Success"] = $"Zona horaria actualizada a {zonaHoraria}";
+            }
+            catch (Exception)
+            {
+                TempData["Error"] = "Error al actualizar la zona horaria";
+            }
+
+            return RedirectToAction(nameof(Configuracion));
+        }
+
+        private async Task ActualizarConfiguracionAsync(string clave, string valor, DateTime fecha, string categoria = "Billetera")
         {
             var config = await _context.ConfiguracionesPlataforma.FirstOrDefaultAsync(c => c.Clave == clave);
             if (config != null)
@@ -907,7 +1147,7 @@ namespace Lado.Controllers
                 {
                     Clave = clave,
                     Valor = valor,
-                    Categoria = "Billetera",
+                    Categoria = categoria,
                     UltimaModificacion = fecha
                 });
             }
@@ -3184,5 +3424,442 @@ namespace Lado.Controllers
                 TotalPreferenciasUsuarios = preferencias
             });
         }
+
+        // ========================================
+        // SEED DE CATEGORIAS DE INTERES
+        // ========================================
+
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> SeedCategoriasInteres()
+        {
+            try
+            {
+                var categoriasExistentes = await _context.CategoriasIntereses.CountAsync();
+                int categoriasCreadas = 0;
+
+                if (categoriasExistentes == 0)
+                {
+                    var categorias = new List<CategoriaInteres>
+                    {
+                        new CategoriaInteres { Nombre = "Entretenimiento", Descripcion = "Contenido de entretenimiento general", Icono = "bi-film", Color = "#FF6B6B", Orden = 1, EstaActiva = true },
+                        new CategoriaInteres { Nombre = "Musica", Descripcion = "Artistas, covers, producciones musicales", Icono = "bi-music-note-beamed", Color = "#4ECDC4", Orden = 2, EstaActiva = true },
+                        new CategoriaInteres { Nombre = "Fitness", Descripcion = "Ejercicio, rutinas, vida saludable", Icono = "bi-heart-pulse", Color = "#45B7D1", Orden = 3, EstaActiva = true },
+                        new CategoriaInteres { Nombre = "Moda", Descripcion = "Estilo, tendencias, outfits", Icono = "bi-bag-heart", Color = "#F7DC6F", Orden = 4, EstaActiva = true },
+                        new CategoriaInteres { Nombre = "Belleza", Descripcion = "Maquillaje, skincare, cuidado personal", Icono = "bi-stars", Color = "#BB8FCE", Orden = 5, EstaActiva = true },
+                        new CategoriaInteres { Nombre = "Cocina", Descripcion = "Recetas, gastronomia, tips culinarios", Icono = "bi-egg-fried", Color = "#F39C12", Orden = 6, EstaActiva = true },
+                        new CategoriaInteres { Nombre = "Viajes", Descripcion = "Destinos, aventuras, experiencias", Icono = "bi-airplane", Color = "#1ABC9C", Orden = 7, EstaActiva = true },
+                        new CategoriaInteres { Nombre = "Gaming", Descripcion = "Videojuegos, streams, esports", Icono = "bi-controller", Color = "#9B59B6", Orden = 8, EstaActiva = true },
+                        new CategoriaInteres { Nombre = "Arte", Descripcion = "Dibujo, pintura, creatividad", Icono = "bi-palette", Color = "#E74C3C", Orden = 9, EstaActiva = true },
+                        new CategoriaInteres { Nombre = "Educacion", Descripcion = "Tutoriales, cursos, aprendizaje", Icono = "bi-book", Color = "#3498DB", Orden = 10, EstaActiva = true },
+                        new CategoriaInteres { Nombre = "Comedia", Descripcion = "Humor, sketches, entretenimiento", Icono = "bi-emoji-laughing", Color = "#F1C40F", Orden = 11, EstaActiva = true },
+                        new CategoriaInteres { Nombre = "Lifestyle", Descripcion = "Dia a dia, vlogs, estilo de vida", Icono = "bi-house-heart", Color = "#E91E63", Orden = 12, EstaActiva = true },
+                        new CategoriaInteres { Nombre = "Tecnologia", Descripcion = "Gadgets, apps, innovacion", Icono = "bi-cpu", Color = "#607D8B", Orden = 13, EstaActiva = true },
+                        new CategoriaInteres { Nombre = "Deportes", Descripcion = "Futbol, basquet, atletismo", Icono = "bi-trophy", Color = "#27AE60", Orden = 14, EstaActiva = true },
+                        new CategoriaInteres { Nombre = "Mascotas", Descripcion = "Perros, gatos, animales", Icono = "bi-heart", Color = "#FF9800", Orden = 15, EstaActiva = true }
+                    };
+
+                    _context.CategoriasIntereses.AddRange(categorias);
+                    await _context.SaveChangesAsync();
+                    categoriasCreadas = categorias.Count;
+                }
+
+                // Verificar algoritmo por intereses
+                var algoritmoExiste = await _context.AlgoritmosFeed.AnyAsync(a => a.Codigo == "por_intereses");
+                bool algoritmoCreado = false;
+
+                if (!algoritmoExiste)
+                {
+                    var algoritmo = new AlgoritmoFeed
+                    {
+                        Codigo = "por_intereses",
+                        Nombre = "Por Intereses",
+                        Descripcion = "Prioriza contenido basado en tus intereses seleccionados y aprendidos",
+                        Icono = "star",
+                        Activo = true,
+                        EsPorDefecto = false,
+                        Orden = 5,
+                        TotalUsos = 0,
+                        FechaCreacion = DateTime.Now
+                    };
+
+                    _context.AlgoritmosFeed.Add(algoritmo);
+                    await _context.SaveChangesAsync();
+                    algoritmoCreado = true;
+                }
+
+                var totalCategorias = await _context.CategoriasIntereses.CountAsync();
+                var mensaje = categoriasCreadas > 0 || algoritmoCreado
+                    ? "Seeds ejecutados correctamente"
+                    : "Los datos ya existian, no se realizaron cambios";
+
+                return Json(new
+                {
+                    success = true,
+                    message = mensaje,
+                    categoriasCreadas = categoriasCreadas,
+                    totalCategorias = totalCategorias,
+                    algoritmoCreado = algoritmoCreado
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        // ========================================
+        // PRUEBA DE CLASIFICACION CON CLAUDE
+        // ========================================
+
+        [HttpGet]
+        public async Task<IActionResult> ProbarClasificacion()
+        {
+            // Obtener categorias disponibles
+            var categorias = await _context.CategoriasIntereses
+                .Where(c => c.EstaActiva && c.CategoriaPadreId == null)
+                .OrderBy(c => c.Orden)
+                .Select(c => new { c.Id, c.Nombre, c.Icono, c.Color })
+                .ToListAsync();
+
+            ViewBag.Categorias = categorias;
+            ViewBag.TieneCategorias = categorias.Any();
+            ViewBag.ApiKeyConfigurada = !string.IsNullOrEmpty(_configuration["Claude:ApiKey"]);
+
+            return View();
+        }
+
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> ProbarClasificacionTexto([FromBody] ProbarClasificacionRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request?.Texto))
+                {
+                    return Json(new { success = false, message = "El texto es requerido" });
+                }
+
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                var categoriaId = await _claudeService.ClasificarPorTextoAsync(request.Texto);
+                stopwatch.Stop();
+
+                if (categoriaId == null)
+                {
+                    return Json(new {
+                        success = false,
+                        message = "No se pudo clasificar. Verifica que la API Key esté configurada y las categorías existan.",
+                        tiempoMs = stopwatch.ElapsedMilliseconds
+                    });
+                }
+
+                var categoria = await _context.CategoriasIntereses
+                    .Where(c => c.Id == categoriaId)
+                    .Select(c => new { c.Id, c.Nombre, c.Icono, c.Color })
+                    .FirstOrDefaultAsync();
+
+                return Json(new
+                {
+                    success = true,
+                    categoriaId = categoriaId,
+                    categoriaNombre = categoria?.Nombre,
+                    categoriaIcono = categoria?.Icono,
+                    categoriaColor = categoria?.Color,
+                    tiempoMs = stopwatch.ElapsedMilliseconds
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> ProbarClasificacionImagen(IFormFile imagen, string? descripcion)
+        {
+            try
+            {
+                if (imagen == null || imagen.Length == 0)
+                {
+                    return Json(new { success = false, message = "La imagen es requerida" });
+                }
+
+                // Leer imagen
+                byte[] imagenBytes;
+                using (var ms = new MemoryStream())
+                {
+                    await imagen.CopyToAsync(ms);
+                    imagenBytes = ms.ToArray();
+                }
+
+                // Verificar tamaño (max 5MB para Claude)
+                if (imagenBytes.Length > 5 * 1024 * 1024)
+                {
+                    return Json(new { success = false, message = "La imagen debe ser menor a 5MB" });
+                }
+
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                var categoriaId = await _claudeService.ClasificarContenidoAsync(
+                    imagenBytes,
+                    descripcion,
+                    imagen.ContentType
+                );
+                stopwatch.Stop();
+
+                if (categoriaId == null)
+                {
+                    return Json(new
+                    {
+                        success = false,
+                        message = "No se pudo clasificar. Verifica que la API Key esté configurada y las categorías existan.",
+                        tiempoMs = stopwatch.ElapsedMilliseconds
+                    });
+                }
+
+                var categoria = await _context.CategoriasIntereses
+                    .Where(c => c.Id == categoriaId)
+                    .Select(c => new { c.Id, c.Nombre, c.Icono, c.Color })
+                    .FirstOrDefaultAsync();
+
+                return Json(new
+                {
+                    success = true,
+                    categoriaId = categoriaId,
+                    categoriaNombre = categoria?.Nombre,
+                    categoriaIcono = categoria?.Icono,
+                    categoriaColor = categoria?.Color,
+                    tiempoMs = stopwatch.ElapsedMilliseconds
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        public class ProbarClasificacionRequest
+        {
+            public string? Texto { get; set; }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DiagnosticoClasificacion()
+        {
+            var diagnostico = new Dictionary<string, object>();
+
+            // 1. Verificar API Key
+            var apiKey = _configuration["Claude:ApiKey"];
+            diagnostico["apiKeyConfigurada"] = !string.IsNullOrEmpty(apiKey);
+            diagnostico["apiKeyPrimeros10Chars"] = string.IsNullOrEmpty(apiKey) ? "NO CONFIGURADA" : apiKey.Substring(0, Math.Min(10, apiKey.Length)) + "...";
+
+            // 2. Verificar categorías
+            var categorias = await _context.CategoriasIntereses
+                .Where(c => c.EstaActiva && c.CategoriaPadreId == null)
+                .OrderBy(c => c.Orden)
+                .Select(c => new { c.Id, c.Nombre })
+                .ToListAsync();
+
+            diagnostico["totalCategorias"] = categorias.Count;
+            diagnostico["categorias"] = categorias;
+
+            // 3. Probar conexión a Claude API (sin enviar contenido)
+            if (!string.IsNullOrEmpty(apiKey))
+            {
+                try
+                {
+                    using var httpClient = new HttpClient();
+                    httpClient.Timeout = TimeSpan.FromSeconds(10);
+
+                    var testRequest = new HttpRequestMessage(HttpMethod.Post, "https://api.anthropic.com/v1/messages");
+                    testRequest.Headers.Add("x-api-key", apiKey);
+                    testRequest.Headers.Add("anthropic-version", "2023-06-01");
+                    testRequest.Content = new StringContent(
+                        System.Text.Json.JsonSerializer.Serialize(new
+                        {
+                            model = "claude-3-haiku-20240307",
+                            max_tokens = 5,
+                            messages = new[] { new { role = "user", content = "Di solo 'OK'" } }
+                        }),
+                        System.Text.Encoding.UTF8,
+                        "application/json"
+                    );
+
+                    var response = await httpClient.SendAsync(testRequest);
+                    var responseContent = await response.Content.ReadAsStringAsync();
+
+                    diagnostico["claudeApiStatus"] = response.StatusCode.ToString();
+                    diagnostico["claudeApiOk"] = response.IsSuccessStatusCode;
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        diagnostico["claudeApiError"] = responseContent;
+                    }
+                    else
+                    {
+                        diagnostico["claudeApiResponse"] = "Conexion exitosa";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    diagnostico["claudeApiStatus"] = "Error";
+                    diagnostico["claudeApiError"] = ex.Message;
+                }
+            }
+
+            return Json(diagnostico);
+        }
+
+        // ========================================
+        // CONFIGURACION DE ALGORITMOS DE FEED
+        // ========================================
+
+        [HttpGet]
+        public async Task<IActionResult> ConfigurarAlgoritmos()
+        {
+            // Obtener configuraciones actuales o valores por defecto
+            var configuraciones = await _context.ConfiguracionesPlataforma
+                .Where(c => c.Categoria == "Algoritmos")
+                .ToDictionaryAsync(c => c.Clave, c => c.Valor);
+
+            var modelo = new ConfiguracionAlgoritmosViewModel
+            {
+                // Para Ti
+                ParaTi_Engagement = ObtenerValorConfig(configuraciones, ConfiguracionPlataforma.PARATI_PESO_ENGAGEMENT, 30),
+                ParaTi_Intereses = ObtenerValorConfig(configuraciones, ConfiguracionPlataforma.PARATI_PESO_INTERESES, 25),
+                ParaTi_CreadorFavorito = ObtenerValorConfig(configuraciones, ConfiguracionPlataforma.PARATI_PESO_CREADOR_FAVORITO, 20),
+                ParaTi_TipoContenido = ObtenerValorConfig(configuraciones, ConfiguracionPlataforma.PARATI_PESO_TIPO_CONTENIDO, 10),
+                ParaTi_Recencia = ObtenerValorConfig(configuraciones, ConfiguracionPlataforma.PARATI_PESO_RECENCIA, 15),
+
+                // Por Intereses
+                Intereses_Categoria = ObtenerValorConfig(configuraciones, ConfiguracionPlataforma.INTERESES_PESO_CATEGORIA, 80),
+                Intereses_Descubrimiento = ObtenerValorConfig(configuraciones, ConfiguracionPlataforma.INTERESES_PESO_DESCUBRIMIENTO, 20)
+            };
+
+            return View(modelo);
+        }
+
+        private int ObtenerValorConfig(Dictionary<string, string> config, string clave, int valorDefault)
+        {
+            if (config.TryGetValue(clave, out var valor) && int.TryParse(valor, out int resultado))
+                return resultado;
+            return valorDefault;
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> GuardarConfiguracionAlgoritmos(ConfiguracionAlgoritmosViewModel modelo)
+        {
+            // Validar que Para Ti sume 100
+            int sumaParaTi = modelo.ParaTi_Engagement + modelo.ParaTi_Intereses +
+                            modelo.ParaTi_CreadorFavorito + modelo.ParaTi_TipoContenido + modelo.ParaTi_Recencia;
+
+            if (sumaParaTi != 100)
+            {
+                TempData["Error"] = $"Los pesos de 'Para Ti' deben sumar 100. Actual: {sumaParaTi}";
+                return RedirectToAction("ConfigurarAlgoritmos");
+            }
+
+            // Validar que Por Intereses sume 100
+            int sumaIntereses = modelo.Intereses_Categoria + modelo.Intereses_Descubrimiento;
+            if (sumaIntereses != 100)
+            {
+                TempData["Error"] = $"Los pesos de 'Por Intereses' deben sumar 100. Actual: {sumaIntereses}";
+                return RedirectToAction("ConfigurarAlgoritmos");
+            }
+
+            // Guardar configuraciones
+            var configuraciones = new Dictionary<string, int>
+            {
+                { ConfiguracionPlataforma.PARATI_PESO_ENGAGEMENT, modelo.ParaTi_Engagement },
+                { ConfiguracionPlataforma.PARATI_PESO_INTERESES, modelo.ParaTi_Intereses },
+                { ConfiguracionPlataforma.PARATI_PESO_CREADOR_FAVORITO, modelo.ParaTi_CreadorFavorito },
+                { ConfiguracionPlataforma.PARATI_PESO_TIPO_CONTENIDO, modelo.ParaTi_TipoContenido },
+                { ConfiguracionPlataforma.PARATI_PESO_RECENCIA, modelo.ParaTi_Recencia },
+                { ConfiguracionPlataforma.INTERESES_PESO_CATEGORIA, modelo.Intereses_Categoria },
+                { ConfiguracionPlataforma.INTERESES_PESO_DESCUBRIMIENTO, modelo.Intereses_Descubrimiento }
+            };
+
+            foreach (var config in configuraciones)
+            {
+                var existente = await _context.ConfiguracionesPlataforma
+                    .FirstOrDefaultAsync(c => c.Clave == config.Key);
+
+                if (existente != null)
+                {
+                    existente.Valor = config.Value.ToString();
+                    existente.UltimaModificacion = DateTime.Now;
+                }
+                else
+                {
+                    _context.ConfiguracionesPlataforma.Add(new ConfiguracionPlataforma
+                    {
+                        Clave = config.Key,
+                        Valor = config.Value.ToString(),
+                        Categoria = "Algoritmos",
+                        Descripcion = ObtenerDescripcionConfig(config.Key),
+                        UltimaModificacion = DateTime.Now
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = "Configuracion de algoritmos guardada correctamente";
+            return RedirectToAction("ConfigurarAlgoritmos");
+        }
+
+        private string ObtenerDescripcionConfig(string clave)
+        {
+            return clave switch
+            {
+                ConfiguracionPlataforma.PARATI_PESO_ENGAGEMENT => "Peso del engagement (likes, comentarios, vistas) en Para Ti",
+                ConfiguracionPlataforma.PARATI_PESO_INTERESES => "Peso de los intereses del usuario en Para Ti",
+                ConfiguracionPlataforma.PARATI_PESO_CREADOR_FAVORITO => "Peso de los creadores favoritos en Para Ti",
+                ConfiguracionPlataforma.PARATI_PESO_TIPO_CONTENIDO => "Peso del tipo de contenido preferido en Para Ti",
+                ConfiguracionPlataforma.PARATI_PESO_RECENCIA => "Peso de la recencia (contenido nuevo) en Para Ti",
+                ConfiguracionPlataforma.INTERESES_PESO_CATEGORIA => "Porcentaje de contenido de categorias de interes",
+                ConfiguracionPlataforma.INTERESES_PESO_DESCUBRIMIENTO => "Porcentaje de contenido de descubrimiento",
+                _ => ""
+            };
+        }
+
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> RestablecerAlgoritmos()
+        {
+            var clavesAlgoritmos = new[]
+            {
+                ConfiguracionPlataforma.PARATI_PESO_ENGAGEMENT,
+                ConfiguracionPlataforma.PARATI_PESO_INTERESES,
+                ConfiguracionPlataforma.PARATI_PESO_CREADOR_FAVORITO,
+                ConfiguracionPlataforma.PARATI_PESO_TIPO_CONTENIDO,
+                ConfiguracionPlataforma.PARATI_PESO_RECENCIA,
+                ConfiguracionPlataforma.INTERESES_PESO_CATEGORIA,
+                ConfiguracionPlataforma.INTERESES_PESO_DESCUBRIMIENTO
+            };
+
+            var configuraciones = await _context.ConfiguracionesPlataforma
+                .Where(c => clavesAlgoritmos.Contains(c.Clave))
+                .ToListAsync();
+
+            _context.ConfiguracionesPlataforma.RemoveRange(configuraciones);
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, message = "Configuracion restablecida a valores por defecto" });
+        }
+    }
+
+    public class ConfiguracionAlgoritmosViewModel
+    {
+        // Para Ti (deben sumar 100)
+        public int ParaTi_Engagement { get; set; }
+        public int ParaTi_Intereses { get; set; }
+        public int ParaTi_CreadorFavorito { get; set; }
+        public int ParaTi_TipoContenido { get; set; }
+        public int ParaTi_Recencia { get; set; }
+
+        // Por Intereses (deben sumar 100)
+        public int Intereses_Categoria { get; set; }
+        public int Intereses_Descubrimiento { get; set; }
     }
 }

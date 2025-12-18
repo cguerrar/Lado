@@ -1,0 +1,471 @@
+@model List<Lado.Models.CategoriaInteres>
+@{
+    ViewData["Title"] = "Selecciona tus intereses";
+    Layout = "_Layout";
+    var interesesSeleccionados = ViewBag.InteresesSeleccionados as List<int> ?? new List<int>();
+    var esNuevoUsuario = ViewBag.EsNuevoUsuario ?? false;
+}
+
+<style>
+    :root {
+        --primary: #4682B4;
+        --primary-dark: #36648B;
+        --primary-light: #B0C4DE;
+        --primary-lighter: #E8F1F8;
+        --bg-light: #f8fafc;
+        --text-dark: #1e293b;
+        --text-muted: #64748b;
+        --border: #e2e8f0;
+        --success: #10b981;
+    }
+
+    .onboarding-container {
+        min-height: 100vh;
+        background: linear-gradient(135deg, var(--primary-lighter) 0%, #fff 50%, var(--primary-lighter) 100%);
+        padding: 2rem 1rem;
+    }
+
+    .onboarding-card {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 24px;
+        box-shadow: 0 10px 40px rgba(70, 130, 180, 0.15);
+        overflow: hidden;
+    }
+
+    .onboarding-header {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        color: white;
+        padding: 2.5rem 2rem;
+        text-align: center;
+    }
+
+    .onboarding-header h1 {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin: 0 0 0.5rem 0;
+    }
+
+    .onboarding-header p {
+        opacity: 0.9;
+        margin: 0;
+        font-size: 1rem;
+    }
+
+    .onboarding-body {
+        padding: 2rem;
+    }
+
+    .step-indicator {
+        display: flex;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .step-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--primary-light);
+    }
+
+    .step-dot.active {
+        background: var(--primary);
+        width: 30px;
+        border-radius: 5px;
+    }
+
+    .categories-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .category-card {
+        background: var(--bg-light);
+        border: 2px solid var(--border);
+        border-radius: 16px;
+        padding: 1.25rem 1rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+    }
+
+    .category-card:hover {
+        border-color: var(--primary-light);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(70, 130, 180, 0.15);
+    }
+
+    .category-card.selected {
+        border-color: var(--primary);
+        background: var(--primary-lighter);
+    }
+
+    .category-card.selected::after {
+        content: '';
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 22px;
+        height: 22px;
+        background: var(--primary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: center;
+    }
+
+    .category-icon {
+        font-size: 2.5rem;
+        margin-bottom: 0.75rem;
+        display: block;
+    }
+
+    .category-name {
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--text-dark);
+        margin: 0;
+    }
+
+    .selection-info {
+        text-align: center;
+        padding: 1rem;
+        background: var(--bg-light);
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+    }
+
+    .selection-count {
+        font-size: 1.1rem;
+        color: var(--text-dark);
+    }
+
+    .selection-count strong {
+        color: var(--primary);
+    }
+
+    .selection-hint {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+    }
+
+    .onboarding-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .btn-primary-custom {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        color: white;
+        border: none;
+        padding: 1rem 2.5rem;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        min-width: 200px;
+    }
+
+    .btn-primary-custom:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(70, 130, 180, 0.35);
+    }
+
+    .btn-primary-custom:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-skip {
+        background: transparent;
+        color: var(--text-muted);
+        border: 2px solid var(--border);
+        padding: 1rem 2rem;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-skip:hover {
+        border-color: var(--text-muted);
+        color: var(--text-dark);
+    }
+
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255,255,255,0.9);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+
+    .loading-overlay.show {
+        display: flex;
+    }
+
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid var(--primary-light);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Colores personalizados por categoria */
+    .category-card[data-color="#FF6B6B"] .category-icon { color: #FF6B6B; }
+    .category-card[data-color="#4ECDC4"] .category-icon { color: #4ECDC4; }
+    .category-card[data-color="#45B7D1"] .category-icon { color: #45B7D1; }
+    .category-card[data-color="#F7DC6F"] .category-icon { color: #F7DC6F; }
+    .category-card[data-color="#BB8FCE"] .category-icon { color: #BB8FCE; }
+    .category-card[data-color="#F39C12"] .category-icon { color: #F39C12; }
+    .category-card[data-color="#1ABC9C"] .category-icon { color: #1ABC9C; }
+    .category-card[data-color="#9B59B6"] .category-icon { color: #9B59B6; }
+    .category-card[data-color="#E74C3C"] .category-icon { color: #E74C3C; }
+    .category-card[data-color="#3498DB"] .category-icon { color: #3498DB; }
+    .category-card[data-color="#F1C40F"] .category-icon { color: #F1C40F; }
+    .category-card[data-color="#E91E63"] .category-icon { color: #E91E63; }
+    .category-card[data-color="#607D8B"] .category-icon { color: #607D8B; }
+    .category-card[data-color="#27AE60"] .category-icon { color: #27AE60; }
+    .category-card[data-color="#FF9800"] .category-icon { color: #FF9800; }
+
+    @@media (max-width: 576px) {
+        .onboarding-container {
+            padding: 1rem 0.5rem;
+        }
+
+        .onboarding-card {
+            border-radius: 16px;
+        }
+
+        .onboarding-header {
+            padding: 1.5rem 1rem;
+        }
+
+        .onboarding-header h1 {
+            font-size: 1.4rem;
+        }
+
+        .onboarding-body {
+            padding: 1.25rem;
+        }
+
+        .categories-grid {
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .category-card {
+            padding: 1rem 0.75rem;
+        }
+
+        .category-icon {
+            font-size: 2rem;
+        }
+
+        .category-name {
+            font-size: 0.8rem;
+        }
+
+        .onboarding-actions {
+            flex-direction: column;
+        }
+
+        .btn-primary-custom, .btn-skip {
+            width: 100%;
+        }
+    }
+</style>
+
+<div class="onboarding-container">
+    <div class="onboarding-card">
+        <div class="onboarding-header">
+            @if ((bool)esNuevoUsuario)
+            {
+                <div class="step-indicator">
+                    <div class="step-dot"></div>
+                    <div class="step-dot"></div>
+                    <div class="step-dot active"></div>
+                </div>
+            }
+            <h1>Selecciona tus intereses</h1>
+            <p>Personaliza tu experiencia eligiendo lo que te gusta</p>
+        </div>
+
+        <div class="onboarding-body">
+            <div class="selection-info">
+                <div class="selection-count">
+                    Has seleccionado <strong id="selectedCount">@interesesSeleccionados.Count</strong> intereses
+                </div>
+                <div class="selection-hint">Selecciona al menos 3 para una mejor experiencia</div>
+            </div>
+
+            <div class="categories-grid" id="categoriesGrid">
+                @foreach (var categoria in Model)
+                {
+                    var isSelected = interesesSeleccionados.Contains(categoria.Id);
+                    <div class="category-card @(isSelected ? "selected" : "")"
+                         data-id="@categoria.Id"
+                         data-color="@categoria.Color"
+                         onclick="toggleCategory(this)">
+                        <span class="category-icon">
+                            @(GetEmojiForCategory(categoria.Nombre))
+                        </span>
+                        <p class="category-name">@categoria.Nombre</p>
+                    </div>
+                }
+            </div>
+
+            <div class="onboarding-actions">
+                <button type="button" class="btn-primary-custom" id="btnContinuar" onclick="guardarIntereses()">
+                    Continuar
+                </button>
+                @if ((bool)esNuevoUsuario)
+                {
+                    <button type="button" class="btn-skip" onclick="omitirSeleccion()">
+                        Omitir por ahora
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+</div>
+
+@functions {
+    string GetEmojiForCategory(string nombre)
+    {
+        return nombre.ToLower() switch
+        {
+            "entretenimiento" => "🎬",
+            "musica" => "🎵",
+            "fitness" => "💪",
+            "moda" => "👗",
+            "belleza" => "💄",
+            "cocina" => "🍳",
+            "viajes" => "✈️",
+            "gaming" => "🎮",
+            "arte" => "🎨",
+            "educacion" => "📚",
+            "comedia" => "😂",
+            "lifestyle" => "🏠",
+            "tecnologia" => "💻",
+            "deportes" => "⚽",
+            "mascotas" => "🐕",
+            _ => "⭐"
+        };
+    }
+}
+
+@section Scripts {
+    <script>
+        let selectedCategories = new Set(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(interesesSeleccionados)));
+
+        function toggleCategory(element) {
+            const id = parseInt(element.dataset.id);
+
+            if (selectedCategories.has(id)) {
+                selectedCategories.delete(id);
+                element.classList.remove('selected');
+            } else {
+                selectedCategories.add(id);
+                element.classList.add('selected');
+            }
+
+            updateCounter();
+        }
+
+        function updateCounter() {
+            document.getElementById('selectedCount').textContent = selectedCategories.size;
+        }
+
+        async function guardarIntereses() {
+            if (selectedCategories.size === 0) {
+                alert('Selecciona al menos un interes');
+                return;
+            }
+
+            showLoading();
+
+            try {
+                const response = await fetch('/Usuario/GuardarIntereses', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        categoriaIds: Array.from(selectedCategories)
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    window.location.href = '/Feed';
+                } else {
+                    hideLoading();
+                    alert(data.message || 'Error al guardar');
+                }
+            } catch (error) {
+                hideLoading();
+                alert('Error de conexion');
+            }
+        }
+
+        async function omitirSeleccion() {
+            showLoading();
+
+            try {
+                const response = await fetch('/Usuario/OmitirIntereses', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    window.location.href = data.redirectUrl || '/Feed';
+                } else {
+                    hideLoading();
+                }
+            } catch (error) {
+                hideLoading();
+                window.location.href = '/Feed';
+            }
+        }
+
+        function showLoading() {
+            document.getElementById('loadingOverlay').classList.add('show');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('show');
+        }
+    </script>
+}

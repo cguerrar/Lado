@@ -1,0 +1,316 @@
+@using Lado.Controllers
+@model ConfiguracionAlgoritmosViewModel
+@{
+    ViewData["Title"] = "Configurar Algoritmos de Feed";
+}
+
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h2><i class="fas fa-sliders-h text-primary"></i> Configurar Algoritmos de Feed</h2>
+            <p class="text-muted">Ajusta los pesos de los algoritmos de recomendacion</p>
+        </div>
+        <div class="col-md-6 text-end">
+            <a href="@Url.Action("Algoritmos", "Admin")" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-chart-bar"></i> Ver Estadisticas
+            </a>
+            <a href="@Url.Action("Configuracion", "Admin")" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </div>
+    </div>
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            <i class="fas fa-exclamation-triangle"></i> @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            <i class="fas fa-check-circle"></i> @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <form method="post" action="@Url.Action("GuardarConfiguracionAlgoritmos")">
+        @Html.AntiForgeryToken()
+
+        <div class="row g-4">
+            <!-- Algoritmo "Para Ti" -->
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-magic"></i> Algoritmo "Para Ti"
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-4">
+                            <i class="fas fa-info-circle"></i>
+                            Los pesos deben sumar <strong>100%</strong>.
+                            <span id="sumaParaTi" class="float-end fw-bold">100%</span>
+                        </div>
+
+                        <!-- Engagement -->
+                        <div class="mb-4">
+                            <label class="form-label d-flex justify-content-between">
+                                <span><i class="fas fa-heart text-danger"></i> Engagement (likes, comentarios)</span>
+                                <span class="badge bg-primary" id="labelEngagement">@Model.ParaTi_Engagement%</span>
+                            </label>
+                            <input type="range" class="form-range" name="ParaTi_Engagement"
+                                   id="ParaTi_Engagement" min="0" max="100" value="@Model.ParaTi_Engagement"
+                                   oninput="actualizarPesoParaTi(this, 'labelEngagement')">
+                            <small class="text-muted">Peso de likes, comentarios, reacciones y vistas</small>
+                        </div>
+
+                        <!-- Intereses -->
+                        <div class="mb-4">
+                            <label class="form-label d-flex justify-content-between">
+                                <span><i class="fas fa-star text-warning"></i> Intereses del Usuario</span>
+                                <span class="badge bg-primary" id="labelIntereses">@Model.ParaTi_Intereses%</span>
+                            </label>
+                            <input type="range" class="form-range" name="ParaTi_Intereses"
+                                   id="ParaTi_Intereses" min="0" max="100" value="@Model.ParaTi_Intereses"
+                                   oninput="actualizarPesoParaTi(this, 'labelIntereses')">
+                            <small class="text-muted">Contenido de categorias que le gustan al usuario</small>
+                        </div>
+
+                        <!-- Creador Favorito -->
+                        <div class="mb-4">
+                            <label class="form-label d-flex justify-content-between">
+                                <span><i class="fas fa-user-check text-success"></i> Creador Favorito</span>
+                                <span class="badge bg-primary" id="labelCreador">@Model.ParaTi_CreadorFavorito%</span>
+                            </label>
+                            <input type="range" class="form-range" name="ParaTi_CreadorFavorito"
+                                   id="ParaTi_CreadorFavorito" min="0" max="100" value="@Model.ParaTi_CreadorFavorito"
+                                   oninput="actualizarPesoParaTi(this, 'labelCreador')">
+                            <small class="text-muted">Contenido de creadores con los que mas interactua</small>
+                        </div>
+
+                        <!-- Tipo de Contenido -->
+                        <div class="mb-4">
+                            <label class="form-label d-flex justify-content-between">
+                                <span><i class="fas fa-photo-video text-info"></i> Tipo de Contenido</span>
+                                <span class="badge bg-primary" id="labelTipo">@Model.ParaTi_TipoContenido%</span>
+                            </label>
+                            <input type="range" class="form-range" name="ParaTi_TipoContenido"
+                                   id="ParaTi_TipoContenido" min="0" max="100" value="@Model.ParaTi_TipoContenido"
+                                   oninput="actualizarPesoParaTi(this, 'labelTipo')">
+                            <small class="text-muted">Preferencia por imagen, video o carrusel</small>
+                        </div>
+
+                        <!-- Recencia -->
+                        <div class="mb-4">
+                            <label class="form-label d-flex justify-content-between">
+                                <span><i class="fas fa-clock text-secondary"></i> Recencia</span>
+                                <span class="badge bg-primary" id="labelRecencia">@Model.ParaTi_Recencia%</span>
+                            </label>
+                            <input type="range" class="form-range" name="ParaTi_Recencia"
+                                   id="ParaTi_Recencia" min="0" max="100" value="@Model.ParaTi_Recencia"
+                                   oninput="actualizarPesoParaTi(this, 'labelRecencia')">
+                            <small class="text-muted">Prioridad para contenido reciente</small>
+                        </div>
+
+                        <!-- Barra de progreso visual -->
+                        <div class="progress" style="height: 30px;">
+                            <div class="progress-bar bg-danger" id="barEngagement" style="width: @Model.ParaTi_Engagement%">
+                                @Model.ParaTi_Engagement%
+                            </div>
+                            <div class="progress-bar bg-warning" id="barIntereses" style="width: @Model.ParaTi_Intereses%">
+                                @Model.ParaTi_Intereses%
+                            </div>
+                            <div class="progress-bar bg-success" id="barCreador" style="width: @Model.ParaTi_CreadorFavorito%">
+                                @Model.ParaTi_CreadorFavorito%
+                            </div>
+                            <div class="progress-bar bg-info" id="barTipo" style="width: @Model.ParaTi_TipoContenido%">
+                                @Model.ParaTi_TipoContenido%
+                            </div>
+                            <div class="progress-bar bg-secondary" id="barRecencia" style="width: @Model.ParaTi_Recencia%">
+                                @Model.ParaTi_Recencia%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Algoritmo "Por Intereses" -->
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-star"></i> Algoritmo "Por Intereses"
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-4">
+                            <i class="fas fa-info-circle"></i>
+                            Los pesos deben sumar <strong>100%</strong>.
+                            <span id="sumaIntereses" class="float-end fw-bold">100%</span>
+                        </div>
+
+                        <!-- Contenido de Categorias -->
+                        <div class="mb-4">
+                            <label class="form-label d-flex justify-content-between">
+                                <span><i class="fas fa-tags text-primary"></i> Contenido de Categorias de Interes</span>
+                                <span class="badge bg-success" id="labelCategoria">@Model.Intereses_Categoria%</span>
+                            </label>
+                            <input type="range" class="form-range" name="Intereses_Categoria"
+                                   id="Intereses_Categoria" min="0" max="100" value="@Model.Intereses_Categoria"
+                                   oninput="actualizarPesoIntereses(this, 'labelCategoria')">
+                            <small class="text-muted">Contenido que coincide con los intereses seleccionados</small>
+                        </div>
+
+                        <!-- Descubrimiento -->
+                        <div class="mb-4">
+                            <label class="form-label d-flex justify-content-between">
+                                <span><i class="fas fa-compass text-warning"></i> Contenido de Descubrimiento</span>
+                                <span class="badge bg-success" id="labelDescubrimiento">@Model.Intereses_Descubrimiento%</span>
+                            </label>
+                            <input type="range" class="form-range" name="Intereses_Descubrimiento"
+                                   id="Intereses_Descubrimiento" min="0" max="100" value="@Model.Intereses_Descubrimiento"
+                                   oninput="actualizarPesoIntereses(this, 'labelDescubrimiento')">
+                            <small class="text-muted">Contenido nuevo para explorar otras categorias</small>
+                        </div>
+
+                        <!-- Barra de progreso visual -->
+                        <div class="progress mb-4" style="height: 30px;">
+                            <div class="progress-bar bg-primary" id="barCategoria" style="width: @Model.Intereses_Categoria%">
+                                Intereses @Model.Intereses_Categoria%
+                            </div>
+                            <div class="progress-bar bg-warning" id="barDescubrimiento" style="width: @Model.Intereses_Descubrimiento%">
+                                Descubrir @Model.Intereses_Descubrimiento%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info adicional -->
+                <div class="card border-0 shadow-sm mt-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle"></i> Informacion
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="mb-0">
+                            <li><strong>Para Ti:</strong> Algoritmo personalizado que combina multiples factores</li>
+                            <li><strong>Por Intereses:</strong> Prioriza contenido de categorias favoritas del usuario</li>
+                            <li class="text-muted mt-2">Los cambios se aplican en tiempo real (cache de 5 min)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-danger" onclick="restablecerValores()">
+                        <i class="fas fa-undo"></i> Restablecer Valores por Defecto
+                    </button>
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-save"></i> Guardar Configuracion
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    function actualizarPesoParaTi(input, labelId) {
+        document.getElementById(labelId).textContent = input.value + '%';
+        actualizarSumaParaTi();
+        actualizarBarrasParaTi();
+    }
+
+    function actualizarPesoIntereses(input, labelId) {
+        document.getElementById(labelId).textContent = input.value + '%';
+        actualizarSumaIntereses();
+        actualizarBarrasIntereses();
+    }
+
+    function actualizarSumaParaTi() {
+        const engagement = parseInt(document.getElementById('ParaTi_Engagement').value) || 0;
+        const intereses = parseInt(document.getElementById('ParaTi_Intereses').value) || 0;
+        const creador = parseInt(document.getElementById('ParaTi_CreadorFavorito').value) || 0;
+        const tipo = parseInt(document.getElementById('ParaTi_TipoContenido').value) || 0;
+        const recencia = parseInt(document.getElementById('ParaTi_Recencia').value) || 0;
+
+        const suma = engagement + intereses + creador + tipo + recencia;
+        const elemento = document.getElementById('sumaParaTi');
+        elemento.textContent = suma + '%';
+        elemento.className = suma === 100 ? 'float-end fw-bold text-success' : 'float-end fw-bold text-danger';
+    }
+
+    function actualizarSumaIntereses() {
+        const categoria = parseInt(document.getElementById('Intereses_Categoria').value) || 0;
+        const descubrimiento = parseInt(document.getElementById('Intereses_Descubrimiento').value) || 0;
+
+        const suma = categoria + descubrimiento;
+        const elemento = document.getElementById('sumaIntereses');
+        elemento.textContent = suma + '%';
+        elemento.className = suma === 100 ? 'float-end fw-bold text-success' : 'float-end fw-bold text-danger';
+    }
+
+    function actualizarBarrasParaTi() {
+        const engagement = parseInt(document.getElementById('ParaTi_Engagement').value) || 0;
+        const intereses = parseInt(document.getElementById('ParaTi_Intereses').value) || 0;
+        const creador = parseInt(document.getElementById('ParaTi_CreadorFavorito').value) || 0;
+        const tipo = parseInt(document.getElementById('ParaTi_TipoContenido').value) || 0;
+        const recencia = parseInt(document.getElementById('ParaTi_Recencia').value) || 0;
+
+        document.getElementById('barEngagement').style.width = engagement + '%';
+        document.getElementById('barEngagement').textContent = engagement + '%';
+        document.getElementById('barIntereses').style.width = intereses + '%';
+        document.getElementById('barIntereses').textContent = intereses + '%';
+        document.getElementById('barCreador').style.width = creador + '%';
+        document.getElementById('barCreador').textContent = creador + '%';
+        document.getElementById('barTipo').style.width = tipo + '%';
+        document.getElementById('barTipo').textContent = tipo + '%';
+        document.getElementById('barRecencia').style.width = recencia + '%';
+        document.getElementById('barRecencia').textContent = recencia + '%';
+    }
+
+    function actualizarBarrasIntereses() {
+        const categoria = parseInt(document.getElementById('Intereses_Categoria').value) || 0;
+        const descubrimiento = parseInt(document.getElementById('Intereses_Descubrimiento').value) || 0;
+
+        document.getElementById('barCategoria').style.width = categoria + '%';
+        document.getElementById('barCategoria').textContent = 'Intereses ' + categoria + '%';
+        document.getElementById('barDescubrimiento').style.width = descubrimiento + '%';
+        document.getElementById('barDescubrimiento').textContent = 'Descubrir ' + descubrimiento + '%';
+    }
+
+    async function restablecerValores() {
+        if (!confirm('¿Estas seguro de restablecer los valores por defecto?')) return;
+
+        try {
+            const response = await fetch('@Url.Action("RestablecerAlgoritmos", "Admin")', {
+                method: 'POST'
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        } catch (error) {
+            alert('Error de conexion: ' + error.message);
+        }
+    }
+
+    // Inicializar
+    document.addEventListener('DOMContentLoaded', function() {
+        actualizarSumaParaTi();
+        actualizarSumaIntereses();
+    });
+</script>

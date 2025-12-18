@@ -317,6 +317,100 @@
             </div>
         </div>
 
+        <!-- Configuración Regional -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-purple text-white" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+                    <h5 class="mb-0">
+                        <i class="fas fa-globe"></i> Configuracion Regional
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="@Url.Action("ActualizarZonaHoraria")">
+                        <div class="mb-3">
+                            <label class="form-label">Zona Horaria de la Plataforma</label>
+                            <select name="zonaHoraria" id="selectZonaHoraria" class="form-select" required>
+                                <optgroup label="America">
+                                    <option value="America/Bogota">Colombia (America/Bogota) UTC-5</option>
+                                    <option value="America/Mexico_City">Mexico (America/Mexico_City) UTC-6</option>
+                                    <option value="America/Lima">Peru (America/Lima) UTC-5</option>
+                                    <option value="America/Santiago">Chile (America/Santiago) UTC-3/-4</option>
+                                    <option value="America/Argentina/Buenos_Aires">Argentina (Buenos Aires) UTC-3</option>
+                                    <option value="America/Caracas">Venezuela (America/Caracas) UTC-4</option>
+                                    <option value="America/New_York">Estados Unidos Este (New York) UTC-5/-4</option>
+                                    <option value="America/Los_Angeles">Estados Unidos Oeste (Los Angeles) UTC-8/-7</option>
+                                    <option value="America/Sao_Paulo">Brasil (Sao Paulo) UTC-3</option>
+                                </optgroup>
+                                <optgroup label="Europa">
+                                    <option value="Europe/Madrid">Espana (Europe/Madrid) UTC+1/+2</option>
+                                    <option value="Europe/London">Reino Unido (Europe/London) UTC+0/+1</option>
+                                    <option value="Europe/Paris">Francia (Europe/Paris) UTC+1/+2</option>
+                                </optgroup>
+                                <optgroup label="Otras">
+                                    <option value="UTC">UTC (Coordinado Universal)</option>
+                                </optgroup>
+                            </select>
+                            <small class="text-muted">
+                                Esta zona horaria se usara para mostrar fechas y horas en toda la plataforma
+                            </small>
+                        </div>
+
+                        <div class="alert alert-info mb-3">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Hora actual:</strong>
+                            <span id="horaActual">Cargando...</span>
+                        </div>
+
+                        <button type="submit" class="btn text-white" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+                            <i class="fas fa-save"></i> Guardar Zona Horaria
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Datos Iniciales (Seeds) -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-database"></i> Datos Iniciales
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">
+                        Ejecuta scripts para poblar datos iniciales necesarios para el funcionamiento de la plataforma.
+                    </p>
+
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary" type="button" id="btnSeedCategorias" onclick="ejecutarSeedCategorias()">
+                            <i class="fas fa-tags" id="iconSeedCategorias"></i>
+                            <span id="textSeedCategorias">Cargar Categorías de Intereses</span>
+                        </button>
+                        <a href="@Url.Action("ProbarClasificacion", "Admin")" class="btn btn-outline-info">
+                            <i class="fas fa-robot"></i>
+                            Probar Clasificacion con IA
+                        </a>
+                        <a href="@Url.Action("ConfigurarAlgoritmos", "Admin")" class="btn btn-outline-warning">
+                            <i class="fas fa-sliders-h"></i>
+                            Configurar Pesos de Algoritmos
+                        </a>
+                    </div>
+
+                    <div id="resultadoSeed" class="mt-3" style="display: none;">
+                    </div>
+
+                    <hr>
+
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle"></i>
+                        Estos scripts verifican si los datos ya existen antes de insertarlos,
+                        por lo que es seguro ejecutarlos múltiples veces.
+                    </small>
+                </div>
+            </div>
+        </div>
+
         <!-- Información del Sistema -->
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm h-100">
@@ -368,3 +462,112 @@
         alert('@TempData["Success"]');
     </script>
 }
+
+<script>
+    // Establecer zona horaria guardada
+    const zonaHorariaGuardada = '@ViewBag.ZonaHoraria';
+
+    // Mostrar hora actual segun zona horaria seleccionada
+    function actualizarHora() {
+        const select = document.getElementById('selectZonaHoraria');
+        const zonaHoraria = select.value;
+        const horaActualSpan = document.getElementById('horaActual');
+
+        try {
+            const ahora = new Date();
+            const opciones = {
+                timeZone: zonaHoraria,
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            };
+            horaActualSpan.textContent = ahora.toLocaleString('es-ES', opciones);
+        } catch (e) {
+            horaActualSpan.textContent = 'Zona horaria no valida';
+        }
+    }
+
+    // Actualizar al cargar y cuando cambia la seleccion
+    document.addEventListener('DOMContentLoaded', function() {
+        // Establecer el valor guardado en el select
+        const select = document.getElementById('selectZonaHoraria');
+        if (zonaHorariaGuardada) {
+            select.value = zonaHorariaGuardada;
+        }
+
+        actualizarHora();
+        setInterval(actualizarHora, 1000);
+
+        select.addEventListener('change', actualizarHora);
+    });
+
+    // Funcion para ejecutar seed de categorias
+    async function ejecutarSeedCategorias() {
+        const btn = document.getElementById('btnSeedCategorias');
+        const icon = document.getElementById('iconSeedCategorias');
+        const text = document.getElementById('textSeedCategorias');
+        const resultado = document.getElementById('resultadoSeed');
+
+        // Deshabilitar boton y mostrar loading
+        btn.disabled = true;
+        icon.className = 'fas fa-spinner fa-spin';
+        text.textContent = 'Ejecutando...';
+
+        try {
+            const response = await fetch('@Url.Action("SeedCategoriasInteres", "Admin")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                resultado.innerHTML = `
+                    <div class="alert alert-success mb-0">
+                        <i class="fas fa-check-circle"></i>
+                        <strong>Exito!</strong><br>
+                        ${data.message}<br>
+                        <small class="text-muted">
+                            Categorias: ${data.categoriasCreadas || 0} creadas<br>
+                            Algoritmo: ${data.algoritmoCreado ? 'Creado' : 'Ya existia'}
+                        </small>
+                    </div>
+                `;
+                icon.className = 'fas fa-check';
+                text.textContent = 'Completado';
+                btn.classList.remove('btn-outline-primary');
+                btn.classList.add('btn-success');
+            } else {
+                resultado.innerHTML = `
+                    <div class="alert alert-danger mb-0">
+                        <i class="fas fa-times-circle"></i>
+                        <strong>Error:</strong> ${data.message || 'Error desconocido'}
+                    </div>
+                `;
+                icon.className = 'fas fa-times';
+                text.textContent = 'Error - Reintentar';
+                btn.disabled = false;
+            }
+        } catch (error) {
+            resultado.innerHTML = `
+                <div class="alert alert-danger mb-0">
+                    <i class="fas fa-times-circle"></i>
+                    <strong>Error de conexion:</strong> ${error.message}
+                </div>
+            `;
+            icon.className = 'fas fa-tags';
+            text.textContent = 'Cargar Categorias de Intereses';
+            btn.disabled = false;
+        }
+
+        resultado.style.display = 'block';
+    }
+</script>

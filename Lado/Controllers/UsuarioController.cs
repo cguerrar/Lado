@@ -14,17 +14,20 @@ namespace Lado.Controllers
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ApplicationDbContext _context;
         private readonly IWebHostEnvironment _environment;
+        private readonly Services.IInteresesService _interesesService;
 
         public UsuarioController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             ApplicationDbContext context,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            Services.IInteresesService interesesService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _context = context;
             _environment = environment;
+            _interesesService = interesesService;
         }
 
         // GET: /Usuario/Perfil
@@ -1231,6 +1234,92 @@ namespace Lado.Controllers
 
             return $"Hace {(int)(diferencia.TotalDays / 365)}año";
         }
+
+        // ========================================
+        // ONBOARDING - SELECCION DE INTERESES
+        // ========================================
+
+        /// <summary>
+        /// Vista de onboarding para seleccionar intereses
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> SeleccionarIntereses()
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+                return RedirectToAction("Login", "Account");
+
+            // Obtener categorias principales (sin subcategorias en la vista principal)
+            var categorias = await _context.CategoriasIntereses
+                .Where(c => c.EstaActiva && c.CategoriaPadreId == null)
+                .OrderBy(c => c.Orden)
+                .ToListAsync();
+
+            // Obtener intereses ya seleccionados por el usuario
+            var interesesUsuario = await _context.InteresesUsuarios
+                .Where(i => i.UsuarioId == usuario.Id)
+                .Select(i => i.CategoriaInteresId)
+                .ToListAsync();
+
+            ViewBag.InteresesSeleccionados = interesesUsuario;
+            ViewBag.EsNuevoUsuario = (DateTime.Now - usuario.FechaRegistro).TotalMinutes < 30;
+
+            return View(categorias);
+        }
+
+        /// <summary>
+        /// Guardar intereses seleccionados en onboarding
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> GuardarIntereses([FromBody] GuardarInteresesRequest request)
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+                return Json(new { success = false, message = "No autenticado" });
+
+            if (request.CategoriaIds == null || !request.CategoriaIds.Any())
+            {
+                return Json(new { success = false, message = "Selecciona al menos un interes" });
+            }
+
+            try
+            {
+                // Eliminar intereses explicitos anteriores
+                var interesesAnteriores = await _context.InteresesUsuarios
+                    .Where(i => i.UsuarioId == usuario.Id && i.Tipo == TipoInteres.Explicito)
+                    .ToListAsync();
+
+                _context.InteresesUsuarios.RemoveRange(interesesAnteriores);
+                await _context.SaveChangesAsync();
+
+                // Agregar nuevos intereses
+                foreach (var categoriaId in request.CategoriaIds.Distinct())
+                {
+                    var categoriaExiste = await _context.CategoriasIntereses
+                        .AnyAsync(c => c.Id == categoriaId && c.EstaActiva);
+
+                    if (categoriaExiste)
+                    {
+                        await _interesesService.AgregarInteresExplicitoAsync(usuario.Id, categoriaId);
+                    }
+                }
+
+                return Json(new { success = true, message = "Intereses guardados correctamente" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Error al guardar: " + ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Omitir seleccion de intereses en onboarding
+        /// </summary>
+        [HttpPost]
+        public IActionResult OmitirIntereses()
+        {
+            return Json(new { success = true, redirectUrl = "/Feed" });
+        }
     }
 
     // ========================================
@@ -1265,6 +1354,11 @@ namespace Lado.Controllers
     public class CambiarLadoPreferidoRequest
     {
         public int LadoPreferido { get; set; } = 0;
+    }
+
+    public class GuardarInteresesRequest
+    {
+        public List<int> CategoriaIds { get; set; } = new();
     }
 
     // DTO para notificaciones

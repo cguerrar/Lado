@@ -140,11 +140,22 @@ builder.Services.AddSession(options =>
 builder.Services.AddScoped<Lado.Services.StripeSimuladoService>();
 builder.Services.AddScoped<Lado.Services.IAdService, Lado.Services.AdService>();
 builder.Services.AddSingleton<Lado.Services.IServerMetricsService, Lado.Services.ServerMetricsService>();
-builder.Services.AddScoped<Lado.Services.IEmailService, Lado.Services.EmailService>();
+builder.Services.AddScoped<Lado.Services.IEmailService, Lado.Services.MailjetEmailService>();
 builder.Services.AddScoped<Lado.Services.IVisitasService, Lado.Services.VisitasService>();
 builder.Services.AddScoped<Lado.Services.INotificationService, Lado.Services.NotificationService>();
 builder.Services.AddScoped<Lado.Services.IFeedAlgorithmService, Lado.Services.FeedAlgorithmService>();
 builder.Services.AddScoped<Lado.Services.IImageService, Lado.Services.ImageService>();
+builder.Services.AddScoped<Lado.Services.IDateTimeService, Lado.Services.DateTimeService>();
+builder.Services.AddScoped<Lado.Services.IInteresesService, Lado.Services.InteresesService>();
+
+// ========================================
+// CONFIGURACIÓN DE CLAUDE API (Clasificación de contenido)
+// ========================================
+builder.Services.AddHttpClient("Claude", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddScoped<Lado.Services.IClaudeClassificationService, Lado.Services.ClaudeClassificationService>();
 
 // ========================================
 // CONFIGURACIÓN DE CACHING

@@ -114,119 +114,164 @@
                             }
                         </div>
 
-                        <div class="card-body">
-                            @if (contenido.Usuario != null)
-                            {
-                                <div class="d-flex align-items-center mb-2">
-                                    @if (!string.IsNullOrEmpty(contenido.Usuario.FotoPerfil))
-                                    {
-                                        <img src="@contenido.Usuario.FotoPerfil" alt="@contenido.Usuario.UserName"
-                                             class="rounded-circle me-2" style="width: 30px; height: 30px; object-fit: cover;">
-                                    }
-                                    else
-                                    {
-                                        <div class="rounded-circle bg-primary text-white me-2 d-flex align-items-center justify-content-center"
-                                             style="width: 30px; height: 30px; font-size: 0.8rem;">
-                                            <strong>@(contenido.Usuario.UserName?.Substring(0, 1).ToUpper() ?? "?")</strong>
-                                        </div>
-                                    }
-                                    <small class="text-muted">@(contenido.Usuario.UserName ?? "Usuario Desconocido")</small>
-                                </div>
-                            }
+                        <div class="card-body p-3">
+                            @* Header: Usuario + Fecha *@
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                @if (contenido.Usuario != null)
+                                {
+                                    <div class="d-flex align-items-center">
+                                        @if (!string.IsNullOrEmpty(contenido.Usuario.FotoPerfil))
+                                        {
+                                            <img src="@contenido.Usuario.FotoPerfil" alt="@contenido.Usuario.UserName"
+                                                 class="rounded-circle me-2" style="width: 28px; height: 28px; object-fit: cover;">
+                                        }
+                                        else
+                                        {
+                                            <div class="rounded-circle bg-gradient text-white me-2 d-flex align-items-center justify-content-center"
+                                                 style="width: 28px; height: 28px; font-size: 0.75rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                                <strong>@(contenido.Usuario.UserName?.Substring(0, 1).ToUpper() ?? "?")</strong>
+                                            </div>
+                                        }
+                                        <span class="fw-medium small">@(contenido.Usuario.UserName ?? "?")</span>
+                                    </div>
+                                }
+                                <small class="text-muted">@contenido.FechaPublicacion.ToString("dd MMM")</small>
+                            </div>
 
-                            <p class="card-text small mb-2">
+                            @* Descripcion *@
+                            <p class="card-text small text-secondary mb-2" style="min-height: 36px;">
                                 @if (!string.IsNullOrEmpty(contenido.Descripcion))
                                 {
-                                    if (contenido.Descripcion.Length > 60)
-                                    {
-                                        @contenido.Descripcion.Substring(0, 60)<text>...</text>
-                                    }
-                                    else
-                                    {
-                                        @contenido.Descripcion
-                                    }
+                                    @(contenido.Descripcion.Length > 50 ? contenido.Descripcion.Substring(0, 50) + "..." : contenido.Descripcion)
                                 }
                                 else
                                 {
-                                    <span class="text-muted fst-italic">Sin descripcion</span>
+                                    <span class="fst-italic opacity-50">Sin descripcion</span>
                                 }
                             </p>
 
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <div class="d-flex align-items-center gap-1">
-                                    <span class="badge bg-secondary">@contenido.TipoContenido</span>
-                                    @if (contenido.PistaMusicalId != null)
-                                    {
-                                        <span class="badge bg-info" title="Tiene pista de audio">
-                                            <i class="fas fa-music"></i>
+                            @* Badges de tipo y categoria *@
+                            <div class="d-flex flex-wrap gap-1 mb-2">
+                                <span class="badge rounded-pill bg-dark bg-opacity-75">
+                                    @if ((int)contenido.TipoContenido == 1)
+                                    {<i class="fas fa-image"></i>}
+                                    else if ((int)contenido.TipoContenido == 2)
+                                    {<i class="fas fa-video"></i>}
+                                    else
+                                    {<i class="fas fa-images"></i>}
+                                    @contenido.TipoContenido
+                                </span>
+                                @if (contenido.PistaMusicalId != null)
+                                {
+                                    <span class="badge rounded-pill bg-info" title="Con audio"><i class="fas fa-music"></i></span>
+                                }
+                                @if (contenido.EsPrivado)
+                                {
+                                    <span class="badge rounded-pill" style="background-color: #8B5CF6;" title="Privado"><i class="fas fa-lock"></i></span>
+                                }
+                            </div>
+
+                            @* Categoria IA - Destacada *@
+                            <div class="mb-2" id="categoria-@contenido.Id">
+                                @if (contenido.CategoriaInteres != null)
+                                {
+                                    <div class="d-flex align-items-center gap-2 p-2 rounded" style="background-color: @(contenido.CategoriaInteres.Color)15;">
+                                        <span class="badge" style="background-color: @contenido.CategoriaInteres.Color;">
+                                            <i class="@contenido.CategoriaInteres.Icono"></i>
                                         </span>
-                                    }
-                                    @if (contenido.EsPrivado)
-                                    {
-                                        <span class="badge bg-purple" title="Solo visible para el creador" style="background-color: #8B5CF6 !important;">
-                                            <i class="fas fa-lock"></i>
-                                        </span>
-                                    }
+                                        <small class="fw-medium" style="color: @contenido.CategoriaInteres.Color;">@contenido.CategoriaInteres.Nombre</small>
+                                        <i class="fas fa-robot ms-auto text-muted" style="font-size: 0.7rem;" title="Clasificado por IA"></i>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="d-flex align-items-center gap-2 p-2 rounded bg-light">
+                                        <span class="badge bg-secondary"><i class="fas fa-question"></i></span>
+                                        <small class="text-muted">Sin clasificar</small>
+                                    </div>
+                                }
+                            </div>
+
+                            @* Stats *@
+                            <div class="d-flex justify-content-around text-center py-2 mb-3 border-top border-bottom">
+                                <div>
+                                    <i class="fas fa-heart text-danger"></i>
+                                    <span class="small fw-bold ms-1">@(contenido.Likes?.Count ?? 0)</span>
                                 </div>
-                                <small class="text-muted">@contenido.FechaPublicacion.ToString("dd/MM/yy")</small>
+                                <div>
+                                    <i class="fas fa-comment text-primary"></i>
+                                    <span class="small fw-bold ms-1">@(contenido.Comentarios?.Count ?? 0)</span>
+                                </div>
+                                <div>
+                                    <i class="fas fa-eye text-secondary"></i>
+                                    <span class="small fw-bold ms-1">@contenido.NumeroVistas</span>
+                                </div>
                             </div>
 
-                            <div class="d-flex justify-content-between text-muted small mb-3">
-                                <span><i class="fas fa-heart"></i> @(contenido.Likes?.Count ?? 0)</span>
-                                <span><i class="fas fa-comment"></i> @(contenido.Comentarios?.Count ?? 0)</span>
-                            </div>
-
-                            <div class="d-grid gap-2">
+                            @* Botones Grupo 1: Moderacion *@
+                            <div class="d-flex gap-1 mb-2">
                                 @if (contenido.Censurado)
                                 {
                                     <form method="post" action="@Url.Action("DescensurarContenido", new { id = contenido.Id })"
-                                          onsubmit="return confirm('Descensurar este contenido?')">
+                                          class="flex-fill" onsubmit="return confirm('Descensurar?')">
                                         @Html.AntiForgeryToken()
                                         <button type="submit" class="btn btn-sm btn-success w-100">
-                                            <i class="fas fa-check"></i> Descensurar
+                                            <i class="fas fa-check"></i>
                                         </button>
                                     </form>
                                 }
                                 else
                                 {
-                                    <button class="btn btn-sm btn-warning" data-bs-toggle="modal"
-                                            data-bs-target="#censurarModal" data-contentid="@contenido.Id">
-                                        <i class="fas fa-ban"></i> Censurar
+                                    <button class="btn btn-sm btn-outline-warning flex-fill" data-bs-toggle="modal"
+                                            data-bs-target="#censurarModal" data-contentid="@contenido.Id" title="Censurar">
+                                        <i class="fas fa-ban"></i>
                                     </button>
                                 }
-                                <!-- Boton Contenido Sensible -->
+
                                 @if (contenido.EsContenidoSensible)
                                 {
                                     <form method="post" action="@Url.Action("QuitarContenidoSensible", new { id = contenido.Id })"
-                                          onsubmit="return confirm('Quitar marca de contenido sensible?')">
+                                          class="flex-fill" onsubmit="return confirm('Quitar sensible?')">
                                         @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn btn-sm btn-outline-success w-100">
-                                            <i class="fas fa-eye"></i> Quitar Sensible
+                                        <button type="submit" class="btn btn-sm btn-success w-100" title="Quitar Sensible">
+                                            <i class="fas fa-eye"></i>
                                         </button>
                                     </form>
                                 }
                                 else
                                 {
                                     <form method="post" action="@Url.Action("MarcarContenidoSensible", new { id = contenido.Id })"
-                                          onsubmit="return confirm('Marcar como contenido sensible?')">
+                                          class="flex-fill" onsubmit="return confirm('Marcar sensible?')">
                                         @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn btn-sm btn-outline-warning w-100">
-                                            <i class="fas fa-eye-slash"></i> Marcar Sensible
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary w-100" title="Marcar Sensible">
+                                            <i class="fas fa-eye-slash"></i>
                                         </button>
                                     </form>
                                 }
-                                <!-- Boton Transferir -->
-                                <button class="btn btn-sm btn-info" data-bs-toggle="modal"
+                            </div>
+
+                            @* Botones Grupo 2: IA + Transferir *@
+                            <div class="d-flex gap-1 mb-2">
+                                <button class="btn btn-sm btn-outline-primary flex-fill"
+                                        onclick="reclasificarContenido(@contenido.Id)" title="Reclasificar con IA">
+                                    <i class="fas fa-robot" id="icon-reclasificar-@contenido.Id"></i>
+                                    <span class="d-none d-xl-inline ms-1">IA</span>
+                                </button>
+                                <button class="btn btn-sm btn-outline-info flex-fill" data-bs-toggle="modal"
                                         data-bs-target="#transferirModal"
                                         data-contentid="@contenido.Id"
-                                        data-username="@(contenido.Usuario?.UserName ?? "Desconocido")">
-                                    <i class="fas fa-exchange-alt"></i> Transferir
-                                </button>
-                                <button class="btn btn-sm btn-danger" data-bs-toggle="modal"
-                                        data-bs-target="#eliminarModal" data-contentid="@contenido.Id">
-                                    <i class="fas fa-trash"></i> Eliminar
+                                        data-username="@(contenido.Usuario?.UserName ?? "?")" title="Transferir">
+                                    <i class="fas fa-exchange-alt"></i>
+                                    <span class="d-none d-xl-inline ms-1">Transferir</span>
                                 </button>
                             </div>
+
+                            @* Boton Eliminar *@
+                            <button class="btn btn-sm btn-outline-danger w-100" data-bs-toggle="modal"
+                                    data-bs-target="#eliminarModal" data-contentid="@contenido.Id">
+                                <i class="fas fa-trash"></i>
+                                <span class="ms-1">Eliminar</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -421,6 +466,57 @@
 </div>
 
 <script>
+    // Reclasificar contenido con IA
+    async function reclasificarContenido(id) {
+        const icon = document.getElementById('icon-reclasificar-' + id);
+        const categoriaContainer = document.getElementById('categoria-' + id);
+
+        // Mostrar loading
+        icon.className = 'fas fa-spinner fa-spin';
+
+        try {
+            const response = await fetch('@Url.Action("ReclasificarContenido", "Admin")?id=' + id, {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Actualizar la UI con la nueva categoria
+                const esNueva = data.categoriaCreada ? '<i class="fas fa-sparkles text-warning ms-1" title="Categoria creada por IA"></i>' : '';
+                categoriaContainer.innerHTML = `
+                    <div class="d-flex align-items-center gap-2 p-2 rounded" style="background-color: ${data.categoriaColor}15;">
+                        <span class="badge" style="background-color: ${data.categoriaColor};">
+                            <i class="${data.categoriaIcono}"></i>
+                        </span>
+                        <small class="fw-medium" style="color: ${data.categoriaColor};">${data.categoriaNombre}${esNueva}</small>
+                        <i class="fas fa-robot ms-auto text-muted" style="font-size: 0.7rem;" title="Clasificado por IA (${data.tiempoMs}ms)"></i>
+                    </div>
+                `;
+                icon.className = 'fas fa-check text-success';
+                // Mostrar mensaje si se creo categoria nueva
+                if (data.categoriaCreada) {
+                    alert('Nueva categoria creada: ' + data.categoriaNombre);
+                }
+                setTimeout(() => { icon.className = 'fas fa-robot'; }, 2000);
+            } else {
+                // Mostrar error detallado
+                let errorMsg = data.message || 'Error desconocido';
+                if (data.detalle) {
+                    errorMsg += '\n\nDetalle: ' + data.detalle;
+                }
+                if (data.tiempoMs) {
+                    errorMsg += '\n\nTiempo: ' + data.tiempoMs + 'ms';
+                }
+                alert(errorMsg);
+                icon.className = 'fas fa-robot';
+            }
+        } catch (error) {
+            alert('Error de conexion: ' + error.message);
+            icon.className = 'fas fa-robot';
+        }
+    }
+
     // Modal Censurar Individual
     document.getElementById('censurarModal').addEventListener('show.bs.modal', function (event) {
         var button = event.relatedTarget;

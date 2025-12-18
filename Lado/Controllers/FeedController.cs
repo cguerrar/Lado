@@ -18,6 +18,7 @@ namespace Lado.Controllers
         private readonly IAdService _adService;
         private readonly INotificationService _notificationService;
         private readonly IFeedAlgorithmService _feedAlgorithmService;
+        private readonly IInteresesService _interesesService;
 
         public FeedController(
             ApplicationDbContext context,
@@ -25,7 +26,8 @@ namespace Lado.Controllers
             ILogger<FeedController> logger,
             IAdService adService,
             INotificationService notificationService,
-            IFeedAlgorithmService feedAlgorithmService)
+            IFeedAlgorithmService feedAlgorithmService,
+            IInteresesService interesesService)
         {
             _context = context;
             _userManager = userManager;
@@ -33,6 +35,7 @@ namespace Lado.Controllers
             _adService = adService;
             _notificationService = notificationService;
             _feedAlgorithmService = feedAlgorithmService;
+            _interesesService = interesesService;
         }
 
 
@@ -821,6 +824,12 @@ namespace Lado.Controllers
 
                 await _context.SaveChangesAsync();
 
+                // Registrar interaccion para clasificacion de intereses
+                if (!string.IsNullOrEmpty(usuarioId))
+                {
+                    _ = _interesesService.RegistrarInteraccionAsync(usuarioId, id, TipoInteraccion.Comentario);
+                }
+
                 var usuario = await _userManager.FindByIdAsync(usuarioId);
 
                 // Notificar al dueño del contenido sobre el nuevo comentario
@@ -1488,6 +1497,9 @@ namespace Lado.Controllers
                 {
                     contenido.NumeroVistas++;
                     await _context.SaveChangesAsync();
+
+                    // Registrar interaccion de vista para clasificacion de intereses
+                    _ = _interesesService.RegistrarInteraccionAsync(usuarioActual.Id, id, TipoInteraccion.Vista);
                 }
 
                 var reacciones = await _context.Reacciones
@@ -1638,6 +1650,12 @@ namespace Lado.Controllers
 
                 await _context.SaveChangesAsync();
 
+                // Registrar interaccion para clasificacion de intereses (en segundo plano)
+                if (liked && !string.IsNullOrEmpty(usuarioId))
+                {
+                    _ = _interesesService.RegistrarInteraccionAsync(usuarioId, id, TipoInteraccion.Like);
+                }
+
                 // Notificar en segundo plano (no bloquea la respuesta)
                 if (liked && contenido.UsuarioId != usuarioId)
                 {
@@ -1652,7 +1670,7 @@ namespace Lado.Controllers
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "🔔 Error en notificación de like");
+                            _logger.LogError(ex, "Error en notificacion de like");
                         }
                     });
                 }
@@ -1672,7 +1690,7 @@ namespace Lado.Controllers
         }
 
         // ========================================
-        // MÉTODO AUXILIAR - VERIFICAR ACCESO
+        // METODO AUXILIAR - VERIFICAR ACCESO
         // ========================================
 
         private async Task<bool> VerificarAccesoContenido(string usuarioId, Contenido contenido)

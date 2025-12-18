@@ -49,5 +49,23 @@ namespace Lado.Models
         public const string MONTO_MINIMO_RECARGA = "MontoMinimoRecarga";
         public const string MONTO_MAXIMO_RECARGA = "MontoMaximoRecarga";
         public const string COMISION_PLATAFORMA = "ComisionPlataforma";
+
+        // Configuración Regional
+        public const string ZONA_HORARIA = "ZonaHoraria";
+
+        // ========================================
+        // ALGORITMO "PARA TI" - Pesos (deben sumar 100)
+        // ========================================
+        public const string PARATI_PESO_ENGAGEMENT = "ParaTi_PesoEngagement";           // Default: 30
+        public const string PARATI_PESO_INTERESES = "ParaTi_PesoIntereses";             // Default: 25
+        public const string PARATI_PESO_CREADOR_FAVORITO = "ParaTi_PesoCreadorFavorito"; // Default: 20
+        public const string PARATI_PESO_TIPO_CONTENIDO = "ParaTi_PesoTipoContenido";    // Default: 10
+        public const string PARATI_PESO_RECENCIA = "ParaTi_PesoRecencia";               // Default: 15
+
+        // ========================================
+        // ALGORITMO "POR INTERESES" - Pesos (deben sumar 100)
+        // ========================================
+        public const string INTERESES_PESO_CATEGORIA = "Intereses_PesoCategoria";       // Default: 80
+        public const string INTERESES_PESO_DESCUBRIMIENTO = "Intereses_PesoDescubrimiento"; // Default: 20
     }
 }

@@ -23,10 +23,70 @@ namespace Lado.Services
     {
         private readonly ILogger<FeedAlgorithmService> _logger;
 
+        // Cache de pesos (se actualiza cada 5 minutos)
+        private static Dictionary<string, double> _pesosCache = new();
+        private static DateTime _ultimaActualizacionCache = DateTime.MinValue;
+        private static readonly TimeSpan _cacheDuration = TimeSpan.FromMinutes(5);
+
         public FeedAlgorithmService(ILogger<FeedAlgorithmService> logger)
         {
             _logger = logger;
         }
+
+        #region Configuración de Pesos
+        private async Task<Dictionary<string, double>> ObtenerPesosAsync(ApplicationDbContext context)
+        {
+            // Usar cache si es válido
+            if (_pesosCache.Any() && DateTime.Now - _ultimaActualizacionCache < _cacheDuration)
+            {
+                return _pesosCache;
+            }
+
+            // Valores por defecto
+            var pesosDefault = new Dictionary<string, double>
+            {
+                // Para Ti
+                { ConfiguracionPlataforma.PARATI_PESO_ENGAGEMENT, 30 },
+                { ConfiguracionPlataforma.PARATI_PESO_INTERESES, 25 },
+                { ConfiguracionPlataforma.PARATI_PESO_CREADOR_FAVORITO, 20 },
+                { ConfiguracionPlataforma.PARATI_PESO_TIPO_CONTENIDO, 10 },
+                { ConfiguracionPlataforma.PARATI_PESO_RECENCIA, 15 },
+                // Por Intereses
+                { ConfiguracionPlataforma.INTERESES_PESO_CATEGORIA, 80 },
+                { ConfiguracionPlataforma.INTERESES_PESO_DESCUBRIMIENTO, 20 }
+            };
+
+            try
+            {
+                // Obtener valores de la BD
+                var configuraciones = await context.ConfiguracionesPlataforma
+                    .Where(c => c.Categoria == "Algoritmos")
+                    .ToListAsync();
+
+                foreach (var config in configuraciones)
+                {
+                    if (pesosDefault.ContainsKey(config.Clave) && double.TryParse(config.Valor, out double valor))
+                    {
+                        pesosDefault[config.Clave] = valor;
+                    }
+                }
+
+                _pesosCache = pesosDefault;
+                _ultimaActualizacionCache = DateTime.Now;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error al obtener pesos de configuración, usando valores por defecto");
+            }
+
+            return pesosDefault;
+        }
+
+        private double ObtenerPeso(Dictionary<string, double> pesos, string clave)
+        {
+            return pesos.TryGetValue(clave, out double valor) ? valor / 100.0 : 0;
+        }
+        #endregion
 
         public async Task<List<Contenido>> AplicarAlgoritmoAsync(
             List<Contenido> contenidos,
@@ -44,6 +104,7 @@ namespace Lado.Services
                 "trending" => await AplicarTrendingAsync(contenidos, context),
                 "seguidos" => await AplicarSeguidosPrimeroAsync(contenidos, usuarioId, context),
                 "para_ti" => await AplicarParaTiAsync(contenidos, usuarioId, context),
+                "por_intereses" => await AplicarPorInteresesAsync(contenidos, usuarioId, context),
                 _ => AplicarCronologico(contenidos)
             };
         }
@@ -160,6 +221,9 @@ namespace Lado.Services
             string usuarioId,
             ApplicationDbContext context)
         {
+            // Obtener pesos configurables
+            var pesos = await ObtenerPesosAsync(context);
+
             // Obtener historial de interacciones del usuario
             var likesUsuario = await context.Likes
                 .Where(l => l.UsuarioId == usuarioId)
@@ -175,7 +239,7 @@ namespace Lado.Services
                 .Select(c => c.ContenidoId)
                 .ToListAsync();
 
-            // Creadores con los que más interactúa
+            // Creadores con los que mas interactua
             var contenidosInteractuados = likesUsuario.Union(comentariosUsuario).ToList();
             var creadoresInteractuados = await context.Contenidos
                 .Where(c => contenidosInteractuados.Contains(c.Id))
@@ -193,6 +257,11 @@ namespace Lado.Services
                 .OrderByDescending(x => x.Count)
                 .FirstOrDefaultAsync();
 
+            // Obtener intereses del usuario con sus pesos
+            var interesesUsuario = await context.InteresesUsuarios
+                .Where(i => i.UsuarioId == usuarioId && i.PesoInteres > 0.5m)
+                .ToDictionaryAsync(i => i.CategoriaInteresId, i => i.PesoInteres);
+
             var contenidoIds = contenidos.Select(c => c.Id).ToList();
             var reaccionesPorContenido = await context.Reacciones
                 .Where(r => contenidoIds.Contains(r.ContenidoId))
@@ -209,7 +278,9 @@ namespace Lado.Services
                         usuarioId,
                         creadoresInteractuados,
                         tipoPreferido?.Tipo,
-                        reaccionesPorContenido.GetValueOrDefault(c.Id, 0))
+                        reaccionesPorContenido.GetValueOrDefault(c.Id, 0),
+                        interesesUsuario,
+                        pesos)
                 })
                 .OrderByDescending(x => x.Score)
                 .Select(x => x.Contenido)
@@ -221,46 +292,173 @@ namespace Lado.Services
             string usuarioId,
             Dictionary<string, int> creadoresInteractuados,
             TipoContenido? tipoPreferido,
-            int totalReacciones)
+            int totalReacciones,
+            Dictionary<int, decimal> interesesUsuario,
+            Dictionary<string, double> pesos)
         {
             double score = 0;
 
-            // 1. Score base por engagement (40%)
+            // Obtener pesos configurados (divididos por 100 para convertir a decimales)
+            double pesoEngagement = ObtenerPeso(pesos, ConfiguracionPlataforma.PARATI_PESO_ENGAGEMENT);
+            double pesoIntereses = ObtenerPeso(pesos, ConfiguracionPlataforma.PARATI_PESO_INTERESES);
+            double pesoCreadorFavorito = ObtenerPeso(pesos, ConfiguracionPlataforma.PARATI_PESO_CREADOR_FAVORITO);
+            double pesoTipoContenido = ObtenerPeso(pesos, ConfiguracionPlataforma.PARATI_PESO_TIPO_CONTENIDO);
+            double pesoRecencia = ObtenerPeso(pesos, ConfiguracionPlataforma.PARATI_PESO_RECENCIA);
+
+            // 1. Score base por engagement
             double engagement =
                 (contenido.NumeroLikes * 1.0) +
                 (contenido.NumeroComentarios * 3.0) +
                 (totalReacciones * 1.5) +
                 (contenido.NumeroVistas * 0.1);
-            score += Math.Log(1 + engagement) * 10 * 0.4;
+            score += Math.Log(1 + engagement) * 10 * pesoEngagement;
 
-            // 2. Boost por creador favorito (30%)
+            // 2. Boost por creador favorito
             if (creadoresInteractuados.TryGetValue(contenido.UsuarioId, out int interacciones))
             {
-                score += Math.Min(interacciones * 5, 50) * 0.3;
+                score += Math.Min(interacciones * 5, 50) * pesoCreadorFavorito;
             }
 
-            // 3. Boost por tipo de contenido preferido (15%)
+            // 3. Boost por categoria de interes
+            if (contenido.CategoriaInteresId.HasValue && interesesUsuario.Count > 0)
+            {
+                if (interesesUsuario.TryGetValue(contenido.CategoriaInteresId.Value, out decimal pesoInteres))
+                {
+                    double boostInteres = (double)pesoInteres * 0.6;
+                    score += boostInteres * pesoIntereses;
+                }
+            }
+
+            // 4. Boost por tipo de contenido preferido
             if (tipoPreferido.HasValue && contenido.TipoContenido == tipoPreferido.Value)
             {
-                score += 30 * 0.15;
+                score += 30 * pesoTipoContenido;
             }
 
-            // 4. Recency boost (15%)
+            // 5. Recency boost
             var horasDesdePublicacion = (DateTime.Now - contenido.FechaPublicacion).TotalHours;
             if (horasDesdePublicacion < 6)
-                score += 50 * 0.15;
+                score += 50 * pesoRecencia;
             else if (horasDesdePublicacion < 24)
-                score += 25 * 0.15;
+                score += 25 * pesoRecencia;
             else if (horasDesdePublicacion < 72)
-                score += 10 * 0.15;
+                score += 10 * pesoRecencia;
 
-            // 5. Boost por contenido propio
+            // 6. Boost por contenido propio (fijo)
             if (contenido.UsuarioId == usuarioId)
                 score += 20;
 
-            // 6. Boost por contenido premium
+            // 7. Boost por contenido premium (fijo)
             if (contenido.TipoLado == TipoLado.LadoB)
                 score += 15;
+
+            return score;
+        }
+        #endregion
+
+        #region Algoritmo Por Intereses
+        private async Task<List<Contenido>> AplicarPorInteresesAsync(
+            List<Contenido> contenidos,
+            string usuarioId,
+            ApplicationDbContext context)
+        {
+            // Obtener pesos configurables
+            var pesos = await ObtenerPesosAsync(context);
+            int pesoCategoria = (int)pesos.GetValueOrDefault(ConfiguracionPlataforma.INTERESES_PESO_CATEGORIA, 80);
+
+            // Obtener intereses del usuario ordenados por peso
+            var interesesUsuario = await context.InteresesUsuarios
+                .Where(i => i.UsuarioId == usuarioId && i.PesoInteres > 0.5m)
+                .OrderByDescending(i => i.PesoInteres)
+                .ToDictionaryAsync(i => i.CategoriaInteresId, i => i.PesoInteres);
+
+            if (!interesesUsuario.Any())
+            {
+                // Si no tiene intereses, usar trending como fallback
+                _logger.LogInformation("Usuario {UsuarioId} sin intereses, usando trending como fallback", usuarioId);
+                return await AplicarTrendingAsync(contenidos, context);
+            }
+
+            var contenidoIds = contenidos.Select(c => c.Id).ToList();
+            var reaccionesPorContenido = await context.Reacciones
+                .Where(r => contenidoIds.Contains(r.ContenidoId))
+                .GroupBy(r => r.ContenidoId)
+                .Select(g => new { ContenidoId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.ContenidoId, x => x.Count);
+
+            // Separar contenido por si tiene categoria de interes o no
+            var contenidoConCategoria = contenidos
+                .Where(c => c.CategoriaInteresId.HasValue && interesesUsuario.ContainsKey(c.CategoriaInteresId.Value))
+                .Select(c => new
+                {
+                    Contenido = c,
+                    Score = CalcularScorePorIntereses(c, interesesUsuario, reaccionesPorContenido.GetValueOrDefault(c.Id, 0))
+                })
+                .OrderByDescending(x => x.Score)
+                .Select(x => x.Contenido)
+                .ToList();
+
+            var contenidoSinCategoria = contenidos
+                .Where(c => !c.CategoriaInteresId.HasValue || !interesesUsuario.ContainsKey(c.CategoriaInteresId.Value))
+                .OrderByDescending(c => c.NumeroLikes + c.NumeroComentarios * 2)
+                .ToList();
+
+            // Usar peso configurable: pesoCategoria% contenido de intereses, resto descubrimiento
+            var resultado = new List<Contenido>();
+            int indexIntereses = 0;
+            int indexDescubrimiento = 0;
+
+            for (int i = 0; i < contenidos.Count; i++)
+            {
+                // Calcular dinamicamente: si pesoCategoria=80, entonces 8 de cada 10 son de intereses
+                bool usarIntereses = (i % 10) < (pesoCategoria / 10);
+
+                if (usarIntereses && indexIntereses < contenidoConCategoria.Count)
+                {
+                    resultado.Add(contenidoConCategoria[indexIntereses++]);
+                }
+                else if (indexDescubrimiento < contenidoSinCategoria.Count)
+                {
+                    resultado.Add(contenidoSinCategoria[indexDescubrimiento++]);
+                }
+                else if (indexIntereses < contenidoConCategoria.Count)
+                {
+                    resultado.Add(contenidoConCategoria[indexIntereses++]);
+                }
+            }
+
+            return resultado;
+        }
+
+        private double CalcularScorePorIntereses(
+            Contenido contenido,
+            Dictionary<int, decimal> interesesUsuario,
+            int totalReacciones)
+        {
+            double score = 0;
+
+            // 1. Score por peso del interes (50%)
+            if (contenido.CategoriaInteresId.HasValue &&
+                interesesUsuario.TryGetValue(contenido.CategoriaInteresId.Value, out decimal pesoInteres))
+            {
+                score += (double)pesoInteres * 0.5;
+            }
+
+            // 2. Score por engagement (30%)
+            double engagement =
+                (contenido.NumeroLikes * 1.0) +
+                (contenido.NumeroComentarios * 2.0) +
+                (totalReacciones * 1.0);
+            score += Math.Log(1 + engagement) * 5 * 0.3;
+
+            // 3. Recency boost (20%)
+            var horasDesdePublicacion = (DateTime.Now - contenido.FechaPublicacion).TotalHours;
+            if (horasDesdePublicacion < 12)
+                score += 30 * 0.2;
+            else if (horasDesdePublicacion < 48)
+                score += 15 * 0.2;
+            else if (horasDesdePublicacion < 168) // 1 semana
+                score += 5 * 0.2;
 
             return score;
         }
@@ -340,6 +538,18 @@ namespace Lado.Services
                     Activo = true,
                     EsPorDefecto = false,
                     Orden = 4,
+                    TotalUsos = 0,
+                    FechaCreacion = DateTime.Now
+                },
+                new AlgoritmoFeed
+                {
+                    Codigo = "por_intereses",
+                    Nombre = "Por Intereses",
+                    Descripcion = "Prioriza contenido basado en tus intereses seleccionados y aprendidos",
+                    Icono = "star",
+                    Activo = true,
+                    EsPorDefecto = false,
+                    Orden = 5,
                     TotalUsos = 0,
                     FechaCreacion = DateTime.Now
                 }

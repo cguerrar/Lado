@@ -117,15 +117,17 @@ namespace Lado.Controllers
 
                 if (result.Succeeded)
                 {
-                    _logger.LogInformation("✅ Usuario creado exitosamente: {Username}", usuario.UserName);
+                    _logger.LogInformation("Usuario creado exitosamente: {Username}", usuario.UserName);
 
-                    // Iniciar sesión automáticamente
+                    // Iniciar sesion automaticamente
                     await _signInManager.SignInAsync(usuario, isPersistent: false);
 
-                    _logger.LogInformation("✅ Sesión iniciada para: {Username}", usuario.UserName);
+                    _logger.LogInformation("Sesion iniciada para: {Username}", usuario.UserName);
 
-                    TempData["Success"] = "¡Bienvenido a LADO! Tu cuenta ha sido creada exitosamente.";
-                    return RedirectToAction("Index", "Feed");
+                    TempData["Success"] = "Bienvenido a LADO! Tu cuenta ha sido creada exitosamente.";
+
+                    // Redirigir al onboarding de intereses
+                    return RedirectToAction("SeleccionarIntereses", "Usuario");
                 }
 
                 // Si hay errores, mostrarlos

@@ -18,6 +18,7 @@ namespace Lado.Controllers
         private readonly ILogger<ContenidoController> _logger;
         private readonly INotificationService _notificationService;
         private readonly IImageService _imageService;
+        private readonly IClaudeClassificationService _classificationService;
 
         public ContenidoController(
             ApplicationDbContext context,
@@ -25,7 +26,8 @@ namespace Lado.Controllers
             IWebHostEnvironment environment,
             ILogger<ContenidoController> logger,
             INotificationService notificationService,
-            IImageService imageService)
+            IImageService imageService,
+            IClaudeClassificationService classificationService)
         {
             _context = context;
             _userManager = userManager;
@@ -33,6 +35,7 @@ namespace Lado.Controllers
             _logger = logger;
             _notificationService = notificationService;
             _imageService = imageService;
+            _classificationService = classificationService;
         }
 
         // ========================================
@@ -266,11 +269,71 @@ namespace Lado.Controllers
                     }
                 }
 
+                // Clasificar contenido automaticamente con Claude AI
+                try
+                {
+                    byte[]? imagenBytes = null;
+                    string? mimeType = null;
+
+                    // Leer el archivo guardado para clasificacion
+                    if (!string.IsNullOrEmpty(contenido.RutaArchivo))
+                    {
+                        var extension = Path.GetExtension(contenido.RutaArchivo).ToLower();
+                        var tiposImagen = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+
+                        if (tiposImagen.Contains(extension))
+                        {
+                            var rutaCompleta = Path.Combine(_environment.WebRootPath, contenido.RutaArchivo.TrimStart('/'));
+                            if (System.IO.File.Exists(rutaCompleta))
+                            {
+                                var fileInfo = new FileInfo(rutaCompleta);
+                                if (fileInfo.Length < 5 * 1024 * 1024) // Max 5MB para clasificacion
+                                {
+                                    imagenBytes = await System.IO.File.ReadAllBytesAsync(rutaCompleta);
+                                    mimeType = extension switch
+                                    {
+                                        ".jpg" or ".jpeg" => "image/jpeg",
+                                        ".png" => "image/png",
+                                        ".gif" => "image/gif",
+                                        ".webp" => "image/webp",
+                                        _ => "image/jpeg"
+                                    };
+                                }
+                            }
+                        }
+                    }
+
+                    var resultado = await _classificationService.ClasificarContenidoDetalladoAsync(
+                        imagenBytes, Descripcion, mimeType);
+
+                    if (resultado.Exito && resultado.CategoriaId.HasValue)
+                    {
+                        contenido.CategoriaInteresId = resultado.CategoriaId.Value;
+                        if (resultado.CategoriaCreada)
+                        {
+                            _logger.LogInformation("Nueva categoria creada por IA: {Nombre} (ID: {Id})",
+                                resultado.CategoriaNombre, resultado.CategoriaId.Value);
+                        }
+                        else
+                        {
+                            _logger.LogInformation("Contenido clasificado en categoria {CategoriaId}", resultado.CategoriaId.Value);
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(resultado.Error))
+                    {
+                        _logger.LogWarning("No se pudo clasificar: {Error} - {Detalle}", resultado.Error, resultado.DetalleError);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error al clasificar contenido, continuando sin categoria");
+                }
+
                 _context.Contenidos.Add(contenido);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("✅ Contenido guardado - ID: {Id}, TipoLado: {TipoLado}, NombreMostrado: {Nombre}, Precio: {Precio}",
-                    contenido.Id, contenido.TipoLado, contenido.NombreMostrado, contenido.PrecioDesbloqueo);
+                _logger.LogInformation("Contenido guardado - ID: {Id}, TipoLado: {TipoLado}, CategoriaId: {CategoriaId}",
+                    contenido.Id, contenido.TipoLado, contenido.CategoriaInteresId);
 
                 // ✅ Mensajes de éxito personalizados
                 if (EsBorrador)
@@ -489,9 +552,70 @@ namespace Lado.Controllers
                 }
                 // Si solo hay videos, dejar Thumbnail null para que la vista use el tag <video>
 
+                // Clasificar contenido automaticamente con Claude AI
+                try
+                {
+                    byte[]? imagenBytes = null;
+                    string? mimeType = null;
+
+                    // Usar la primera imagen para clasificacion
+                    if (primeraImagen != null && !string.IsNullOrEmpty(primeraImagen.RutaArchivo))
+                    {
+                        var extension = Path.GetExtension(primeraImagen.RutaArchivo).ToLower();
+                        var tiposImagen = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+
+                        if (tiposImagen.Contains(extension))
+                        {
+                            var rutaCompleta = Path.Combine(_environment.WebRootPath, primeraImagen.RutaArchivo.TrimStart('/'));
+                            if (System.IO.File.Exists(rutaCompleta))
+                            {
+                                var fileInfo = new FileInfo(rutaCompleta);
+                                if (fileInfo.Length < 5 * 1024 * 1024)
+                                {
+                                    imagenBytes = await System.IO.File.ReadAllBytesAsync(rutaCompleta);
+                                    mimeType = extension switch
+                                    {
+                                        ".jpg" or ".jpeg" => "image/jpeg",
+                                        ".png" => "image/png",
+                                        ".gif" => "image/gif",
+                                        ".webp" => "image/webp",
+                                        _ => "image/jpeg"
+                                    };
+                                }
+                            }
+                        }
+                    }
+
+                    var resultado = await _classificationService.ClasificarContenidoDetalladoAsync(
+                        imagenBytes, Descripcion, mimeType);
+
+                    if (resultado.Exito && resultado.CategoriaId.HasValue)
+                    {
+                        contenido.CategoriaInteresId = resultado.CategoriaId.Value;
+                        if (resultado.CategoriaCreada)
+                        {
+                            _logger.LogInformation("Carrusel: Nueva categoria creada por IA: {Nombre} (ID: {Id})",
+                                resultado.CategoriaNombre, resultado.CategoriaId.Value);
+                        }
+                        else
+                        {
+                            _logger.LogInformation("Carrusel clasificado en categoria {CategoriaId}", resultado.CategoriaId.Value);
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(resultado.Error))
+                    {
+                        _logger.LogWarning("Carrusel no clasificado: {Error} - {Detalle}", resultado.Error, resultado.DetalleError);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error al clasificar carrusel, continuando sin categoria");
+                }
+
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("✅ Carrusel creado - ID: {Id}, Archivos: {Count}", contenido.Id, archivosGuardados.Count);
+                _logger.LogInformation("Carrusel creado - ID: {Id}, Archivos: {Count}, CategoriaId: {CategoriaId}",
+                    contenido.Id, archivosGuardados.Count, contenido.CategoriaInteresId);
 
                 // Notificar a seguidores
                 if (!EsBorrador)
@@ -665,15 +789,64 @@ namespace Lado.Controllers
                     if (pista != null)
                     {
                         pista.ContadorUsos++;
-                        _logger.LogInformation("Música agregada: {Titulo} - {Artista}", pista.Titulo, pista.Artista);
+                        _logger.LogInformation("Musica agregada: {Titulo} - {Artista}", pista.Titulo, pista.Artista);
                     }
+                }
+
+                // Clasificar contenido automaticamente con Claude AI
+                try
+                {
+                    byte[]? imagenBytes = null;
+                    string? mimeType = null;
+
+                    if (tipoContenido == TipoContenido.Foto && System.IO.File.Exists(filePath))
+                    {
+                        var fileInfo = new FileInfo(filePath);
+                        if (fileInfo.Length < 5 * 1024 * 1024)
+                        {
+                            imagenBytes = await System.IO.File.ReadAllBytesAsync(filePath);
+                            mimeType = extension switch
+                            {
+                                ".jpg" or ".jpeg" => "image/jpeg",
+                                ".png" => "image/png",
+                                ".gif" => "image/gif",
+                                ".webp" => "image/webp",
+                                _ => "image/jpeg"
+                            };
+                        }
+                    }
+
+                    var resultado = await _classificationService.ClasificarContenidoDetalladoAsync(
+                        imagenBytes, descripcion, mimeType);
+
+                    if (resultado.Exito && resultado.CategoriaId.HasValue)
+                    {
+                        contenido.CategoriaInteresId = resultado.CategoriaId.Value;
+                        if (resultado.CategoriaCreada)
+                        {
+                            _logger.LogInformation("Reel: Nueva categoria creada por IA: {Nombre} (ID: {Id})",
+                                resultado.CategoriaNombre, resultado.CategoriaId.Value);
+                        }
+                        else
+                        {
+                            _logger.LogInformation("Reel clasificado en categoria {CategoriaId}", resultado.CategoriaId.Value);
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(resultado.Error))
+                    {
+                        _logger.LogWarning("Reel no clasificado: {Error} - {Detalle}", resultado.Error, resultado.DetalleError);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error al clasificar reel, continuando sin categoria");
                 }
 
                 _context.Contenidos.Add(contenido);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("✅ Contenido creado desde Reels - ID: {Id}, Ruta: {Ruta}",
-                    contenido.Id, rutaArchivo);
+                _logger.LogInformation("Contenido creado desde Reels - ID: {Id}, CategoriaId: {CategoriaId}",
+                    contenido.Id, contenido.CategoriaInteresId);
 
                 // Notificar a seguidores sobre el nuevo contenido
                 _ = _notificationService.NotificarNuevoContenidoAsync(

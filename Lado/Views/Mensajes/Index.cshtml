@@ -1,8 +1,10 @@
 @model Lado.Models.ApplicationUser
 @using Lado.Controllers
+@inject Lado.Services.IDateTimeService DateTimeService
 @{
     ViewData["Title"] = "Mensajes";
     var conversaciones = ViewBag.Conversaciones as List<ConversacionViewModel>;
+    var localNow = DateTimeService.GetLocalNow();
 }
 
 <style>
@@ -403,6 +405,170 @@
         color: white;
     }
 
+    /* Menú de opciones de conversación */
+    .conversacion-item-wrapper {
+        position: relative;
+        display: flex;
+        align-items: stretch;
+    }
+
+    .conversacion-item-wrapper .conversacion-item {
+        flex: 1;
+    }
+
+    .conv-options-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.2s;
+        flex-shrink: 0;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+
+    .conv-options-btn:hover {
+        color: var(--primary);
+        background: var(--bg-light);
+    }
+
+    .conv-options-btn:active {
+        background: var(--border);
+    }
+
+    .conv-options-dropdown {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        z-index: 100;
+        min-width: 180px;
+        overflow: hidden;
+        display: none;
+    }
+
+    .conv-options-dropdown.show {
+        display: block;
+    }
+
+    .conv-option-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        font-size: 0.9rem;
+        color: var(--text-dark);
+        cursor: pointer;
+        transition: background 0.15s;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+    }
+
+    .conv-option-item:hover {
+        background: var(--bg-light);
+    }
+
+    .conv-option-item.danger {
+        color: #dc2626;
+    }
+
+    .conv-option-item.danger:hover {
+        background: #fef2f2;
+    }
+
+    /* Modal de confirmación */
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 20px;
+    }
+
+    .modal-overlay.show {
+        display: flex;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 400px;
+        width: 100%;
+        text-align: center;
+    }
+
+    .modal-icon {
+        width: 60px;
+        height: 60px;
+        background: #fef2f2;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 16px;
+        color: #dc2626;
+    }
+
+    .modal-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin-bottom: 8px;
+    }
+
+    .modal-text {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-bottom: 24px;
+    }
+
+    .modal-buttons {
+        display: flex;
+        gap: 12px;
+    }
+
+    .modal-btn {
+        flex: 1;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+    }
+
+    .modal-btn-cancel {
+        background: var(--bg-light);
+        color: var(--text-dark);
+    }
+
+    .modal-btn-cancel:hover {
+        background: var(--border);
+    }
+
+    .modal-btn-danger {
+        background: #dc2626;
+        color: white;
+    }
+
+    .modal-btn-danger:hover {
+        background: #b91c1c;
+    }
+
     /* Responsive */
     @@media (max-width: 640px) {
         .mensajes-container {
@@ -475,86 +641,97 @@
                 @foreach (var conv in conversaciones)
                 {
                     <li data-nombre="@conv.Contacto.NombreCompleto?.ToLower()" data-username="@conv.Contacto.UserName?.ToLower()">
-                        <a href="/Mensajes/Chat/@conv.Contacto.Id" class="conversacion-item @(conv.MensajesNoLeidos > 0 ? "no-leido" : "")">
-                            <div class="avatar-container">
-                                @if (!string.IsNullOrEmpty(conv.Contacto.FotoPerfil))
-                                {
-                                    <img src="@conv.Contacto.FotoPerfil" alt="" class="avatar">
-                                }
-                                else
-                                {
-                                    <div class="avatar-placeholder">
-                                        @conv.Contacto.NombreCompleto?.Substring(0, 1).ToUpper()
-                                    </div>
-                                }
-                                @if (conv.MensajesNoLeidos > 0)
-                                {
-                                    <span class="unread-badge">@(conv.MensajesNoLeidos > 9 ? "9+" : conv.MensajesNoLeidos.ToString())</span>
-                                }
-                            </div>
+                        <div class="conversacion-item-wrapper">
+                            <a href="/Mensajes/Chat/@conv.Contacto.Id" class="conversacion-item @(conv.MensajesNoLeidos > 0 ? "no-leido" : "")">
+                                <div class="avatar-container">
+                                    @if (!string.IsNullOrEmpty(conv.Contacto.FotoPerfil))
+                                    {
+                                        <img src="@conv.Contacto.FotoPerfil" alt="" class="avatar">
+                                    }
+                                    else
+                                    {
+                                        <div class="avatar-placeholder">
+                                            @conv.Contacto.NombreCompleto?.Substring(0, 1).ToUpper()
+                                        </div>
+                                    }
+                                    @if (conv.MensajesNoLeidos > 0)
+                                    {
+                                        <span class="unread-badge">@(conv.MensajesNoLeidos > 9 ? "9+" : conv.MensajesNoLeidos.ToString())</span>
+                                    }
+                                </div>
 
-                            <div class="conversacion-info">
-                                <div class="conversacion-header">
-                                    <span class="conversacion-nombre">
-                                        @conv.Contacto.NombreCompleto
-                                        @if (conv.Contacto.EsVerificado)
+                                <div class="conversacion-info">
+                                    <div class="conversacion-header">
+                                        <span class="conversacion-nombre">
+                                            @conv.Contacto.NombreCompleto
+                                            @if (conv.Contacto.EsVerificado)
+                                            {
+                                                <svg class="verificado-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                                </svg>
+                                            }
+                                        </span>
+                                        @if (conv.UltimoMensaje != null)
                                         {
-                                            <svg class="verificado-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                                            </svg>
+                                            var fechaLocal = DateTimeService.ConvertToLocal(conv.UltimoMensaje.FechaEnvio);
+                                            <span class="conversacion-fecha">
+                                                @if (fechaLocal.Date == localNow.Date)
+                                                {
+                                                    @fechaLocal.ToString("HH:mm")
+                                                }
+                                                else if (fechaLocal.Date == localNow.Date.AddDays(-1))
+                                                {
+                                                    <text>Ayer</text>
+                                                }
+                                                else if (fechaLocal.Date > localNow.Date.AddDays(-7))
+                                                {
+                                                    @fechaLocal.ToString("ddd", new System.Globalization.CultureInfo("es-ES"))
+                                                }
+                                                else
+                                                {
+                                                    @fechaLocal.ToString("dd/MM")
+                                                }
+                                            </span>
                                         }
-                                    </span>
+                                    </div>
                                     @if (conv.UltimoMensaje != null)
                                     {
-                                        <span class="conversacion-fecha">
-                                            @if (conv.UltimoMensaje.FechaEnvio.Date == DateTime.Today)
+                                        <p class="conversacion-preview">
+                                            @if (conv.UltimoMensaje.RemitenteId == Model.Id)
                                             {
-                                                @conv.UltimoMensaje.FechaEnvio.ToString("HH:mm")
+                                                <span>Tu: </span>
                                             }
-                                            else if (conv.UltimoMensaje.FechaEnvio.Date == DateTime.Today.AddDays(-1))
+                                            @if (conv.UltimoMensaje.TipoMensaje == Lado.Models.TipoMensaje.Imagen)
                                             {
-                                                <text>Ayer</text>
+                                                <svg class="preview-media-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>
+                                                </svg>
+                                                <span>Foto</span>
                                             }
-                                            else if (conv.UltimoMensaje.FechaEnvio.Date > DateTime.Today.AddDays(-7))
+                                            else if (conv.UltimoMensaje.TipoMensaje == Lado.Models.TipoMensaje.Video)
                                             {
-                                                @conv.UltimoMensaje.FechaEnvio.ToString("ddd", new System.Globalization.CultureInfo("es-ES"))
+                                                <svg class="preview-media-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <polygon points="5 3 19 12 5 21 5 3"/>
+                                                </svg>
+                                                <span>Video</span>
                                             }
                                             else
                                             {
-                                                @conv.UltimoMensaje.FechaEnvio.ToString("dd/MM")
+                                                <span>@conv.UltimoMensaje.Contenido</span>
                                             }
-                                        </span>
+                                        </p>
                                     }
                                 </div>
-                                @if (conv.UltimoMensaje != null)
-                                {
-                                    <p class="conversacion-preview">
-                                        @if (conv.UltimoMensaje.RemitenteId == Model.Id)
-                                        {
-                                            <span>Tu: </span>
-                                        }
-                                        @if (conv.UltimoMensaje.TipoMensaje == Lado.Models.TipoMensaje.Imagen)
-                                        {
-                                            <svg class="preview-media-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>
-                                            </svg>
-                                            <span>Foto</span>
-                                        }
-                                        else if (conv.UltimoMensaje.TipoMensaje == Lado.Models.TipoMensaje.Video)
-                                        {
-                                            <svg class="preview-media-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polygon points="5 3 19 12 5 21 5 3"/>
-                                            </svg>
-                                            <span>Video</span>
-                                        }
-                                        else
-                                        {
-                                            <span>@conv.UltimoMensaje.Contenido</span>
-                                        }
-                                    </p>
-                                }
-                            </div>
-                        </a>
+                            </a>
+                            <!-- Botón de opciones -->
+                            <button class="conv-options-btn" onclick="toggleConvOptions(event, '@conv.Contacto.Id', '@(conv.Contacto.NombreCompleto?.Replace("'", "\\'"))')">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="1"></circle>
+                                    <circle cx="12" cy="5" r="1"></circle>
+                                    <circle cx="12" cy="19" r="1"></circle>
+                                </svg>
+                            </button>
+                        </div>
                     </li>
                 }
             </ul>
@@ -579,6 +756,41 @@
             </div>
         }
     </div>
+</div>
+
+<!-- Modal de confirmación para eliminar -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal-content">
+        <div class="modal-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+            </svg>
+        </div>
+        <h3 class="modal-title">¿Eliminar conversación?</h3>
+        <p class="modal-text">Se eliminarán todos los mensajes con <strong id="deleteContactName"></strong>. Esta acción no se puede deshacer.</p>
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-cancel" onclick="cerrarModalEliminar()">Cancelar</button>
+            <form id="deleteForm" method="post" action="/Mensajes/EliminarConversacion" style="flex: 1;">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="contactoId" id="deleteContactId">
+                <button type="submit" class="modal-btn modal-btn-danger" style="width: 100%;">Eliminar</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Dropdown de opciones (se mueve dinámicamente) -->
+<div class="conv-options-dropdown" id="convOptionsDropdown">
+    <button class="conv-option-item danger" onclick="confirmarEliminarConversacion()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18"></path>
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+        </svg>
+        Eliminar conversación
+    </button>
 </div>
 
 <script>
@@ -696,4 +908,84 @@
     if (userId) {
         window.location.href = '/Mensajes/Chat/' + userId;
     }
+
+    // ========================================
+    // FUNCIONES PARA ELIMINAR CONVERSACIÓN
+    // ========================================
+    let currentContactId = null;
+    let currentContactName = null;
+    const convOptionsDropdown = document.getElementById('convOptionsDropdown');
+    const deleteModal = document.getElementById('deleteModal');
+
+    function toggleConvOptions(event, contactId, contactName) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        currentContactId = contactId;
+        currentContactName = contactName;
+
+        // Cerrar si ya está abierto en el mismo botón
+        if (convOptionsDropdown.classList.contains('show') && convOptionsDropdown.dataset.contactId === contactId) {
+            convOptionsDropdown.classList.remove('show');
+            return;
+        }
+
+        // Posicionar dropdown cerca del botón
+        const btn = event.currentTarget;
+        const rect = btn.getBoundingClientRect();
+        const wrapper = btn.closest('.conversacion-item-wrapper');
+
+        // Posicionar el dropdown
+        convOptionsDropdown.style.position = 'fixed';
+        convOptionsDropdown.style.top = rect.top + 'px';
+        convOptionsDropdown.style.right = (window.innerWidth - rect.right + 10) + 'px';
+        convOptionsDropdown.style.transform = 'none';
+        convOptionsDropdown.dataset.contactId = contactId;
+        convOptionsDropdown.classList.add('show');
+    }
+
+    function confirmarEliminarConversacion() {
+        convOptionsDropdown.classList.remove('show');
+
+        if (!currentContactId) return;
+
+        document.getElementById('deleteContactId').value = currentContactId;
+        document.getElementById('deleteContactName').textContent = currentContactName || 'este contacto';
+        deleteModal.classList.add('show');
+    }
+
+    function cerrarModalEliminar() {
+        deleteModal.classList.remove('show');
+        currentContactId = null;
+        currentContactName = null;
+    }
+
+    // Cerrar dropdown y modal al hacer click fuera
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.conv-options-btn') && !e.target.closest('.conv-options-dropdown')) {
+            convOptionsDropdown.classList.remove('show');
+        }
+        if (e.target.classList.contains('modal-overlay')) {
+            cerrarModalEliminar();
+        }
+    });
+
+    // Cerrar con Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            convOptionsDropdown.classList.remove('show');
+            cerrarModalEliminar();
+        }
+    });
+
+    // Fix para touch en iOS/Android
+    document.querySelectorAll('.conv-options-btn').forEach(btn => {
+        btn.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            const contactId = this.getAttribute('onclick').match(/'([^']+)'/g);
+            if (contactId && contactId.length >= 2) {
+                toggleConvOptions(e, contactId[0].replace(/'/g, ''), contactId[1].replace(/'/g, ''));
+            }
+        }, { passive: false });
+    });
 </script>
