@@ -2,6 +2,8 @@
 @{
     ViewData["Title"] = "Nueva Publicación";
     var usuarioVerificado = ViewBag.UsuarioVerificado ?? false;
+    var ladoPreferido = ViewBag.LadoPreferido ?? Lado.Models.TipoLado.LadoA;
+    var ladoPreferidoEsB = ladoPreferido == Lado.Models.TipoLado.LadoB && usuarioVerificado;
 }
 
 <div class="crear-container">
@@ -25,7 +27,7 @@
                 <label class="section-label">¿Dónde quieres publicar?</label>
                 <div class="lado-selector">
                     <!-- LADO A - GRATIS CON NOMBRE REAL -->
-                    <div class="lado-option active" data-lado="ladoa" data-esgratis="true">
+                    <div class="lado-option @(ladoPreferidoEsB ? "" : "active")" data-lado="ladoa" data-esgratis="true">
                         <div class="lado-badge ladoa">A</div>
                         <div class="lado-info">
                             <h3>LadoA · Público</h3>
@@ -41,7 +43,7 @@
                     <!-- LADO B - CON SEUDÓNIMO (solo visible si verificado) -->
                     @if (usuarioVerificado)
                     {
-                        <div class="lado-option" data-lado="ladob" data-esgratis="false">
+                        <div class="lado-option @(ladoPreferidoEsB ? "active" : "")" data-lado="ladob" data-esgratis="false">
                             <div class="lado-badge ladob">B</div>
                             <div class="lado-info">
                                 <h3>LadoB · Con seudónimo</h3>
@@ -58,10 +60,10 @@
             </div>
 
             <!-- Input hidden para EsGratis -->
-            <input type="hidden" name="EsGratis" id="esGratisInput" value="true" />
+            <input type="hidden" name="EsGratis" id="esGratisInput" value="@(ladoPreferidoEsB ? "false" : "true")" />
 
             <!-- Opcion Feed Publico (solo para LadoA) -->
-            <div class="form-section" id="feedPublicoSection">
+            <div class="form-section" id="feedPublicoSection" style="@(ladoPreferidoEsB ? "display: none;" : "")">
                 <div class="publico-card">
                     <div class="publico-toggle">
                         <label class="toggle-container">
@@ -118,25 +120,49 @@
                 <input type="hidden" name="TipoContenido" id="tipoContenidoInput" value="1" />
             </div>
 
-            <!-- Subir Archivo -->
+            <!-- Subir Archivo(s) -->
             <div class="form-section" id="archivoSection">
                 <label class="section-label">
-                    Subir archivo
+                    Subir archivos
                     <span class="required">*</span>
+                    <span class="upload-badge">Hasta 10 archivos</span>
                 </label>
                 <div class="upload-zone" id="uploadArea">
                     <div class="upload-content">
                         <svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor" class="upload-icon">
                             <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z" />
                         </svg>
-                        <h3>Arrastra tu archivo aquí</h3>
-                        <p>o haz clic para seleccionar</p>
-                        <span class="upload-hint">Máximo 100 MB</span>
+                        <h3>Arrastra, pega o haz clic</h3>
+                        <p>Ctrl+V para pegar desde el portapapeles</p>
+                        <span class="upload-hint">Maximo 100 MB por archivo · Hasta 10 archivos</span>
                     </div>
-                    <input type="file" name="archivo" id="archivoInput" class="file-input" accept="image/*,video/*" required>
+                    <input type="file" name="archivos" id="archivoInput" class="file-input" accept="image/*,video/*,.heic,.heif,.mov" multiple>
                 </div>
 
-                <div id="previewArea" class="preview-area">
+                <!-- Preview Grid para múltiples archivos -->
+                <div id="previewGrid" class="preview-grid" style="display: none;">
+                    <div class="preview-header">
+                        <span id="fileCount">0 archivos seleccionados</span>
+                        <button type="button" class="btn-clear-all" id="clearAllBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                            </svg>
+                            Limpiar todo
+                        </button>
+                    </div>
+                    <div class="preview-items" id="previewItems">
+                        <!-- Items de preview se agregan dinámicamente -->
+                    </div>
+                    <button type="button" class="btn-add-more" id="addMoreBtn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
+                        </svg>
+                        Agregar más
+                    </button>
+                </div>
+
+                <!-- Preview single (compatibilidad) -->
+                <div id="previewArea" class="preview-area" style="display: none;">
                     <div class="preview-container">
                         <img id="imagePreview" class="preview-media" alt="Preview">
                         <video id="videoPreview" class="preview-media" controls></video>
@@ -160,7 +186,7 @@
             </div>
 
             <!-- Configuración Premium (solo para LadoB) -->
-            <div class="form-section" id="precioSectionWrapper" style="display: none;">
+            <div class="form-section" id="precioSectionWrapper" style="@(ladoPreferidoEsB ? "display: block;" : "display: none;")">
                 <div class="premium-card">
                     @if (!usuarioVerificado)
                     {
@@ -1072,12 +1098,201 @@
             flex-direction: column;
         }
     }
+
+    /* ========================================
+       ESTILOS PARA MÚLTIPLES ARCHIVOS (CARRUSEL)
+       ======================================== */
+
+    .upload-badge {
+        display: inline-block;
+        background: #4682B4;
+        color: white;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: 4px;
+        margin-left: 8px;
+        vertical-align: middle;
+    }
+
+    .preview-grid {
+        margin-top: 20px;
+        background: #F9FAFB;
+        border-radius: 12px;
+        padding: 16px;
+    }
+
+    .preview-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+
+    #fileCount {
+        font-size: 14px;
+        font-weight: 600;
+        color: #4682B4;
+    }
+
+    .btn-clear-all {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: #EF4444;
+        color: white;
+        border: none;
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-clear-all:hover {
+        background: #DC2626;
+    }
+
+    .preview-items {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .preview-item {
+        position: relative;
+        aspect-ratio: 1;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #E5E7EB;
+        border: 2px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .preview-item:hover {
+        border-color: #4682B4;
+    }
+
+    .preview-item img,
+    .preview-item video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .preview-item .order-badge {
+        position: absolute;
+        top: 6px;
+        left: 6px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 4px;
+    }
+
+    .preview-item .type-badge {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        background: rgba(70, 130, 180, 0.9);
+        color: white;
+        padding: 4px;
+        border-radius: 4px;
+    }
+
+    .preview-item .remove-item {
+        position: absolute;
+        bottom: 6px;
+        right: 6px;
+        width: 28px;
+        height: 28px;
+        background: rgba(239, 68, 68, 0.9);
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: all 0.2s;
+    }
+
+    .preview-item:hover .remove-item {
+        opacity: 1;
+    }
+
+    .preview-item .remove-item:hover {
+        background: #DC2626;
+        transform: scale(1.1);
+    }
+
+    .preview-item .remove-item svg {
+        fill: white;
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Fallback para archivos que no se pueden previsualizar (HEIC en iOS) */
+    .preview-fallback {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #4682B4 0%, #36648B 100%);
+        color: white;
+    }
+
+    .preview-fallback svg {
+        width: 40px;
+        height: 40px;
+        opacity: 0.8;
+    }
+
+    /* Asegurar que el botón eliminar sea visible en móvil (iOS) */
+    @@media (max-width: 768px) {
+        .preview-item .remove-item {
+            opacity: 1; /* Siempre visible en móvil */
+        }
+    }
+
+    .btn-add-more {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        background: white;
+        color: #4682B4;
+        border: 2px dashed #4682B4;
+        padding: 12px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-add-more:hover {
+        background: rgba(70, 130, 180, 0.1);
+    }
+
+    .btn-add-more:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
 </style>
 
 @section Scripts {
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const usuarioVerificado = @(usuarioVerificado ? "true" : "false");
+            const ladoPreferidoEsB = @(ladoPreferidoEsB ? "true" : "false");
+            const MAX_FILES = 10;
 
             // Elementos
             const ladoOptions = document.querySelectorAll('.lado-option');
@@ -1088,11 +1303,11 @@
             const archivoSection = document.getElementById('archivoSection');
             const uploadArea = document.getElementById('uploadArea');
             const archivoInput = document.getElementById('archivoInput');
-            const previewArea = document.getElementById('previewArea');
-            const imagePreview = document.getElementById('imagePreview');
-            const videoPreview = document.getElementById('videoPreview');
-            const fileInfo = document.getElementById('fileInfo');
-            const removeFileBtn = document.getElementById('removeFileBtn');
+            const previewGrid = document.getElementById('previewGrid');
+            const previewItems = document.getElementById('previewItems');
+            const fileCountSpan = document.getElementById('fileCount');
+            const clearAllBtn = document.getElementById('clearAllBtn');
+            const addMoreBtn = document.getElementById('addMoreBtn');
             const precioSelect = document.getElementById('precioSelect');
             const descripcionTextarea = document.getElementById('descripcionTextarea');
             const charCount = document.getElementById('charCount');
@@ -1102,6 +1317,9 @@
             const loadingOverlay = document.getElementById('loadingOverlay');
             const feedPublicoSection = document.getElementById('feedPublicoSection');
             const esPublicoGeneralInput = document.getElementById('esPublicoGeneralInput');
+
+            // Array para almacenar archivos seleccionados
+            let selectedFiles = [];
 
             // Selector de Lado
             ladoOptions.forEach(option => {
@@ -1122,14 +1340,12 @@
                         }
                     }
 
-                    // Mostrar/ocultar seccion Feed Publico segun el lado seleccionado
                     const ladoSeleccionado = this.dataset.lado;
                     if (feedPublicoSection) {
                         if (ladoSeleccionado === 'ladoa') {
                             feedPublicoSection.style.display = 'block';
                         } else {
                             feedPublicoSection.style.display = 'none';
-                            // Desmarcar el checkbox si se oculta
                             if (esPublicoGeneralInput) {
                                 esPublicoGeneralInput.checked = false;
                             }
@@ -1145,18 +1361,18 @@
                     this.classList.add('active');
                     tipoInput.value = this.dataset.tipo;
 
-                    if (this.dataset.tipo === '0') { // Post = 0 (solo texto)
+                    if (this.dataset.tipo === '0') {
                         archivoSection.style.display = 'none';
-                        archivoInput.removeAttribute('required');
                     } else {
                         archivoSection.style.display = 'block';
-                        archivoInput.setAttribute('required', 'required');
                     }
                 });
             });
 
-            // Upload
+            // Upload - Click
             uploadArea.addEventListener('click', () => archivoInput.click());
+
+            // Upload - Drag & Drop
             uploadArea.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 uploadArea.classList.add('dragover');
@@ -1167,47 +1383,243 @@
             uploadArea.addEventListener('drop', (e) => {
                 e.preventDefault();
                 uploadArea.classList.remove('dragover');
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    const dt = new DataTransfer();
-                    dt.items.add(files[0]);
-                    archivoInput.files = dt.files;
-                    handleFileSelect(files[0]);
+                handleFilesSelect(e.dataTransfer.files);
+            });
+
+            // Upload - Paste desde portapapeles (Ctrl+V)
+            document.addEventListener('paste', (e) => {
+                // Solo procesar si el tipo de contenido no es "solo texto"
+                if (tipoInput.value === '0') return;
+
+                // Verificar si hay archivos en el clipboard
+                const clipboardData = e.clipboardData || window.clipboardData;
+                if (!clipboardData) return;
+
+                const items = clipboardData.items;
+                if (!items) return;
+
+                const filesToAdd = [];
+
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+
+                    // Solo procesar archivos (no texto)
+                    if (item.kind === 'file') {
+                        const file = item.getAsFile();
+                        if (file) {
+                            // Verificar si es imagen o video
+                            const isImage = file.type.startsWith('image/');
+                            const isVideo = file.type.startsWith('video/');
+
+                            if (isImage || isVideo) {
+                                // Renombrar archivo si no tiene nombre (screenshots)
+                                let finalFile = file;
+                                if (!file.name || file.name === 'image.png') {
+                                    const ext = file.type.split('/')[1] || 'png';
+                                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                                    const newName = `pegado-${timestamp}.${ext}`;
+                                    finalFile = new File([file], newName, { type: file.type });
+                                }
+                                filesToAdd.push(finalFile);
+                            }
+                        }
+                    }
+                }
+
+                if (filesToAdd.length > 0) {
+                    e.preventDefault();
+                    handleFilesSelect(filesToAdd);
+
+                    // Feedback visual
+                    showPasteToast(filesToAdd.length);
                 }
             });
 
+            // Toast para feedback de pegado
+            function showPasteToast(count) {
+                const existingToast = document.getElementById('pasteToast');
+                if (existingToast) existingToast.remove();
+
+                const toast = document.createElement('div');
+                toast.id = 'pasteToast';
+                toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#4682B4;color:white;padding:12px 20px;border-radius:10px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.2);animation:slideUp 0.3s ease';
+                toast.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-4px;margin-right:8px"><polyline points="20 6 9 17 4 12"/></svg>${count} archivo${count > 1 ? 's' : ''} pegado${count > 1 ? 's' : ''}`;
+                document.body.appendChild(toast);
+
+                setTimeout(() => toast.remove(), 2500);
+            }
+
+            // Input change
             archivoInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    handleFileSelect(e.target.files[0]);
-                }
+                handleFilesSelect(e.target.files);
             });
 
-            removeFileBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                archivoInput.value = '';
-                previewArea.classList.remove('show');
-                imagePreview.classList.remove('show');
-                videoPreview.classList.remove('show');
+            // Agregar más archivos
+            addMoreBtn.addEventListener('click', () => archivoInput.click());
+
+            // Limpiar todos
+            clearAllBtn.addEventListener('click', () => {
+                selectedFiles = [];
+                updatePreviewGrid();
             });
 
-            function handleFileSelect(file) {
-                const reader = new FileReader();
-                previewArea.classList.add('show');
+            function handleFilesSelect(files) {
+                const filesArray = Array.from(files);
 
-                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
-                fileInfo.textContent = `${file.name} (${sizeMB} MB)`;
+                // Extensiones permitidas (para iOS que a veces no tiene MIME type)
+                const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.bmp'];
+                const videoExtensions = ['.mp4', '.mov', '.avi', '.webm', '.m4v', '.3gp'];
+                const allExtensions = [...imageExtensions, ...videoExtensions];
 
-                if (file.type.startsWith('image/')) {
-                    videoPreview.classList.remove('show');
-                    imagePreview.classList.add('show');
-                    reader.onload = (e) => imagePreview.src = e.target.result;
-                    reader.readAsDataURL(file);
-                } else if (file.type.startsWith('video/')) {
-                    imagePreview.classList.remove('show');
-                    videoPreview.classList.add('show');
-                    reader.onload = (e) => videoPreview.src = e.target.result;
-                    reader.readAsDataURL(file);
+                // Filtrar archivos válidos
+                const validFiles = filesArray.filter(file => {
+                    // Verificar por MIME type
+                    const isImageMime = file.type && file.type.startsWith('image/');
+                    const isVideoMime = file.type && file.type.startsWith('video/');
+
+                    // Verificar por extensión (fallback para iOS con HEIC)
+                    const fileName = file.name.toLowerCase();
+                    const ext = '.' + fileName.split('.').pop();
+                    const isImageExt = imageExtensions.includes(ext);
+                    const isVideoExt = videoExtensions.includes(ext);
+
+                    // Archivo válido si cumple MIME o extensión
+                    const isImage = isImageMime || isImageExt;
+                    const isVideo = isVideoMime || isVideoExt;
+                    const isValidSize = file.size <= 100 * 1024 * 1024; // 100MB
+
+                    return (isImage || isVideo) && isValidSize;
+                });
+
+                // Verificar límite
+                const remaining = MAX_FILES - selectedFiles.length;
+                const filesToAdd = validFiles.slice(0, remaining);
+
+                if (filesToAdd.length < validFiles.length) {
+                    alert(`Solo puedes subir un máximo de ${MAX_FILES} archivos`);
                 }
+
+                if (filesToAdd.length === 0 && filesArray.length > 0) {
+                    alert('Los archivos seleccionados no son válidos. Formatos permitidos: JPG, PNG, GIF, HEIC, MP4, MOV');
+                    return;
+                }
+
+                // Agregar archivos
+                selectedFiles = selectedFiles.concat(filesToAdd);
+                updatePreviewGrid();
+            }
+
+            function updatePreviewGrid() {
+                previewItems.innerHTML = '';
+
+                if (selectedFiles.length === 0) {
+                    previewGrid.style.display = 'none';
+                    uploadArea.style.display = 'block';
+                    return;
+                }
+
+                previewGrid.style.display = 'block';
+                uploadArea.style.display = 'none';
+                fileCountSpan.textContent = `${selectedFiles.length} archivo${selectedFiles.length > 1 ? 's' : ''} seleccionado${selectedFiles.length > 1 ? 's' : ''}`;
+
+                // Actualizar botón agregar más
+                addMoreBtn.disabled = selectedFiles.length >= MAX_FILES;
+
+                // Helper para detectar si es video (compatible con iOS)
+                function isVideoFile(file) {
+                    if (file.type && file.type.startsWith('video/')) return true;
+                    const ext = '.' + file.name.toLowerCase().split('.').pop();
+                    return ['.mp4', '.mov', '.avi', '.webm', '.m4v', '.3gp'].includes(ext);
+                }
+
+                selectedFiles.forEach((file, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'preview-item';
+                    item.dataset.index = index;
+
+                    const isVideo = isVideoFile(file);
+
+                    // Crear preview con manejo de errores para iOS
+                    try {
+                        const objectUrl = URL.createObjectURL(file);
+
+                        if (isVideo) {
+                            const video = document.createElement('video');
+                            video.muted = true;
+                            video.playsInline = true; // Importante para iOS
+                            video.src = objectUrl;
+                            video.onerror = () => {
+                                // Fallback si no puede cargar el video
+                                item.innerHTML = '<div class="preview-fallback"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>';
+                            };
+                            item.appendChild(video);
+                        } else {
+                            const img = document.createElement('img');
+                            img.src = objectUrl;
+                            img.onerror = () => {
+                                // Fallback para HEIC u otros formatos no soportados
+                                item.innerHTML = '<div class="preview-fallback"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>';
+                            };
+                            item.appendChild(img);
+                        }
+                    } catch (e) {
+                        // Error al crear ObjectURL
+                        item.innerHTML = '<div class="preview-fallback"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>';
+                    }
+
+                    // Badge de orden
+                    const orderBadge = document.createElement('span');
+                    orderBadge.className = 'order-badge';
+                    orderBadge.textContent = index + 1;
+                    item.appendChild(orderBadge);
+
+                    // Badge de tipo (video) - usar la misma función helper
+                    if (isVideoFile(file)) {
+                        const typeBadge = document.createElement('span');
+                        typeBadge.className = 'type-badge';
+                        typeBadge.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
+                        item.appendChild(typeBadge);
+                    }
+
+                    // Botón eliminar
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.className = 'remove-item';
+                    removeBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>';
+                    removeBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        selectedFiles.splice(index, 1);
+                        updatePreviewGrid();
+                    });
+                    item.appendChild(removeBtn);
+
+                    previewItems.appendChild(item);
+                });
+
+                // Actualizar el input file con los archivos seleccionados
+                updateFileInput();
+            }
+
+            function updateFileInput() {
+                // Intentar usar DataTransfer (no soportado en iOS Safari antiguo)
+                try {
+                    if (typeof DataTransfer !== 'undefined') {
+                        const dt = new DataTransfer();
+                        selectedFiles.forEach(file => dt.items.add(file));
+                        archivoInput.files = dt.files;
+                    }
+                } catch (e) {
+                    // En iOS antiguo, DataTransfer no está soportado
+                    // No es crítico porque usamos FormData directamente en submitCarrusel
+                    console.log('DataTransfer no soportado, usando FormData directo');
+                }
+            }
+
+            // Helper global para detectar si es video (para usar en submit también)
+            function isVideoFileGlobal(file) {
+                if (file.type && file.type.startsWith('video/')) return true;
+                const ext = '.' + file.name.toLowerCase().split('.').pop();
+                return ['.mp4', '.mov', '.avi', '.webm', '.m4v', '.3gp'].includes(ext);
             }
 
             // Character counter
@@ -1218,26 +1630,27 @@
             // Guardar borrador
             btnBorrador.addEventListener('click', function() {
                 esBorradorInput.value = 'true';
-                archivoInput.removeAttribute('required');
-                descripcionTextarea.removeAttribute('required');
-                loadingOverlay.classList.add('show');
-                formContenido.submit();
+
+                // Siempre usar submitCarrusel para archivos (1 o más)
+                if (selectedFiles.length >= 1) {
+                    submitCarrusel(true);
+                } else {
+                    // Solo texto - submit normal
+                    loadingOverlay.classList.add('show');
+                    formContenido.submit();
+                }
             });
 
-            // Validación del formulario
+            // Submit del formulario
             formContenido.addEventListener('submit', function(e) {
                 const tipoContenido = tipoInput.value;
                 const esBorrador = esBorradorInput.value === 'true';
                 const esGratis = esGratisInput.value === 'true';
 
-                // Validar archivo requerido (excepto para posts de solo texto o borradores)
-                if (!esBorrador && tipoContenido !== '0' && !archivoInput.files.length) {
+                // Validar archivos requeridos
+                if (!esBorrador && tipoContenido !== '0' && selectedFiles.length === 0) {
                     e.preventDefault();
-                    if (typeof showToast === 'function') {
-                        showToast('error', 'Error', 'Por favor selecciona un archivo para publicar');
-                    } else {
-                        alert('Por favor selecciona un archivo para publicar');
-                    }
+                    alert('Por favor selecciona al menos un archivo para publicar');
                     return false;
                 }
 
@@ -1246,18 +1659,64 @@
                     const precio = parseInt(precioSelect.value);
                     if (!precio || precio <= 0 || precio % 5 !== 0) {
                         e.preventDefault();
-                        if (typeof showToast === 'function') {
-                            showToast('error', 'Error', 'El precio debe ser un múltiplo de 5');
-                        } else {
-                            alert('El precio debe ser un múltiplo de 5');
-                        }
+                        alert('El precio debe ser un múltiplo de 5');
                         return false;
                     }
                 }
 
-                // Mostrar loading
+                // Siempre usar endpoint de carrusel para archivos (funciona para 1 o más)
+                if (selectedFiles.length >= 1) {
+                    e.preventDefault();
+                    submitCarrusel(false);
+                    return false;
+                }
+
+                // Solo texto (post sin archivo) - submit normal
                 loadingOverlay.classList.add('show');
             });
+
+            async function submitCarrusel(esBorrador) {
+                loadingOverlay.classList.add('show');
+
+                const formData = new FormData();
+                selectedFiles.forEach(file => {
+                    formData.append('archivos', file);
+                });
+                formData.append('Descripcion', descripcionTextarea.value);
+                formData.append('EsGratis', esGratisInput.value);
+                formData.append('EsBorrador', esBorrador ? 'true' : 'false');
+                formData.append('EsPublicoGeneral', esPublicoGeneralInput?.checked ? 'true' : 'false');
+
+                if (precioSelect) {
+                    formData.append('PrecioDesbloqueo', precioSelect.value);
+                }
+
+                // Agregar token antiforgery
+                const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                if (token) {
+                    formData.append('__RequestVerificationToken', token);
+                }
+
+                try {
+                    const response = await fetch('/Contenido/CrearCarrusel', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        window.location.href = '/Contenido';
+                    } else {
+                        loadingOverlay.classList.remove('show');
+                        alert(data.message || 'Error al crear el carrusel');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    loadingOverlay.classList.remove('show');
+                    alert('Error al crear el carrusel');
+                }
+            }
         });
     </script>
 }

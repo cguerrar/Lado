@@ -2,6 +2,7 @@
 using Lado.Models;
 using Lado.Middleware;
 using Lado.Services;
+using Lado.Hubs;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -95,6 +96,18 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 
+// ========================================
+// CONFIGURACION ANTIFORGERY PARA AJAX/JSON
+// ========================================
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN"; // Token en header para peticiones AJAX
+    options.Cookie.Name = ".Lado.Antiforgery";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+});
+
 // Registrar servicios personalizados
 builder.Services.AddScoped<Lado.Services.MercadoPagoService>();
 
@@ -131,12 +144,18 @@ builder.Services.AddScoped<Lado.Services.IEmailService, Lado.Services.EmailServi
 builder.Services.AddScoped<Lado.Services.IVisitasService, Lado.Services.VisitasService>();
 builder.Services.AddScoped<Lado.Services.INotificationService, Lado.Services.NotificationService>();
 builder.Services.AddScoped<Lado.Services.IFeedAlgorithmService, Lado.Services.FeedAlgorithmService>();
+builder.Services.AddScoped<Lado.Services.IImageService, Lado.Services.ImageService>();
 
 // ========================================
 // CONFIGURACIÓN DE CACHING
 // ========================================
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<Lado.Services.ICacheService, Lado.Services.CacheService>();
+
+// ========================================
+// CONFIGURACIÓN DE SIGNALR (Chat en tiempo real)
+// ========================================
+builder.Services.AddSignalR();
 
 // ========================================
 // CONFIGURACIÓN DE LOCALIZACIÓN (i18n)
@@ -214,6 +233,11 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.MapRazorPages();
+
+// ========================================
+// SIGNALR HUB ENDPOINT
+// ========================================
+app.MapHub<ChatHub>("/chatHub");
 
 // ========================================
 // ✅ INICIALIZACIÓN MEJORADA DEL SISTEMA

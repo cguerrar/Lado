@@ -107,6 +107,16 @@ namespace Lado.Controllers
             ViewBag.RetencionImpuestos = await ObtenerRetencionUsuarioAsync(usuario);
             ViewBag.NombrePais = await ObtenerNombrePaisAsync(usuario.Pais);
 
+            // Cargar configuraciones de plataforma
+            var configuraciones = await _context.ConfiguracionesPlataforma
+                .Where(c => c.Categoria == "Billetera")
+                .ToDictionaryAsync(c => c.Clave, c => c.Valor);
+
+            ViewBag.ComisionBilleteraElectronica = configuraciones.TryGetValue(ConfiguracionPlataforma.COMISION_BILLETERA_ELECTRONICA, out var comision) ? comision : "2.5";
+            ViewBag.TiempoProcesoRetiro = configuraciones.TryGetValue(ConfiguracionPlataforma.TIEMPO_PROCESO_RETIRO, out var tiempo) ? tiempo : "3-5 dias habiles";
+            ViewBag.MontoMinimoRecarga = configuraciones.TryGetValue(ConfiguracionPlataforma.MONTO_MINIMO_RECARGA, out var minRecarga) ? minRecarga : "5";
+            ViewBag.MontoMaximoRecarga = configuraciones.TryGetValue(ConfiguracionPlataforma.MONTO_MAXIMO_RECARGA, out var maxRecarga) ? maxRecarga : "1000";
+
             return View(usuario);
         }
 

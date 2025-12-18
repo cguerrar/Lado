@@ -437,6 +437,99 @@
                 font-size: 1.1rem;
             }
         }
+
+        /* Selector de Lado Preferido */
+        .lado-selector {
+            display: flex;
+            gap: 16px;
+        }
+
+        .lado-option {
+            flex: 1;
+            cursor: pointer;
+        }
+
+        .lado-option input[type="radio"] {
+            display: none;
+        }
+
+        .lado-option-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            border: 2px solid var(--line);
+            border-radius: var(--radius-sm);
+            transition: all 0.2s ease;
+            background: var(--bg);
+        }
+
+        .lado-option:hover .lado-option-content {
+            border-color: var(--primary);
+            background: rgba(70, 130, 180, 0.03);
+        }
+
+        .lado-option.selected .lado-option-content {
+            border-color: var(--primary);
+            background: rgba(70, 130, 180, 0.08);
+        }
+
+        .lado-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .lado-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .lado-title {
+            font-weight: 600;
+            color: var(--fg);
+            font-size: 0.9375rem;
+        }
+
+        .lado-desc {
+            font-size: 0.8125rem;
+            color: var(--muted);
+        }
+
+        .lado-check {
+            color: var(--primary);
+            font-size: 1.25rem;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .lado-option.selected .lado-check {
+            opacity: 1;
+        }
+
+        @@media (max-width: 640px) {
+            .lado-selector {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .lado-option-content {
+                padding: 14px;
+            }
+
+            .lado-icon {
+                width: 40px;
+                height: 40px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -515,6 +608,46 @@
                             <span asp-validation-for="Seudonimo" class="text-danger"></span>
                         </div>
 
+                        <!-- Selección de Lado Preferido -->
+                        <div class="form-group">
+                            <label class="form-label">
+                                ¿Cuál lado prefieres ver primero?
+                                <span class="form-label-help">(Puedes cambiarlo después)</span>
+                            </label>
+                            <div class="lado-selector">
+                                <label class="lado-option selected" id="ladoAOption">
+                                    <input type="radio" asp-for="LadoPreferido" value="0" checked />
+                                    <div class="lado-option-content">
+                                        <div class="lado-icon" style="background: linear-gradient(135deg, #4682B4, #5a9fd4);">
+                                            <i class="fas fa-user"></i>
+                                        </div>
+                                        <div class="lado-info">
+                                            <span class="lado-title">Lado A</span>
+                                            <span class="lado-desc">Contenido público y gratuito</span>
+                                        </div>
+                                        <div class="lado-check">
+                                            <i class="fas fa-check-circle"></i>
+                                        </div>
+                                    </div>
+                                </label>
+                                <label class="lado-option" id="ladoBOption">
+                                    <input type="radio" asp-for="LadoPreferido" value="1" />
+                                    <div class="lado-option-content">
+                                        <div class="lado-icon" style="background: linear-gradient(135deg, #9333ea, #c084fc);">
+                                            <i class="fas fa-star"></i>
+                                        </div>
+                                        <div class="lado-info">
+                                            <span class="lado-title">Lado B</span>
+                                            <span class="lado-desc">Contenido premium exclusivo</span>
+                                        </div>
+                                        <div class="lado-check">
+                                            <i class="fas fa-check-circle"></i>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
                         <div class="form-group">
                             <label asp-for="Contraseña" class="form-label">@Localizer.Get("Auth_Password")</label>
                             <div class="password-toggle">
@@ -574,6 +707,60 @@
     <script src="https://ajax.aspnetcdn.com/ajax/jquery.validate/1.19.3/jquery.validate.min.js"></script>
     <script src="https://ajax.aspnetcdn.com/ajax/jquery.validation.unobtrusive/3.2.12/jquery.validation.unobtrusive.min.js"></script>
     <script>
+        // ========================================
+        // ESTADO DE DISPONIBILIDAD
+        // ========================================
+        let emailAvailable = null;
+        let usernameAvailable = null;
+        let seudonimoAvailable = null;
+
+        // ========================================
+        // VALIDACIÓN DEL FORMULARIO ANTES DE SUBMIT
+        // ========================================
+        document.getElementById('registerForm').addEventListener('submit', function(e) {
+            let errors = [];
+
+            // Verificar campos vacíos
+            const email = document.getElementById('emailInput').value.trim();
+            const username = document.getElementById('usernameInput').value.trim();
+            const seudonimo = document.getElementById('seudonimoInput').value.trim();
+            const nombre = document.querySelector('input[name="NombreCompleto"]').value.trim();
+            const password = document.getElementById('passwordInput').value;
+            const confirmPassword = document.querySelector('input[name="ConfirmarContraseña"]').value;
+            const acceptTerms = document.querySelector('input[name="AceptaTerminos"]').checked;
+
+            // Validar campos requeridos
+            if (!email) errors.push('El email es requerido');
+            if (!username) errors.push('El nombre de usuario es requerido');
+            if (username.length < 3) errors.push('El nombre de usuario debe tener al menos 3 caracteres');
+            if (!/^[a-zA-Z0-9_]+$/.test(username)) errors.push('El nombre de usuario solo puede contener letras, números y guión bajo');
+            if (!seudonimo) errors.push('El seudónimo es requerido');
+            if (seudonimo.length < 3) errors.push('El seudónimo debe tener al menos 3 caracteres');
+            if (!nombre) errors.push('El nombre completo es requerido');
+            if (!password) errors.push('La contraseña es requerida');
+            if (password.length < 8) errors.push('La contraseña debe tener al menos 8 caracteres');
+            if (!/[a-zA-Z]/.test(password)) errors.push('La contraseña debe contener letras');
+            if (!/[0-9!@@#$%^&*(),.?":{}|<>]/.test(password)) errors.push('La contraseña debe contener números o símbolos');
+            if (password !== confirmPassword) errors.push('Las contraseñas no coinciden');
+            if (!acceptTerms) errors.push('Debes aceptar los términos y condiciones');
+
+            // Verificar disponibilidad
+            if (emailAvailable === false) errors.push('El email ya está registrado');
+            if (usernameAvailable === false) errors.push('El nombre de usuario ya está en uso');
+            if (seudonimoAvailable === false) errors.push('El seudónimo ya está en uso');
+
+            // Si hay verificaciones pendientes, advertir
+            if (email && emailAvailable === null) errors.push('Espera mientras verificamos la disponibilidad del email');
+            if (username.length >= 3 && usernameAvailable === null) errors.push('Espera mientras verificamos la disponibilidad del usuario');
+            if (seudonimo.length >= 3 && seudonimoAvailable === null) errors.push('Espera mientras verificamos la disponibilidad del seudónimo');
+
+            if (errors.length > 0) {
+                e.preventDefault();
+                alert('Por favor corrige los siguientes errores:\n\n• ' + errors.join('\n• '));
+                return false;
+            }
+        });
+
         // ========================================
         // TOGGLE PASSWORD
         // ========================================
@@ -650,16 +837,18 @@
         document.getElementById('emailInput').addEventListener('input', function() {
             const email = this.value.trim();
             const indicator = document.getElementById('emailIndicator');
-            
+
             clearTimeout(emailTimeout);
-            
+            emailAvailable = null; // Reset estado
+
             if (email.length < 3 || !email.includes('@@')) {
                 indicator.className = 'availability-indicator';
                 return;
             }
-            
+
             indicator.className = 'availability-indicator checking';
-            
+            indicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
             emailTimeout = setTimeout(async () => {
                 try {
                     const response = await fetch('/Account/CheckEmailAvailability', {
@@ -668,14 +857,16 @@
                         body: JSON.stringify({ email: email })
                     });
                     const data = await response.json();
-                    
+
+                    emailAvailable = data.available; // Guardar estado
                     indicator.className = data.available ? 'availability-indicator available' : 'availability-indicator unavailable';
-                    indicator.innerHTML = data.available 
-                        ? '<i class="fas fa-check"></i>' 
+                    indicator.innerHTML = data.available
+                        ? '<i class="fas fa-check"></i>'
                         : '<i class="fas fa-times"></i>';
                 } catch (error) {
                     console.error('Error checking email:', error);
                     indicator.className = 'availability-indicator';
+                    emailAvailable = null;
                 }
             }, 500);
         });
@@ -684,16 +875,26 @@
         document.getElementById('usernameInput').addEventListener('input', function() {
             const username = this.value.trim();
             const indicator = document.getElementById('usernameIndicator');
-            
+
             clearTimeout(usernameTimeout);
-            
+            usernameAvailable = null; // Reset estado
+
+            // Validar formato en tiempo real
+            if (username.length > 0 && !/^[a-zA-Z0-9_]+$/.test(username)) {
+                indicator.className = 'availability-indicator unavailable';
+                indicator.innerHTML = '<i class="fas fa-times"></i>';
+                usernameAvailable = false;
+                return;
+            }
+
             if (username.length < 3) {
                 indicator.className = 'availability-indicator';
                 return;
             }
-            
+
             indicator.className = 'availability-indicator checking';
-            
+            indicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
             usernameTimeout = setTimeout(async () => {
                 try {
                     const response = await fetch('/Account/CheckUsernameAvailability', {
@@ -702,32 +903,36 @@
                         body: JSON.stringify({ username: username })
                     });
                     const data = await response.json();
-                    
+
+                    usernameAvailable = data.available; // Guardar estado
                     indicator.className = data.available ? 'availability-indicator available' : 'availability-indicator unavailable';
-                    indicator.innerHTML = data.available 
-                        ? '<i class="fas fa-check"></i>' 
+                    indicator.innerHTML = data.available
+                        ? '<i class="fas fa-check"></i>'
                         : '<i class="fas fa-times"></i>';
                 } catch (error) {
                     console.error('Error checking username:', error);
                     indicator.className = 'availability-indicator';
+                    usernameAvailable = null;
                 }
             }, 500);
         });
 
-        // ⭐ NUEVO: Seudónimo availability
+        // Seudónimo availability
         document.getElementById('seudonimoInput').addEventListener('input', function() {
             const seudonimo = this.value.trim();
             const indicator = document.getElementById('seudonimoIndicator');
-            
+
             clearTimeout(seudonimoTimeout);
-            
+            seudonimoAvailable = null; // Reset estado
+
             if (seudonimo.length < 3) {
                 indicator.className = 'availability-indicator';
                 return;
             }
-            
+
             indicator.className = 'availability-indicator checking';
-            
+            indicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
             seudonimoTimeout = setTimeout(async () => {
                 try {
                     const response = await fetch('/Account/CheckSeudonimoAvailability', {
@@ -736,16 +941,40 @@
                         body: JSON.stringify({ seudonimo: seudonimo })
                     });
                     const data = await response.json();
-                    
+
+                    seudonimoAvailable = data.available; // Guardar estado
                     indicator.className = data.available ? 'availability-indicator available' : 'availability-indicator unavailable';
-                    indicator.innerHTML = data.available 
-                        ? '<i class="fas fa-check"></i>' 
+                    indicator.innerHTML = data.available
+                        ? '<i class="fas fa-check"></i>'
                         : '<i class="fas fa-times"></i>';
                 } catch (error) {
                     console.error('Error checking seudonimo:', error);
                     indicator.className = 'availability-indicator';
+                    seudonimoAvailable = null;
                 }
             }, 500);
+        });
+
+        // Validación visual del checkbox de términos
+        document.querySelector('input[name="AceptaTerminos"]').addEventListener('change', function() {
+            const label = this.closest('.form-check');
+            if (this.checked) {
+                label.style.borderColor = 'transparent';
+            }
+        });
+
+        // ========================================
+        // SELECCIÓN DE LADO PREFERIDO
+        // ========================================
+        document.querySelectorAll('.lado-option input[type="radio"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                // Remover clase 'selected' de todas las opciones
+                document.querySelectorAll('.lado-option').forEach(opt => {
+                    opt.classList.remove('selected');
+                });
+                // Agregar clase 'selected' a la opción seleccionada
+                this.closest('.lado-option').classList.add('selected');
+            });
         });
     </script>
 </body>

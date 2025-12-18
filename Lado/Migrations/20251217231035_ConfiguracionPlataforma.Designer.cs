@@ -4,6 +4,7 @@ using Lado.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Lado.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251217231035_ConfiguracionPlataforma")]
+    partial class ConfiguracionPlataforma
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1008,7 +1011,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "ComisionBilleteraElectronica",
                             Descripcion = "Comision por usar billetera electronica (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 17, 21, 6, 29, 480, DateTimeKind.Local).AddTicks(4234),
+                            UltimaModificacion = new DateTime(2025, 12, 17, 20, 10, 34, 820, DateTimeKind.Local).AddTicks(4325),
                             Valor = "2.5"
                         },
                         new
@@ -1017,7 +1020,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "TiempoProcesoRetiro",
                             Descripcion = "Tiempo estimado para procesar retiros",
-                            UltimaModificacion = new DateTime(2025, 12, 17, 21, 6, 29, 480, DateTimeKind.Local).AddTicks(4305),
+                            UltimaModificacion = new DateTime(2025, 12, 17, 20, 10, 34, 820, DateTimeKind.Local).AddTicks(4393),
                             Valor = "3-5 dias habiles"
                         },
                         new
@@ -1026,7 +1029,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMinimoRecarga",
                             Descripcion = "Monto minimo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 17, 21, 6, 29, 480, DateTimeKind.Local).AddTicks(4310),
+                            UltimaModificacion = new DateTime(2025, 12, 17, 20, 10, 34, 820, DateTimeKind.Local).AddTicks(4394),
                             Valor = "5"
                         },
                         new
@@ -1035,7 +1038,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMaximoRecarga",
                             Descripcion = "Monto maximo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 17, 21, 6, 29, 480, DateTimeKind.Local).AddTicks(4313),
+                            UltimaModificacion = new DateTime(2025, 12, 17, 20, 10, 34, 820, DateTimeKind.Local).AddTicks(4396),
                             Valor = "1000"
                         },
                         new
@@ -1044,7 +1047,7 @@ namespace Lado.Migrations
                             Categoria = "General",
                             Clave = "ComisionPlataforma",
                             Descripcion = "Comision general de la plataforma (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 17, 21, 6, 29, 480, DateTimeKind.Local).AddTicks(4317),
+                            UltimaModificacion = new DateTime(2025, 12, 17, 20, 10, 34, 820, DateTimeKind.Local).AddTicks(4397),
                             Valor = "20"
                         });
                 });
@@ -1082,9 +1085,6 @@ namespace Lado.Migrations
                         .HasColumnType("int");
 
                     b.Property<bool>("EsBorrador")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("EsContenidoSensible")
                         .HasColumnType("bit");
 
                     b.Property<bool>("EsGratis")

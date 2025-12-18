@@ -93,6 +93,7 @@ namespace Lado.Controllers
                     Email = model.Email,
                     NombreCompleto = model.NombreCompleto,
                     Seudonimo = model.Seudonimo, // ⭐ NUEVO campo obligatorio
+                    LadoPreferido = model.LadoPreferido, // ⭐ Lado preferido seleccionado por el usuario
                     FechaRegistro = DateTime.Now,
                     EstaActivo = true,
                     EmailConfirmed = false,
@@ -694,6 +695,7 @@ namespace Lado.Controllers
                     Email = email,
                     NombreCompleto = name ?? email.Split('@')[0],
                     Seudonimo = email.Split('@')[0] + "_" + Guid.NewGuid().ToString("N").Substring(0, 4),
+                    LadoPreferido = Models.TipoLado.LadoA, // Por defecto LadoA para login con Google
                     FechaRegistro = DateTime.Now,
                     EstaActivo = true,
                     EmailConfirmed = true, // Email verificado por Google

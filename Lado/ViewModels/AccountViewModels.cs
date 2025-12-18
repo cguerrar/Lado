@@ -6,22 +6,25 @@ namespace Lado.ViewModels
     public class RegisterViewModel
     {
         [Required(ErrorMessage = "El nombre de usuario es requerido")]
-        [StringLength(50, ErrorMessage = "Máximo 50 caracteres")]
+        [StringLength(30, MinimumLength = 3, ErrorMessage = "Entre 3 y 30 caracteres")]
+        [RegularExpression(@"^[a-zA-Z0-9_]+$", ErrorMessage = "Solo letras, números y guión bajo")]
         [Display(Name = "Nombre de usuario")]
         public string NombreUsuario { get; set; }
 
         [Required(ErrorMessage = "El email es requerido")]
         [EmailAddress(ErrorMessage = "Email inválido")]
+        [StringLength(100, ErrorMessage = "Máximo 100 caracteres")]
         [Display(Name = "Email")]
         public string Email { get; set; }
 
         [Required(ErrorMessage = "El nombre es requerido")]
-        [StringLength(100)]
+        [StringLength(100, MinimumLength = 2, ErrorMessage = "Entre 2 y 100 caracteres")]
         [Display(Name = "Nombre completo")]
         public string NombreCompleto { get; set; }
 
         [Required(ErrorMessage = "La contraseña es requerida")]
         [StringLength(100, MinimumLength = 8, ErrorMessage = "Mínimo 8 caracteres")]
+        [RegularExpression(@"^(?=.*[a-zA-Z])(?=.*[0-9!@#$%^&*]).+$", ErrorMessage = "Debe contener letras y al menos un número o símbolo")]
         [DataType(DataType.Password)]
         [Display(Name = "Contraseña")]
         public string Contraseña { get; set; }
@@ -32,17 +35,21 @@ namespace Lado.ViewModels
         [Display(Name = "Confirmar contraseña")]
         public string ConfirmarContraseña { get; set; }
 
-        [Required]
         [Display(Name = "Tipo de cuenta")]
-        public TipoUsuario TipoUsuario { get; set; }
+        public TipoUsuario TipoUsuario { get; set; } = TipoUsuario.Creador;
 
-        [Required(ErrorMessage = "Debes aceptar los términos")]
+        [Range(typeof(bool), "true", "true", ErrorMessage = "Debes aceptar los términos y condiciones")]
+        [Display(Name = "Acepto los términos")]
         public bool AceptaTerminos { get; set; }
 
         [Required(ErrorMessage = "El seudónimo es obligatorio")]
-        [StringLength(50)]
+        [StringLength(30, MinimumLength = 3, ErrorMessage = "Entre 3 y 30 caracteres")]
+        [RegularExpression(@"^[a-zA-Z0-9_\s]+$", ErrorMessage = "Solo letras, números, espacios y guión bajo")]
         [Display(Name = "Seudónimo")]
         public string Seudonimo { get; set; }
+
+        [Display(Name = "Lado Preferido")]
+        public TipoLado LadoPreferido { get; set; } = TipoLado.LadoA;
 
     }
 

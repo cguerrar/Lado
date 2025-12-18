@@ -4,6 +4,7 @@ using Lado.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Lado.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251216220051_AgregarCarruselMultiplesArchivos")]
+    partial class AgregarCarruselMultiplesArchivos
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -426,9 +429,6 @@ namespace Lado.Migrations
                         .IsRequired()
                         .HasMaxLength(5)
                         .HasColumnType("nvarchar(5)");
-
-                    b.Property<int>("LadoPreferido")
-                        .HasColumnType("int");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("bit");
@@ -960,95 +960,6 @@ namespace Lado.Migrations
                     b.ToTable("ComprasContenido");
                 });
 
-            modelBuilder.Entity("Lado.Models.ConfiguracionPlataforma", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Categoria")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Clave")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Descripcion")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<DateTime>("UltimaModificacion")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Valor")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Categoria")
-                        .HasDatabaseName("IX_ConfiguracionPlataforma_Categoria");
-
-                    b.HasIndex("Clave")
-                        .IsUnique()
-                        .HasDatabaseName("IX_ConfiguracionPlataforma_Clave");
-
-                    b.ToTable("ConfiguracionesPlataforma");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Categoria = "Billetera",
-                            Clave = "ComisionBilleteraElectronica",
-                            Descripcion = "Comision por usar billetera electronica (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 17, 21, 6, 29, 480, DateTimeKind.Local).AddTicks(4234),
-                            Valor = "2.5"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Categoria = "Billetera",
-                            Clave = "TiempoProcesoRetiro",
-                            Descripcion = "Tiempo estimado para procesar retiros",
-                            UltimaModificacion = new DateTime(2025, 12, 17, 21, 6, 29, 480, DateTimeKind.Local).AddTicks(4305),
-                            Valor = "3-5 dias habiles"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Categoria = "Billetera",
-                            Clave = "MontoMinimoRecarga",
-                            Descripcion = "Monto minimo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 17, 21, 6, 29, 480, DateTimeKind.Local).AddTicks(4310),
-                            Valor = "5"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Categoria = "Billetera",
-                            Clave = "MontoMaximoRecarga",
-                            Descripcion = "Monto maximo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 17, 21, 6, 29, 480, DateTimeKind.Local).AddTicks(4313),
-                            Valor = "1000"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Categoria = "General",
-                            Clave = "ComisionPlataforma",
-                            Descripcion = "Comision general de la plataforma (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 17, 21, 6, 29, 480, DateTimeKind.Local).AddTicks(4317),
-                            Valor = "20"
-                        });
-                });
-
             modelBuilder.Entity("Lado.Models.Contenido", b =>
                 {
                     b.Property<int>("Id")
@@ -1072,9 +983,6 @@ namespace Lado.Migrations
                     b.Property<bool>("Censurado")
                         .HasColumnType("bit");
 
-                    b.Property<bool>("ComentariosDesactivados")
-                        .HasColumnType("bit");
-
                     b.Property<string>("Descripcion")
                         .HasColumnType("nvarchar(max)");
 
@@ -1082,9 +990,6 @@ namespace Lado.Migrations
                         .HasColumnType("int");
 
                     b.Property<bool>("EsBorrador")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("EsContenidoSensible")
                         .HasColumnType("bit");
 
                     b.Property<bool>("EsGratis")
@@ -1678,32 +1583,12 @@ namespace Lado.Migrations
                     b.Property<DateTime>("FechaEnvio")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime?>("FechaLectura")
-                        .HasColumnType("datetime2");
-
                     b.Property<bool>("Leido")
                         .HasColumnType("bit");
-
-                    b.Property<int?>("MensajeRespondidoId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("NombreArchivoOriginal")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
 
                     b.Property<string>("RemitenteId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("RutaArchivo")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<long?>("TamanoArchivo")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("TipoMensaje")
-                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -1712,8 +1597,6 @@ namespace Lado.Migrations
                     b.HasIndex("FechaEnvio");
 
                     b.HasIndex("Leido");
-
-                    b.HasIndex("MensajeRespondidoId");
 
                     b.HasIndex("RemitenteId");
 
@@ -3063,10 +2946,6 @@ namespace Lado.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Lado.Models.MensajePrivado", "MensajeRespondido")
-                        .WithMany()
-                        .HasForeignKey("MensajeRespondidoId");
-
                     b.HasOne("Lado.Models.ApplicationUser", "Remitente")
                         .WithMany()
                         .HasForeignKey("RemitenteId")
@@ -3074,8 +2953,6 @@ namespace Lado.Migrations
                         .IsRequired();
 
                     b.Navigation("Destinatario");
-
-                    b.Navigation("MensajeRespondido");
 
                     b.Navigation("Remitente");
                 });

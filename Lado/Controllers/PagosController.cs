@@ -214,6 +214,7 @@ namespace Lado.Controllers
         // ============================================
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> DesbloquearContenido([FromBody] DesbloquearContenidoRequest request)
         {
             try
@@ -234,6 +235,12 @@ namespace Lado.Controllers
                 if (contenido == null)
                 {
                     return Json(new { success = false, message = "Contenido no encontrado" });
+                }
+
+                // SEGURIDAD: No puedes desbloquear tu propio contenido
+                if (contenido.UsuarioId == usuarioId)
+                {
+                    return Json(new { success = false, message = "No puedes comprar tu propio contenido" });
                 }
 
                 // Verificar que el contenido es premium
@@ -344,7 +351,7 @@ namespace Lado.Controllers
         // ============================================
 
         [HttpPost]
-        [IgnoreAntiforgeryToken]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> EnviarTip([FromBody] EnviarTipRequest request)
         {
             try
@@ -374,10 +381,16 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "No puedes enviarte una propina a ti mismo." });
                 }
 
-                // Validar monto
+                // Validar monto mínimo y máximo
                 if (request.Monto < 1)
                 {
                     return Json(new { success = false, message = "El monto mínimo es $1.00" });
+                }
+
+                const decimal MONTO_MAXIMO_TIP = 10000m;
+                if (request.Monto > MONTO_MAXIMO_TIP)
+                {
+                    return Json(new { success = false, message = $"El monto máximo es ${MONTO_MAXIMO_TIP:N0}" });
                 }
 
                 // Verificar saldo

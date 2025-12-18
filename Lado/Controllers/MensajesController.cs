@@ -1,9 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Lado.Data;
 using Lado.Models;
+using Lado.Hubs;
 
 namespace Lado.Controllers
 {
@@ -13,15 +15,26 @@ namespace Lado.Controllers
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILogger<MensajesController> _logger;
+        private readonly IHubContext<ChatHub> _hubContext;
+        private readonly IWebHostEnvironment _environment;
+
+        // Límite de archivo: 10 MB
+        private const long MaxFileSize = 10 * 1024 * 1024;
+        private static readonly string[] AllowedImageExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+        private static readonly string[] AllowedVideoExtensions = { ".mp4", ".mov", ".webm" };
 
         public MensajesController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
-            ILogger<MensajesController> logger)
+            ILogger<MensajesController> logger,
+            IHubContext<ChatHub> hubContext,
+            IWebHostEnvironment environment)
         {
             _context = context;
             _userManager = userManager;
             _logger = logger;
+            _hubContext = hubContext;
+            _environment = environment;
         }
 
         // ========================================
@@ -186,10 +199,12 @@ namespace Lado.Controllers
                 }
             }
 
-            // Cargar mensajes
+            // Cargar mensajes con respuestas incluidas
             var mensajes = await _context.MensajesPrivados
                 .Include(m => m.Remitente)
                 .Include(m => m.Destinatario)
+                .Include(m => m.MensajeRespondido)
+                    .ThenInclude(mr => mr!.Remitente)
                 .Where(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == id) ||
                            (m.RemitenteId == id && m.DestinatarioId == usuario.Id))
                 .Where(m => (m.RemitenteId == usuario.Id && !m.EliminadoPorRemitente) ||
@@ -199,19 +214,31 @@ namespace Lado.Controllers
 
             _logger.LogInformation("Mensajes cargados: {Count}", mensajes.Count);
 
-            // Marcar mensajes como leídos
+            // Marcar mensajes como leídos y guardar FechaLectura
             var mensajesNoLeidos = mensajes
                 .Where(m => m.DestinatarioId == usuario.Id && !m.Leido)
                 .ToList();
 
             if (mensajesNoLeidos.Any())
             {
+                var ahora = DateTime.Now;
+                var mensajeIds = new List<int>();
                 foreach (var mensaje in mensajesNoLeidos)
                 {
                     mensaje.Leido = true;
+                    mensaje.FechaLectura = ahora;
+                    mensajeIds.Add(mensaje.Id);
                 }
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Marcados como leídos: {Count} mensajes", mensajesNoLeidos.Count);
+
+                // Notificar via SignalR al remitente que sus mensajes fueron leídos
+                await _hubContext.Clients.Group($"user_{id}").SendAsync("MensajesLeidos", new
+                {
+                    LectorId = usuario.Id,
+                    MensajeIds = mensajeIds,
+                    FechaLectura = ahora
+                });
             }
 
             ViewBag.Mensajes = mensajes;
@@ -221,80 +248,65 @@ namespace Lado.Controllers
         }
 
         // ========================================
-        // ENVIAR MENSAJE
+        // ENVIAR MENSAJE CON ARCHIVO (Principal)
         // ========================================
 
         [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EnviarMensaje(string destinatarioId, string contenido)
+        public async Task<IActionResult> EnviarMensajeConArchivo(
+            string destinatarioId,
+            string? contenido,
+            IFormFile? archivo,
+            int? mensajeRespondidoId)
         {
             try
             {
-                _logger.LogInformation("=== ENVIAR MENSAJE - INICIO ===");
-                _logger.LogInformation("DestinatarioId: {DestinatarioId}", destinatarioId);
+                _logger.LogInformation("=== ENVIAR MENSAJE CON ARCHIVO - INICIO ===");
 
                 var usuario = await _userManager.GetUserAsync(User);
                 if (usuario == null)
                 {
-                    _logger.LogError("Usuario no autenticado");
                     return Json(new { success = false, message = "Usuario no autenticado" });
-                }
-
-                _logger.LogInformation("Usuario: {Username} (ID: {UserId})", usuario.UserName, usuario.Id);
-
-                // Validaciones
-                if (string.IsNullOrWhiteSpace(contenido))
-                {
-                    _logger.LogWarning("Contenido vacío");
-                    return Json(new { success = false, message = "El mensaje no puede estar vacío" });
                 }
 
                 if (string.IsNullOrWhiteSpace(destinatarioId))
                 {
-                    _logger.LogWarning("DestinatarioId vacío");
                     return Json(new { success = false, message = "Destinatario no especificado" });
+                }
+
+                // Validar que haya contenido o archivo
+                if (string.IsNullOrWhiteSpace(contenido) && archivo == null)
+                {
+                    return Json(new { success = false, message = "Debes enviar un mensaje o un archivo" });
                 }
 
                 var destinatario = await _userManager.FindByIdAsync(destinatarioId);
                 if (destinatario == null)
                 {
-                    _logger.LogError("Destinatario no encontrado: {DestinatarioId}", destinatarioId);
                     return Json(new { success = false, message = "Destinatario no encontrado" });
                 }
 
-                _logger.LogInformation("Destinatario: {Username}", destinatario.UserName);
-
-                // ========================================
-                // VERIFICAR BLOQUEO
-                // ========================================
+                // Verificar bloqueo
                 var existeBloqueo = await _context.BloqueosUsuarios
                     .AnyAsync(b => (b.BloqueadorId == usuario.Id && b.BloqueadoId == destinatarioId) ||
                                   (b.BloqueadorId == destinatarioId && b.BloqueadoId == usuario.Id));
 
                 if (existeBloqueo)
                 {
-                    _logger.LogWarning("Intento de mensaje a usuario bloqueado");
                     return Json(new { success = false, message = "No puedes enviar mensajes a este usuario" });
                 }
 
-                // ⭐ CAMBIO: Verificar relación de suscripción (bidireccional)
+                // Verificar relación de suscripción o conversación previa
                 var existeRelacion = await _context.Suscripciones
                     .AnyAsync(s => (s.FanId == usuario.Id && s.CreadorId == destinatarioId && s.EstaActiva) ||
                                   (s.FanId == destinatarioId && s.CreadorId == usuario.Id && s.EstaActiva));
 
-                // Verificar si ya tienen conversación previa
                 var tieneConversacion = await _context.MensajesPrivados
                     .AnyAsync(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == destinatarioId) ||
                                   (m.RemitenteId == destinatarioId && m.DestinatarioId == usuario.Id));
 
                 if (!existeRelacion && !tieneConversacion)
                 {
-                    _logger.LogWarning("Sin relación de suscripción ni conversación previa");
-                    return Json(new
-                    {
-                        success = false,
-                        message = "Debes estar suscrito para iniciar una conversación con este usuario"
-                    });
+                    return Json(new { success = false, message = "Debes estar suscrito para iniciar una conversación" });
                 }
 
                 // Crear mensaje
@@ -302,40 +314,125 @@ namespace Lado.Controllers
                 {
                     RemitenteId = usuario.Id,
                     DestinatarioId = destinatarioId,
-                    Contenido = contenido.Trim(),
+                    Contenido = contenido?.Trim() ?? "",
                     FechaEnvio = DateTime.Now,
                     Leido = false,
-                    EliminadoPorRemitente = false,
-                    EliminadoPorDestinatario = false
+                    TipoMensaje = TipoMensaje.Texto
                 };
+
+                // Procesar archivo si existe
+                if (archivo != null && archivo.Length > 0)
+                {
+                    if (archivo.Length > MaxFileSize)
+                    {
+                        return Json(new { success = false, message = "El archivo no puede superar 10 MB" });
+                    }
+
+                    var extension = Path.GetExtension(archivo.FileName).ToLowerInvariant();
+
+                    // Determinar tipo de mensaje
+                    if (AllowedImageExtensions.Contains(extension))
+                    {
+                        mensaje.TipoMensaje = TipoMensaje.Imagen;
+                    }
+                    else if (AllowedVideoExtensions.Contains(extension))
+                    {
+                        mensaje.TipoMensaje = TipoMensaje.Video;
+                    }
+                    else
+                    {
+                        return Json(new { success = false, message = "Tipo de archivo no permitido. Solo imágenes y videos." });
+                    }
+
+                    // Guardar archivo
+                    var nombreArchivo = $"{Guid.NewGuid()}{extension}";
+                    var carpeta = Path.Combine(_environment.WebRootPath, "uploads", "mensajes", usuario.UserName ?? usuario.Id);
+
+                    if (!Directory.Exists(carpeta))
+                    {
+                        Directory.CreateDirectory(carpeta);
+                    }
+
+                    var rutaCompleta = Path.Combine(carpeta, nombreArchivo);
+                    using (var stream = new FileStream(rutaCompleta, FileMode.Create))
+                    {
+                        await archivo.CopyToAsync(stream);
+                    }
+
+                    mensaje.RutaArchivo = $"/uploads/mensajes/{usuario.UserName ?? usuario.Id}/{nombreArchivo}";
+                    mensaje.NombreArchivoOriginal = archivo.FileName;
+                    mensaje.TamanoArchivo = archivo.Length;
+
+                    _logger.LogInformation("Archivo guardado: {Ruta}", mensaje.RutaArchivo);
+                }
+
+                // Agregar respuesta si existe
+                if (mensajeRespondidoId.HasValue && mensajeRespondidoId > 0)
+                {
+                    var mensajeOriginal = await _context.MensajesPrivados.FindAsync(mensajeRespondidoId);
+                    if (mensajeOriginal != null)
+                    {
+                        mensaje.MensajeRespondidoId = mensajeRespondidoId;
+                    }
+                }
 
                 _context.MensajesPrivados.Add(mensaje);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("✅ Mensaje enviado exitosamente. ID: {MensajeId}", mensaje.Id);
+                _logger.LogInformation("✅ Mensaje enviado. ID: {MensajeId}, Tipo: {Tipo}", mensaje.Id, mensaje.TipoMensaje);
 
-                return Json(new
+                // Cargar datos del mensaje respondido si existe
+                MensajePrivado? mensajeRespondido = null;
+                if (mensaje.MensajeRespondidoId.HasValue)
                 {
-                    success = true,
-                    mensaje = new
+                    mensajeRespondido = await _context.MensajesPrivados
+                        .Include(m => m.Remitente)
+                        .FirstOrDefaultAsync(m => m.Id == mensaje.MensajeRespondidoId);
+                }
+
+                // Preparar DTO del mensaje
+                var mensajeDto = new
+                {
+                    id = mensaje.Id,
+                    contenido = mensaje.Contenido,
+                    fechaEnvio = mensaje.FechaEnvio.ToString("HH:mm"),
+                    fechaCompleta = mensaje.FechaEnvio.ToString("dd/MM/yyyy HH:mm"),
+                    remitenteId = mensaje.RemitenteId,
+                    remitenteNombre = usuario.NombreCompleto ?? usuario.UserName,
+                    remitenteFoto = usuario.FotoPerfil,
+                    tipoMensaje = (int)mensaje.TipoMensaje,
+                    rutaArchivo = mensaje.RutaArchivo,
+                    leido = false,
+                    mensajeRespondido = mensajeRespondido != null ? new
                     {
-                        id = mensaje.Id,
-                        contenido = mensaje.Contenido,
-                        fechaEnvio = mensaje.FechaEnvio.ToString("HH:mm"),
-                        fechaCompleta = mensaje.FechaEnvio.ToString("dd/MM/yyyy HH:mm"),
-                        remitenteId = mensaje.RemitenteId
-                    }
-                });
+                        id = mensajeRespondido.Id,
+                        contenido = mensajeRespondido.Contenido,
+                        remitenteNombre = mensajeRespondido.Remitente?.NombreCompleto ?? mensajeRespondido.Remitente?.UserName ?? "Usuario",
+                        tipoMensaje = (int)mensajeRespondido.TipoMensaje
+                    } : null
+                };
+
+                // Notificar via SignalR al destinatario
+                await _hubContext.Clients.Group($"user_{destinatarioId}").SendAsync("RecibirMensaje", mensajeDto);
+
+                return Json(new { success = true, mensaje = mensajeDto });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Error al enviar mensaje");
-                return Json(new
-                {
-                    success = false,
-                    message = "Error al enviar el mensaje. Por favor intenta nuevamente."
-                });
+                _logger.LogError(ex, "❌ Error al enviar mensaje con archivo");
+                return Json(new { success = false, message = "Error al enviar el mensaje" });
             }
+        }
+
+        // ========================================
+        // ENVIAR MENSAJE (Compatibilidad)
+        // ========================================
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EnviarMensaje(string destinatarioId, string contenido)
+        {
+            return await EnviarMensajeConArchivo(destinatarioId, contenido, null, null);
         }
 
         // ========================================
@@ -409,17 +506,18 @@ namespace Lado.Controllers
                 var usuario = await _userManager.GetUserAsync(User);
                 if (usuario == null)
                 {
-                    _logger.LogWarning("Usuario no autenticado en CargarMensajes");
                     return Json(new { success = false, message = "Usuario no autenticado" });
                 }
 
                 if (string.IsNullOrWhiteSpace(contactoId))
                 {
-                    _logger.LogWarning("ContactoId vacío en CargarMensajes");
                     return Json(new { success = false, message = "Contacto no especificado" });
                 }
 
                 var mensajes = await _context.MensajesPrivados
+                    .Include(m => m.Remitente)
+                    .Include(m => m.MensajeRespondido)
+                        .ThenInclude(mr => mr!.Remitente)
                     .Where(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == contactoId) ||
                                (m.RemitenteId == contactoId && m.DestinatarioId == usuario.Id))
                     .Where(m => (m.RemitenteId == usuario.Id && !m.EliminadoPorRemitente) ||
@@ -429,17 +527,30 @@ namespace Lado.Controllers
                     {
                         id = m.Id,
                         remitenteId = m.RemitenteId,
+                        remitenteNombre = m.Remitente != null ? (m.Remitente.NombreCompleto ?? m.Remitente.UserName) : "Usuario",
                         contenido = m.Contenido,
                         fechaEnvio = m.FechaEnvio.ToString("HH:mm"),
                         fechaCompleta = m.FechaEnvio.ToString("dd/MM/yyyy HH:mm"),
-                        leido = m.Leido
+                        leido = m.Leido,
+                        fechaLectura = m.FechaLectura,
+                        tipoMensaje = (int)m.TipoMensaje,
+                        rutaArchivo = m.RutaArchivo,
+                        mensajeRespondido = m.MensajeRespondido != null ? new
+                        {
+                            id = m.MensajeRespondido.Id,
+                            contenido = m.MensajeRespondido.Contenido,
+                            remitenteNombre = m.MensajeRespondido.Remitente != null
+                                ? (m.MensajeRespondido.Remitente.NombreCompleto ?? m.MensajeRespondido.Remitente.UserName)
+                                : "Usuario",
+                            tipoMensaje = (int)m.MensajeRespondido.TipoMensaje
+                        } : null
                     })
                     .ToListAsync();
 
                 _logger.LogInformation("Cargados {Count} mensajes para contacto {ContactoId}",
                     mensajes.Count, contactoId);
 
-                return Json(new { success = true, mensajes });
+                return Json(new { success = true, mensajes, usuarioId = usuario.Id });
             }
             catch (Exception ex)
             {
@@ -471,8 +582,18 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "Mensaje no encontrado" });
                 }
 
+                var ahora = DateTime.Now;
                 mensaje.Leido = true;
+                mensaje.FechaLectura = ahora;
                 await _context.SaveChangesAsync();
+
+                // Notificar al remitente via SignalR
+                await _hubContext.Clients.Group($"user_{mensaje.RemitenteId}").SendAsync("MensajesLeidos", new
+                {
+                    LectorId = usuario.Id,
+                    MensajeIds = new[] { mensajeId },
+                    FechaLectura = ahora
+                });
 
                 _logger.LogInformation("Mensaje {MensajeId} marcado como leído", mensajeId);
 
@@ -486,11 +607,73 @@ namespace Lado.Controllers
         }
 
         // ========================================
+        // MARCAR MÚLTIPLES COMO LEÍDOS (AJAX)
+        // ========================================
+
+        [HttpPost]
+        public async Task<IActionResult> MarcarMensajesComoLeidos([FromBody] MarcarLeidosRequest request)
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
+                {
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                if (request?.MensajeIds == null || !request.MensajeIds.Any())
+                {
+                    return Json(new { success = true }); // Nada que marcar
+                }
+
+                var mensajes = await _context.MensajesPrivados
+                    .Where(m => request.MensajeIds.Contains(m.Id) && m.DestinatarioId == usuario.Id && !m.Leido)
+                    .ToListAsync();
+
+                if (!mensajes.Any())
+                {
+                    return Json(new { success = true });
+                }
+
+                var ahora = DateTime.Now;
+                var remitenteIds = new HashSet<string>();
+
+                foreach (var mensaje in mensajes)
+                {
+                    mensaje.Leido = true;
+                    mensaje.FechaLectura = ahora;
+                    remitenteIds.Add(mensaje.RemitenteId);
+                }
+
+                await _context.SaveChangesAsync();
+
+                // Notificar a cada remitente via SignalR
+                foreach (var remitenteId in remitenteIds)
+                {
+                    var idsDelRemitente = mensajes.Where(m => m.RemitenteId == remitenteId).Select(m => m.Id).ToArray();
+                    await _hubContext.Clients.Group($"user_{remitenteId}").SendAsync("MensajesLeidos", new
+                    {
+                        LectorId = usuario.Id,
+                        MensajeIds = idsDelRemitente,
+                        FechaLectura = ahora
+                    });
+                }
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al marcar mensajes como leídos");
+                return Json(new { success = false, message = "Error al marcar como leídos" });
+            }
+        }
+
+        // ========================================
         // ENVIAR MENSAJE DIRECTO (desde perfil)
         // ========================================
 
         [HttpPost]
-        [IgnoreAntiforgeryToken]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> EnviarMensajeDirecto([FromBody] EnviarMensajeDirectoRequest request)
         {
             try
@@ -647,9 +830,14 @@ namespace Lado.Controllers
 
     public class ConversacionViewModel
     {
-        public ApplicationUser Contacto { get; set; }
-        public MensajePrivado UltimoMensaje { get; set; }
+        public ApplicationUser Contacto { get; set; } = null!;
+        public MensajePrivado? UltimoMensaje { get; set; }
         public int MensajesNoLeidos { get; set; }
         public bool TieneConversacion { get; set; }
+    }
+
+    public class MarcarLeidosRequest
+    {
+        public int[] MensajeIds { get; set; } = Array.Empty<int>();
     }
 }

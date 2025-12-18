@@ -152,4 +152,15 @@
         Registrarse = 4,
         MasInformacion = 5
     }
+
+    // ====================================
+    // ENUMS PARA SISTEMA DE MENSAJES
+    // ====================================
+
+    public enum TipoMensaje
+    {
+        Texto = 0,
+        Imagen = 1,
+        Video = 2
+    }
 }

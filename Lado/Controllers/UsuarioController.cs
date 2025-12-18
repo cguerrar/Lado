@@ -618,6 +618,31 @@ namespace Lado.Controllers
             return Json(new { success = true, message = $"Idioma cambiado a {nombreIdioma}" });
         }
 
+        // POST: /Usuario/CambiarLadoPreferido
+        [HttpPost]
+        public async Task<IActionResult> CambiarLadoPreferido([FromBody] CambiarLadoPreferidoRequest request)
+        {
+            // Validar lado
+            if (request.LadoPreferido < 0 || request.LadoPreferido > 1)
+            {
+                return Json(new { success = false, message = "Lado no válido" });
+            }
+
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            // Guardar el lado preferido
+            usuario.LadoPreferido = (TipoLado)request.LadoPreferido;
+            await _userManager.UpdateAsync(usuario);
+
+            var nombreLado = request.LadoPreferido == 0 ? "Lado A" : "Lado B";
+
+            return Json(new { success = true, message = $"Lado preferido cambiado a {nombreLado}" });
+        }
+
         // GET: /Usuario/ActividadReciente
         public async Task<IActionResult> ActividadReciente(int pagina = 1, string tipo = "todas")
         {
@@ -1235,6 +1260,11 @@ namespace Lado.Controllers
     public class CambiarIdiomaRequest
     {
         public string Idioma { get; set; } = "es";
+    }
+
+    public class CambiarLadoPreferidoRequest
+    {
+        public int LadoPreferido { get; set; } = 0;
     }
 
     // DTO para notificaciones

@@ -1,4 +1,7 @@
-﻿namespace Lado.Models
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace Lado.Models
 {
     public class MensajePrivado
     {
@@ -10,6 +13,56 @@
         public bool Leido { get; set; } = false;
         public bool EliminadoPorRemitente { get; set; } = false;
         public bool EliminadoPorDestinatario { get; set; } = false;
+
+        // ========================================
+        // ARCHIVOS ADJUNTOS
+        // ========================================
+
+        /// <summary>
+        /// Tipo de mensaje: Texto, Imagen, Video
+        /// </summary>
+        public TipoMensaje TipoMensaje { get; set; } = TipoMensaje.Texto;
+
+        /// <summary>
+        /// Ruta del archivo adjunto (si aplica)
+        /// </summary>
+        [StringLength(500)]
+        public string? RutaArchivo { get; set; }
+
+        /// <summary>
+        /// Nombre original del archivo
+        /// </summary>
+        [StringLength(255)]
+        public string? NombreArchivoOriginal { get; set; }
+
+        /// <summary>
+        /// Tamaño del archivo en bytes
+        /// </summary>
+        public long? TamanoArchivo { get; set; }
+
+        // ========================================
+        // SISTEMA DE RESPUESTAS (HILOS)
+        // ========================================
+
+        /// <summary>
+        /// ID del mensaje al que se responde (null si no es respuesta)
+        /// </summary>
+        public int? MensajeRespondidoId { get; set; }
+
+        /// <summary>
+        /// Navegación al mensaje respondido
+        /// </summary>
+        [ForeignKey("MensajeRespondidoId")]
+        public virtual MensajePrivado? MensajeRespondido { get; set; }
+
+        /// <summary>
+        /// Fecha en que se leyó el mensaje
+        /// </summary>
+        public DateTime? FechaLectura { get; set; }
+
+        // ========================================
+        // RELACIONES
+        // ========================================
 
         public ApplicationUser? Remitente { get; set; }
         public ApplicationUser? Destinatario { get; set; }

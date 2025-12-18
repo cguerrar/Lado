@@ -91,9 +91,7 @@ namespace Lado.Services
                     return;
                 }
 
-                var nombreMostrar = tipoLado == TipoLado.LadoB && !string.IsNullOrEmpty(creador.Seudonimo)
-                    ? creador.Seudonimo
-                    : creador.NombreCompleto;
+                var nombreMostrar = $"@{creador.UserName}";
 
                 var descripcionCorta = descripcion?.Length > 50
                     ? descripcion.Substring(0, 47) + "..."
@@ -143,7 +141,7 @@ namespace Lado.Services
                     UsuarioOrigenId = seguidorId,
                     Tipo = TipoNotificacion.NuevoSeguidor,
                     Titulo = "Nuevo seguidor",
-                    Mensaje = $"{seguidor.NombreCompleto} comenzó a seguirte",
+                    Mensaje = $"@{seguidor.UserName} comenzó a seguirte",
                     UrlDestino = $"/Feed/Perfil/{seguidor.UserName}",
                     ImagenUrl = seguidor.FotoPerfil,
                     FechaCreacion = DateTime.Now,
@@ -218,7 +216,7 @@ namespace Lado.Services
                     UsuarioOrigenId = usuarioLikeId,
                     Tipo = TipoNotificacion.NuevoLike,
                     Titulo = "Nuevo like",
-                    Mensaje = $"A {usuarioLike.NombreCompleto} le gustó tu publicación",
+                    Mensaje = $"A @{usuarioLike.UserName} le gustó tu publicación",
                     ContenidoId = contenidoId,
                     UrlDestino = $"/Feed/Detalle/{contenidoId}",
                     ImagenUrl = usuarioLike.FotoPerfil,
@@ -258,7 +256,7 @@ namespace Lado.Services
                     UsuarioOrigenId = usuarioComentarioId,
                     Tipo = TipoNotificacion.NuevoComentario,
                     Titulo = "Nuevo comentario",
-                    Mensaje = $"{usuarioComentario.NombreCompleto} comentó en tu publicación",
+                    Mensaje = $"@{usuarioComentario.UserName} comentó en tu publicación",
                     ContenidoId = contenidoId,
                     ComentarioId = comentarioId,
                     UrlDestino = $"/Feed/Detalle/{contenidoId}",
@@ -307,7 +305,7 @@ namespace Lado.Services
                     UsuarioOrigenId = remitenteId,
                     Tipo = TipoNotificacion.NuevoMensaje,
                     Titulo = "Nuevo mensaje",
-                    Mensaje = $"{remitente.NombreCompleto} te envió un mensaje",
+                    Mensaje = $"@{remitente.UserName} te envió un mensaje",
                     MensajeId = mensajeId,
                     UrlDestino = $"/Mensajes?chat={remitenteId}",
                     ImagenUrl = remitente.FotoPerfil,
@@ -345,7 +343,7 @@ namespace Lado.Services
                     UsuarioOrigenId = suscriptorId,
                     Tipo = TipoNotificacion.NuevaSuscripcion,
                     Titulo = "Nueva suscripción",
-                    Mensaje = $"{suscriptor.NombreCompleto} se suscribió a tu contenido",
+                    Mensaje = $"@{suscriptor.UserName} se suscribió a tu contenido",
                     UrlDestino = $"/Feed/Perfil/{suscriptor.UserName}",
                     ImagenUrl = suscriptor.FotoPerfil,
                     FechaCreacion = DateTime.Now,

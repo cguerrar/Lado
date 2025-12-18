@@ -993,7 +993,7 @@
                         <button type="submit" class="btn btn-subscribe">Suscribirse</button>
                     </form>
                 }
-                <button class="btn btn-message" data-bs-toggle="modal" data-bs-target="#messageModal">Mensaje</button>
+                <a href="/Mensajes/Chat/@Model.Id" class="btn btn-message">Mensaje</a>
                 @if (estaSuscrito)
                 {
                     <button class="btn btn-cancel" data-bs-toggle="modal" data-bs-target="#cancelModal">Suscrito</button>
@@ -1400,14 +1400,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     const modal = bootstrap.Modal.getInstance(messageModal);
                     if (modal) modal.hide();
 
-                    // Mostrar éxito con toast elegante
-                    showToast(monto > 0 ? '¡Mensaje y propina enviados!' : '¡Mensaje enviado!', 'success');
-
                     // Limpiar formulario
                     messageForm.reset();
                     if (tipSection) tipSection.classList.remove('active');
                     if (btnEnviarTexto) btnEnviarTexto.textContent = 'Enviar Mensaje';
                     if (montoBtns) montoBtns.forEach(b => b.classList.remove('active'));
+
+                    // Mostrar toast con opcion de ir a la conversacion
+                    showMessageSentToast(creadorId, monto > 0);
                 } else {
                     if (result.requiereRecarga) {
                         const confirmed = await showConfirm('Saldo insuficiente', result.message + '\n\n¿Deseas recargar saldo?');
@@ -1428,6 +1428,48 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Toast especial con opcion de ir a la conversacion
+function showMessageSentToast(creadorId, conPropina) {
+    // Remover toast anterior si existe
+    const existingToast = document.getElementById('messageSentToast');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'messageSentToast';
+    toast.innerHTML = `
+        <div style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1e293b;color:white;padding:16px 20px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.2);z-index:9999;display:flex;align-items:center;gap:16px;max-width:90%;animation:slideUp 0.3s ease">
+            <div style="display:flex;align-items:center;gap:10px">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                <span style="font-weight:600">${conPropina ? 'Mensaje y propina enviados' : 'Mensaje enviado'}</span>
+            </div>
+            <a href="/Mensajes/Chat/${creadorId}" style="background:#4682B4;color:white;padding:8px 16px;border-radius:8px;font-weight:600;font-size:0.9rem;text-decoration:none;white-space:nowrap">
+                Ir al chat
+            </a>
+            <button onclick="this.closest('#messageSentToast').remove()" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:4px">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        <style>
+            @@keyframes slideUp {
+                from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+                to { opacity: 1; transform: translateX(-50%) translateY(0); }
+            }
+        </style>
+    `;
+    document.body.appendChild(toast);
+
+    // Auto-cerrar despues de 8 segundos
+    setTimeout(() => {
+        if (document.getElementById('messageSentToast')) {
+            toast.remove();
+        }
+    }, 8000);
+}
 </script>
 
 <div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true">

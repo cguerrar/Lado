@@ -163,6 +163,12 @@ namespace Lado.Models
         [StringLength(5)]
         public string Idioma { get; set; } = "es"; // es = Español, en = English, pt = Português
 
+        // ========================================
+        // PREFERENCIA DE LADO (A o B)
+        // ========================================
+        [Display(Name = "Lado Preferido")]
+        public TipoLado LadoPreferido { get; set; } = TipoLado.LadoA; // LadoA = Público, LadoB = Premium
+
         // Relacion con Agencia (si TipoUsuario == 2)
         public virtual Agencia? Agencia { get; set; }
 

@@ -109,9 +109,20 @@ namespace Lado.Models
         public string? RazonCensura { get; set; }
 
         /// <summary>
+        /// Si es true, el contenido se muestra con advertencia de contenido sensible
+        /// (el usuario debe hacer clic para ver)
+        /// </summary>
+        public bool EsContenidoSensible { get; set; } = false;
+
+        /// <summary>
         /// Si es true, el contenido solo es visible para el creador (privado)
         /// </summary>
         public bool EsPrivado { get; set; } = false;
+
+        /// <summary>
+        /// Si es true, los comentarios están desactivados para este contenido
+        /// </summary>
+        public bool ComentariosDesactivados { get; set; } = false;
 
         // ========================================
         // MÉTRICAS
@@ -145,5 +156,68 @@ namespace Lado.Models
         public ICollection<ContenidoColeccion> Colecciones { get; set; } = new List<ContenidoColeccion>();
 
         public ICollection<CompraContenido> Compras { get; set; } = new List<CompraContenido>();
+
+        // ========================================
+        // MÚLTIPLES ARCHIVOS (CARRUSEL)
+        // ========================================
+
+        /// <summary>
+        /// Colección de archivos del post (carrusel).
+        /// Si está vacío, usar RutaArchivo para compatibilidad.
+        /// </summary>
+        public ICollection<ArchivoContenido> Archivos { get; set; } = new List<ArchivoContenido>();
+
+        /// <summary>
+        /// Indica si este contenido tiene múltiples archivos (es carrusel)
+        /// </summary>
+        [NotMapped]
+        public bool EsCarrusel => Archivos?.Count > 1;
+
+        /// <summary>
+        /// Obtiene todos los archivos del contenido (compatibilidad con posts antiguos)
+        /// </summary>
+        [NotMapped]
+        public List<ArchivoContenido> TodosLosArchivos
+        {
+            get
+            {
+                // Si tiene archivos en la colección, usarlos
+                if (Archivos?.Any() == true)
+                {
+                    return Archivos.OrderBy(a => a.Orden).ToList();
+                }
+
+                // Compatibilidad con posts antiguos que solo tienen RutaArchivo
+                if (!string.IsNullOrEmpty(RutaArchivo))
+                {
+                    return new List<ArchivoContenido>
+                    {
+                        new ArchivoContenido
+                        {
+                            Id = 0,
+                            ContenidoId = Id,
+                            RutaArchivo = RutaArchivo,
+                            Orden = 0,
+                            TipoArchivo = TipoContenido == TipoContenido.Video ? TipoArchivo.Video : TipoArchivo.Foto,
+                            Thumbnail = Thumbnail
+                        }
+                    };
+                }
+
+                return new List<ArchivoContenido>();
+            }
+        }
+
+        /// <summary>
+        /// Obtiene la URL del primer archivo (para previews y thumbnails)
+        /// </summary>
+        [NotMapped]
+        public string? PrimerArchivo => TodosLosArchivos.FirstOrDefault()?.RutaArchivo ?? RutaArchivo;
+
+        /// <summary>
+        /// Número total de archivos en el post
+        /// </summary>
+        [NotMapped]
+        public int NumeroArchivos => TodosLosArchivos.Count;
     }
 }

@@ -282,5 +282,44 @@ document.querySelectorAll('input[name="metodoPago"]').forEach(function(radio) {
         }
     });
 });
+
+// Procesar recarga via AJAX
+document.getElementById('formRecarga').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    var monto = parseFloat(document.getElementById('montoInput').value) || 0;
+    if (monto < 10) {
+        alert('El monto minimo de recarga es $10.00');
+        return;
+    }
+
+    var submitBtn = this.querySelector('button[type="submit"]');
+    var originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Procesando...';
+
+    try {
+        var formData = new FormData(this);
+        var response = await fetch('/Agencia/ProcesarRecarga', {
+            method: 'POST',
+            body: formData
+        });
+
+        var data = await response.json();
+
+        if (data.success) {
+            alert('Recarga procesada exitosamente. Nuevo saldo: $' + data.nuevoSaldo.toFixed(2));
+            window.location.reload();
+        } else {
+            alert(data.message || 'Error al procesar la recarga');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al procesar la recarga. Intenta nuevamente.');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    }
+});
 </script>
 }

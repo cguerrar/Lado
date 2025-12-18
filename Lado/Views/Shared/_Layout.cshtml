@@ -4,6 +4,7 @@
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
 @inject ApplicationDbContext Context
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 
 @{
 	var usuario = await UserManager.GetUserAsync(User);
@@ -1235,30 +1236,88 @@
 		   ======================================== */
 		.modal {
 			z-index: 10000000 !important;
+			position: fixed !important;
+			top: 0 !important;
+			left: 0 !important;
+			width: 100% !important;
+			height: 100% !important;
+			pointer-events: auto !important;
 		}
 		.modal-backdrop {
 			z-index: 9999999 !important;
+			position: fixed !important;
+			top: 0 !important;
+			left: 0 !important;
+			width: 100vw !important;
+			height: 100vh !important;
 		}
 		.modal.show {
 			display: flex !important;
 			align-items: center;
 			justify-content: center;
+			pointer-events: auto !important;
 		}
 		.modal-dialog {
 			pointer-events: auto !important;
+			position: relative !important;
+			z-index: 10000001 !important;
+			margin: auto !important;
 		}
 		.modal-content {
 			pointer-events: auto !important;
+			position: relative !important;
+			z-index: 10000002 !important;
 		}
 		.modal input,
 		.modal textarea,
 		.modal button,
 		.modal select,
-		.modal a {
+		.modal a,
+		.modal label,
+		.modal .form-control,
+		.modal .form-select,
+		.modal .btn {
 			pointer-events: auto !important;
+			position: relative !important;
+			z-index: 10000003 !important;
+		}
+		/* Asegurar que el modal-body sea scrolleable si es necesario */
+		.modal-body {
+			pointer-events: auto !important;
+			overflow-y: auto !important;
 		}
 
 	</style>
+
+	<!-- CSRF Token para peticiones AJAX -->
+	@{
+		var tokens = Antiforgery.GetAndStoreTokens(ViewContext.HttpContext);
+	}
+	<script>
+		// Token CSRF global para peticiones AJAX
+		window.csrfToken = '@tokens.RequestToken';
+		window.csrfHeaderName = '@tokens.HeaderName';
+
+		// Helper para hacer peticiones POST con CSRF
+		window.fetchWithCsrf = async function(url, options = {}) {
+			const defaultOptions = {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'@tokens.HeaderName': '@tokens.RequestToken'
+				}
+			};
+			const mergedOptions = {
+				...defaultOptions,
+				...options,
+				headers: {
+					...defaultOptions.headers,
+					...(options.headers || {})
+				}
+			};
+			return fetch(url, mergedOptions);
+		};
+	</script>
 </head>
 <body class="@(User.Identity?.IsAuthenticated != true ? "no-sidebar" : "")">
 	@if (User.Identity?.IsAuthenticated == true)
@@ -1499,7 +1558,7 @@
 				</button>
 
 				<!-- Theme Toggle -->
-				<button class="theme-toggle" onclick="toggleTheme()" aria-label="@Localizer.Get("Settings_Theme")">
+				<button type="button" class="theme-toggle" id="themeToggleBtn" aria-label="@Localizer.Get("Settings_Theme")">
 					<svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 						<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
 					</svg>
@@ -1597,23 +1656,195 @@
 	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 	<!-- iOS Audio/Video Compatibility Fix -->
 	<script src="~/js/ios-audio-fix.js" asp-append-version="true"></script>
+
+	<!-- FIX GLOBAL: Asegurar que todos los modales Bootstrap funcionen correctamente -->
+	<script>
+	(function() {
+		// Esperar a que el DOM esté listo
+		document.addEventListener('DOMContentLoaded', function() {
+			// Mover todos los modales al body para evitar problemas de stacking context
+			var modales = document.querySelectorAll('.modal');
+			modales.forEach(function(modal) {
+				if (modal.parentElement !== document.body) {
+					document.body.appendChild(modal);
+				}
+			});
+
+			// Configurar cada modal para asegurar interactividad
+			modales.forEach(function(modal) {
+				// Cuando el modal se muestra
+				modal.addEventListener('show.bs.modal', function() {
+					// Eliminar cualquier estilo inline que pueda interferir
+					document.body.style.overflow = 'hidden';
+					document.body.style.paddingRight = '0px';
+				});
+
+				modal.addEventListener('shown.bs.modal', function() {
+					// Asegurar que el modal sea interactivo
+					this.style.pointerEvents = 'auto';
+					this.style.display = 'block';
+
+					var dialog = this.querySelector('.modal-dialog');
+					var content = this.querySelector('.modal-content');
+
+					if (dialog) {
+						dialog.style.pointerEvents = 'auto';
+						dialog.style.transform = 'none';
+					}
+					if (content) {
+						content.style.pointerEvents = 'auto';
+					}
+
+					// Asegurar que todos los inputs sean interactivos
+					var inputs = this.querySelectorAll('input, select, textarea, button');
+					inputs.forEach(function(input) {
+						input.style.pointerEvents = 'auto';
+					});
+
+					// Enfocar el primer input
+					var primerInput = this.querySelector('input:not([type="hidden"]), select, textarea');
+					if (primerInput) {
+						setTimeout(function() { primerInput.focus(); }, 100);
+					}
+				});
+
+				modal.addEventListener('hidden.bs.modal', function() {
+					document.body.style.overflow = '';
+					document.body.style.paddingRight = '';
+				});
+			});
+		});
+
+		// También manejar modales que se agreguen dinámicamente
+		var observer = new MutationObserver(function(mutations) {
+			mutations.forEach(function(mutation) {
+				mutation.addedNodes.forEach(function(node) {
+					if (node.nodeType === 1 && node.classList && node.classList.contains('modal')) {
+						if (node.parentElement !== document.body) {
+							document.body.appendChild(node);
+						}
+					}
+				});
+			});
+		});
+
+		observer.observe(document.documentElement, { childList: true, subtree: true });
+	})();
+	</script>
+
 	<script>
 		// ========================================
 		// THEME TOGGLE - Modo Oscuro/Claro
+		// Compatible con Safari/iOS (modo privado incluido)
 		// ========================================
+
+		// Función segura para acceder a storage (localStorage o sessionStorage fallback)
+		const ThemeStorage = {
+			_storage: null,
+			_memoryFallback: {},
+
+			init: function() {
+				// Intentar localStorage primero
+				try {
+					const test = '__storage_test__';
+					localStorage.setItem(test, test);
+					localStorage.removeItem(test);
+					this._storage = localStorage;
+					return;
+				} catch (e) {
+					// localStorage no disponible (Safari privado)
+				}
+
+				// Intentar sessionStorage como fallback
+				try {
+					const test = '__storage_test__';
+					sessionStorage.setItem(test, test);
+					sessionStorage.removeItem(test);
+					this._storage = sessionStorage;
+					return;
+				} catch (e) {
+					// sessionStorage tampoco disponible
+				}
+
+				// Usar memoria como último recurso
+				this._storage = null;
+			},
+
+			getItem: function(key) {
+				if (this._storage) {
+					try {
+						return this._storage.getItem(key);
+					} catch (e) {
+						return this._memoryFallback[key] || null;
+					}
+				}
+				return this._memoryFallback[key] || null;
+			},
+
+			setItem: function(key, value) {
+				if (this._storage) {
+					try {
+						this._storage.setItem(key, value);
+						return;
+					} catch (e) {
+						// Fallback a memoria
+					}
+				}
+				this._memoryFallback[key] = value;
+			}
+		};
+
+		// Inicializar storage
+		ThemeStorage.init();
+
+		// Aplicar tema guardado al cargar
 		(function() {
-			const savedTheme = localStorage.getItem('theme') || 'light';
+			const savedTheme = ThemeStorage.getItem('theme') || 'light';
 			document.documentElement.setAttribute('data-theme', savedTheme);
 		})();
 
 		function toggleTheme() {
 			const html = document.documentElement;
-			const currentTheme = html.getAttribute('data-theme');
+			const currentTheme = html.getAttribute('data-theme') || 'light';
 			const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
 
+			// Aplicar el nuevo tema inmediatamente
 			html.setAttribute('data-theme', newTheme);
-			localStorage.setItem('theme', newTheme);
+
+			// Guardar preferencia
+			ThemeStorage.setItem('theme', newTheme);
+
+			// Forzar repaint en iOS (fix para algunos dispositivos)
+			html.style.display = 'none';
+			html.offsetHeight; // Trigger reflow
+			html.style.display = '';
 		}
+
+		// Agregar event listener robusto para iOS
+		document.addEventListener('DOMContentLoaded', function() {
+			const themeBtn = document.getElementById('themeToggleBtn');
+			if (themeBtn) {
+				let lastToggle = 0;
+
+				function handleToggle(e) {
+					e.preventDefault();
+					e.stopPropagation();
+
+					// Debounce para evitar doble toggle (touchend + click)
+					const now = Date.now();
+					if (now - lastToggle < 300) return;
+					lastToggle = now;
+
+					toggleTheme();
+				}
+
+				// Usar addEventListener (más confiable en iOS)
+				themeBtn.addEventListener('click', handleToggle, { passive: false });
+
+				// También agregar touchend para iOS (algunos modelos lo necesitan)
+				themeBtn.addEventListener('touchend', handleToggle, { passive: false });
+			}
+		});
 
 		function toggleSidebar() {
 			const sidebar = document.getElementById('sidebar');

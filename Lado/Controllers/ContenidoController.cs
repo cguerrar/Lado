@@ -17,19 +17,22 @@ namespace Lado.Controllers
         private readonly IWebHostEnvironment _environment;
         private readonly ILogger<ContenidoController> _logger;
         private readonly INotificationService _notificationService;
+        private readonly IImageService _imageService;
 
         public ContenidoController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             IWebHostEnvironment environment,
             ILogger<ContenidoController> logger,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IImageService imageService)
         {
             _context = context;
             _userManager = userManager;
             _environment = environment;
             _logger = logger;
             _notificationService = notificationService;
+            _imageService = imageService;
         }
 
         // ========================================
@@ -102,9 +105,10 @@ namespace Lado.Controllers
             }
 
             ViewBag.UsuarioVerificado = user.CreadorVerificado;
+            ViewBag.LadoPreferido = user.LadoPreferido;
 
-            _logger.LogInformation("GET Crear - Usuario: {Username}, Verificado: {Verificado}",
-                user.UserName, user.CreadorVerificado);
+            _logger.LogInformation("GET Crear - Usuario: {Username}, Verificado: {Verificado}, LadoPreferido: {LadoPreferido}",
+                user.UserName, user.CreadorVerificado, user.LadoPreferido);
 
             return View();
         }
@@ -220,11 +224,13 @@ namespace Lado.Controllers
                     }
 
                     var extension = Path.GetExtension(archivo.FileName).ToLower();
-                    var tiposPermitidos = new[] { ".jpg", ".jpeg", ".png", ".gif", ".mp4", ".mov", ".avi", ".webm" };
+                    var tiposPermitidosImg = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".bmp" };
+                    var tiposPermitidosVideo = new[] { ".mp4", ".mov", ".avi", ".webm", ".m4v", ".3gp" };
+                    var tiposPermitidos = tiposPermitidosImg.Concat(tiposPermitidosVideo).ToArray();
 
                     if (!tiposPermitidos.Contains(extension))
                     {
-                        TempData["Error"] = "Tipo de archivo no permitido";
+                        TempData["Error"] = "Tipo de archivo no permitido. Formatos válidos: JPG, PNG, GIF, WEBP, HEIC, MP4, MOV, AVI";
                         ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
                         return View();
                     }
@@ -247,6 +253,17 @@ namespace Lado.Controllers
 
                     contenido.RutaArchivo = $"/uploads/{carpetaUsuario}/{uniqueFileName}";
                     _logger.LogInformation("Archivo guardado: {RutaArchivo}", contenido.RutaArchivo);
+
+                    // Generar thumbnail para imágenes
+                    if (_imageService.EsImagenValida(extension))
+                    {
+                        var thumbnail = await _imageService.GenerarThumbnailAsync(filePath, 400, 400, 75);
+                        if (!string.IsNullOrEmpty(thumbnail))
+                        {
+                            contenido.Thumbnail = thumbnail;
+                            _logger.LogInformation("Thumbnail generado: {Thumbnail}", thumbnail);
+                        }
+                    }
                 }
 
                 _context.Contenidos.Add(contenido);
@@ -291,6 +308,213 @@ namespace Lado.Controllers
                 TempData["Error"] = $"Error al crear contenido: {ex.Message}";
                 ViewBag.UsuarioVerificado = false;
                 return View();
+            }
+        }
+
+        // ========================================
+        // CREAR CARRUSEL (MÚLTIPLES ARCHIVOS)
+        // ========================================
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CrearCarrusel(
+            List<IFormFile> archivos,
+            string Descripcion,
+            bool EsGratis,
+            decimal? PrecioDesbloqueo = null,
+            bool EsBorrador = false,
+            bool EsPublicoGeneral = false)
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+
+                if (usuario == null)
+                {
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                // Validar que hay archivos
+                if (archivos == null || !archivos.Any())
+                {
+                    return Json(new { success = false, message = "Debes seleccionar al menos un archivo" });
+                }
+
+                // Límite de 10 archivos por carrusel
+                if (archivos.Count > 10)
+                {
+                    return Json(new { success = false, message = "Máximo 10 archivos por publicación" });
+                }
+
+                _logger.LogInformation("=== CREAR CARRUSEL ===");
+                _logger.LogInformation("Usuario: {Username}, Archivos: {Count}", usuario.UserName, archivos.Count);
+
+                // Validar verificación para monetización
+                var intentaPublicarEnLadoB = !EsGratis;
+                if (!EsGratis && !usuario.CreadorVerificado)
+                {
+                    EsGratis = true;
+                    PrecioDesbloqueo = 0;
+                }
+
+                // Validar precio
+                if (!EsGratis && usuario.CreadorVerificado)
+                {
+                    if (!PrecioDesbloqueo.HasValue || PrecioDesbloqueo <= 0)
+                        PrecioDesbloqueo = 10m;
+
+                    if (PrecioDesbloqueo % 5 != 0)
+                    {
+                        return Json(new { success = false, message = "El precio debe ser un múltiplo de 5" });
+                    }
+                }
+
+                var tipoLado = intentaPublicarEnLadoB ? TipoLado.LadoB : TipoLado.LadoA;
+                var nombreMostrado = tipoLado == TipoLado.LadoA ? usuario.NombreCompleto : usuario.Seudonimo;
+
+                // Determinar tipo de contenido (si hay video, es video; si no, foto)
+                var extensionesVideo = new[] { ".mp4", ".mov", ".avi", ".webm", ".m4v", ".3gp" };
+                var tieneVideo = archivos.Any(a =>
+                {
+                    var ext = Path.GetExtension(a.FileName).ToLower();
+                    return extensionesVideo.Contains(ext);
+                });
+
+                var contenido = new Contenido
+                {
+                    UsuarioId = usuario.Id,
+                    TipoContenido = tieneVideo ? Models.TipoContenido.Video : Models.TipoContenido.Foto,
+                    Descripcion = Descripcion ?? "",
+                    TipoLado = tipoLado,
+                    EsGratis = EsGratis,
+                    NombreMostrado = nombreMostrado,
+                    EsPremium = !EsGratis,
+                    PrecioDesbloqueo = EsGratis ? 0m : (PrecioDesbloqueo ?? 0m),
+                    EsBorrador = EsBorrador,
+                    FechaPublicacion = DateTime.Now,
+                    EstaActivo = true,
+                    NumeroLikes = 0,
+                    NumeroComentarios = 0,
+                    NumeroVistas = 0,
+                    EsPublicoGeneral = tipoLado == TipoLado.LadoA && EsPublicoGeneral
+                };
+
+                // Guardar contenido primero para obtener el ID
+                _context.Contenidos.Add(contenido);
+                await _context.SaveChangesAsync();
+
+                // Procesar cada archivo
+                var carpetaUsuario = usuario.UserName?.Replace("@", "_").Replace(".", "_") ?? usuario.Id;
+                var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", carpetaUsuario);
+
+                if (!Directory.Exists(uploadsFolder))
+                {
+                    Directory.CreateDirectory(uploadsFolder);
+                }
+
+                var tiposPermitidosImg = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".bmp" };
+                var tiposPermitidosVideo = new[] { ".mp4", ".mov", ".avi", ".webm", ".m4v", ".3gp" };
+                var archivosGuardados = new List<ArchivoContenido>();
+
+                for (int i = 0; i < archivos.Count; i++)
+                {
+                    var archivo = archivos[i];
+
+                    if (archivo.Length > 100 * 1024 * 1024) // 100 MB
+                    {
+                        continue; // Saltar archivos muy grandes
+                    }
+
+                    var extension = Path.GetExtension(archivo.FileName).ToLower();
+                    var esVideo = tiposPermitidosVideo.Contains(extension);
+                    var esFoto = tiposPermitidosImg.Contains(extension);
+
+                    if (!esVideo && !esFoto)
+                    {
+                        continue; // Saltar tipos no permitidos
+                    }
+
+                    var uniqueFileName = $"{Guid.NewGuid()}{extension}";
+                    var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                    using (var fileStream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await archivo.CopyToAsync(fileStream);
+                    }
+
+                    var archivoContenido = new ArchivoContenido
+                    {
+                        ContenidoId = contenido.Id,
+                        RutaArchivo = $"/uploads/{carpetaUsuario}/{uniqueFileName}",
+                        Orden = i,
+                        TipoArchivo = esVideo ? TipoArchivo.Video : TipoArchivo.Foto,
+                        TamanoBytes = archivo.Length,
+                        FechaCreacion = DateTime.Now
+                    };
+
+                    // Generar thumbnail para imágenes
+                    if (esFoto && _imageService.EsImagenValida(extension))
+                    {
+                        var thumbnail = await _imageService.GenerarThumbnailAsync(filePath, 400, 400, 75);
+                        if (!string.IsNullOrEmpty(thumbnail))
+                        {
+                            archivoContenido.Thumbnail = thumbnail;
+                        }
+                    }
+
+                    archivosGuardados.Add(archivoContenido);
+                    _logger.LogInformation("Archivo {Index} guardado: {Ruta}", i, archivoContenido.RutaArchivo);
+                }
+
+                if (!archivosGuardados.Any())
+                {
+                    // Si no se guardó ningún archivo válido, eliminar el contenido
+                    _context.Contenidos.Remove(contenido);
+                    await _context.SaveChangesAsync();
+                    return Json(new { success = false, message = "No se pudo procesar ningún archivo válido" });
+                }
+
+                // Guardar archivos en BD
+                _context.ArchivosContenido.AddRange(archivosGuardados);
+
+                // Establecer el primer archivo como RutaArchivo principal (compatibilidad)
+                contenido.RutaArchivo = archivosGuardados.First().RutaArchivo;
+
+                // Establecer thumbnail del contenido principal (usar el thumbnail generado si existe)
+                var primeraImagen = archivosGuardados.FirstOrDefault(a => a.TipoArchivo == TipoArchivo.Foto);
+                if (primeraImagen != null)
+                {
+                    // Usar thumbnail generado si existe, sino usar imagen original
+                    contenido.Thumbnail = primeraImagen.Thumbnail ?? primeraImagen.RutaArchivo;
+                }
+                // Si solo hay videos, dejar Thumbnail null para que la vista use el tag <video>
+
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("✅ Carrusel creado - ID: {Id}, Archivos: {Count}", contenido.Id, archivosGuardados.Count);
+
+                // Notificar a seguidores
+                if (!EsBorrador)
+                {
+                    _ = _notificationService.NotificarNuevoContenidoAsync(
+                        usuario.Id,
+                        contenido.Id,
+                        contenido.Descripcion ?? "Nuevo contenido",
+                        tipoLado);
+                }
+
+                return Json(new
+                {
+                    success = true,
+                    message = $"Carrusel publicado con {archivosGuardados.Count} archivos",
+                    contenidoId = contenido.Id,
+                    archivos = archivosGuardados.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al crear carrusel");
+                return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }
 
@@ -398,6 +622,14 @@ namespace Lado.Controllers
 
                 var rutaArchivo = $"/uploads/{carpetaUsuario}/{uniqueFileName}";
 
+                // Generar thumbnail para imágenes
+                string? thumbnailPath = null;
+                if (tipoContenido == TipoContenido.Foto && _imageService.EsImagenValida(extension))
+                {
+                    thumbnailPath = await _imageService.GenerarThumbnailAsync(filePath, 400, 400, 75);
+                    _logger.LogInformation("Thumbnail generado: {Thumbnail}", thumbnailPath);
+                }
+
                 // Crear contenido
                 var contenido = new Contenido
                 {
@@ -416,6 +648,7 @@ namespace Lado.Controllers
                     NumeroComentarios = 0,
                     NumeroVistas = 0,
                     RutaArchivo = rutaArchivo,
+                    Thumbnail = thumbnailPath,
                     EsPublicoGeneral = esPublicoGeneral,
                     // Música asociada
                     PistaMusicalId = audioTrackId,

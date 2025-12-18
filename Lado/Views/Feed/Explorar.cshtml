@@ -201,11 +201,19 @@
         object-fit: cover;
         display: block;
         transition: transform 0.3s ease;
+        background: var(--bg-tertiary);
     }
 
     .explore-item:hover img,
     .explore-item:hover video {
         transform: scale(1.05);
+    }
+
+    /* Fallback para imágenes que fallan */
+    .explore-item img.error {
+        object-fit: contain;
+        padding: 20%;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
     }
 
     .explore-overlay {
@@ -241,12 +249,19 @@
         position: absolute;
         top: 8px;
         right: 8px;
+        background: rgba(0, 0, 0, 0.6);
         color: white;
-        filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
+        padding: 6px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
     }
 
     .video-badge i {
-        font-size: 16px;
+        font-size: 12px;
     }
 
     .premium-badge {
@@ -295,14 +310,241 @@
     }
 
     /* ========================================
-       TARJETAS DE CREADORES (HORIZONTALES)
+       TARJETAS DE CREADORES - DISEÑO GRID ATRACTIVO
        ======================================== */
     .creators-list {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
     }
 
+    .creator-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+    }
+
+    .creator-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+        border-color: var(--primary);
+    }
+
+    /* Banner/Cover del creador */
+    .creator-card-cover {
+        height: 80px;
+        background: linear-gradient(135deg, var(--primary) 0%, #2c5f8a 100%);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .creator-card-cover::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.08'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+
+    .creator-card.premium .creator-card-cover {
+        background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+    }
+
+    /* Avatar centrado sobre el cover */
+    .creator-card-avatar {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        border: 4px solid var(--surface);
+        overflow: hidden;
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        top: 44px;
+        background: var(--bg-tertiary);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 2;
+    }
+
+    .creator-card-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        /* iOS Safari fix */
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+    }
+
+    .creator-card-avatar-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--primary);
+        background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+    }
+
+    .creator-card.premium .creator-card-avatar-placeholder {
+        color: #8b5cf6;
+        background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+    }
+
+    /* Contenido de la card */
+    .creator-card-body {
+        padding: 44px 16px 16px;
+        text-align: center;
+    }
+
+    .creator-card-name {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--fg);
+        margin-bottom: 2px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .creator-card-verified {
+        color: var(--primary);
+        font-size: 14px;
+    }
+
+    .creator-card.premium .creator-card-verified {
+        color: #8b5cf6;
+    }
+
+    .creator-card-username {
+        font-size: 13px;
+        color: var(--muted);
+        margin-bottom: 8px;
+    }
+
+    .creator-card-bio {
+        font-size: 13px;
+        color: var(--fg-secondary);
+        line-height: 1.4;
+        margin-bottom: 12px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        min-height: 36px;
+    }
+
+    .creator-card-stats {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-bottom: 12px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .creator-stat {
+        text-align: center;
+    }
+
+    .creator-stat-value {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--fg);
+        display: block;
+    }
+
+    .creator-stat-label {
+        font-size: 11px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Badge premium */
+    .creator-card-badge {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: rgba(255, 255, 255, 0.9);
+        color: #8b5cf6;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        z-index: 3;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+    }
+
+    .creator-card-price {
+        font-size: 12px;
+        color: var(--primary);
+        font-weight: 600;
+        margin-bottom: 12px;
+    }
+
+    .creator-card.premium .creator-card-price {
+        color: #8b5cf6;
+    }
+
+    /* Botón seguir en card */
+    .btn-follow-card {
+        width: 100%;
+        padding: 10px 16px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        background: var(--primary);
+        color: white;
+    }
+
+    .btn-follow-card:hover {
+        background: #3a7ca5;
+        transform: scale(1.02);
+    }
+
+    .btn-follow-card.following {
+        background: var(--bg-tertiary);
+        color: var(--fg);
+        border: 1px solid var(--line);
+    }
+
+    .btn-follow-card.following:hover {
+        background: #fee2e2;
+        color: #dc2626;
+        border-color: #fecaca;
+    }
+
+    .creator-card.premium .btn-follow-card {
+        background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+    }
+
+    .creator-card.premium .btn-follow-card:hover {
+        background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+    }
+
+    /* Avatar blur para no suscritos premium */
+    .creator-card.premium.not-subscribed .creator-card-avatar img {
+        filter: blur(6px);
+    }
+
+    /* Compatibilidad con modo legacy (filas) */
     .creator-row {
         display: flex;
         align-items: center;
@@ -566,6 +808,224 @@
             font-size: 12px;
         }
     }
+
+    /* =====================================================
+       OVERLAY CONTENIDO SENSIBLE
+    ===================================================== */
+    .sensitive-content-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.15);
+        backdrop-filter: blur(40px) saturate(1.2);
+        -webkit-backdrop-filter: blur(40px) saturate(1.2);
+    }
+
+    .sensitive-warning {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 16px;
+    }
+
+    .sensitive-icon {
+        width: 36px;
+        height: 36px;
+        stroke: rgba(255, 255, 255, 0.85);
+        margin-bottom: 8px;
+    }
+
+    .sensitive-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 8px;
+    }
+
+    .sensitive-reveal-btn {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        color: #fff;
+        padding: 6px 18px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .sensitive-reveal-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: #fff;
+    }
+
+    .sensitive-content-overlay.revealing {
+        animation: sensitiveReveal 0.3s ease forwards;
+    }
+
+    @@keyframes sensitiveReveal {
+        from { opacity: 1; }
+        to { opacity: 0; pointer-events: none; }
+    }
+
+    /* =====================================================
+       COMPATIBILIDAD iOS / SAFARI
+    ===================================================== */
+    /* Fix para imágenes en iOS Safari */
+    .explore-item img,
+    .creator-card-avatar img {
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+        image-rendering: -webkit-optimize-contrast;
+    }
+
+    /* Fix aspect-ratio en iOS < 15 */
+    @@supports not (aspect-ratio: 1) {
+        .explore-item {
+            padding-bottom: 100%;
+            height: 0;
+        }
+        .explore-item > * {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+    }
+
+    /* Fix backdrop-filter en iOS */
+    @@supports (-webkit-touch-callout: none) {
+        .sensitive-content-overlay {
+            background: rgba(0, 0, 0, 0.6);
+        }
+        .creator-card-badge {
+            background: rgba(255, 255, 255, 0.95);
+        }
+    }
+
+    /* Fix videos en iOS - poster y playsinline */
+    .explore-item video {
+        -webkit-playsinline: true;
+        playsinline: true;
+    }
+
+    /* Safe area para notch en iPhone */
+    @@supports (padding-top: env(safe-area-inset-top)) {
+        .explorar-container {
+            padding-left: max(16px, env(safe-area-inset-left));
+            padding-right: max(16px, env(safe-area-inset-right));
+        }
+    }
+
+    /* Fix hover en dispositivos táctiles iOS */
+    @@media (hover: none) and (pointer: coarse) {
+        .explore-item:hover img,
+        .explore-item:hover video {
+            transform: none;
+        }
+
+        .explore-item:active {
+            opacity: 0.8;
+        }
+
+        .creator-card:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        .creator-card:active {
+            transform: scale(0.98);
+        }
+
+        /* Grid más compacto en móviles táctiles */
+        .creators-list {
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+        }
+
+        .creator-card-cover {
+            height: 60px;
+        }
+
+        .creator-card-avatar {
+            width: 56px;
+            height: 56px;
+            top: 32px;
+        }
+
+        .creator-card-body {
+            padding: 32px 12px 12px;
+        }
+
+        .creator-card-name {
+            font-size: 14px;
+        }
+
+        .creator-card-bio {
+            display: none;
+        }
+
+        .creator-card-stats {
+            gap: 12px;
+        }
+
+        .creator-stat-value {
+            font-size: 14px;
+        }
+    }
+
+    /* Efecto día/noche compatible con iOS */
+    @@media (prefers-color-scheme: dark) {
+        .creator-card {
+            background: var(--surface, #1a1a1a);
+            border-color: var(--line, #333);
+        }
+
+        .creator-card-cover {
+            background: linear-gradient(135deg, #3a7ca5 0%, #1e4a6d 100%);
+        }
+
+        .creator-card.premium .creator-card-cover {
+            background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+        }
+
+        .creator-card-avatar {
+            border-color: var(--surface, #1a1a1a);
+        }
+
+        .creator-card-avatar-placeholder {
+            background: linear-gradient(135deg, #1e3a5f 0%, #0f2942 100%);
+            color: #60a5fa;
+        }
+
+        .creator-card-badge {
+            background: rgba(30, 30, 30, 0.9);
+            color: #a78bfa;
+        }
+
+        .btn-follow-card.following {
+            background: #2a2a2a;
+            border-color: #444;
+        }
+
+        .btn-follow-card.following:hover {
+            background: #3d1f1f;
+            color: #f87171;
+            border-color: #5c2626;
+        }
+    }
 </style>
 
 <div class="explorar-container">
@@ -621,17 +1081,17 @@
             {
                 var esVideo = (int)item.TipoContenido == 2;
                 var esPremium = item.TipoLado == Lado.Models.TipoLado.LadoB;
-                <div class="explore-item" onclick="window.location.href='/Feed/Detalle/@item.Id'" data-tipo="@((int)item.TipoContenido)">
+                // Usar thumbnail si existe, sino usar placeholder para videos o la imagen original
+                var tieneThumb = !string.IsNullOrEmpty(item.Thumbnail);
+                var imagenSrc = tieneThumb ? item.Thumbnail : (esVideo ? "/images/video-placeholder.svg" : item.RutaArchivo);
+                <div class="explore-item" onclick="@(item.EsContenidoSensible ? "" : "window.location.href='/Feed/Detalle/" + item.Id + "'")" data-tipo="@((int)item.TipoContenido)" data-post-id="@item.Id" data-video-src="@(esVideo ? item.RutaArchivo : "")">
+                    <!-- Siempre usar imagen para preview (más rápido y compatible con iOS) -->
+                    <img src="@imagenSrc" alt="" loading="lazy" decoding="async" class="explore-thumb">
                     @if (esVideo)
                     {
-                        <video src="@item.RutaArchivo" muted preload="metadata"></video>
                         <div class="video-badge">
                             <i class="fas fa-play"></i>
                         </div>
-                    }
-                    else
-                    {
-                        <img src="@item.RutaArchivo" alt="" loading="lazy">
                     }
                     @if (esPremium)
                     {
@@ -639,16 +1099,33 @@
                             <i class="fas fa-crown"></i>
                         </div>
                     }
-                    <div class="explore-overlay">
-                        <div class="explore-stat">
-                            <i class="fas fa-heart"></i>
-                            <span>@item.NumeroLikes</span>
+                    @if (item.EsContenidoSensible)
+                    {
+                        <div class="sensitive-content-overlay" data-post-id="@item.Id">
+                            <div class="sensitive-warning">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="sensitive-icon">
+                                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <line x1="2" y1="2" x2="22" y2="22"></line>
+                                </svg>
+                                <span class="sensitive-title">Contenido Delicado</span>
+                                <button class="sensitive-reveal-btn" onclick="event.stopPropagation(); revelarContenidoSensibleExplorar(event, @item.Id)">Ver</button>
+                            </div>
                         </div>
-                        <div class="explore-stat">
-                            <i class="fas fa-comment"></i>
-                            <span>@item.NumeroComentarios</span>
+                    }
+                    else
+                    {
+                        <div class="explore-overlay">
+                            <div class="explore-stat">
+                                <i class="fas fa-heart"></i>
+                                <span>@item.NumeroLikes</span>
+                            </div>
+                            <div class="explore-stat">
+                                <i class="fas fa-comment"></i>
+                                <span>@item.NumeroComentarios</span>
+                            </div>
                         </div>
-                    </div>
+                    }
                 </div>
             }
         </div>
@@ -686,41 +1163,63 @@
                 @foreach (var creador in creadoresLadoA)
                 {
                     var estaSuscrito = suscripcionesActivas.Contains(creador.Id);
-                    <div class="creator-row" data-name="@creador.NombreCompleto?.ToLower()" data-username="@creador.UserName?.ToLower()">
-                        <div class="creator-row-avatar" onclick="window.location.href='/Feed/Perfil/@creador.Id'">
+                    <div class="creator-card" data-name="@creador.NombreCompleto?.ToLower()" data-username="@creador.UserName?.ToLower()">
+                        <!-- Cover -->
+                        <div class="creator-card-cover" onclick="window.location.href='/Feed/Perfil/@creador.Id'"></div>
+
+                        <!-- Avatar -->
+                        <div class="creator-card-avatar" onclick="window.location.href='/Feed/Perfil/@creador.Id'">
                             @if (!string.IsNullOrEmpty(creador.FotoPerfil))
                             {
-                                <img src="@creador.FotoPerfil" alt="@creador.NombreCompleto">
+                                <img src="@creador.FotoPerfil" alt="@creador.NombreCompleto" loading="lazy" decoding="async">
                             }
                             else
                             {
-                                <div class="creator-row-avatar-placeholder">
+                                <div class="creator-card-avatar-placeholder">
                                     @(creador.NombreCompleto?.Substring(0, 1).ToUpper() ?? "?")
                                 </div>
                             }
                         </div>
-                        <div class="creator-row-info" onclick="window.location.href='/Feed/Perfil/@creador.Id'">
-                            <div class="creator-row-header">
-                                <span class="creator-row-username">@@@creador.UserName</span>
+
+                        <!-- Body -->
+                        <div class="creator-card-body">
+                            <div class="creator-card-name" onclick="window.location.href='/Feed/Perfil/@creador.Id'">
+                                @creador.NombreCompleto
                                 @if (creador.CreadorVerificado)
                                 {
-                                    <i class="fas fa-check-circle creator-row-verified"></i>
+                                    <i class="fas fa-check-circle creator-card-verified"></i>
                                 }
                             </div>
-                            <div class="creator-row-name">@creador.NombreCompleto</div>
+                            <div class="creator-card-username">@@@creador.UserName</div>
+
                             @if (!string.IsNullOrEmpty(creador.Biografia))
                             {
-                                <div class="creator-row-bio">@creador.Biografia</div>
+                                <div class="creator-card-bio">@creador.Biografia</div>
                             }
-                            <div class="creator-row-stats">
-                                <i class="fas fa-users"></i>
-                                <span>@FormatNumber(creador.NumeroSeguidores) seguidores</span>
+                            else
+                            {
+                                <div class="creator-card-bio" style="opacity: 0.5;">Sin biografía</div>
+                            }
+
+                            <div class="creator-card-stats">
+                                <div class="creator-stat">
+                                    <span class="creator-stat-value">@FormatNumber(creador.NumeroSeguidores)</span>
+                                    <span class="creator-stat-label">Seguidores</span>
+                                </div>
                             </div>
-                        </div>
-                        <div class="creator-row-action">
-                            <button class="btn-follow @(estaSuscrito ? "following" : "")"
+
+                            <button class="btn-follow-card @(estaSuscrito ? "following" : "")"
                                     onclick="event.stopPropagation(); toggleFollow('@creador.Id', this, 0)">
-                                @(estaSuscrito ? "Siguiendo" : "Seguir")
+                                @if (estaSuscrito)
+                                {
+                                    <i class="fas fa-check"></i>
+                                    <span>Siguiendo</span>
+                                }
+                                else
+                                {
+                                    <i class="fas fa-plus"></i>
+                                    <span>Seguir</span>
+                                }
                             </button>
                         </div>
                     </div>
@@ -750,48 +1249,74 @@
                 @foreach (var creador in creadoresLadoB)
                 {
                     var estaSuscrito = suscripcionesActivas.Contains(creador.Id);
-                    var cardClass = estaSuscrito ? "creator-row premium" : "creator-row premium not-subscribed";
+                    var cardClass = estaSuscrito ? "creator-card premium" : "creator-card premium not-subscribed";
+                    var fotoAvatar = !string.IsNullOrEmpty(creador.FotoPerfilLadoB) ? creador.FotoPerfilLadoB : creador.FotoPerfil;
+                    var biografia = !string.IsNullOrEmpty(creador.BiografiaLadoB) ? creador.BiografiaLadoB : creador.Biografia;
                     <div class="@cardClass" data-name="@(creador.Seudonimo ?? creador.NombreCompleto)?.ToLower()" data-username="@creador.UserName?.ToLower()">
-                        <div class="creator-row-avatar" onclick="window.location.href='/Feed/Perfil/@creador.Id?verSeudonimo=true'">
-                            @if (!string.IsNullOrEmpty(creador.FotoPerfilLadoB))
+                        <!-- Badge Premium -->
+                        <div class="creator-card-badge">
+                            <i class="fas fa-crown"></i>
+                            VIP
+                        </div>
+
+                        <!-- Cover -->
+                        <div class="creator-card-cover" onclick="window.location.href='/Feed/Perfil/@creador.Id?verSeudonimo=true'"></div>
+
+                        <!-- Avatar -->
+                        <div class="creator-card-avatar" onclick="window.location.href='/Feed/Perfil/@creador.Id?verSeudonimo=true'">
+                            @if (!string.IsNullOrEmpty(fotoAvatar))
                             {
-                                <img src="@creador.FotoPerfilLadoB" alt="@creador.Seudonimo">
-                            }
-                            else if (!string.IsNullOrEmpty(creador.FotoPerfil))
-                            {
-                                <img src="@creador.FotoPerfil" alt="@creador.Seudonimo">
+                                <img src="@fotoAvatar" alt="@(creador.Seudonimo ?? creador.NombreCompleto)" loading="lazy" decoding="async">
                             }
                             else
                             {
-                                <div class="creator-row-avatar-placeholder">
+                                <div class="creator-card-avatar-placeholder">
                                     @((creador.Seudonimo ?? creador.NombreCompleto)?.Substring(0, 1).ToUpper() ?? "?")
                                 </div>
                             }
                         </div>
-                        <div class="creator-row-info" onclick="window.location.href='/Feed/Perfil/@creador.Id?verSeudonimo=true'">
-                            <div class="creator-row-header">
-                                <span class="creator-row-username">@@@(creador.Seudonimo ?? creador.UserName)</span>
-                                <span class="premium-tag"><i class="fas fa-crown"></i> VIP</span>
+
+                        <!-- Body -->
+                        <div class="creator-card-body">
+                            <div class="creator-card-name" onclick="window.location.href='/Feed/Perfil/@creador.Id?verSeudonimo=true'">
+                                @(creador.Seudonimo ?? creador.NombreCompleto)
+                                <i class="fas fa-crown creator-card-verified"></i>
                             </div>
-                            <div class="creator-row-name">@(creador.Seudonimo ?? creador.NombreCompleto)</div>
-                            @if (!string.IsNullOrEmpty(creador.BiografiaLadoB))
+                            <div class="creator-card-username">@@@(creador.Seudonimo ?? creador.UserName)</div>
+
+                            @if (!string.IsNullOrEmpty(biografia))
                             {
-                                <div class="creator-row-bio">@creador.BiografiaLadoB</div>
+                                <div class="creator-card-bio">@biografia</div>
                             }
-                            else if (!string.IsNullOrEmpty(creador.Biografia))
+                            else
                             {
-                                <div class="creator-row-bio">@creador.Biografia</div>
+                                <div class="creator-card-bio" style="opacity: 0.5;">Contenido exclusivo</div>
                             }
-                            <div class="creator-row-stats">
-                                <span class="creator-row-price">$@creador.PrecioSuscripcion.ToString("N2")/mes</span>
-                                <span style="margin: 0 6px;">•</span>
-                                <i class="fas fa-users"></i>
-                                <span>@FormatNumber(creador.NumeroSeguidores)</span>
+
+                            <div class="creator-card-stats">
+                                <div class="creator-stat">
+                                    <span class="creator-stat-value">@FormatNumber(creador.NumeroSeguidores)</span>
+                                    <span class="creator-stat-label">Fans</span>
+                                </div>
                             </div>
-                        </div>
-                        <div class="creator-row-action">
-                            <a href="/Feed/Perfil/@creador.Id?verSeudonimo=true" class="btn-follow" style="text-decoration: none;">
-                                @(estaSuscrito ? "Ver" : "Suscribirse")
+
+                            <div class="creator-card-price">
+                                <i class="fas fa-star"></i> $@creador.PrecioSuscripcion.ToString("N2")/mes
+                            </div>
+
+                            <a href="/Feed/Perfil/@creador.Id?verSeudonimo=true"
+                               class="btn-follow-card @(estaSuscrito ? "following" : "")"
+                               style="text-decoration: none;">
+                                @if (estaSuscrito)
+                                {
+                                    <i class="fas fa-eye"></i>
+                                    <span>Ver perfil</span>
+                                }
+                                else
+                                {
+                                    <i class="fas fa-unlock"></i>
+                                    <span>Suscribirse</span>
+                                }
                             </a>
                         </div>
                     </div>
@@ -821,6 +1346,19 @@
 }
 
 <script>
+        // Manejar errores de carga de imágenes
+        document.addEventListener('DOMContentLoaded', function() {
+            const exploreGrid = document.getElementById('exploreGrid');
+            if (exploreGrid) {
+                exploreGrid.querySelectorAll('.explore-thumb').forEach(img => {
+                    img.addEventListener('error', function() {
+                        this.classList.add('error');
+                        this.src = '/images/video-placeholder.svg';
+                    });
+                });
+            }
+        });
+
         // Estado de la aplicación
         let currentPage = 1;
         let currentTipo = 'todos';
@@ -902,29 +1440,53 @@
                         const div = document.createElement('div');
                         div.className = 'explore-item';
                         div.setAttribute('data-tipo', item.tipoContenido);
-                        div.onclick = () => window.location.href = '/Feed/Detalle/' + item.id;
+                        div.setAttribute('data-post-id', item.id);
+
+                        // Solo agregar onclick si NO es contenido sensible
+                        if (!item.esContenidoSensible) {
+                            div.onclick = () => window.location.href = '/Feed/Detalle/' + item.id;
+                        }
 
                         const isVideo = item.tipoContenido === 2;
                         const premiumBadge = item.esPremium ? '<div class="premium-badge"><i class="fas fa-crown"></i></div>' : '';
+
+                        // Overlay de contenido sensible
+                        const sensitiveOverlay = item.esContenidoSensible ? `
+                            <div class="sensitive-content-overlay" data-post-id="${item.id}">
+                                <div class="sensitive-warning">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="sensitive-icon">
+                                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                        <line x1="2" y1="2" x2="22" y2="22"></line>
+                                    </svg>
+                                    <span class="sensitive-title">Contenido Delicado</span>
+                                    <button class="sensitive-reveal-btn" onclick="event.stopPropagation(); revelarContenidoSensibleExplorar(event, ${item.id})">Ver</button>
+                                </div>
+                            </div>
+                        ` : '';
+
+                        // Overlay normal de estadísticas (solo si no es sensible)
+                        const statsOverlay = item.esContenidoSensible ? '' : `
+                            <div class="explore-overlay">
+                                <div class="explore-stat"><i class="fas fa-heart"></i><span>${item.numeroLikes}</span></div>
+                                <div class="explore-stat"><i class="fas fa-comment"></i><span>${item.numeroComentarios}</span></div>
+                            </div>
+                        `;
 
                         if (isVideo) {
                             div.innerHTML = `
                                 <video src="${item.rutaArchivo}" muted preload="metadata"></video>
                                 <div class="video-badge"><i class="fas fa-play"></i></div>
                                 ${premiumBadge}
-                                <div class="explore-overlay">
-                                    <div class="explore-stat"><i class="fas fa-heart"></i><span>${item.numeroLikes}</span></div>
-                                    <div class="explore-stat"><i class="fas fa-comment"></i><span>${item.numeroComentarios}</span></div>
-                                </div>
+                                ${sensitiveOverlay}
+                                ${statsOverlay}
                             `;
                         } else {
                             div.innerHTML = `
                                 <img src="${item.rutaArchivo}" alt="" loading="lazy">
                                 ${premiumBadge}
-                                <div class="explore-overlay">
-                                    <div class="explore-stat"><i class="fas fa-heart"></i><span>${item.numeroLikes}</span></div>
-                                    <div class="explore-stat"><i class="fas fa-comment"></i><span>${item.numeroComentarios}</span></div>
-                                </div>
+                                ${sensitiveOverlay}
+                                ${statsOverlay}
                             `;
                         }
 
@@ -986,7 +1548,7 @@
             if (!searchInput || !list) return;
 
             const filter = searchInput.value.toLowerCase();
-            const rows = list.querySelectorAll('.creator-row');
+            const rows = list.querySelectorAll('.creator-card');
 
             rows.forEach(row => {
                 const name = row.getAttribute('data-name') || '';
@@ -1107,5 +1669,24 @@
         const exploreGrid = document.getElementById('exploreGrid');
         if (exploreGrid) {
             gridObserver.observe(exploreGrid, { childList: true });
+        }
+
+        // Revelar contenido sensible
+        function revelarContenidoSensibleExplorar(event, postId) {
+            event.stopPropagation();
+            event.preventDefault();
+
+            const overlay = document.querySelector(`.sensitive-content-overlay[data-post-id="${postId}"]`);
+            if (overlay) {
+                overlay.classList.add('revealing');
+                setTimeout(() => {
+                    overlay.remove();
+                    // Re-habilitar click en el item
+                    const item = document.querySelector(`.explore-item[data-post-id="${postId}"]`);
+                    if (item) {
+                        item.onclick = () => window.location.href = '/Feed/Detalle/' + postId;
+                    }
+                }, 300);
+            }
         }
 </script>

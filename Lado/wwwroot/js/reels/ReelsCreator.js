@@ -235,6 +235,9 @@ class ReelsCreator {
                             </svg>
                         </div>
                         <p class="upload-text">Arrastra tu archivo aquí o <span>selecciona</span></p>
+                        <p class="upload-paste-hint">
+                            <kbd>Ctrl</kbd>+<kbd>V</kbd> para pegar desde el portapapeles
+                        </p>
                         <p class="upload-hint">Fotos: JPG, PNG, GIF • Videos: MP4, MOV, WebM</p>
                         <input type="file" id="fileInput" accept="image/*,video/*">
                     </div>

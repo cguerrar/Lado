@@ -543,22 +543,25 @@
     }
     else
     {
+        var suscripcionesLadoA = Model.Count(s => s.TipoLado == Lado.Models.TipoLado.LadoA);
+        var suscripcionesLadoB = Model.Count(s => s.TipoLado == Lado.Models.TipoLado.LadoB);
+        var gastoMensual = Model.Where(s => s.TipoLado == Lado.Models.TipoLado.LadoB).Sum(s => s.PrecioMensual);
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-value primary">@Model.Count</div>
                 <div class="stat-label">Suscripciones Activas</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value success">$@Model.Sum(s => s.PrecioMensual).ToString("N0")</div>
+                <div class="stat-value" style="color: #4682b4;">@suscripcionesLadoA</div>
+                <div class="stat-label">Lado A (Gratis)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: #9333ea;">@suscripcionesLadoB</div>
+                <div class="stat-label">Lado B (Premium)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value success">$@gastoMensual.ToString("N0")</div>
                 <div class="stat-label">Gasto Mensual</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value info">$@((Model.Sum(s => s.PrecioMensual) * 12).ToString("N0"))</div>
-                <div class="stat-label">Gasto Anual Estimado</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value warning">@Model.Count(s => s.RenovacionAutomatica)</div>
-                <div class="stat-label">Renovacion Automatica</div>
             </div>
         </div>
 
@@ -632,9 +635,16 @@
                                             <line x1="12" y1="1" x2="12" y2="23"></line>
                                             <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
                                         </svg>
-                                        Precio mensual
+                                        @(esLadoB ? "Precio mensual" : "Tipo")
                                     </span>
-                                    <span class="sub-detail-value price">$@suscripcion.PrecioMensual.ToString("N2")</span>
+                                    @if (esLadoB)
+                                    {
+                                        <span class="sub-detail-value price">$@suscripcion.PrecioMensual.ToString("N2")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="sub-detail-value" style="color: #4682b4;">Gratis</span>
+                                    }
                                 </div>
                                 <div class="sub-detail-row">
                                     <span class="sub-detail-label">
@@ -648,16 +658,19 @@
                                     </span>
                                     <span class="sub-detail-value">@suscripcion.FechaInicio.ToString("dd MMM yyyy")</span>
                                 </div>
-                                <div class="sub-detail-row">
-                                    <span class="sub-detail-label">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <circle cx="12" cy="12" r="10"></circle>
-                                            <polyline points="12 6 12 12 16 14"></polyline>
-                                        </svg>
-                                        Proxima renovacion
-                                    </span>
-                                    <span class="sub-detail-value">@suscripcion.ProximaRenovacion.ToString("dd MMM yyyy")</span>
-                                </div>
+                                @if (esLadoB)
+                                {
+                                    <div class="sub-detail-row">
+                                        <span class="sub-detail-label">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <polyline points="12 6 12 12 16 14"></polyline>
+                                            </svg>
+                                            Proxima renovacion
+                                        </span>
+                                        <span class="sub-detail-value">@suscripcion.ProximaRenovacion.ToString("dd MMM yyyy")</span>
+                                    </div>
+                                }
                             </div>
 
                             <div class="sub-actions">

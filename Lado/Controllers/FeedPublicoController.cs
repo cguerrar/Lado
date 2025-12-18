@@ -40,19 +40,20 @@ namespace Lado.Controllers
                 var estaAutenticado = User.Identity?.IsAuthenticated ?? false;
                 ViewBag.EstaAutenticado = estaAutenticado;
 
-                // 1. CONTENIDO PÚBLICO LadoA - mostrar solo contenido marcado como EsPublicoGeneral
+                // 1. CONTENIDO PÚBLICO para el mosaico - obtener mas contenido
                 var contenidoPublico = await _context.Contenidos
                     .Include(c => c.Usuario)
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
                             && !c.EsPrivado
-                            && c.TipoLado == TipoLado.LadoA
-                            && c.EsPublicoGeneral  // Solo contenido marcado como público general
+                            && !c.EsContenidoSensible  // Excluir contenido sensible del mosaico publico
+                            && !string.IsNullOrEmpty(c.RutaArchivo)  // Solo contenido con media
                             && c.Usuario != null
                             && c.Usuario.EstaActivo)
-                    .OrderByDescending(c => c.FechaPublicacion)
-                    .Take(20)
+                    .OrderByDescending(c => c.NumeroLikes + c.NumeroVistas)
+                    .ThenByDescending(c => c.FechaPublicacion)
+                    .Take(150)  // Obtener mas contenido para el mosaico
                     .ToListAsync();
 
                 // 2. CONTENIDO PREMIUM (LadoB) para mostrar difuminado
@@ -158,7 +159,22 @@ namespace Lado.Controllers
                     await _adService.RegistrarImpresion(anuncio.Id, usuarioId, ipAddress);
                 }
 
-                return View(feedMezclado);
+                // 7. ESTADISTICAS PARA EL MOSAICO
+                // Contar creadores: LadoA (EsCreador o TipoUsuario=1) + LadoB (tiene seudónimo)
+                var totalCreadores = await _userManager.Users
+                    .CountAsync(u => u.EstaActivo &&
+                        (u.EsCreador || u.TipoUsuario == 1 || !string.IsNullOrEmpty(u.Seudonimo)));
+                var totalUsuarios = await _userManager.Users
+                    .CountAsync(u => u.EstaActivo);
+                var totalContenido = await _context.Contenidos
+                    .CountAsync(c => c.EstaActivo && !c.EsBorrador);
+
+                ViewBag.TotalCreadores = totalCreadores;
+                ViewBag.TotalUsuarios = totalUsuarios;
+                ViewBag.TotalContenido = totalContenido;
+
+                // Para el mosaico, devolver todo el contenido sin mezclar
+                return View(contenidoPublico);
             }
             catch (Exception ex)
             {

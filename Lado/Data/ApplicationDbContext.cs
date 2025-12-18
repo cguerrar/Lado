@@ -15,6 +15,7 @@ namespace Lado.Data
         // DbSets EXISTENTES
         // ========================================
         public DbSet<Contenido> Contenidos { get; set; }
+        public DbSet<ArchivoContenido> ArchivosContenido { get; set; }
         public DbSet<Suscripcion> Suscripciones { get; set; }
         public DbSet<Transaccion> Transacciones { get; set; }
         public DbSet<Like> Likes { get; set; }
@@ -97,6 +98,11 @@ namespace Lado.Data
         // ⭐ DbSets NUEVOS - ALGORITMOS DE FEED
         // ========================================
         public DbSet<AlgoritmoFeed> AlgoritmosFeed { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - CONFIGURACIÓN PLATAFORMA
+        // ========================================
+        public DbSet<ConfiguracionPlataforma> ConfiguracionesPlataforma { get; set; }
         public DbSet<PreferenciaAlgoritmoUsuario> PreferenciasAlgoritmoUsuario { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -555,6 +561,41 @@ namespace Lado.Data
                 entity.HasIndex(e => e.EstaActivo);
                 entity.HasIndex(e => e.FechaPublicacion);
                 entity.HasIndex(e => e.TipoLado);
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE ARCHIVOS CONTENIDO (CARRUSEL)
+            // ========================================
+            modelBuilder.Entity<ArchivoContenido>(entity =>
+            {
+                entity.HasKey(a => a.Id);
+
+                entity.HasOne(a => a.Contenido)
+                    .WithMany(c => c.Archivos)
+                    .HasForeignKey(a => a.ContenidoId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(a => a.RutaArchivo)
+                    .HasMaxLength(500)
+                    .IsRequired();
+
+                entity.Property(a => a.Thumbnail)
+                    .HasMaxLength(500)
+                    .IsRequired(false);
+
+                entity.Property(a => a.AltText)
+                    .HasMaxLength(500)
+                    .IsRequired(false);
+
+                entity.Property(a => a.Orden)
+                    .HasDefaultValue(0);
+
+                // Índices
+                entity.HasIndex(a => a.ContenidoId)
+                    .HasDatabaseName("IX_ArchivosContenido_ContenidoId");
+
+                entity.HasIndex(a => new { a.ContenidoId, a.Orden })
+                    .HasDatabaseName("IX_ArchivosContenido_Contenido_Orden");
             });
 
             // ========================================
@@ -1101,6 +1142,78 @@ namespace Lado.Data
                 entity.HasIndex(p => p.UsuarioId)
                     .IsUnique()
                     .HasDatabaseName("IX_PreferenciasAlgoritmoUsuario_UsuarioId");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE PLATAFORMA
+            // ========================================
+            modelBuilder.Entity<ConfiguracionPlataforma>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+
+                entity.Property(c => c.Clave)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(c => c.Valor)
+                    .HasMaxLength(500);
+
+                entity.Property(c => c.Descripcion)
+                    .HasMaxLength(255);
+
+                entity.Property(c => c.Categoria)
+                    .HasMaxLength(50);
+
+                entity.HasIndex(c => c.Clave)
+                    .IsUnique()
+                    .HasDatabaseName("IX_ConfiguracionPlataforma_Clave");
+
+                entity.HasIndex(c => c.Categoria)
+                    .HasDatabaseName("IX_ConfiguracionPlataforma_Categoria");
+
+                // Datos por defecto
+                entity.HasData(
+                    new ConfiguracionPlataforma
+                    {
+                        Id = 1,
+                        Clave = ConfiguracionPlataforma.COMISION_BILLETERA_ELECTRONICA,
+                        Valor = "2.5",
+                        Descripcion = "Comision por usar billetera electronica (%)",
+                        Categoria = "Billetera"
+                    },
+                    new ConfiguracionPlataforma
+                    {
+                        Id = 2,
+                        Clave = ConfiguracionPlataforma.TIEMPO_PROCESO_RETIRO,
+                        Valor = "3-5 dias habiles",
+                        Descripcion = "Tiempo estimado para procesar retiros",
+                        Categoria = "Billetera"
+                    },
+                    new ConfiguracionPlataforma
+                    {
+                        Id = 3,
+                        Clave = ConfiguracionPlataforma.MONTO_MINIMO_RECARGA,
+                        Valor = "5",
+                        Descripcion = "Monto minimo para recargar saldo",
+                        Categoria = "Billetera"
+                    },
+                    new ConfiguracionPlataforma
+                    {
+                        Id = 4,
+                        Clave = ConfiguracionPlataforma.MONTO_MAXIMO_RECARGA,
+                        Valor = "1000",
+                        Descripcion = "Monto maximo para recargar saldo",
+                        Categoria = "Billetera"
+                    },
+                    new ConfiguracionPlataforma
+                    {
+                        Id = 5,
+                        Clave = ConfiguracionPlataforma.COMISION_PLATAFORMA,
+                        Valor = "20",
+                        Descripcion = "Comision general de la plataforma (%)",
+                        Categoria = "General"
+                    }
+                );
             });
         }
     }

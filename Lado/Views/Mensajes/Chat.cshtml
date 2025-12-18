@@ -1,6 +1,7 @@
 @model Lado.Models.ApplicationUser
 @{
     var otroUsuario = ViewBag.Destinatario as Lado.Models.ApplicationUser;
+    var mensajes = ViewBag.Mensajes as List<Lado.Models.MensajePrivado>;
     ViewData["Title"] = otroUsuario != null ? $"Chat con {otroUsuario.NombreCompleto}" : "Chat";
 }
 
@@ -9,114 +10,128 @@
         --primary: #4682B4;
         --primary-dark: #36648B;
         --primary-light: #B0C4DE;
-        --bg-light: #f8fafc;
-        --border: #e2e8f0;
+        --primary-lighter: #E8F1F8;
+        --msg-sent: #E3F2FD;
+        --msg-received: #ffffff;
+        --bg-chat: #f1f5f9;
         --text-dark: #1e293b;
         --text-muted: #64748b;
+        --border: #e2e8f0;
     }
 
-    .chat-wrapper {
-        max-width: 800px;
+    .mensajes-page {
+        max-width: 900px;
         margin: 0 auto;
-        height: calc(100vh - 120px);
-        display: flex;
-        flex-direction: column;
+        padding: 0;
+    }
+
+    .chat-container {
         background: white;
         border-radius: 16px;
-        overflow: hidden;
         box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 120px);
+        min-height: 500px;
+        overflow: hidden;
     }
 
     /* Header */
     .chat-header {
         background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
         color: white;
-        padding: 1rem 1.5rem;
+        padding: 16px 20px;
         display: flex;
         align-items: center;
-        gap: 1rem;
+        gap: 16px;
         flex-shrink: 0;
     }
 
-    .back-btn {
+    .btn-back {
         color: white;
         text-decoration: none;
-        padding: 8px;
-        border-radius: 10px;
-        transition: background 0.2s;
+        width: 40px;
+        height: 40px;
         display: flex;
         align-items: center;
         justify-content: center;
+        border-radius: 10px;
+        transition: background 0.2s;
     }
 
-    .back-btn:hover {
+    .btn-back:hover {
         background: rgba(255,255,255,0.15);
     }
 
-    .chat-user {
-        display: flex;
-        align-items: center;
-        gap: 12px;
+    .chat-user-info {
         flex: 1;
         min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        cursor: pointer;
     }
 
     .chat-avatar {
         width: 44px;
         height: 44px;
-        border-radius: 50%;
+        border-radius: 12px;
         object-fit: cover;
         border: 2px solid rgba(255,255,255,0.3);
         flex-shrink: 0;
     }
 
-    .chat-avatar-placeholder {
+    .chat-avatar-default {
         width: 44px;
         height: 44px;
-        border-radius: 50%;
+        border-radius: 12px;
         background: rgba(255,255,255,0.2);
         display: flex;
         align-items: center;
         justify-content: center;
-        border: 2px solid rgba(255,255,255,0.3);
         flex-shrink: 0;
     }
 
-    .chat-user-info {
-        min-width: 0;
-    }
-
-    .chat-user-name {
+    .chat-user-details h2 {
+        font-size: 1.1rem;
         font-weight: 700;
-        font-size: 1rem;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        margin: 0;
+        line-height: 1.3;
     }
 
-    .chat-user-handle {
-        font-size: 0.8rem;
-        opacity: 0.8;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+    .chat-user-details span {
+        font-size: 0.85rem;
+        opacity: 0.85;
     }
 
-    .chat-actions .dropdown-toggle::after {
+    .typing-indicator {
         display: none;
+        color: #a5d6a7;
     }
 
-    .chat-action-btn {
+    .typing-indicator.show {
+        display: inline;
+    }
+
+    .chat-menu {
+        position: relative;
+    }
+
+    .btn-menu {
         color: white;
         background: none;
         border: none;
-        padding: 8px;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         border-radius: 10px;
         cursor: pointer;
         transition: background 0.2s;
     }
 
-    .chat-action-btn:hover {
+    .btn-menu:hover {
         background: rgba(255,255,255,0.15);
     }
 
@@ -124,28 +139,32 @@
     .chat-messages {
         flex: 1;
         overflow-y: auto;
-        padding: 1.5rem;
-        background: var(--bg-light);
+        padding: 20px;
+        background: var(--bg-chat);
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 8px;
     }
 
+    .chat-messages::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .chat-messages::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb {
+        background: rgba(0,0,0,0.15);
+        border-radius: 3px;
+    }
+
+    /* Message Bubbles */
     .mensaje {
         display: flex;
+        flex-direction: column;
         max-width: 75%;
-        animation: fadeIn 0.3s ease;
-    }
-
-    @@keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        position: relative;
     }
 
     .mensaje-recibido {
@@ -156,74 +175,236 @@
         align-self: flex-end;
     }
 
-    .mensaje-contenido {
-        padding: 12px 16px;
-        border-radius: 18px;
+    .mensaje-burbuja {
+        padding: 10px 14px;
+        border-radius: 16px;
+        position: relative;
         word-wrap: break-word;
-        word-break: break-word;
-        line-height: 1.5;
     }
 
-    .mensaje-recibido .mensaje-contenido {
-        background: white;
+    .mensaje-recibido .mensaje-burbuja {
+        background: var(--msg-received);
+        border-bottom-left-radius: 4px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+
+    .mensaje-enviado .mensaje-burbuja {
+        background: var(--msg-sent);
+        border-bottom-right-radius: 4px;
+    }
+
+    /* Reply Quote */
+    .mensaje-respuesta {
+        background: rgba(70,130,180,0.1);
+        border-left: 3px solid var(--primary);
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .mensaje-respuesta:hover {
+        background: rgba(70,130,180,0.15);
+    }
+
+    .mensaje-respuesta-nombre {
+        color: var(--primary);
+        font-weight: 600;
+        margin-bottom: 2px;
+    }
+
+    .mensaje-respuesta-texto {
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .mensaje-respuesta-media {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--text-muted);
+    }
+
+    /* Media */
+    .mensaje-imagen {
+        max-width: 280px;
+        border-radius: 12px;
+        cursor: pointer;
+        margin-bottom: 6px;
+    }
+
+    .mensaje-video {
+        max-width: 280px;
+        border-radius: 12px;
+        margin-bottom: 6px;
+    }
+
+    .mensaje-texto {
+        font-size: 0.95rem;
+        line-height: 1.45;
         color: var(--text-dark);
-        border-bottom-left-radius: 6px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    }
-
-    .mensaje-enviado .mensaje-contenido {
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-        color: white;
-        border-bottom-right-radius: 6px;
-        box-shadow: 0 2px 8px rgba(70,130,180,0.3);
     }
 
     .mensaje-info {
         display: flex;
         align-items: center;
         justify-content: flex-end;
-        gap: 4px;
+        gap: 5px;
         margin-top: 4px;
         font-size: 0.7rem;
-        opacity: 0.7;
-    }
-
-    .mensaje-enviado .mensaje-info svg {
-        color: white;
-    }
-
-    /* Empty Chat */
-    .chat-empty {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        padding: 2rem;
         color: var(--text-muted);
     }
 
-    .chat-empty-icon {
-        width: 64px;
-        height: 64px;
-        background: var(--primary-light);
-        border-radius: 50%;
+    /* Check marks */
+    .check-icon {
+        width: 16px;
+        height: 16px;
+    }
+
+    .check-leido {
+        color: var(--primary);
+    }
+
+    .check-enviado {
+        color: #9ca3af;
+    }
+
+    /* Reply button on hover */
+    .mensaje-actions {
+        position: absolute;
+        top: 6px;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    .mensaje-recibido .mensaje-actions {
+        right: -36px;
+    }
+
+    .mensaje-enviado .mensaje-actions {
+        left: -36px;
+    }
+
+    .mensaje:hover .mensaje-actions {
+        opacity: 1;
+    }
+
+    .btn-reply {
+        background: white;
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        cursor: pointer;
+        color: var(--text-muted);
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-bottom: 1rem;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        transition: all 0.2s;
     }
 
-    .chat-empty-icon svg {
-        width: 32px;
-        height: 32px;
-        color: var(--primary-dark);
+    .btn-reply:hover {
+        background: var(--primary);
+        color: white;
+    }
+
+    /* Reply Panel */
+    .reply-panel {
+        display: none;
+        background: white;
+        padding: 12px 20px;
+        border-top: 1px solid var(--border);
+        align-items: center;
+        gap: 12px;
+    }
+
+    .reply-panel.show {
+        display: flex;
+    }
+
+    .reply-content {
+        flex: 1;
+        background: var(--primary-lighter);
+        border-left: 3px solid var(--primary);
+        padding: 10px 14px;
+        border-radius: 8px;
+    }
+
+    .reply-nombre {
+        color: var(--primary);
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+
+    .reply-texto {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .btn-cancel {
+        background: none;
+        border: none;
+        width: 36px;
+        height: 36px;
+        cursor: pointer;
+        color: var(--text-muted);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-cancel:hover {
+        background: #f1f5f9;
+    }
+
+    /* Preview Panel */
+    .preview-panel {
+        display: none;
+        background: white;
+        padding: 12px 20px;
+        border-top: 1px solid var(--border);
+        align-items: center;
+        gap: 14px;
+    }
+
+    .preview-panel.show {
+        display: flex;
+    }
+
+    .preview-thumb {
+        width: 56px;
+        height: 56px;
+        object-fit: cover;
+        border-radius: 10px;
+    }
+
+    .preview-info {
+        flex: 1;
+    }
+
+    .preview-name {
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--text-dark);
+    }
+
+    .preview-size {
+        color: var(--text-muted);
+        font-size: 0.8rem;
     }
 
     /* Input Area */
     .chat-input-area {
-        padding: 1rem 1.5rem;
+        padding: 16px 20px;
         background: white;
         border-top: 1px solid var(--border);
         flex-shrink: 0;
@@ -235,27 +416,48 @@
         gap: 12px;
     }
 
+    .btn-attach {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        border: 2px solid var(--border);
+        background: white;
+        color: var(--text-muted);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+
+    .btn-attach:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+        background: var(--primary-lighter);
+    }
+
     .chat-input {
         flex: 1;
-        padding: 12px 20px;
+        padding: 12px 18px;
         border: 2px solid var(--border);
-        border-radius: 25px;
+        border-radius: 12px;
         font-size: 0.95rem;
-        transition: all 0.2s;
+        background: white;
         outline: none;
+        transition: border-color 0.2s;
     }
 
     .chat-input:focus {
         border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(70,130,180,0.15);
     }
 
-    .chat-send-btn {
+    .btn-send {
         width: 48px;
         height: 48px;
-        border-radius: 50%;
+        border-radius: 12px;
         border: none;
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        background: var(--primary);
         color: white;
         cursor: pointer;
         display: flex;
@@ -263,340 +465,611 @@
         justify-content: center;
         transition: all 0.2s;
         flex-shrink: 0;
-        box-shadow: 0 4px 12px rgba(70,130,180,0.3);
     }
 
-    .chat-send-btn:hover {
-        transform: scale(1.05);
-        box-shadow: 0 6px 16px rgba(70,130,180,0.4);
+    .btn-send:hover {
+        background: var(--primary-dark);
     }
 
-    .chat-send-btn:active {
-        transform: scale(0.95);
+    .btn-send:disabled {
+        background: #cbd5e1;
+        cursor: not-allowed;
     }
 
-    /* Scrollbar */
-    .chat-messages::-webkit-scrollbar {
-        width: 6px;
+    /* Empty State */
+    .chat-empty {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 3rem;
+        color: var(--text-muted);
     }
 
-    .chat-messages::-webkit-scrollbar-track {
-        background: transparent;
+    .chat-empty svg {
+        width: 64px;
+        height: 64px;
+        color: var(--primary-light);
+        margin-bottom: 1rem;
     }
 
-    .chat-messages::-webkit-scrollbar-thumb {
-        background: var(--primary-light);
-        border-radius: 3px;
+    .chat-empty p {
+        margin: 0;
+        font-size: 1rem;
     }
 
-    .chat-messages::-webkit-scrollbar-thumb:hover {
-        background: var(--primary);
+    .chat-empty small {
+        color: var(--text-muted);
+    }
+
+    /* Image Modal */
+    .image-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.92);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .image-modal.show {
+        display: flex;
+    }
+
+    .image-modal img {
+        max-width: 90%;
+        max-height: 90%;
+        object-fit: contain;
+        border-radius: 8px;
+    }
+
+    .image-modal-close {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(255,255,255,0.15);
+        border: none;
+        color: white;
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        cursor: pointer;
+        font-size: 24px;
+        transition: background 0.2s;
+    }
+
+    .image-modal-close:hover {
+        background: rgba(255,255,255,0.25);
     }
 
     /* Responsive */
-    @@media (max-width: 640px) {
-        .chat-wrapper {
+    @@media (max-width: 768px) {
+        .mensajes-page {
+            padding: 0;
+        }
+
+        .chat-container {
             border-radius: 0;
-            height: calc(100vh - 80px);
-            margin: 0;
-        }
-
-        .chat-header {
-            padding: 1rem;
-        }
-
-        .chat-messages {
-            padding: 1rem;
+            height: calc(100vh - 70px);
         }
 
         .mensaje {
             max-width: 85%;
         }
 
+        .mensaje-actions {
+            display: none;
+        }
+
+        .chat-header {
+            padding: 12px 16px;
+        }
+
+        .chat-messages {
+            padding: 16px;
+        }
+
         .chat-input-area {
-            padding: 0.75rem 1rem;
+            padding: 12px 16px;
         }
+    }
 
-        .chat-input {
-            padding: 10px 16px;
-        }
-
-        .chat-send-btn {
-            width: 44px;
-            height: 44px;
-        }
+    #fileInput {
+        display: none;
     }
 </style>
 
-<div class="chat-wrapper">
-    <!-- Header -->
-    <div class="chat-header">
-        <a href="/Mensajes" class="back-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="19" y1="12" x2="5" y2="12"></line>
-                <polyline points="12 19 5 12 12 5"></polyline>
-            </svg>
-        </a>
+<div class="mensajes-page">
+    <div class="chat-container">
+        <!-- Header -->
+        <div class="chat-header">
+            <a href="/Mensajes" class="btn-back">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+            </a>
 
-        <div class="chat-user">
-            @if (!string.IsNullOrEmpty(otroUsuario.FotoPerfil))
+            <div class="chat-user-info" onclick="window.location.href='/Explorar/Perfil/@otroUsuario?.Id'">
+                @if (!string.IsNullOrEmpty(otroUsuario?.FotoPerfil))
+                {
+                    <img src="@otroUsuario.FotoPerfil" alt="" class="chat-avatar">
+                }
+                else
+                {
+                    <div class="chat-avatar-default">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                    </div>
+                }
+                <div class="chat-user-details">
+                    <h2>@otroUsuario?.NombreCompleto</h2>
+                    <span>
+                        <span class="typing-indicator" id="typingIndicator">escribiendo...</span>
+                        <span class="online-status">@@@otroUsuario?.UserName</span>
+                    </span>
+                </div>
+            </div>
+
+            <div class="chat-menu dropdown">
+                <button class="btn-menu dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
+                    </svg>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="/Explorar/Perfil/@otroUsuario?.Id">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        Ver perfil
+                    </a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="#" onclick="eliminarConversacion(); return false;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        Eliminar conversacion
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="chat-messages" id="chatMessages">
+            @if (mensajes != null && mensajes.Count > 0)
             {
-                <img src="@otroUsuario.FotoPerfil" alt="@otroUsuario.NombreCompleto" class="chat-avatar">
+                @foreach (var mensaje in mensajes)
+                {
+                    var esMio = mensaje.RemitenteId == Model.Id;
+                    <div class="mensaje @(esMio ? "mensaje-enviado" : "mensaje-recibido")" data-id="@mensaje.Id">
+                        <div class="mensaje-burbuja">
+                            @if (mensaje.MensajeRespondido != null)
+                            {
+                                <div class="mensaje-respuesta" onclick="scrollToMessage(@mensaje.MensajeRespondido.Id)">
+                                    <div class="mensaje-respuesta-nombre">
+                                        @(mensaje.MensajeRespondido.Remitente?.NombreCompleto ?? mensaje.MensajeRespondido.Remitente?.UserName ?? "Usuario")
+                                    </div>
+                                    @if (mensaje.MensajeRespondido.TipoMensaje == Lado.Models.TipoMensaje.Imagen)
+                                    {
+                                        <div class="mensaje-respuesta-media">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                                            Foto
+                                        </div>
+                                    }
+                                    else if (mensaje.MensajeRespondido.TipoMensaje == Lado.Models.TipoMensaje.Video)
+                                    {
+                                        <div class="mensaje-respuesta-media">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                            Video
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="mensaje-respuesta-texto">@mensaje.MensajeRespondido.Contenido</div>
+                                    }
+                                </div>
+                            }
+
+                            @if (mensaje.TipoMensaje == Lado.Models.TipoMensaje.Imagen && !string.IsNullOrEmpty(mensaje.RutaArchivo))
+                            {
+                                <img src="@mensaje.RutaArchivo" alt="Imagen" class="mensaje-imagen" onclick="abrirImagenModal(this.src)">
+                            }
+                            else if (mensaje.TipoMensaje == Lado.Models.TipoMensaje.Video && !string.IsNullOrEmpty(mensaje.RutaArchivo))
+                            {
+                                <video src="@mensaje.RutaArchivo" class="mensaje-video" controls playsinline></video>
+                            }
+
+                            @if (!string.IsNullOrEmpty(mensaje.Contenido))
+                            {
+                                <div class="mensaje-texto">@mensaje.Contenido</div>
+                            }
+
+                            <div class="mensaje-info">
+                                <span>@mensaje.FechaEnvio.ToString("HH:mm")</span>
+                                @if (esMio)
+                                {
+                                    @if (mensaje.Leido)
+                                    {
+                                        <svg class="check-icon check-leido" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                            <path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/>
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <svg class="check-icon check-enviado" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                            <polyline points="20 6 9 17 4 12"/>
+                                        </svg>
+                                    }
+                                }
+                            </div>
+                        </div>
+
+                        <div class="mensaje-actions">
+                            <button class="btn-reply" onclick="iniciarRespuesta(@mensaje.Id, '@(mensaje.Remitente?.NombreCompleto ?? mensaje.Remitente?.UserName ?? "Usuario")', '@mensaje.Contenido.Replace("'", "\\'")', @((int)mensaje.TipoMensaje))">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                }
             }
             else
             {
-                <div class="chat-avatar-placeholder">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
+                <div class="chat-empty">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                     </svg>
+                    <p>No hay mensajes aun</p>
+                    <small>Envia el primer mensaje</small>
                 </div>
             }
-            <div class="chat-user-info">
-                <div class="chat-user-name">@otroUsuario.NombreCompleto</div>
-                <div class="chat-user-handle">@@@otroUsuario.UserName</div>
-            </div>
         </div>
 
-        <div class="chat-actions dropdown">
-            <button class="chat-action-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="1"></circle>
-                    <circle cx="12" cy="5" r="1"></circle>
-                    <circle cx="12" cy="19" r="1"></circle>
+        <!-- Reply Panel -->
+        <div class="reply-panel" id="replyPanel">
+            <div class="reply-content">
+                <div class="reply-nombre" id="replyNombre"></div>
+                <div class="reply-texto" id="replyTexto"></div>
+            </div>
+            <button class="btn-cancel" onclick="cancelarRespuesta()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
             </button>
-            <ul class="dropdown-menu dropdown-menu-end">
-                <li>
-                    <a class="dropdown-item" href="/Explorar/Perfil/@otroUsuario.Id">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-2">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="12" cy="7" r="4"></circle>
-                        </svg>
-                        Ver Perfil
-                    </a>
-                </li>
-                <li><hr class="dropdown-divider"></li>
-                <li>
-                    <a class="dropdown-item text-danger" href="#" onclick="eliminarConversacion('@otroUsuario.Id'); return false;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-2">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                        Eliminar Conversacion
-                    </a>
-                </li>
-            </ul>
         </div>
-    </div>
 
-    <!-- Messages -->
-    <div class="chat-messages" id="chatMessages">
-        @if (ViewBag.Mensajes != null && ViewBag.Mensajes.Count > 0)
-        {
-            @foreach (var mensaje in ViewBag.Mensajes)
-            {
-                var esMio = mensaje.RemitenteId == Model.Id;
-                <div class="mensaje @(esMio ? "mensaje-enviado" : "mensaje-recibido")">
-                    <div class="mensaje-contenido">
-                        @mensaje.Contenido
-                        <div class="mensaje-info">
-                            <span>@mensaje.FechaEnvio.ToString("HH:mm")</span>
-                            @if (esMio)
-                            {
-                                @if (mensaje.Leido)
-                                {
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M18 6 7 17l-5-5"></path>
-                                        <path d="m22 10-7.5 7.5L13 16"></path>
-                                    </svg>
-                                }
-                                else
-                                {
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <polyline points="20 6 9 17 4 12"></polyline>
-                                    </svg>
-                                }
-                            }
-                        </div>
-                    </div>
-                </div>
-            }
-        }
-        else
-        {
-            <div class="chat-empty">
-                <div class="chat-empty-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        <!-- Preview Panel -->
+        <div class="preview-panel" id="previewPanel">
+            <img id="previewThumb" class="preview-thumb" src="" alt="">
+            <div class="preview-info">
+                <div class="preview-name" id="previewName"></div>
+                <div class="preview-size" id="previewSize"></div>
+            </div>
+            <button class="btn-cancel" onclick="cancelarArchivo()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Input Area -->
+        <div class="chat-input-area">
+            <form id="formEnviarMensaje" class="chat-input-form" enctype="multipart/form-data">
+                <input type="hidden" id="destinatarioId" value="@otroUsuario?.Id">
+                <input type="hidden" id="mensajeRespondidoId" value="">
+                <input type="file" id="fileInput" accept="image/*,video/*" onchange="previewArchivo(this)">
+
+                <button type="button" class="btn-attach" onclick="document.getElementById('fileInput').click()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
                     </svg>
-                </div>
-                <p>No hay mensajes aun. ¡Envia el primero!</p>
-            </div>
-        }
-    </div>
+                </button>
 
-    <!-- Input -->
-    <div class="chat-input-area">
-        <form id="formEnviarMensaje" class="chat-input-form">
-            @Html.AntiForgeryToken()
-            <input type="hidden" id="destinatarioId" value="@otroUsuario.Id">
-            <input type="text" id="inputMensaje" class="chat-input" placeholder="Escribe un mensaje..." autocomplete="off">
-            <button type="submit" class="chat-send-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                </svg>
-            </button>
-        </form>
+                <input type="text" id="inputMensaje" class="chat-input" placeholder="Escribe un mensaje..." autocomplete="off">
+
+                <button type="submit" class="btn-send" id="btnEnviar">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                    </svg>
+                </button>
+            </form>
+        </div>
     </div>
 </div>
 
+<!-- Image Modal -->
+<div class="image-modal" id="imageModal" onclick="cerrarImagenModal()">
+    <button class="image-modal-close">&times;</button>
+    <img id="modalImage" src="" alt="">
+</div>
+
 @section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
     <script>
         const usuarioActualId = '@Model.Id';
-        const otroUsuarioId = '@otroUsuario.Id';
+        const otroUsuarioId = '@otroUsuario?.Id';
+        let mensajeRespondidoId = null;
+        let archivoSeleccionado = null;
+        let connection = null;
+        let typingTimeout = null;
 
-        function scrollToBottom() {
-            const chatMessages = document.getElementById('chatMessages');
-            if (chatMessages) {
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+        // SignalR
+        async function iniciarSignalR() {
+            connection = new signalR.HubConnectionBuilder()
+                .withUrl("/chatHub")
+                .withAutomaticReconnect()
+                .build();
+
+            connection.on("RecibirMensaje", function(mensaje) {
+                if (mensaje.remitenteId === otroUsuarioId) {
+                    renderizarMensaje(mensaje, false);
+                    marcarMensajesComoLeidos([mensaje.id]);
+                }
+            });
+
+            connection.on("MensajesLeidos", function(data) {
+                if (data.lectorId === otroUsuarioId) {
+                    data.mensajeIds.forEach(id => actualizarCheckLeido(id));
+                }
+            });
+
+            connection.on("UserTyping", function(data) {
+                if (data.userId === otroUsuarioId) mostrarTyping();
+            });
+
+            connection.on("UserStoppedTyping", function(data) {
+                if (data.userId === otroUsuarioId) ocultarTyping();
+            });
+
+            try {
+                await connection.start();
+                await connection.invoke("JoinConversation", otroUsuarioId);
+            } catch (err) {
+                console.error("Error SignalR:", err);
+                setInterval(cargarMensajesNuevos, 5000);
             }
         }
 
-        function agregarMensaje(mensaje, esMio) {
+        function mostrarTyping() {
+            document.getElementById('typingIndicator').classList.add('show');
+            document.querySelector('.online-status').style.display = 'none';
+        }
+
+        function ocultarTyping() {
+            document.getElementById('typingIndicator').classList.remove('show');
+            document.querySelector('.online-status').style.display = 'inline';
+        }
+
+        // Render Messages
+        function renderizarMensaje(mensaje, esMio) {
             const chatEmpty = document.querySelector('.chat-empty');
-            if (chatEmpty) {
-                chatEmpty.remove();
+            if (chatEmpty) chatEmpty.remove();
+
+            let respuestaHtml = '';
+            if (mensaje.mensajeRespondido) {
+                const mr = mensaje.mensajeRespondido;
+                let contenidoRespuesta = mr.tipoMensaje === 1
+                    ? '<div class="mensaje-respuesta-media"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg> Foto</div>'
+                    : mr.tipoMensaje === 2
+                    ? '<div class="mensaje-respuesta-media"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Video</div>'
+                    : `<div class="mensaje-respuesta-texto">${escapeHtml(mr.contenido)}</div>`;
+                respuestaHtml = `<div class="mensaje-respuesta" onclick="scrollToMessage(${mr.id})"><div class="mensaje-respuesta-nombre">${escapeHtml(mr.remitenteNombre)}</div>${contenidoRespuesta}</div>`;
             }
 
-            const checkIcon = esMio ? `
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-            ` : '';
+            let mediaHtml = '';
+            if (mensaje.tipoMensaje === 1 && mensaje.rutaArchivo) {
+                mediaHtml = `<img src="${mensaje.rutaArchivo}" alt="Imagen" class="mensaje-imagen" onclick="abrirImagenModal(this.src)">`;
+            } else if (mensaje.tipoMensaje === 2 && mensaje.rutaArchivo) {
+                mediaHtml = `<video src="${mensaje.rutaArchivo}" class="mensaje-video" controls playsinline></video>`;
+            }
 
-            const mensajeHtml = `
-                <div class="mensaje ${esMio ? 'mensaje-enviado' : 'mensaje-recibido'}">
-                    <div class="mensaje-contenido">
-                        ${mensaje.contenido}
-                        <div class="mensaje-info">
-                            <span>${mensaje.fechaEnvio}</span>
-                            ${checkIcon}
-                        </div>
-                    </div>
-                </div>
-            `;
+            const textoHtml = mensaje.contenido ? `<div class="mensaje-texto">${escapeHtml(mensaje.contenido)}</div>` : '';
+            const checkHtml = esMio ? `<svg class="check-icon check-enviado" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>` : '';
 
-            const chatMessages = document.getElementById('chatMessages');
-            chatMessages.insertAdjacentHTML('beforeend', mensajeHtml);
+            const html = `
+                <div class="mensaje ${esMio ? 'mensaje-enviado' : 'mensaje-recibido'}" data-id="${mensaje.id}">
+                    <div class="mensaje-burbuja">${respuestaHtml}${mediaHtml}${textoHtml}<div class="mensaje-info"><span>${mensaje.fechaEnvio}</span>${checkHtml}</div></div>
+                    <div class="mensaje-actions"><button class="btn-reply" onclick="iniciarRespuesta(${mensaje.id}, '${escapeHtml(mensaje.remitenteNombre || 'Usuario')}', '${escapeHtml(mensaje.contenido || '')}', ${mensaje.tipoMensaje})"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg></button></div>
+                </div>`;
+
+            document.getElementById('chatMessages').insertAdjacentHTML('beforeend', html);
             scrollToBottom();
         }
 
-        function actualizarMensajes(mensajes) {
-            const chatMessages = document.getElementById('chatMessages');
-            const mensajesActuales = chatMessages.querySelectorAll('.mensaje').length;
-
-            if (mensajes.length > mensajesActuales) {
-                const nuevosMensajes = mensajes.slice(mensajesActuales);
-                nuevosMensajes.forEach(function(mensaje) {
-                    const esMio = mensaje.remitenteId === usuarioActualId;
-                    agregarMensaje(mensaje, esMio);
-                });
+        function actualizarCheckLeido(mensajeId) {
+            const mensaje = document.querySelector(`.mensaje[data-id="${mensajeId}"]`);
+            if (mensaje) {
+                const check = mensaje.querySelector('.check-enviado');
+                if (check) {
+                    check.outerHTML = `<svg class="check-icon check-leido" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>`;
+                }
             }
         }
 
-        function cargarMensajesActualizados() {
-            fetch('@Url.Action("CargarMensajes", "Mensajes")?contactoId=' + otroUsuarioId)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.mensajes) {
-                        actualizarMensajes(data.mensajes);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error al cargar mensajes:', error);
-                });
+        // Reply System
+        function iniciarRespuesta(id, nombre, texto, tipoMensaje) {
+            mensajeRespondidoId = id;
+            document.getElementById('mensajeRespondidoId').value = id;
+            document.getElementById('replyNombre').textContent = nombre;
+            document.getElementById('replyTexto').innerHTML = tipoMensaje === 1
+                ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg> Foto'
+                : tipoMensaje === 2
+                ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Video'
+                : texto.substring(0, 50) + (texto.length > 50 ? '...' : '');
+            document.getElementById('replyPanel').classList.add('show');
+            document.getElementById('inputMensaje').focus();
         }
 
-        function enviarMensaje(e) {
+        function cancelarRespuesta() {
+            mensajeRespondidoId = null;
+            document.getElementById('mensajeRespondidoId').value = '';
+            document.getElementById('replyPanel').classList.remove('show');
+        }
+
+        function scrollToMessage(id) {
+            const mensaje = document.querySelector(`.mensaje[data-id="${id}"]`);
+            if (mensaje) {
+                mensaje.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                mensaje.style.backgroundColor = 'rgba(70,130,180,0.15)';
+                setTimeout(() => mensaje.style.backgroundColor = '', 1500);
+            }
+        }
+
+        // File Handling
+        function previewArchivo(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('El archivo no puede superar 10 MB');
+                    input.value = '';
+                    return;
+                }
+                archivoSeleccionado = file;
+                const reader = new FileReader();
+                reader.onload = e => document.getElementById('previewThumb').src = e.target.result;
+                reader.readAsDataURL(file);
+                document.getElementById('previewName').textContent = file.name;
+                document.getElementById('previewSize').textContent = formatBytes(file.size);
+                document.getElementById('previewPanel').classList.add('show');
+            }
+        }
+
+        function cancelarArchivo() {
+            archivoSeleccionado = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('previewPanel').classList.remove('show');
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024, sizes = ['Bytes', 'KB', 'MB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // Image Modal
+        function abrirImagenModal(src) {
+            document.getElementById('modalImage').src = src;
+            document.getElementById('imageModal').classList.add('show');
+        }
+
+        function cerrarImagenModal() {
+            document.getElementById('imageModal').classList.remove('show');
+        }
+
+        // Send Message
+        async function enviarMensaje(e) {
             e.preventDefault();
+            const contenido = document.getElementById('inputMensaje').value.trim();
+            if (!contenido && !archivoSeleccionado) return;
 
-            const inputMensaje = document.getElementById('inputMensaje');
-            const contenido = inputMensaje.value.trim();
-
-            if (!contenido) return;
-
-            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+            const btnEnviar = document.getElementById('btnEnviar');
+            btnEnviar.disabled = true;
 
             const formData = new FormData();
             formData.append('destinatarioId', otroUsuarioId);
             formData.append('contenido', contenido);
-            formData.append('__RequestVerificationToken', token);
+            if (archivoSeleccionado) formData.append('archivo', archivoSeleccionado);
+            if (mensajeRespondidoId) formData.append('mensajeRespondidoId', mensajeRespondidoId);
 
-            fetch('@Url.Action("EnviarMensaje", "Mensajes")', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
+            try {
+                const response = await fetch('/Mensajes/EnviarMensajeConArchivo', { method: 'POST', body: formData });
+                const data = await response.json();
                 if (data.success) {
-                    agregarMensaje(data.mensaje, true);
-                    inputMensaje.value = '';
+                    renderizarMensaje(data.mensaje, true);
+                    document.getElementById('inputMensaje').value = '';
+                    cancelarRespuesta();
+                    cancelarArchivo();
                 } else {
-                    alert(data.message || 'Error al enviar el mensaje');
+                    alert(data.message || 'Error al enviar');
                 }
-            })
-            .catch(error => {
-                console.error('Error al enviar:', error);
+            } catch (error) {
                 alert('Error al enviar el mensaje');
-            });
-        }
-
-        function eliminarConversacion(contactoId) {
-            if (!confirm('¿Estas seguro de que quieres eliminar esta conversacion?')) {
-                return false;
             }
-
-            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
-            const formData = new FormData();
-            formData.append('contactoId', contactoId);
-            formData.append('__RequestVerificationToken', token);
-
-            fetch('@Url.Action("EliminarConversacion", "Mensajes")', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                window.location.href = '@Url.Action("Index", "Mensajes")';
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error al eliminar la conversacion');
-            });
-
-            return false;
+            btnEnviar.disabled = false;
         }
 
+        // Mark as Read
+        async function marcarMensajesComoLeidos(ids) {
+            try {
+                await fetch('/Mensajes/MarcarMensajesComoLeidos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mensajeIds: ids })
+                });
+            } catch (err) {}
+        }
+
+        // Polling fallback
+        let ultimoMensajeId = @(mensajes?.LastOrDefault()?.Id ?? 0);
+        async function cargarMensajesNuevos() {
+            try {
+                const response = await fetch(`/Mensajes/CargarMensajes?contactoId=${otroUsuarioId}`);
+                const data = await response.json();
+                if (data.success && data.mensajes) {
+                    data.mensajes.filter(m => m.id > ultimoMensajeId).forEach(mensaje => {
+                        renderizarMensaje(mensaje, mensaje.remitenteId === usuarioActualId);
+                        ultimoMensajeId = Math.max(ultimoMensajeId, mensaje.id);
+                        if (mensaje.remitenteId !== usuarioActualId) marcarMensajesComoLeidos([mensaje.id]);
+                    });
+                    data.mensajes.forEach(m => { if (m.remitenteId === usuarioActualId && m.leido) actualizarCheckLeido(m.id); });
+                }
+            } catch (err) {}
+        }
+
+        // Delete Conversation
+        function eliminarConversacion() {
+            if (!confirm('¿Eliminar esta conversacion?')) return;
+            const formData = new FormData();
+            formData.append('contactoId', otroUsuarioId);
+            fetch('/Mensajes/EliminarConversacion', { method: 'POST', body: formData })
+                .then(() => window.location.href = '/Mensajes');
+        }
+
+        // Utilities
+        function scrollToBottom() {
+            const chat = document.getElementById('chatMessages');
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML.replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+
+        // Typing
+        function enviarTyping() {
+            if (connection?.state === signalR.HubConnectionState.Connected) {
+                connection.invoke("SendTyping", otroUsuarioId).catch(() => {});
+            }
+        }
+
+        function detenerTyping() {
+            if (connection?.state === signalR.HubConnectionState.Connected) {
+                connection.invoke("StopTyping", otroUsuarioId).catch(() => {});
+            }
+        }
+
+        // Init
         document.addEventListener('DOMContentLoaded', function() {
             scrollToBottom();
-
-            const formEnviar = document.getElementById('formEnviarMensaje');
-            if (formEnviar) {
-                formEnviar.addEventListener('submit', enviarMensaje);
-            }
-
-            const inputMensaje = document.getElementById('inputMensaje');
-            if (inputMensaje) {
-                inputMensaje.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        formEnviar.dispatchEvent(new Event('submit'));
-                    }
-                });
-            }
-
-            setInterval(cargarMensajesActualizados, 5000);
+            iniciarSignalR();
+            document.getElementById('formEnviarMensaje').addEventListener('submit', enviarMensaje);
+            document.getElementById('inputMensaje').addEventListener('input', function() {
+                enviarTyping();
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(detenerTyping, 2000);
+            });
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Escape') { cerrarImagenModal(); cancelarRespuesta(); cancelarArchivo(); }
+            });
         });
     </script>
 }

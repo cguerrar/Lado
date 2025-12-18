@@ -77,6 +77,7 @@
             {
                 <div class="content-card @(contenido.EsBorrador ? "is-draft" : "")" data-tipo="@((int)contenido.TipoContenido)">
                     <!-- Preview del Contenido -->
+                    <a href="/Feed/Detalle/@contenido.Id" class="content-preview-link">
                     <div class="content-preview">
                         @{
                             var tipoContenido = (int)contenido.TipoContenido;
@@ -112,13 +113,20 @@
                             @if (!string.IsNullOrEmpty(contenido.RutaArchivo))
                             {
                                 <div class="preview-video">
-                                    @if (!string.IsNullOrEmpty(contenido.Thumbnail))
+                                    @{
+                                        // Verificar si el thumbnail es una imagen real (no un video)
+                                        var thumbnailPath = contenido.Thumbnail ?? "";
+                                        var extThumb = System.IO.Path.GetExtension(thumbnailPath).ToLower();
+                                        var esImagenThumb = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".bmp" }.Contains(extThumb);
+                                        var tieneThumbValido = !string.IsNullOrEmpty(thumbnailPath) && esImagenThumb;
+                                    }
+                                    @if (tieneThumbValido)
                                     {
                                         <img src="@contenido.Thumbnail" alt="Video thumbnail" class="video-thumbnail" />
                                     }
                                     else
                                     {
-                                        <video class="video-thumbnail" muted preload="metadata">
+                                        <video class="video-thumbnail" muted preload="metadata" playsinline>
                                             <source src="@contenido.RutaArchivo#t=0.5" type="video/mp4" />
                                         </video>
                                     }
@@ -183,6 +191,7 @@
                             </span>
                         }
                     </div>
+                    </a>
 
                     <!-- Info del Contenido -->
                     <div class="content-info">
@@ -628,6 +637,17 @@
         opacity: 1;
     }
 
+    /* Preview Link */
+    .content-preview-link {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .content-preview-link:hover {
+        text-decoration: none;
+    }
+
     /* Preview */
     .content-preview {
         position: relative;
@@ -637,6 +657,12 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        cursor: pointer;
+        transition: opacity 0.2s;
+    }
+
+    .content-preview:hover {
+        opacity: 0.9;
     }
 
     .preview-image {

@@ -165,6 +165,6 @@ namespace Lado.Models
         Procesando = 1,
         Completado = 2,
         Reembolsado = 3,
-             Liberado = 2
+        Liberado = 4
     }
 }

@@ -450,6 +450,97 @@ namespace Lado.Controllers
             return RedirectToAction(nameof(Contenido));
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MarcarContenidoSensible(int id)
+        {
+            var contenido = await _context.Contenidos.FindAsync(id);
+            if (contenido != null)
+            {
+                contenido.EsContenidoSensible = true;
+                await _context.SaveChangesAsync();
+                TempData["Success"] = "Contenido marcado como sensible.";
+            }
+
+            return RedirectToAction(nameof(Contenido));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> QuitarContenidoSensible(int id)
+        {
+            var contenido = await _context.Contenidos.FindAsync(id);
+            if (contenido != null)
+            {
+                contenido.EsContenidoSensible = false;
+                await _context.SaveChangesAsync();
+                TempData["Success"] = "Marca de contenido sensible quitada.";
+            }
+
+            return RedirectToAction(nameof(Contenido));
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> BuscarUsuarios(string q)
+        {
+            if (string.IsNullOrWhiteSpace(q) || q.Length < 2)
+            {
+                return Json(new List<object>());
+            }
+
+            var usuarios = await _context.Users
+                .Where(u => u.UserName != null && u.UserName.Contains(q))
+                .Take(10)
+                .Select(u => new
+                {
+                    id = u.Id,
+                    userName = u.UserName,
+                    fotoPerfil = u.FotoPerfil,
+                    esCreador = u.EsCreador
+                })
+                .ToListAsync();
+
+            return Json(usuarios);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> TransferirContenido(int id, string nuevoUsuarioId, bool cambiarTipoLado = false)
+        {
+            var contenido = await _context.Contenidos
+                .Include(c => c.Usuario)
+                .FirstOrDefaultAsync(c => c.Id == id);
+
+            if (contenido == null)
+            {
+                TempData["Error"] = "Contenido no encontrado.";
+                return RedirectToAction(nameof(Contenido));
+            }
+
+            var nuevoUsuario = await _context.Users.FindAsync(nuevoUsuarioId);
+            if (nuevoUsuario == null)
+            {
+                TempData["Error"] = "Usuario destino no encontrado.";
+                return RedirectToAction(nameof(Contenido));
+            }
+
+            var usuarioAnterior = contenido.Usuario?.UserName ?? "Desconocido";
+            contenido.UsuarioId = nuevoUsuarioId;
+
+            if (cambiarTipoLado)
+            {
+                contenido.TipoLado = contenido.TipoLado == TipoLado.LadoA ? TipoLado.LadoB : TipoLado.LadoA;
+            }
+
+            contenido.FechaActualizacion = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"Contenido transferido de {usuarioAnterior} a {nuevoUsuario.UserName}" +
+                                  (cambiarTipoLado ? $" (cambiado a {contenido.TipoLado})" : "") + ".";
+
+            return RedirectToAction(nameof(Contenido));
+        }
+
         // ========================================
         // REPORTES
         // ========================================
@@ -749,18 +840,77 @@ namespace Lado.Controllers
         }
 
         // ========================================
-        // CONFIGURACI�N
+        // CONFIGURACIÓN
         // ========================================
-        public IActionResult Configuracion()
+        public async Task<IActionResult> Configuracion()
         {
+            // Cargar configuraciones de billetera
+            var configuraciones = await _context.ConfiguracionesPlataforma
+                .Where(c => c.Categoria == "Billetera" || c.Categoria == "General")
+                .ToDictionaryAsync(c => c.Clave, c => c.Valor);
+
+            ViewBag.ComisionBilleteraElectronica = configuraciones.TryGetValue(ConfiguracionPlataforma.COMISION_BILLETERA_ELECTRONICA, out var comision) ? comision : "2.5";
+            ViewBag.TiempoProcesoRetiro = configuraciones.TryGetValue(ConfiguracionPlataforma.TIEMPO_PROCESO_RETIRO, out var tiempo) ? tiempo : "3-5 dias habiles";
+            ViewBag.MontoMinimoRecarga = configuraciones.TryGetValue(ConfiguracionPlataforma.MONTO_MINIMO_RECARGA, out var minRecarga) ? minRecarga : "5";
+            ViewBag.MontoMaximoRecarga = configuraciones.TryGetValue(ConfiguracionPlataforma.MONTO_MAXIMO_RECARGA, out var maxRecarga) ? maxRecarga : "1000";
+
             return View();
         }
 
         [HttpPost]
-        public async Task<IActionResult> ActualizarComision(decimal comision)
+        public async Task<IActionResult> ActualizarComision(decimal comisionVal)
         {
-            TempData["Success"] = $"Comision actualizada a {comision}%";
+            TempData["Success"] = $"Comision actualizada a {comisionVal}%";
             return RedirectToAction(nameof(Configuracion));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ActualizarConfiguracionBilletera(
+            string comisionBilletera,
+            string tiempoProcesoRetiro,
+            string montoMinimoRecarga,
+            string montoMaximoRecarga)
+        {
+            try
+            {
+                var ahora = DateTime.Now;
+
+                // Actualizar cada configuración
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.COMISION_BILLETERA_ELECTRONICA, comisionBilletera, ahora);
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.TIEMPO_PROCESO_RETIRO, tiempoProcesoRetiro, ahora);
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.MONTO_MINIMO_RECARGA, montoMinimoRecarga, ahora);
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.MONTO_MAXIMO_RECARGA, montoMaximoRecarga, ahora);
+
+                await _context.SaveChangesAsync();
+
+                TempData["Success"] = "Configuracion de billetera actualizada correctamente";
+            }
+            catch (Exception)
+            {
+                TempData["Error"] = "Error al actualizar la configuracion";
+            }
+
+            return RedirectToAction(nameof(Configuracion));
+        }
+
+        private async Task ActualizarConfiguracionAsync(string clave, string valor, DateTime fecha)
+        {
+            var config = await _context.ConfiguracionesPlataforma.FirstOrDefaultAsync(c => c.Clave == clave);
+            if (config != null)
+            {
+                config.Valor = valor;
+                config.UltimaModificacion = fecha;
+            }
+            else
+            {
+                _context.ConfiguracionesPlataforma.Add(new ConfiguracionPlataforma
+                {
+                    Clave = clave,
+                    Valor = valor,
+                    Categoria = "Billetera",
+                    UltimaModificacion = fecha
+                });
+            }
         }
 
         // ========================================
@@ -1007,6 +1157,25 @@ namespace Lado.Controllers
             await _context.SaveChangesAsync();
 
             TempData["Success"] = $"País {nombrePais} agregado correctamente con retención de {porcentajeRetencion}%";
+            return RedirectToAction(nameof(RetencionesPaises));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarRetencionPais(int id)
+        {
+            var retencion = await _context.RetencionesPaises.FindAsync(id);
+            if (retencion == null)
+            {
+                TempData["Error"] = "País no encontrado";
+                return RedirectToAction(nameof(RetencionesPaises));
+            }
+
+            var nombrePais = retencion.NombrePais;
+            _context.RetencionesPaises.Remove(retencion);
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"País {nombrePais} eliminado correctamente";
             return RedirectToAction(nameof(RetencionesPaises));
         }
 

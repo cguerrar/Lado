@@ -363,6 +363,7 @@ namespace Lado.Controllers
                 var contenidoPublico = await _context.Contenidos
                     .Include(c => c.Usuario)
                     .Include(c => c.PistaMusical) // Incluir música asociada
+                    .Include(c => c.Archivos.OrderBy(a => a.Orden)) // Incluir archivos del carrusel
                     .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
                         .ThenInclude(com => com.Usuario)
                     .Where(c => c.EstaActivo
@@ -379,6 +380,7 @@ namespace Lado.Controllers
                     ? await _context.Contenidos
                         .Include(c => c.Usuario)
                         .Include(c => c.PistaMusical) // Incluir música asociada
+                        .Include(c => c.Archivos.OrderBy(a => a.Orden)) // Incluir archivos del carrusel
                         .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
                             .ThenInclude(com => com.Usuario)
                         .Where(c => creadoresLadoBIds.Contains(c.UsuarioId) // ✅ Solo LadoB
@@ -395,6 +397,7 @@ namespace Lado.Controllers
                 var contenidoPremiumPropio = await _context.Contenidos
                     .Include(c => c.Usuario)
                     .Include(c => c.PistaMusical) // Incluir música asociada
+                    .Include(c => c.Archivos.OrderBy(a => a.Orden)) // Incluir archivos del carrusel
                     .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
                         .ThenInclude(com => com.Usuario)
                     .Where(c => c.UsuarioId == usuarioId
@@ -414,6 +417,7 @@ namespace Lado.Controllers
                 var contenidoPremiumComprado = await _context.Contenidos
                     .Include(c => c.Usuario)
                     .Include(c => c.PistaMusical) // Incluir música asociada
+                    .Include(c => c.Archivos.OrderBy(a => a.Orden)) // Incluir archivos del carrusel
                     .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
                         .ThenInclude(com => com.Usuario)
                     .Where(c => contenidosCompradosIds.Contains(c.Id)
@@ -429,6 +433,7 @@ namespace Lado.Controllers
                 var contenidoLadoBBloqueado = await _context.Contenidos
                     .Include(c => c.Usuario)
                     .Include(c => c.PistaMusical) // Incluir música asociada
+                    .Include(c => c.Archivos.OrderBy(a => a.Orden)) // Incluir archivos del carrusel
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
@@ -781,6 +786,12 @@ namespace Lado.Controllers
                 if (contenido == null)
                 {
                     return Json(new { success = false, message = "Contenido no encontrado" });
+                }
+
+                // Verificar si los comentarios están desactivados
+                if (contenido.ComentariosDesactivados)
+                {
+                    return Json(new { success = false, message = "Los comentarios están desactivados para esta publicación" });
                 }
 
                 if (contenido.TipoLado == TipoLado.LadoB)
@@ -1386,6 +1397,7 @@ namespace Lado.Controllers
                         tipoContenido = (int)c.TipoContenido,
                         tipoLado = (int)c.TipoLado,
                         esPremium = c.TipoLado == TipoLado.LadoB,
+                        esContenidoSensible = c.EsContenidoSensible,
                         numeroLikes = c.NumeroLikes,
                         numeroComentarios = c.NumeroComentarios,
                         usuario = new

@@ -69,6 +69,43 @@ class FileUpload {
                 this.handleFile(e.dataTransfer.files[0]);
             }
         });
+
+        // Paste from clipboard (Ctrl+V / Cmd+V)
+        document.addEventListener('paste', (e) => this.handlePaste(e));
+    }
+
+    /**
+     * Maneja el evento paste del portapapeles
+     */
+    handlePaste(e) {
+        // Solo procesar si la pantalla de upload está activa
+        const uploadScreen = document.getElementById('uploadScreen');
+        if (!uploadScreen || !uploadScreen.classList.contains('active')) {
+            return;
+        }
+
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        // Buscar archivos de imagen o video en el portapapeles
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+
+            // Verificar si es un archivo (imagen o video)
+            if (item.kind === 'file') {
+                const file = item.getAsFile();
+                if (file) {
+                    e.preventDefault();
+                    this.handleFile(file);
+
+                    // Mostrar feedback visual
+                    const dropzone = document.getElementById('uploadDropzone');
+                    dropzone.classList.add('paste-success');
+                    setTimeout(() => dropzone.classList.remove('paste-success'), 500);
+                    return;
+                }
+            }
+        }
     }
 
     handleFile(file) {
