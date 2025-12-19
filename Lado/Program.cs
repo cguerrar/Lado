@@ -15,6 +15,23 @@ using System.Security.Principal;
 var builder = WebApplication.CreateBuilder(args);
 
 // ========================================
+// CONFIGURACION DE LOGGING A ARCHIVO
+// ========================================
+var logsPath = Path.Combine(builder.Environment.ContentRootPath, "logs");
+if (!Directory.Exists(logsPath))
+{
+    Directory.CreateDirectory(logsPath);
+}
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+
+// Provider de archivo simple
+builder.Services.AddSingleton<ILoggerProvider>(sp =>
+    new FileLoggerProvider(Path.Combine(logsPath, $"lado-{DateTime.Now:yyyy-MM-dd}.log")));
+
+// ========================================
 // CONFIGURACION PARA IIS/PLESK (Proxy Reverso)
 // ========================================
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
