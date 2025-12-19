@@ -1498,8 +1498,18 @@ namespace Lado.Controllers
                     contenido.NumeroVistas++;
                     await _context.SaveChangesAsync();
 
-                    // Registrar interaccion de vista para clasificacion de intereses
-                    _ = _interesesService.RegistrarInteraccionAsync(usuarioActual.Id, id, TipoInteraccion.Vista);
+                    // Registrar interaccion de vista (fire and forget seguro)
+                    if (_interesesService != null)
+                    {
+                        try
+                        {
+                            _ = _interesesService.RegistrarInteraccionAsync(usuarioActual.Id, id, TipoInteraccion.Vista);
+                        }
+                        catch (Exception interesEx)
+                        {
+                            _logger.LogWarning(interesEx, "Error no critico al registrar vista para contenido {Id}", id);
+                        }
+                    }
                 }
 
                 var reacciones = await _context.Reacciones
