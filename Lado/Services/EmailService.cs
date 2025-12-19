@@ -68,21 +68,33 @@ namespace Lado.Services
 
                 var client = new MailjetClient(_apiKey, _secretKey);
 
+                // Usar API v3.1 con la sintaxis correcta
                 var request = new MailjetRequest
                 {
-                    Resource = Send.Resource
+                    Resource = SendV31.Resource
                 }
-                .Property(Send.FromEmail, _fromEmail)
-                .Property(Send.FromName, _fromName)
-                .Property(Send.Subject, subject)
-                .Property(Send.HtmlPart, htmlBody)
-                .Property(Send.TextPart, StripHtml(htmlBody))
-                .Property(Send.Recipients, new JArray
+                .Property(Send.Messages, new JArray
                 {
                     new JObject
                     {
-                        { "Email", toEmail },
-                        { "Name", toEmail.Split('@')[0] }
+                        { "From", new JObject
+                            {
+                                { "Email", _fromEmail },
+                                { "Name", _fromName }
+                            }
+                        },
+                        { "To", new JArray
+                            {
+                                new JObject
+                                {
+                                    { "Email", toEmail },
+                                    { "Name", toEmail.Split('@')[0] }
+                                }
+                            }
+                        },
+                        { "Subject", subject },
+                        { "HTMLPart", htmlBody },
+                        { "TextPart", StripHtml(htmlBody) }
                     }
                 });
 
@@ -95,8 +107,11 @@ namespace Lado.Services
                 }
                 else
                 {
-                    _logger.LogError("Error enviando email: {StatusCode} - {ErrorInfo}",
-                        response.StatusCode, response.GetErrorInfo());
+                    var errorInfo = response.GetErrorInfo();
+                    var errorMessage = response.GetErrorMessage();
+                    var data = response.GetData()?.ToString() ?? "null";
+                    _logger.LogError("Error Mailjet enviando email a {To}: StatusCode={StatusCode}, ErrorInfo={ErrorInfo}, ErrorMessage={ErrorMessage}, Data={Data}",
+                        toEmail, response.StatusCode, errorInfo, errorMessage, data);
                     return false;
                 }
             }
