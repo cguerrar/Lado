@@ -8,6 +8,7 @@ using Lado.Models;
 using Lado.Hubs;
 using Lado.DTOs.Common;
 using Lado.DTOs.Usuario;
+using Lado.Services;
 using System.Security.Claims;
 
 namespace Lado.Controllers.Api
@@ -21,15 +22,18 @@ namespace Lado.Controllers.Api
         private readonly ApplicationDbContext _context;
         private readonly IHubContext<ChatHub> _hubContext;
         private readonly ILogger<MensajesApiController> _logger;
+        private readonly IRateLimitService _rateLimitService;
 
         public MensajesApiController(
             ApplicationDbContext context,
             IHubContext<ChatHub> hubContext,
-            ILogger<MensajesApiController> logger)
+            ILogger<MensajesApiController> logger,
+            IRateLimitService rateLimitService)
         {
             _context = context;
             _hubContext = hubContext;
             _logger = logger;
+            _rateLimitService = rateLimitService;
         }
 
         /// <summary>
@@ -185,6 +189,27 @@ namespace Lado.Controllers.Api
                 if (string.IsNullOrEmpty(userId))
                 {
                     return Unauthorized(ApiResponse<MensajeDto>.Fail("No autenticado"));
+                }
+
+                // ========================================
+                // 🚫 RATE LIMITING - Prevenir abuso
+                // ========================================
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rateLimitKey = $"api_message_send_{userId}";
+                var rateLimitKeyIp = $"api_message_send_ip_{clientIp}";
+
+                // Límite por IP: máximo 60 mensajes por minuto
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, 60, TimeSpan.FromMinutes(1)))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT IP API MENSAJE: IP {IP} excedió límite - Usuario: {UserId}", clientIp, userId);
+                    return StatusCode(429, ApiResponse<MensajeDto>.Fail("Demasiadas solicitudes. Espera un momento."));
+                }
+
+                // Límite por usuario: máximo 30 mensajes por minuto
+                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.Messaging_MaxRequests, RateLimits.Messaging_Window))
+                {
+                    _logger.LogWarning("🚫 RATE LIMIT API MENSAJE: Usuario {UserId} excedió límite - IP: {IP}", userId, clientIp);
+                    return StatusCode(429, ApiResponse<MensajeDto>.Fail("Estás enviando mensajes muy rápido. Espera un momento."));
                 }
 
                 if (string.IsNullOrWhiteSpace(request.Mensaje))

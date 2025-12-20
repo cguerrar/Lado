@@ -19,6 +19,7 @@ namespace Lado.Controllers
         private readonly INotificationService _notificationService;
         private readonly IImageService _imageService;
         private readonly IClaudeClassificationService _classificationService;
+        private readonly IRateLimitService _rateLimitService;
 
         public ContenidoController(
             ApplicationDbContext context,
@@ -27,7 +28,8 @@ namespace Lado.Controllers
             ILogger<ContenidoController> logger,
             INotificationService notificationService,
             IImageService imageService,
-            IClaudeClassificationService classificationService)
+            IClaudeClassificationService classificationService,
+            IRateLimitService rateLimitService)
         {
             _context = context;
             _userManager = userManager;
@@ -36,6 +38,7 @@ namespace Lado.Controllers
             _notificationService = notificationService;
             _imageService = imageService;
             _classificationService = classificationService;
+            _rateLimitService = rateLimitService;
         }
 
         // ========================================
@@ -139,6 +142,60 @@ namespace Lado.Controllers
                 {
                     _logger.LogWarning("Usuario no encontrado en Crear POST");
                     return RedirectToAction("Login", "Account");
+                }
+
+                // ========================================
+                // 🚫 RATE LIMITING - Prevenir abuso
+                // ========================================
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rateLimitKey = $"content_create_{usuario.Id}";
+                var rateLimitKeyHourly = $"content_create_hourly_{usuario.Id}";
+                var rateLimitKeyDaily = $"content_create_daily_{usuario.Id}";
+                var rateLimitKeyIp = $"content_create_ip_{clientIp}";
+                var rateLimitKeyIpHourly = $"content_create_ip_hourly_{clientIp}";
+
+                // 🚨 Rate limit por IP (detectar ataques multi-cuenta)
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT IP: IP {IP} excedió límite de 5 min - Usuario: {UserId} ({UserName})",
+                        clientIp, usuario.Id, usuario.UserName);
+                    TempData["Error"] = "Demasiadas solicitudes desde tu conexión. Espera unos minutos.";
+                    return RedirectToAction("Index");
+                }
+
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIpHourly, RateLimits.ContentCreation_IP_Hourly_MaxRequests, RateLimits.ContentCreation_IP_Hourly_Window))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT IP HORARIO: IP {IP} excedió límite de 1 hora - Usuario: {UserId}",
+                        clientIp, usuario.Id);
+                    TempData["Error"] = "Demasiadas solicitudes desde tu conexión. Intenta más tarde.";
+                    return RedirectToAction("Index");
+                }
+
+                // Límite por usuario - 5 minutos: máximo 10 contenidos
+                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window))
+                {
+                    _logger.LogWarning("🚫 RATE LIMIT: Usuario {UserId} ({UserName}) excedió límite de 5 min - IP: {IP}",
+                        usuario.Id, usuario.UserName, clientIp);
+                    TempData["Error"] = "Has creado demasiado contenido en poco tiempo. Espera unos minutos.";
+                    return RedirectToAction("Index");
+                }
+
+                // Límite por hora: máximo 50 contenidos
+                if (!_rateLimitService.IsAllowed(rateLimitKeyHourly, RateLimits.ContentCreation_Hourly_MaxRequests, RateLimits.ContentCreation_Hourly_Window))
+                {
+                    _logger.LogWarning("🚫 RATE LIMIT HORARIO: Usuario {UserId} ({UserName}) excedió límite de 1 hora",
+                        usuario.Id, usuario.UserName);
+                    TempData["Error"] = "Has alcanzado el límite de contenido por hora. Intenta más tarde.";
+                    return RedirectToAction("Index");
+                }
+
+                // Límite diario: máximo 100 contenidos
+                if (!_rateLimitService.IsAllowed(rateLimitKeyDaily, RateLimits.ContentCreation_Daily_MaxRequests, RateLimits.ContentCreation_Daily_Window))
+                {
+                    _logger.LogWarning("🚫 RATE LIMIT DIARIO: Usuario {UserId} ({UserName}) excedió límite de 24 horas",
+                        usuario.Id, usuario.UserName);
+                    TempData["Error"] = "Has alcanzado el límite diario de contenido. Intenta mañana.";
+                    return RedirectToAction("Index");
                 }
 
                 _logger.LogInformation("=== CREAR CONTENIDO ===");
@@ -395,6 +452,55 @@ namespace Lado.Controllers
                 if (usuario == null)
                 {
                     return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                // ========================================
+                // 🚫 RATE LIMITING - Prevenir abuso
+                // ========================================
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rateLimitKey = $"content_create_{usuario.Id}";
+                var rateLimitKeyHourly = $"content_create_hourly_{usuario.Id}";
+                var rateLimitKeyDaily = $"content_create_daily_{usuario.Id}";
+                var rateLimitKeyIp = $"content_create_ip_{clientIp}";
+                var rateLimitKeyIpHourly = $"content_create_ip_hourly_{clientIp}";
+
+                // 🚨 Rate limit por IP (detectar ataques multi-cuenta)
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT IP CARRUSEL: IP {IP} excedió límite de 5 min - Usuario: {UserId} ({UserName})",
+                        clientIp, usuario.Id, usuario.UserName);
+                    return Json(new { success = false, message = "Demasiadas solicitudes desde tu conexión. Espera unos minutos." });
+                }
+
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIpHourly, RateLimits.ContentCreation_IP_Hourly_MaxRequests, RateLimits.ContentCreation_IP_Hourly_Window))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT IP HORARIO CARRUSEL: IP {IP} excedió límite de 1 hora - Usuario: {UserId}",
+                        clientIp, usuario.Id);
+                    return Json(new { success = false, message = "Demasiadas solicitudes desde tu conexión. Intenta más tarde." });
+                }
+
+                // Límite por usuario - 5 minutos: máximo 10 contenidos
+                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window))
+                {
+                    _logger.LogWarning("🚫 RATE LIMIT CARRUSEL: Usuario {UserId} ({UserName}) excedió límite de 5 min - IP: {IP}",
+                        usuario.Id, usuario.UserName, clientIp);
+                    return Json(new { success = false, message = "Has creado demasiado contenido en poco tiempo. Espera unos minutos." });
+                }
+
+                // Límite por hora: máximo 50 contenidos
+                if (!_rateLimitService.IsAllowed(rateLimitKeyHourly, RateLimits.ContentCreation_Hourly_MaxRequests, RateLimits.ContentCreation_Hourly_Window))
+                {
+                    _logger.LogWarning("🚫 RATE LIMIT HORARIO CARRUSEL: Usuario {UserId} ({UserName}) excedió límite de 1 hora",
+                        usuario.Id, usuario.UserName);
+                    return Json(new { success = false, message = "Has alcanzado el límite de contenido por hora. Intenta más tarde." });
+                }
+
+                // Límite diario: máximo 100 contenidos
+                if (!_rateLimitService.IsAllowed(rateLimitKeyDaily, RateLimits.ContentCreation_Daily_MaxRequests, RateLimits.ContentCreation_Daily_Window))
+                {
+                    _logger.LogWarning("🚫 RATE LIMIT DIARIO CARRUSEL: Usuario {UserId} ({UserName}) excedió límite de 24 horas",
+                        usuario.Id, usuario.UserName);
+                    return Json(new { success = false, message = "Has alcanzado el límite diario de contenido. Intenta mañana." });
                 }
 
                 // Validar que hay archivos
@@ -669,6 +775,55 @@ namespace Lado.Controllers
                 if (usuario == null)
                 {
                     return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                // ========================================
+                // 🚫 RATE LIMITING - Prevenir abuso
+                // ========================================
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rateLimitKey = $"content_create_{usuario.Id}";
+                var rateLimitKeyHourly = $"content_create_hourly_{usuario.Id}";
+                var rateLimitKeyDaily = $"content_create_daily_{usuario.Id}";
+                var rateLimitKeyIp = $"content_create_ip_{clientIp}";
+                var rateLimitKeyIpHourly = $"content_create_ip_hourly_{clientIp}";
+
+                // 🚨 Rate limit por IP (detectar ataques multi-cuenta)
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT IP REELS: IP {IP} excedió límite de 5 min - Usuario: {UserId} ({UserName})",
+                        clientIp, usuario.Id, usuario.UserName);
+                    return Json(new { success = false, message = "Demasiadas solicitudes desde tu conexión. Espera unos minutos." });
+                }
+
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIpHourly, RateLimits.ContentCreation_IP_Hourly_MaxRequests, RateLimits.ContentCreation_IP_Hourly_Window))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT IP HORARIO REELS: IP {IP} excedió límite de 1 hora - Usuario: {UserId}",
+                        clientIp, usuario.Id);
+                    return Json(new { success = false, message = "Demasiadas solicitudes desde tu conexión. Intenta más tarde." });
+                }
+
+                // Límite por usuario - 5 minutos: máximo 10 contenidos
+                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window))
+                {
+                    _logger.LogWarning("🚫 RATE LIMIT REELS: Usuario {UserId} ({UserName}) excedió límite de 5 min - IP: {IP}",
+                        usuario.Id, usuario.UserName, clientIp);
+                    return Json(new { success = false, message = "Has creado demasiado contenido en poco tiempo. Espera unos minutos." });
+                }
+
+                // Límite por hora: máximo 50 contenidos
+                if (!_rateLimitService.IsAllowed(rateLimitKeyHourly, RateLimits.ContentCreation_Hourly_MaxRequests, RateLimits.ContentCreation_Hourly_Window))
+                {
+                    _logger.LogWarning("🚫 RATE LIMIT HORARIO REELS: Usuario {UserId} ({UserName}) excedió límite de 1 hora",
+                        usuario.Id, usuario.UserName);
+                    return Json(new { success = false, message = "Has alcanzado el límite de contenido por hora. Intenta más tarde." });
+                }
+
+                // Límite diario: máximo 100 contenidos
+                if (!_rateLimitService.IsAllowed(rateLimitKeyDaily, RateLimits.ContentCreation_Daily_MaxRequests, RateLimits.ContentCreation_Daily_Window))
+                {
+                    _logger.LogWarning("🚫 RATE LIMIT DIARIO REELS: Usuario {UserId} ({UserName}) excedió límite de 24 horas",
+                        usuario.Id, usuario.UserName);
+                    return Json(new { success = false, message = "Has alcanzado el límite diario de contenido. Intenta mañana." });
                 }
 
                 _logger.LogInformation("=== CREAR DESDE REELS ===");

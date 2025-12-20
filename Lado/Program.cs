@@ -230,6 +230,7 @@ builder.Services.AddScoped<Lado.Services.IClaudeClassificationService, Lado.Serv
 // ========================================
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<Lado.Services.ICacheService, Lado.Services.CacheService>();
+builder.Services.AddSingleton<Lado.Services.IRateLimitService, Lado.Services.RateLimitService>();
 
 // ========================================
 // CONFIGURACIÓN DE SIGNALR (Chat en tiempo real)

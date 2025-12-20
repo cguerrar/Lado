@@ -19,6 +19,7 @@ namespace Lado.Controllers
         private readonly IHubContext<ChatHub> _hubContext;
         private readonly IWebHostEnvironment _environment;
         private readonly IDateTimeService _dateTimeService;
+        private readonly IRateLimitService _rateLimitService;
 
         // Límite de archivo: 10 MB
         private const long MaxFileSize = 10 * 1024 * 1024;
@@ -31,7 +32,8 @@ namespace Lado.Controllers
             ILogger<MensajesController> logger,
             IHubContext<ChatHub> hubContext,
             IWebHostEnvironment environment,
-            IDateTimeService dateTimeService)
+            IDateTimeService dateTimeService,
+            IRateLimitService rateLimitService)
         {
             _context = context;
             _userManager = userManager;
@@ -39,6 +41,7 @@ namespace Lado.Controllers
             _hubContext = hubContext;
             _environment = environment;
             _dateTimeService = dateTimeService;
+            _rateLimitService = rateLimitService;
         }
 
         // ========================================
@@ -257,6 +260,7 @@ namespace Lado.Controllers
         // ========================================
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> EnviarMensajeConArchivo(
             string destinatarioId,
             string? contenido,
@@ -271,6 +275,27 @@ namespace Lado.Controllers
                 if (usuario == null)
                 {
                     return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                // ========================================
+                // 🚫 RATE LIMITING - Prevenir abuso
+                // ========================================
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rateLimitKey = $"message_send_{usuario.Id}";
+                var rateLimitKeyIp = $"message_send_ip_{clientIp}";
+
+                // Límite por IP: máximo 60 mensajes por minuto
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, 60, TimeSpan.FromMinutes(1)))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT IP MENSAJE: IP {IP} excedió límite - Usuario: {UserId}", clientIp, usuario.Id);
+                    return Json(new { success = false, message = "Demasiados mensajes enviados. Espera un momento." });
+                }
+
+                // Límite por usuario: máximo 30 mensajes por minuto
+                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.Messaging_MaxRequests, RateLimits.Messaging_Window))
+                {
+                    _logger.LogWarning("🚫 RATE LIMIT MENSAJE: Usuario {UserId} excedió límite - IP: {IP}", usuario.Id, clientIp);
+                    return Json(new { success = false, message = "Estás enviando mensajes muy rápido. Espera un momento." });
                 }
 
                 if (string.IsNullOrWhiteSpace(destinatarioId))
@@ -697,6 +722,27 @@ namespace Lado.Controllers
                 if (usuario == null)
                 {
                     return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                // ========================================
+                // 🚫 RATE LIMITING - Prevenir abuso
+                // ========================================
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rateLimitKey = $"message_send_{usuario.Id}";
+                var rateLimitKeyIp = $"message_send_ip_{clientIp}";
+
+                // Límite por IP
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, 60, TimeSpan.FromMinutes(1)))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT IP MENSAJE DIRECTO: IP {IP} excedió límite - Usuario: {UserId}", clientIp, usuario.Id);
+                    return Json(new { success = false, message = "Demasiados mensajes enviados. Espera un momento." });
+                }
+
+                // Límite por usuario
+                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.Messaging_MaxRequests, RateLimits.Messaging_Window))
+                {
+                    _logger.LogWarning("🚫 RATE LIMIT MENSAJE DIRECTO: Usuario {UserId} excedió límite - IP: {IP}", usuario.Id, clientIp);
+                    return Json(new { success = false, message = "Estás enviando mensajes muy rápido. Espera un momento." });
                 }
 
                 if (string.IsNullOrEmpty(request?.ReceptorId))

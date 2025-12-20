@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Lado.Data;
 using Lado.Models;
+using Lado.Services;
 
 namespace Lado.Controllers
 {
@@ -15,15 +16,18 @@ namespace Lado.Controllers
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILogger<StoriesController> _logger;
+        private readonly IRateLimitService _rateLimitService;
 
         public StoriesController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
-            ILogger<StoriesController> logger)
+            ILogger<StoriesController> logger,
+            IRateLimitService rateLimitService)
         {
             _context = context;
             _userManager = userManager;
             _logger = logger;
+            _rateLimitService = rateLimitService;
         }
 
         /// <summary>
@@ -187,6 +191,27 @@ namespace Lado.Controllers
                 if (string.IsNullOrEmpty(usuarioId))
                 {
                     return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                // ========================================
+                // 🚫 RATE LIMITING - Prevenir abuso
+                // ========================================
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rateLimitKey = $"story_create_{usuarioId}";
+                var rateLimitKeyIp = $"story_create_ip_{clientIp}";
+
+                // Límite por IP: máximo 20 stories por 5 minutos
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT IP STORY: IP {IP} excedió límite - Usuario: {UserId}", clientIp, usuarioId);
+                    return Json(new { success = false, message = "Demasiadas solicitudes desde tu conexión. Espera unos minutos." });
+                }
+
+                // Límite por usuario: máximo 10 stories por 5 minutos
+                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window))
+                {
+                    _logger.LogWarning("🚫 RATE LIMIT STORY: Usuario {UserId} excedió límite de 5 min - IP: {IP}", usuarioId, clientIp);
+                    return Json(new { success = false, message = "Has creado demasiadas stories en poco tiempo. Espera unos minutos." });
                 }
 
                 if (archivo == null || archivo.Length == 0)

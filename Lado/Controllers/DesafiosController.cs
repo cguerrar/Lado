@@ -1,5 +1,6 @@
 ﻿using Lado.Data;
 using Lado.Models;
+using Lado.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -14,15 +15,18 @@ namespace Lado.Controllers
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILogger<DesafiosController> _logger;
+        private readonly IRateLimitService _rateLimitService;
 
         public DesafiosController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
-            ILogger<DesafiosController> logger)
+            ILogger<DesafiosController> logger,
+            IRateLimitService rateLimitService)
         {
             _context = context;
             _userManager = userManager;
             _logger = logger;
+            _rateLimitService = rateLimitService;
         }
 
         // ========================================
@@ -40,6 +44,27 @@ namespace Lado.Controllers
                 if (string.IsNullOrEmpty(usuarioId))
                 {
                     return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                // ========================================
+                // 🚫 RATE LIMITING - Prevenir abuso
+                // ========================================
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rateLimitKey = $"desafio_entrega_{usuarioId}";
+                var rateLimitKeyIp = $"desafio_entrega_ip_{clientIp}";
+
+                // Límite por IP
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT IP DESAFIO: IP {IP} excedió límite - Usuario: {UserId}", clientIp, usuarioId);
+                    return Json(new { success = false, message = "Demasiadas solicitudes. Espera unos minutos." });
+                }
+
+                // Límite por usuario
+                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window))
+                {
+                    _logger.LogWarning("🚫 RATE LIMIT DESAFIO: Usuario {UserId} excedió límite - IP: {IP}", usuarioId, clientIp);
+                    return Json(new { success = false, message = "Has enviado demasiadas entregas. Espera unos minutos." });
                 }
 
                 var desafio = await _context.Desafios
@@ -132,6 +157,33 @@ namespace Lado.Controllers
             try
             {
                 var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(usuarioId))
+                {
+                    return RedirectToAction("Login", "Account");
+                }
+
+                // ========================================
+                // 🚫 RATE LIMITING - Prevenir abuso
+                // ========================================
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rateLimitKey = $"desafio_crear_{usuarioId}";
+                var rateLimitKeyIp = $"desafio_crear_ip_{clientIp}";
+
+                // Límite por IP
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT IP CREAR DESAFIO: IP {IP} excedió límite - Usuario: {UserId}", clientIp, usuarioId);
+                    TempData["Error"] = "Demasiadas solicitudes. Espera unos minutos.";
+                    return View(model);
+                }
+
+                // Límite por usuario
+                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window))
+                {
+                    _logger.LogWarning("🚫 RATE LIMIT CREAR DESAFIO: Usuario {UserId} excedió límite - IP: {IP}", usuarioId, clientIp);
+                    TempData["Error"] = "Has creado demasiados desafíos. Espera unos minutos.";
+                    return View(model);
+                }
 
                 if (string.IsNullOrWhiteSpace(model.Titulo) ||
                     string.IsNullOrWhiteSpace(model.Descripcion) ||
