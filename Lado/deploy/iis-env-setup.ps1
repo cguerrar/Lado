@@ -49,6 +49,19 @@ $envVars = @{
     # Claude API
     "Claude__ApiKey" = "TU_CLAUDE_API_KEY"
 
+    # JWT (CRÍTICO para autenticación móvil)
+    "Jwt__Key" = "t2ww9oiaFGp1pnLTsqaZVr97m9muNd4SYfJqOzDIjsjixiBJwsAvUDSKFYIHgTto"
+    "Jwt__Issuer" = "LadoApp"
+    "Jwt__Audience" = "LadoAppMobile"
+    "Jwt__ExpiryMinutes" = "15"
+    "Jwt__RefreshTokenExpiryDays" = "30"
+
+    # Mailjet
+    "Mailjet__ApiKey" = "TU_MAILJET_API_KEY"
+    "Mailjet__SecretKey" = "TU_MAILJET_SECRET_KEY"
+    "Mailjet__FromEmail" = "noreply@ladoapp.com"
+    "Mailjet__FromName" = "Lado"
+
     # App Settings
     "AppSettings__BaseUrl" = "https://www.ladoapp.com"
     "AppSettings__MaxFileSize" = "104857600"
