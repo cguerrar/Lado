@@ -4004,6 +4004,197 @@ namespace Lado.Controllers
         }
 
         // ========================================
+        // GESTIÓN DE BLOQUEADOS
+        // ========================================
+
+        public async Task<IActionResult> Bloqueados()
+        {
+            // Bloqueos entre usuarios
+            var bloqueosUsuarios = await _context.BloqueosUsuarios
+                .Include(b => b.Bloqueador)
+                .Include(b => b.Bloqueado)
+                .OrderByDescending(b => b.FechaBloqueo)
+                .Take(100)
+                .ToListAsync();
+
+            // IPs bloqueadas
+            var ipsBloqueadas = await _context.IpsBloqueadas
+                .Where(ip => ip.EstaActivo)
+                .OrderByDescending(ip => ip.FechaBloqueo)
+                .ToListAsync();
+
+            // Usuarios desactivados por admin
+            var usuariosBloqueados = await _context.Users
+                .Where(u => !u.EstaActivo)
+                .OrderByDescending(u => u.FechaRegistro)
+                .ToListAsync();
+
+            ViewBag.BloqueosUsuarios = bloqueosUsuarios;
+            ViewBag.IpsBloqueadas = ipsBloqueadas;
+            ViewBag.UsuariosBloqueados = usuariosBloqueados;
+
+            ViewBag.TotalBloqueosUsuarios = bloqueosUsuarios.Count;
+            ViewBag.TotalIpsBloqueadas = ipsBloqueadas.Count;
+            ViewBag.TotalUsuariosBloqueados = usuariosBloqueados.Count;
+
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> BloquearIp([FromBody] BloquearIpRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.DireccionIp))
+            {
+                return Json(new { success = false, message = "La dirección IP es requerida" });
+            }
+
+            // Validar formato IP
+            if (!System.Net.IPAddress.TryParse(request.DireccionIp.Trim(), out _))
+            {
+                return Json(new { success = false, message = "Formato de IP inválido" });
+            }
+
+            // Verificar si ya existe
+            var existente = await _context.IpsBloqueadas
+                .FirstOrDefaultAsync(ip => ip.DireccionIp == request.DireccionIp.Trim());
+
+            if (existente != null)
+            {
+                if (existente.EstaActivo)
+                {
+                    return Json(new { success = false, message = "Esta IP ya está bloqueada" });
+                }
+                // Reactivar bloqueo existente
+                existente.EstaActivo = true;
+                existente.FechaBloqueo = DateTime.Now;
+                existente.Razon = request.Razon;
+                existente.FechaExpiracion = request.Permanente ? null : request.FechaExpiracion;
+                existente.AdminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            }
+            else
+            {
+                var nuevaIp = new IpBloqueada
+                {
+                    DireccionIp = request.DireccionIp.Trim(),
+                    Razon = request.Razon,
+                    FechaExpiracion = request.Permanente ? null : request.FechaExpiracion,
+                    AdminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                    EstaActivo = true
+                };
+                _context.IpsBloqueadas.Add(nuevaIp);
+            }
+
+            await _context.SaveChangesAsync();
+
+            await _logEventoService.RegistrarEventoAsync(
+                $"IP bloqueada: {request.DireccionIp}",
+                CategoriaEvento.Admin,
+                TipoLogEvento.Warning,
+                User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                User.Identity?.Name);
+
+            return Json(new { success = true, message = $"IP {request.DireccionIp} bloqueada correctamente" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DesbloquearIp([FromBody] DesbloquearIpRequest request)
+        {
+            var ip = await _context.IpsBloqueadas.FindAsync(request.Id);
+            if (ip == null)
+            {
+                return Json(new { success = false, message = "IP no encontrada" });
+            }
+
+            ip.EstaActivo = false;
+            await _context.SaveChangesAsync();
+
+            await _logEventoService.RegistrarEventoAsync(
+                $"IP desbloqueada: {ip.DireccionIp}",
+                CategoriaEvento.Admin,
+                TipoLogEvento.Info,
+                User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                User.Identity?.Name);
+
+            return Json(new { success = true, message = $"IP {ip.DireccionIp} desbloqueada" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarBloqueoUsuario([FromBody] EliminarBloqueoRequest request)
+        {
+            var bloqueo = await _context.BloqueosUsuarios
+                .Include(b => b.Bloqueador)
+                .Include(b => b.Bloqueado)
+                .FirstOrDefaultAsync(b => b.Id == request.Id);
+
+            if (bloqueo == null)
+            {
+                return Json(new { success = false, message = "Bloqueo no encontrado" });
+            }
+
+            _context.BloqueosUsuarios.Remove(bloqueo);
+            await _context.SaveChangesAsync();
+
+            await _logEventoService.RegistrarEventoAsync(
+                $"Bloqueo eliminado por admin: {bloqueo.Bloqueador?.UserName} -> {bloqueo.Bloqueado?.UserName}",
+                CategoriaEvento.Admin,
+                TipoLogEvento.Info,
+                User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                User.Identity?.Name);
+
+            return Json(new { success = true, message = "Bloqueo eliminado correctamente" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ActivarUsuario([FromBody] ActivarUsuarioRequest request)
+        {
+            var usuario = await _context.Users.FindAsync(request.UsuarioId);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "Usuario no encontrado" });
+            }
+
+            usuario.EstaActivo = true;
+            await _context.SaveChangesAsync();
+
+            await _logEventoService.RegistrarEventoAsync(
+                $"Usuario reactivado por admin: {usuario.UserName}",
+                CategoriaEvento.Admin,
+                TipoLogEvento.Info,
+                User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                User.Identity?.Name);
+
+            return Json(new { success = true, message = $"Usuario {usuario.UserName} activado correctamente" });
+        }
+
+        // Request DTOs para Bloqueados
+        public class BloquearIpRequest
+        {
+            public string DireccionIp { get; set; } = string.Empty;
+            public string? Razon { get; set; }
+            public bool Permanente { get; set; } = true;
+            public DateTime? FechaExpiracion { get; set; }
+        }
+
+        public class DesbloquearIpRequest
+        {
+            public int Id { get; set; }
+        }
+
+        public class EliminarBloqueoRequest
+        {
+            public int Id { get; set; }
+        }
+
+        public class ActivarUsuarioRequest
+        {
+            public string UsuarioId { get; set; } = string.Empty;
+        }
+
+        // ========================================
         // LOGS DEL SISTEMA
         // ========================================
 

@@ -62,6 +62,7 @@ namespace Lado.Data
         // ⭐ DbSets NUEVOS - SISTEMA DE BLOQUEOS
         // ========================================
         public DbSet<BloqueoUsuario> BloqueosUsuarios { get; set; }
+        public DbSet<IpBloqueada> IpsBloqueadas { get; set; }
 
         // ========================================
         // ⭐ DbSets NUEVOS - BIBLIOTECA DE MÚSICA

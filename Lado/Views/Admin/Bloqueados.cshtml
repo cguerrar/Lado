@@ -1,0 +1,765 @@
+@{
+    ViewData["Title"] = "Gestión de Bloqueados";
+    var bloqueosUsuarios = ViewBag.BloqueosUsuarios as List<Lado.Models.BloqueoUsuario> ?? new List<Lado.Models.BloqueoUsuario>();
+    var ipsBloqueadas = ViewBag.IpsBloqueadas as List<Lado.Models.IpBloqueada> ?? new List<Lado.Models.IpBloqueada>();
+    var usuariosBloqueados = ViewBag.UsuariosBloqueados as List<Lado.Models.ApplicationUser> ?? new List<Lado.Models.ApplicationUser>();
+}
+
+@Html.AntiForgeryToken()
+
+<style>
+    .tabs-container {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        border-bottom: 2px solid var(--border-color);
+        padding-bottom: 0;
+    }
+
+    .tab-btn {
+        padding: 14px 24px;
+        border: none;
+        background: transparent;
+        color: var(--text-gray);
+        font-weight: 600;
+        font-size: 0.9375rem;
+        cursor: pointer;
+        position: relative;
+        transition: all 0.2s;
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+    }
+
+    .tab-btn:hover {
+        color: var(--primary);
+        background: var(--primary-pale);
+    }
+
+    .tab-btn.active {
+        color: var(--primary);
+        background: var(--bg-white);
+    }
+
+    .tab-btn.active::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--primary);
+        border-radius: 3px 3px 0 0;
+    }
+
+    .tab-btn .badge {
+        margin-left: 8px;
+        padding: 4px 8px;
+        font-size: 0.75rem;
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .data-table th {
+        text-align: left;
+        padding: 14px 16px;
+        background: var(--bg-light);
+        font-weight: 600;
+        color: var(--text-gray);
+        font-size: 0.8125rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    .data-table td {
+        padding: 16px;
+        border-bottom: 1px solid var(--border-color);
+        vertical-align: middle;
+    }
+
+    .data-table tr:hover {
+        background: var(--primary-pale);
+    }
+
+    .user-cell {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--primary-gradient);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 0.875rem;
+    }
+
+    .user-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .user-name {
+        font-weight: 600;
+        color: var(--text-dark);
+    }
+
+    .user-username {
+        font-size: 0.8125rem;
+        color: var(--text-gray);
+    }
+
+    .ip-badge {
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        background: var(--bg-light);
+        padding: 6px 12px;
+        border-radius: var(--radius-sm);
+        font-size: 0.875rem;
+        color: var(--text-dark);
+    }
+
+    .date-cell {
+        font-size: 0.875rem;
+        color: var(--text-gray);
+    }
+
+    .reason-cell {
+        max-width: 200px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 0.875rem;
+        color: var(--text-gray);
+    }
+
+    .action-btn {
+        padding: 8px 14px;
+        border: none;
+        border-radius: var(--radius-sm);
+        font-weight: 600;
+        font-size: 0.8125rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .btn-danger-soft {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--danger);
+    }
+
+    .btn-danger-soft:hover {
+        background: var(--danger);
+        color: white;
+    }
+
+    .btn-success-soft {
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--success);
+    }
+
+    .btn-success-soft:hover {
+        background: var(--success);
+        color: white;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 24px;
+        color: var(--text-gray);
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+
+    .empty-state h5 {
+        font-size: 1.125rem;
+        margin-bottom: 8px;
+        color: var(--text-dark);
+    }
+
+    /* Modal para bloquear IP */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-overlay.active {
+        display: flex;
+    }
+
+    .modal-content {
+        background: var(--bg-white);
+        border-radius: var(--radius-lg);
+        padding: 32px;
+        width: 100%;
+        max-width: 480px;
+        box-shadow: var(--shadow-xl);
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+
+    .modal-header h3 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-dark);
+    }
+
+    .modal-close {
+        width: 36px;
+        height: 36px;
+        border: none;
+        background: var(--bg-light);
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-gray);
+        transition: all 0.2s;
+    }
+
+    .modal-close:hover {
+        background: var(--danger);
+        color: white;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--text-dark);
+        font-size: 0.875rem;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        font-size: 0.9375rem;
+        background: var(--bg-light);
+        color: var(--text-dark);
+        transition: all 0.2s;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 4px var(--primary-pale);
+        background: var(--bg-white);
+    }
+
+    .form-check {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .form-check input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--primary);
+    }
+
+    .form-check label {
+        font-size: 0.9375rem;
+        color: var(--text-dark);
+    }
+
+    .modal-footer {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 24px;
+        padding-top: 24px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .header-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        margin-bottom: 32px;
+    }
+
+    @@media (max-width: 768px) {
+        .stats-row {
+            grid-template-columns: 1fr;
+        }
+
+        .tabs-container {
+            overflow-x: auto;
+        }
+
+        .data-table {
+            font-size: 0.875rem;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px 8px;
+        }
+    }
+</style>
+
+<!-- Stats -->
+<div class="stats-row">
+    <div class="stat-card">
+        <div class="stat-icon bg-warning">
+            <i class="fas fa-ban" style="color: white; font-size: 1.25rem;"></i>
+        </div>
+        <div class="stat-content">
+            <p class="stat-label">IPs Bloqueadas</p>
+            <h3 class="stat-value">@ViewBag.TotalIpsBloqueadas</h3>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon bg-info">
+            <i class="fas fa-user-slash" style="color: white; font-size: 1.25rem;"></i>
+        </div>
+        <div class="stat-content">
+            <p class="stat-label">Bloqueos entre Usuarios</p>
+            <h3 class="stat-value">@ViewBag.TotalBloqueosUsuarios</h3>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon bg-danger">
+            <i class="fas fa-user-times" style="color: white; font-size: 1.25rem;"></i>
+        </div>
+        <div class="stat-content">
+            <p class="stat-label">Usuarios Desactivados</p>
+            <h3 class="stat-value">@ViewBag.TotalUsuariosBloqueados</h3>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        <!-- Tabs -->
+        <div class="tabs-container" style="padding: 24px 24px 0;">
+            <button class="tab-btn active" onclick="showTab('ips')">
+                <i class="fas fa-globe"></i> IPs Bloqueadas
+                <span class="badge bg-warning">@ViewBag.TotalIpsBloqueadas</span>
+            </button>
+            <button class="tab-btn" onclick="showTab('usuarios')">
+                <i class="fas fa-user-slash"></i> Bloqueos Usuarios
+                <span class="badge bg-info">@ViewBag.TotalBloqueosUsuarios</span>
+            </button>
+            <button class="tab-btn" onclick="showTab('desactivados')">
+                <i class="fas fa-user-times"></i> Usuarios Desactivados
+                <span class="badge bg-danger">@ViewBag.TotalUsuariosBloqueados</span>
+            </button>
+        </div>
+
+        <!-- Tab: IPs Bloqueadas -->
+        <div id="tab-ips" class="tab-content active">
+            <div style="padding: 20px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+                <button class="btn btn-primary" onclick="abrirModalBloquearIp()">
+                    <i class="fas fa-plus"></i> Bloquear IP
+                </button>
+            </div>
+            @if (ipsBloqueadas.Any())
+            {
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Dirección IP</th>
+                            <th>Razón</th>
+                            <th>Fecha Bloqueo</th>
+                            <th>Expira</th>
+                            <th>Intentos</th>
+                            <th style="width: 100px;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var ip in ipsBloqueadas)
+                        {
+                            <tr>
+                                <td><span class="ip-badge">@ip.DireccionIp</span></td>
+                                <td class="reason-cell" title="@ip.Razon">@(ip.Razon ?? "-")</td>
+                                <td class="date-cell">@ip.FechaBloqueo.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="date-cell">
+                                    @if (ip.FechaExpiracion.HasValue)
+                                    {
+                                        @ip.FechaExpiracion.Value.ToString("dd/MM/yyyy")
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Permanente</span>
+                                    }
+                                </td>
+                                <td>@ip.IntentosBloqueos</td>
+                                <td>
+                                    <button class="action-btn btn-success-soft" onclick="desbloquearIp(@ip.Id)" title="Desbloquear">
+                                        <i class="fas fa-unlock"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="empty-state">
+                    <i class="fas fa-shield-alt"></i>
+                    <h5>No hay IPs bloqueadas</h5>
+                    <p>Las IPs bloqueadas aparecerán aquí</p>
+                </div>
+            }
+        </div>
+
+        <!-- Tab: Bloqueos entre usuarios -->
+        <div id="tab-usuarios" class="tab-content">
+            @if (bloqueosUsuarios.Any())
+            {
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Bloqueador</th>
+                            <th>Bloqueado</th>
+                            <th>Fecha</th>
+                            <th>Razón</th>
+                            <th style="width: 100px;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var bloqueo in bloqueosUsuarios)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="user-cell">
+                                        <div class="user-avatar">
+                                            @(bloqueo.Bloqueador?.UserName?.Substring(0, 1).ToUpper() ?? "?")
+                                        </div>
+                                        <div class="user-info">
+                                            <span class="user-name">@(bloqueo.Bloqueador?.NombreCompleto ?? "Desconocido")</span>
+                                            <span class="user-username">@@@(bloqueo.Bloqueador?.UserName ?? "?")</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="user-cell">
+                                        <div class="user-avatar" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
+                                            @(bloqueo.Bloqueado?.UserName?.Substring(0, 1).ToUpper() ?? "?")
+                                        </div>
+                                        <div class="user-info">
+                                            <span class="user-name">@(bloqueo.Bloqueado?.NombreCompleto ?? "Desconocido")</span>
+                                            <span class="user-username">@@@(bloqueo.Bloqueado?.UserName ?? "?")</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="date-cell">@bloqueo.FechaBloqueo.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="reason-cell" title="@bloqueo.Razon">@(bloqueo.Razon ?? "-")</td>
+                                <td>
+                                    <button class="action-btn btn-danger-soft" onclick="eliminarBloqueoUsuario(@bloqueo.Id)" title="Eliminar bloqueo">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="empty-state">
+                    <i class="fas fa-users"></i>
+                    <h5>No hay bloqueos entre usuarios</h5>
+                    <p>Los bloqueos entre usuarios aparecerán aquí</p>
+                </div>
+            }
+        </div>
+
+        <!-- Tab: Usuarios desactivados -->
+        <div id="tab-desactivados" class="tab-content">
+            @if (usuariosBloqueados.Any())
+            {
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Email</th>
+                            <th>Fecha Registro</th>
+                            <th style="width: 120px;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var usuario in usuariosBloqueados)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="user-cell">
+                                        <div class="user-avatar" style="background: linear-gradient(135deg, #64748b, #475569);">
+                                            @(usuario.UserName?.Substring(0, 1).ToUpper() ?? "?")
+                                        </div>
+                                        <div class="user-info">
+                                            <span class="user-name">@(usuario.NombreCompleto ?? "Sin nombre")</span>
+                                            <span class="user-username">@@@usuario.UserName</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>@usuario.Email</td>
+                                <td class="date-cell">@usuario.FechaRegistro.ToString("dd/MM/yyyy")</td>
+                                <td>
+                                    <button class="action-btn btn-success-soft" onclick="activarUsuario('@usuario.Id')" title="Activar usuario">
+                                        <i class="fas fa-user-check"></i> Activar
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="empty-state">
+                    <i class="fas fa-user-check"></i>
+                    <h5>No hay usuarios desactivados</h5>
+                    <p>Todos los usuarios están activos</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Modal Bloquear IP -->
+<div class="modal-overlay" id="modalBloquearIp">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-ban" style="color: var(--danger); margin-right: 10px;"></i> Bloquear IP</h3>
+            <button class="modal-close" onclick="cerrarModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form id="formBloquearIp">
+            <div class="form-group">
+                <label for="direccionIp">Dirección IP</label>
+                <input type="text" class="form-control" id="direccionIp" placeholder="Ej: 192.168.1.1" required>
+            </div>
+            <div class="form-group">
+                <label for="razonBloqueo">Razón (opcional)</label>
+                <textarea class="form-control" id="razonBloqueo" rows="3" placeholder="Motivo del bloqueo..."></textarea>
+            </div>
+            <div class="form-check">
+                <input type="checkbox" id="bloquePermanente" checked>
+                <label for="bloquePermanente">Bloqueo permanente</label>
+            </div>
+            <div class="form-group" id="fechaExpiracionGroup" style="display: none;">
+                <label for="fechaExpiracion">Fecha de expiración</label>
+                <input type="datetime-local" class="form-control" id="fechaExpiracion">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-primary" onclick="cerrarModal()">Cancelar</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-ban"></i> Bloquear IP
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+    function showTab(tab) {
+        // Ocultar todos los tabs
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+        // Mostrar el tab seleccionado
+        document.getElementById('tab-' + tab).classList.add('active');
+        event.target.closest('.tab-btn').classList.add('active');
+    }
+
+    function abrirModalBloquearIp() {
+        document.getElementById('modalBloquearIp').classList.add('active');
+        document.getElementById('direccionIp').focus();
+    }
+
+    function cerrarModal() {
+        document.getElementById('modalBloquearIp').classList.remove('active');
+        document.getElementById('formBloquearIp').reset();
+    }
+
+    // Toggle fecha expiración
+    document.getElementById('bloquePermanente').addEventListener('change', function() {
+        document.getElementById('fechaExpiracionGroup').style.display = this.checked ? 'none' : 'block';
+    });
+
+    // Form submit
+    document.getElementById('formBloquearIp').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const data = {
+            DireccionIp: document.getElementById('direccionIp').value,
+            Razon: document.getElementById('razonBloqueo').value,
+            Permanente: document.getElementById('bloquePermanente').checked,
+            FechaExpiracion: document.getElementById('fechaExpiracion').value || null
+        };
+
+        try {
+            const response = await fetch('/Admin/BloquearIp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': token
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast(result.message, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (error) {
+            showToast('Error al bloquear IP', 'error');
+        }
+    });
+
+    async function desbloquearIp(id) {
+        if (!confirm('¿Desbloquear esta IP?')) return;
+
+        try {
+            const response = await fetch('/Admin/DesbloquearIp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': token
+                },
+                body: JSON.stringify({ Id: id })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast(result.message, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (error) {
+            showToast('Error al desbloquear IP', 'error');
+        }
+    }
+
+    async function eliminarBloqueoUsuario(id) {
+        if (!confirm('¿Eliminar este bloqueo entre usuarios?')) return;
+
+        try {
+            const response = await fetch('/Admin/EliminarBloqueoUsuario', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': token
+                },
+                body: JSON.stringify({ Id: id })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast(result.message, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (error) {
+            showToast('Error al eliminar bloqueo', 'error');
+        }
+    }
+
+    async function activarUsuario(usuarioId) {
+        if (!confirm('¿Activar este usuario?')) return;
+
+        try {
+            const response = await fetch('/Admin/ActivarUsuario', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': token
+                },
+                body: JSON.stringify({ UsuarioId: usuarioId })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast(result.message, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (error) {
+            showToast('Error al activar usuario', 'error');
+        }
+    }
+
+    // Cerrar modal con Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            cerrarModal();
+        }
+    });
+
+    // Cerrar modal al hacer click fuera
+    document.getElementById('modalBloquearIp').addEventListener('click', function(e) {
+        if (e.target === this) {
+            cerrarModal();
+        }
+    });
+</script>
+}
