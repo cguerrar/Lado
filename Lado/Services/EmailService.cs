@@ -1,15 +1,38 @@
 using Mailjet.Client;
 using Mailjet.Client.Resources;
+using Mailjet.Client.TransactionalEmails;
 using Newtonsoft.Json.Linq;
+using System.Net;
+using System.Net.Mail;
 
 namespace Lado.Services
 {
+    /// <summary>
+    /// Resultado del envío de email con información detallada
+    /// </summary>
+    public class EmailResult
+    {
+        public bool Success { get; set; }
+        public string? ErrorMessage { get; set; }
+        public int StatusCode { get; set; }
+        public string? ErrorDetails { get; set; }
+
+        public static EmailResult Ok() => new() { Success = true, StatusCode = 200 };
+        public static EmailResult Fail(string message, int statusCode = 0, string? details = null)
+            => new() { Success = false, ErrorMessage = message, StatusCode = statusCode, ErrorDetails = details };
+    }
+
     public interface IEmailService
     {
         /// <summary>
         /// Envia un email generico
         /// </summary>
         Task<bool> SendEmailAsync(string toEmail, string subject, string htmlBody);
+
+        /// <summary>
+        /// Envia un email generico con resultado detallado
+        /// </summary>
+        Task<EmailResult> SendEmailWithResultAsync(string toEmail, string subject, string htmlBody);
 
         /// <summary>
         /// Envia email de confirmacion de cuenta
@@ -50,10 +73,15 @@ namespace Lado.Services
         {
             _configuration = configuration;
             _logger = logger;
-            _apiKey = configuration["Mailjet:ApiKey"] ?? "";
-            _secretKey = configuration["Mailjet:SecretKey"] ?? "";
-            _fromEmail = configuration["Mailjet:FromEmail"] ?? "noreply@ladoapp.com";
-            _fromName = configuration["Mailjet:FromName"] ?? "Lado";
+            _apiKey = configuration["Mailjet:ApiKey"]?.Trim() ?? "";
+            _secretKey = configuration["Mailjet:SecretKey"]?.Trim() ?? "";
+            _fromEmail = configuration["Mailjet:FromEmail"]?.Trim() ?? "noreply@ladoapp.com";
+            _fromName = configuration["Mailjet:FromName"]?.Trim() ?? "Lado";
+
+            // Log para diagnóstico
+            _logger.LogInformation("Mailjet Config - ApiKey: {ApiKey}***, SecretKey length: {SecretLen}",
+                _apiKey.Length > 8 ? _apiKey.Substring(0, 8) : "EMPTY",
+                _secretKey.Length);
         }
 
         public async Task<bool> SendEmailAsync(string toEmail, string subject, string htmlBody)
@@ -73,7 +101,7 @@ namespace Lado.Services
                 {
                     Resource = SendV31.Resource
                 }
-                .Property(Send.Messages, new JArray
+                .Property("Messages", new JArray
                 {
                     new JObject
                     {
@@ -98,20 +126,79 @@ namespace Lado.Services
                     }
                 });
 
+                _logger.LogInformation("Mailjet: Enviando email a {Email} desde {From}", toEmail, _fromEmail);
+
                 var response = await client.PostAsync(request);
+
+                _logger.LogInformation("Mailjet Response: StatusCode={StatusCode}, IsSuccess={IsSuccess}",
+                    response.StatusCode, response.IsSuccessStatusCode);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    _logger.LogInformation("Email enviado exitosamente a {Email}", toEmail);
+                    // Log de la respuesta completa para diagnóstico
+                    var responseData = response.GetData();
+                    _logger.LogInformation("Email enviado exitosamente a {Email}. Response: {Response}",
+                        toEmail, responseData?.ToString() ?? "null");
+
+                    // Verificar si realmente se envió
+                    if (responseData != null)
+                    {
+                        try
+                        {
+                            var messages = responseData["Messages"];
+                            if (messages != null)
+                            {
+                                foreach (var msg in messages)
+                                {
+                                    var status = msg["Status"]?.ToString();
+                                    var msgId = msg["MessageID"]?.ToString() ?? msg["MessageUUID"]?.ToString();
+                                    _logger.LogInformation("Mailjet Message Status: {Status}, MessageID: {MessageId}",
+                                        status, msgId);
+                                }
+                            }
+                        }
+                        catch { /* Ignorar errores de parsing */ }
+                    }
+
                     return true;
                 }
                 else
                 {
                     var errorInfo = response.GetErrorInfo();
                     var errorMessage = response.GetErrorMessage();
-                    var data = response.GetData()?.ToString() ?? "null";
-                    _logger.LogError("Error Mailjet enviando email a {To}: StatusCode={StatusCode}, ErrorInfo={ErrorInfo}, ErrorMessage={ErrorMessage}, Data={Data}",
-                        toEmail, response.StatusCode, errorInfo, errorMessage, data);
+                    var rawData = response.GetData();
+                    var data = rawData?.ToString() ?? "null";
+
+                    // Log más detallado del error
+                    _logger.LogError("Error Mailjet enviando email a {To}: StatusCode={StatusCode}, ErrorInfo={ErrorInfo}, ErrorMessage={ErrorMessage}, RawResponse={Data}",
+                        toEmail, (int)response.StatusCode, errorInfo, errorMessage, data);
+
+                    // Si hay mensajes de error en la respuesta, extraerlos
+                    if (rawData != null)
+                    {
+                        try
+                        {
+                            var messages = rawData["Messages"];
+                            if (messages != null)
+                            {
+                                foreach (var msg in messages)
+                                {
+                                    var status = msg["Status"]?.ToString();
+                                    var errors = msg["Errors"];
+                                    if (errors != null)
+                                    {
+                                        foreach (var err in errors)
+                                        {
+                                            _logger.LogError("Mailjet Error Detail: Status={Status}, ErrorCode={ErrorCode}, ErrorMessage={ErrorMsg}",
+                                                status, err["ErrorCode"]?.ToString(), err["ErrorMessage"]?.ToString());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        catch { /* Ignorar errores de parsing */ }
+                    }
+
                     return false;
                 }
             }
@@ -119,6 +206,268 @@ namespace Lado.Services
             {
                 _logger.LogError(ex, "Excepcion al enviar email a {Email}", toEmail);
                 return false;
+            }
+        }
+
+        public async Task<EmailResult> SendEmailWithResultAsync(string toEmail, string subject, string htmlBody)
+        {
+            // Usar método Legacy que da más información de errores
+            return await SendEmailWithResultAsyncLegacy(toEmail, subject, htmlBody);
+        }
+
+        /// <summary>
+        /// Envía email usando SMTP de Mailjet
+        /// </summary>
+        private async Task<EmailResult> SendEmailViaSMTPAsync(string toEmail, string subject, string htmlBody)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(_apiKey) || string.IsNullOrEmpty(_secretKey))
+                {
+                    return EmailResult.Fail("Credenciales de Mailjet no configuradas.", 0);
+                }
+
+                _logger.LogInformation("Mailjet SMTP: Enviando email a {Email} desde {From}", toEmail, _fromEmail);
+
+                using var smtpClient = new SmtpClient("in-v3.mailjet.com", 587)
+                {
+                    Credentials = new NetworkCredential(_apiKey, _secretKey),
+                    EnableSsl = true,
+                    DeliveryMethod = SmtpDeliveryMethod.Network
+                };
+
+                using var mailMessage = new MailMessage
+                {
+                    From = new MailAddress(_fromEmail, _fromName),
+                    Subject = subject,
+                    Body = htmlBody,
+                    IsBodyHtml = true
+                };
+                mailMessage.To.Add(new MailAddress(toEmail));
+
+                await smtpClient.SendMailAsync(mailMessage);
+
+                _logger.LogInformation("Email enviado exitosamente via SMTP a {Email}", toEmail);
+                return EmailResult.Ok();
+            }
+            catch (SmtpException smtpEx)
+            {
+                _logger.LogError(smtpEx, "Error SMTP al enviar email a {Email}: {StatusCode} - {Message}",
+                    toEmail, smtpEx.StatusCode, smtpEx.Message);
+                return EmailResult.Fail($"Error SMTP: {smtpEx.Message}", (int)smtpEx.StatusCode, smtpEx.ToString());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Excepcion al enviar email via SMTP a {Email}", toEmail);
+                return EmailResult.Fail($"Excepción: {ex.Message}", 0, ex.ToString());
+            }
+        }
+
+        /// <summary>
+        /// Envía email usando la API de Mailjet v3.1
+        /// </summary>
+        private async Task<EmailResult> SendEmailViaAPIAsync(string toEmail, string subject, string htmlBody)
+        {
+            try
+            {
+                _logger.LogInformation("========== MAILJET API v3.1 - INICIO ==========");
+                _logger.LogInformation("Config: ApiKey={ApiKeyPrefix}***, FromEmail={From}, FromName={FromName}",
+                    _apiKey.Length > 8 ? _apiKey.Substring(0, 8) : "???", _fromEmail, _fromName);
+
+                if (string.IsNullOrEmpty(_apiKey) || string.IsNullOrEmpty(_secretKey))
+                {
+                    _logger.LogError("ERROR: Credenciales de Mailjet no configuradas");
+                    return EmailResult.Fail("Credenciales de Mailjet no configuradas. Verifica ApiKey y SecretKey.", 0);
+                }
+
+                var client = new MailjetClient(_apiKey, _secretKey);
+
+                // Usar TransactionalEmailBuilder (forma recomendada para API v3.1)
+                _logger.LogInformation("Construyendo email transaccional...");
+                _logger.LogInformation("  From: {FromEmail} ({FromName})", _fromEmail, _fromName);
+                _logger.LogInformation("  To: {ToEmail}", toEmail);
+                _logger.LogInformation("  Subject: {Subject}", subject);
+                _logger.LogInformation("  HTML Length: {Length} chars", htmlBody?.Length ?? 0);
+
+                var email = new TransactionalEmailBuilder()
+                    .WithFrom(new SendContact(_fromEmail, _fromName))
+                    .WithSubject(subject)
+                    .WithHtmlPart(htmlBody)
+                    .WithTextPart(StripHtml(htmlBody))
+                    .WithTo(new SendContact(toEmail, toEmail.Split('@')[0]))
+                    .Build();
+
+                _logger.LogInformation("Email construido. Enviando a Mailjet API...");
+
+                try
+                {
+                    var response = await client.SendTransactionalEmailAsync(email);
+
+                    _logger.LogInformation("Respuesta recibida de Mailjet");
+
+                    if (response == null)
+                    {
+                        _logger.LogError("ERROR: Response es NULL");
+                        return EmailResult.Fail("Mailjet devolvió respuesta nula", 0);
+                    }
+
+                    _logger.LogInformation("  Messages Count: {Count}", response.Messages?.Length ?? 0);
+
+                    // Log detallado de la respuesta
+                    if (response.Messages != null && response.Messages.Length > 0)
+                    {
+                        for (int i = 0; i < response.Messages.Length; i++)
+                        {
+                            var msg = response.Messages[i];
+                            _logger.LogInformation("  Message[{Index}]:", i);
+                            _logger.LogInformation("    Status: {Status}", msg.Status);
+
+                            if (msg.Errors != null && msg.Errors.Count > 0)
+                            {
+                                var errorDetails = new System.Text.StringBuilder();
+                                foreach (var err in msg.Errors)
+                                {
+                                    _logger.LogError("    Error: {Code} - {Message}", err.ErrorCode, err.ErrorMessage);
+                                    errorDetails.AppendLine($"{err.ErrorCode}: {err.ErrorMessage}");
+                                }
+                                return EmailResult.Fail(msg.Errors[0].ErrorMessage, 0, errorDetails.ToString());
+                            }
+
+                            if (msg.Status == "success")
+                            {
+                                _logger.LogInformation("========== EMAIL ENVIADO EXITOSAMENTE ==========");
+                                return EmailResult.Ok();
+                            }
+                        }
+                    }
+
+                    _logger.LogWarning("No se recibieron mensajes en la respuesta");
+                    return EmailResult.Fail("No se recibió respuesta de Mailjet", 0);
+                }
+                catch (Exception apiEx)
+                {
+                    _logger.LogError(apiEx, "ERROR al llamar SendTransactionalEmailAsync");
+                    return EmailResult.Fail($"Error API Mailjet: {apiEx.Message}", 0, apiEx.ToString());
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "EXCEPCION al enviar email via API a {Email}", toEmail);
+                return EmailResult.Fail($"Excepción: {ex.Message}", 0, ex.ToString());
+            }
+        }
+
+        // Método antiguo mantenido para compatibilidad - usa MailjetRequest directamente
+        public async Task<EmailResult> SendEmailWithResultAsyncLegacy(string toEmail, string subject, string htmlBody)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(_apiKey) || string.IsNullOrEmpty(_secretKey))
+                {
+                    return EmailResult.Fail("Credenciales de Mailjet no configuradas. Verifica ApiKey y SecretKey.", 0);
+                }
+
+                var client = new MailjetClient(_apiKey, _secretKey);
+
+                var request = new MailjetRequest
+                {
+                    Resource = SendV31.Resource
+                }
+                .Property("Messages", new JArray
+                {
+                    new JObject
+                    {
+                        { "From", new JObject
+                            {
+                                { "Email", _fromEmail },
+                                { "Name", _fromName }
+                            }
+                        },
+                        { "To", new JArray
+                            {
+                                new JObject
+                                {
+                                    { "Email", toEmail },
+                                    { "Name", toEmail.Split('@')[0] }
+                                }
+                            }
+                        },
+                        { "Subject", subject },
+                        { "HTMLPart", htmlBody },
+                        { "TextPart", StripHtml(htmlBody) }
+                    }
+                });
+
+                _logger.LogInformation("Mailjet Legacy: Enviando email a {Email} desde {From}", toEmail, _fromEmail);
+
+                var response = await client.PostAsync(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseData = response.GetData();
+                    _logger.LogInformation("Email enviado exitosamente a {Email}. Response: {Response}",
+                        toEmail, responseData?.ToString() ?? "null");
+                    return EmailResult.Ok();
+                }
+                else
+                {
+                    var errorInfo = response.GetErrorInfo();
+                    var errorMessage = response.GetErrorMessage();
+                    var rawData = response.GetData();
+                    var statusCode = (int)response.StatusCode;
+
+                    // Construir mensaje de error detallado
+                    var errorDetails = new System.Text.StringBuilder();
+                    errorDetails.AppendLine($"StatusCode: {statusCode}");
+                    errorDetails.AppendLine($"ErrorInfo: {errorInfo}");
+                    errorDetails.AppendLine($"ErrorMessage: {errorMessage}");
+
+                    string mainError = $"Error HTTP {statusCode}";
+
+                    // Extraer errores específicos de Mailjet
+                    if (rawData != null)
+                    {
+                        try
+                        {
+                            var messages = rawData["Messages"];
+                            if (messages != null)
+                            {
+                                foreach (var msg in messages)
+                                {
+                                    var status = msg["Status"]?.ToString();
+                                    var errors = msg["Errors"];
+                                    if (errors != null)
+                                    {
+                                        foreach (var err in errors)
+                                        {
+                                            var errCode = err["ErrorCode"]?.ToString();
+                                            var errMsg = err["ErrorMessage"]?.ToString();
+                                            var errRelated = err["ErrorRelatedTo"]?.ToString();
+
+                                            mainError = $"[{errCode}] {errMsg}";
+                                            errorDetails.AppendLine($"ErrorCode: {errCode}");
+                                            errorDetails.AppendLine($"ErrorMessage: {errMsg}");
+                                            if (!string.IsNullOrEmpty(errRelated))
+                                                errorDetails.AppendLine($"RelatedTo: {errRelated}");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        catch { /* Ignorar errores de parsing */ }
+
+                        errorDetails.AppendLine($"RawResponse: {rawData}");
+                    }
+
+                    _logger.LogError("Error Mailjet: {Error}", mainError);
+
+                    return EmailResult.Fail(mainError, statusCode, errorDetails.ToString());
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Excepcion al enviar email a {Email}", toEmail);
+                return EmailResult.Fail($"Excepción: {ex.Message}", 0, ex.ToString());
             }
         }
 

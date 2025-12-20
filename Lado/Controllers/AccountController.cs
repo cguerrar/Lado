@@ -42,8 +42,8 @@ namespace Lado.Controllers
         {
             if (User.Identity.IsAuthenticated)
             {
-                _logger.LogInformation("Usuario ya autenticado, redirigiendo a Feed");
-                return RedirectToAction("Index", "Feed");
+                _logger.LogInformation("Usuario ya autenticado, redirigiendo a FeedPublico");
+                return RedirectToAction("Index", "FeedPublico");
             }
 
             return View();
@@ -156,8 +156,8 @@ namespace Lado.Controllers
         {
             if (User.Identity.IsAuthenticated)
             {
-                _logger.LogInformation("Usuario ya autenticado, redirigiendo a Feed");
-                return RedirectToAction("Index", "Feed");
+                _logger.LogInformation("Usuario ya autenticado, redirigiendo a FeedPublico");
+                return RedirectToAction("Index", "FeedPublico");
             }
 
             ViewData["ReturnUrl"] = returnUrl;
@@ -242,18 +242,10 @@ namespace Lado.Controllers
                         return RedirectToAction("Index", "Admin");
                     }
 
-                    // ✅ CAMBIO: Feed es la página principal ahora
-                    _logger.LogInformation("Redirigiendo a Feed");
-
+                    // ✅ Siempre ir a FeedPublico después del login
+                    _logger.LogInformation("Redirigiendo a FeedPublico");
                     TempData["Success"] = $"¡Bienvenido de nuevo, {user.NombreCompleto}!";
-
-                    // Si hay returnUrl válido, redirigir ahí
-                    if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
-                    {
-                        return Redirect(returnUrl);
-                    }
-
-                    return RedirectToAction("Index", "Feed");
+                    return RedirectToAction("Index", "FeedPublico");
                 }
 
                 if (result.IsLockedOut)
@@ -403,7 +395,7 @@ namespace Lado.Controllers
         {
             if (User.Identity?.IsAuthenticated == true)
             {
-                return RedirectToAction("Index", "Feed");
+                return RedirectToAction("Index", "FeedPublico");
             }
             return View();
         }
@@ -642,7 +634,8 @@ namespace Lado.Controllers
                         }
                     }
 
-                    return LocalRedirect(returnUrl);
+                    // Siempre ir a FeedPublico después del login con Google
+                    return RedirectToAction("Index", "FeedPublico");
                 }
 
                 if (result.IsLockedOut)
@@ -679,14 +672,14 @@ namespace Lado.Controllers
                     {
                         await _signInManager.SignInAsync(existingUser, isPersistent: true);
                         _logger.LogInformation("Login externo vinculado a usuario existente: {Email}", email);
-                        return LocalRedirect(returnUrl);
+                        return RedirectToAction("Index", "FeedPublico");
                     }
                     else
                     {
                         // Si falla porque ya existe el login, simplemente hacer sign in
                         _logger.LogInformation("Login externo ya vinculado, haciendo sign in: {Email}", email);
                         await _signInManager.SignInAsync(existingUser, isPersistent: true);
-                        return LocalRedirect(returnUrl);
+                        return RedirectToAction("Index", "FeedPublico");
                     }
                 }
 
@@ -719,7 +712,7 @@ namespace Lado.Controllers
                         await _signInManager.SignInAsync(newUser, isPersistent: true);
                         _logger.LogInformation("Nuevo usuario creado con Google: {Email}", email);
                         TempData["Success"] = "¡Bienvenido a LADO! Tu cuenta ha sido creada con Google.";
-                        return RedirectToAction("Index", "Feed");
+                        return RedirectToAction("Index", "FeedPublico");
                     }
                 }
 
