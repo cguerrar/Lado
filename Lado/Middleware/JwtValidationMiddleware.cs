@@ -7,8 +7,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Lado.Middleware
 {
     /// <summary>
-    /// Middleware que valida tokens JWT contra la base de datos
-    /// Verifica que el token esté activo (no revocado) y que el SecurityVersion sea válido
+    /// Middleware de seguridad JWT - Valida tokens contra la base de datos
+    /// IMPORTANTE: Implementa whitelist - solo tokens registrados en ActiveTokens son válidos
     /// </summary>
     public class JwtValidationMiddleware
     {
@@ -41,28 +41,50 @@ namespace Lado.Middleware
                 return;
             }
 
-            // Validar el token (firma, expiración, etc.)
+            // ========================================
+            // VALIDACIÓN 1: Firma y expiración del token
+            // ========================================
             var principal = jwtService.ValidateToken(token);
             if (principal == null)
             {
-                // Token inválido - dejar que el middleware de autenticación lo maneje
-                await _next(context);
-                return;
+                _logger.LogWarning("Token JWT inválido (firma o expiración) - Path: {Path}", path);
+                await RespondUnauthorized(context, "Token inválido o expirado");
+                return; // CRÍTICO: Rechazar inmediatamente, no pasar al siguiente middleware
             }
 
-            // Extraer claims necesarios
+            // ========================================
+            // VALIDACIÓN 2: Claims requeridos
+            // ========================================
             var jti = principal.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
             var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var securityVersionStr = principal.FindFirst("security_version")?.Value;
 
+            // CRÍTICO: Jti es OBLIGATORIO para poder revocar tokens
+            if (string.IsNullOrEmpty(jti))
+            {
+                _logger.LogWarning("Token sin Jti (posible token antiguo o manipulado) - Path: {Path}", path);
+                await RespondUnauthorized(context, "Token inválido - falta identificador");
+                return;
+            }
+
             if (string.IsNullOrEmpty(userId))
             {
-                _logger.LogWarning("Token sin UserId - rechazando");
+                _logger.LogWarning("Token sin UserId - Path: {Path}", path);
                 await RespondUnauthorized(context, "Token inválido");
                 return;
             }
 
-            // Obtener el usuario actual para verificar SecurityVersion
+            // CRÍTICO: security_version es OBLIGATORIO
+            if (string.IsNullOrEmpty(securityVersionStr) || !int.TryParse(securityVersionStr, out int tokenSecurityVersion))
+            {
+                _logger.LogWarning("Token sin security_version válido (posible token antiguo) - UserId: {UserId}", userId);
+                await RespondUnauthorized(context, "Sesión expirada. Por favor inicia sesión nuevamente.");
+                return;
+            }
+
+            // ========================================
+            // VALIDACIÓN 3: Usuario existe y está activo
+            // ========================================
             var user = await dbContext.Users.FindAsync(userId);
             if (user == null)
             {
@@ -73,42 +95,59 @@ namespace Lado.Middleware
 
             if (!user.EstaActivo)
             {
-                _logger.LogWarning("Usuario desactivado: {UserId}", userId);
+                _logger.LogWarning("Usuario desactivado intentando acceder: {UserId}", userId);
                 await RespondUnauthorized(context, "Cuenta desactivada");
                 return;
             }
 
-            // Verificar SecurityVersion del token vs usuario
-            if (!string.IsNullOrEmpty(securityVersionStr))
+            // ========================================
+            // VALIDACIÓN 4: SecurityVersion (invalidación masiva)
+            // ========================================
+            if (tokenSecurityVersion < user.SecurityVersion)
             {
-                if (int.TryParse(securityVersionStr, out int tokenSecurityVersion))
-                {
-                    if (tokenSecurityVersion < user.SecurityVersion)
-                    {
-                        _logger.LogWarning("SecurityVersion del token ({TokenVersion}) es menor que el del usuario ({UserVersion}) - UserId: {UserId}",
-                            tokenSecurityVersion, user.SecurityVersion, userId);
-                        await RespondUnauthorized(context, "Sesión invalidada. Por favor inicia sesión nuevamente.");
-                        return;
-                    }
-                }
+                _logger.LogWarning("SecurityVersion obsoleto - Token: {TokenVersion}, Usuario: {UserVersion}, UserId: {UserId}",
+                    tokenSecurityVersion, user.SecurityVersion, userId);
+                await RespondUnauthorized(context, "Sesión invalidada. Por favor inicia sesión nuevamente.");
+                return;
             }
 
-            // Si hay Jti, verificar si está en la lista negra (revocado)
-            if (!string.IsNullOrEmpty(jti))
-            {
-                var activeToken = await dbContext.ActiveTokens
-                    .FirstOrDefaultAsync(t => t.Jti == jti);
+            // ========================================
+            // VALIDACIÓN 5: Token en whitelist (ActiveTokens)
+            // CRÍTICO: Solo tokens registrados son válidos
+            // ========================================
+            var activeToken = await dbContext.ActiveTokens
+                .FirstOrDefaultAsync(t => t.Jti == jti && t.UserId == userId);
 
-                // Si el token existe en ActiveTokens y está revocado, rechazar
-                if (activeToken != null && activeToken.IsRevoked)
-                {
-                    _logger.LogWarning("Token revocado - Jti: {Jti}, UserId: {UserId}",
-                        jti[..Math.Min(8, jti.Length)] + "...", userId);
-                    await RespondUnauthorized(context, "Sesión cerrada. Por favor inicia sesión nuevamente.");
-                    return;
-                }
+            // Si el token NO está en ActiveTokens, rechazar (whitelist approach)
+            if (activeToken == null)
+            {
+                _logger.LogWarning("Token no registrado en ActiveTokens (posible token forjado) - Jti: {Jti}, UserId: {UserId}",
+                    jti[..Math.Min(8, jti.Length)] + "...", userId);
+                await RespondUnauthorized(context, "Sesión no válida. Por favor inicia sesión nuevamente.");
+                return;
             }
 
+            // Si el token está revocado, rechazar
+            if (activeToken.IsRevoked)
+            {
+                _logger.LogWarning("Token revocado - Jti: {Jti}, UserId: {UserId}",
+                    jti[..Math.Min(8, jti.Length)] + "...", userId);
+                await RespondUnauthorized(context, "Sesión cerrada. Por favor inicia sesión nuevamente.");
+                return;
+            }
+
+            // Verificar expiración en BD (doble check)
+            if (activeToken.ExpiresAt < DateTime.UtcNow)
+            {
+                _logger.LogWarning("Token expirado en BD - Jti: {Jti}, UserId: {UserId}",
+                    jti[..Math.Min(8, jti.Length)] + "...", userId);
+                await RespondUnauthorized(context, "Sesión expirada. Por favor inicia sesión nuevamente.");
+                return;
+            }
+
+            // ========================================
+            // TOKEN VÁLIDO - Continuar
+            // ========================================
             await _next(context);
         }
 
@@ -116,11 +155,16 @@ namespace Lado.Middleware
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             context.Response.ContentType = "application/json";
+
+            // Agregar headers de seguridad
+            context.Response.Headers.Append("WWW-Authenticate", "Bearer error=\"invalid_token\"");
+
             await context.Response.WriteAsJsonAsync(new
             {
                 success = false,
                 message = message,
-                errors = new[] { "Token revocado o inválido. Por favor inicia sesión nuevamente." }
+                code = "TOKEN_INVALID",
+                errors = new[] { "Autenticación requerida. Por favor inicia sesión nuevamente." }
             });
         }
     }

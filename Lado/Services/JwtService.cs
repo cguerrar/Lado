@@ -43,11 +43,20 @@ namespace Lado.Services
             _context = context;
             _logger = logger;
 
-            _jwtKey = _configuration["Jwt:Key"] ?? "LadoApp_DefaultKey_ChangeInProduction123!";
+            // CRÍTICO: La key DEBE estar configurada en user secrets o variables de entorno
+            _jwtKey = _configuration["Jwt:Key"]
+                ?? throw new InvalidOperationException("SEGURIDAD: Jwt:Key no está configurada. Use 'dotnet user-secrets set Jwt:Key <your-secret-key>'");
+
             _jwtIssuer = _configuration["Jwt:Issuer"] ?? "LadoApp";
             _jwtAudience = _configuration["Jwt:Audience"] ?? "LadoAppMobile";
             _expiryMinutes = int.TryParse(_configuration["Jwt:ExpiryMinutes"], out var exp) ? exp : 15;
             _refreshTokenExpiryDays = int.TryParse(_configuration["Jwt:RefreshTokenExpiryDays"], out var ref_exp) ? ref_exp : 30;
+
+            // Validar longitud mínima de la key (256 bits = 32 bytes para HS256)
+            if (_jwtKey.Length < 32)
+            {
+                throw new InvalidOperationException("SEGURIDAD: Jwt:Key debe tener al menos 32 caracteres para seguridad adecuada");
+            }
         }
 
         public async Task<TokenResponse> GenerateTokensAsync(ApplicationUser user, IList<string> roles, string? deviceInfo = null, string? ipAddress = null)
