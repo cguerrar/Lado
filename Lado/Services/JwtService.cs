@@ -52,6 +52,15 @@ namespace Lado.Services
             _expiryMinutes = int.TryParse(_configuration["Jwt:ExpiryMinutes"], out var exp) ? exp : 15;
             _refreshTokenExpiryDays = int.TryParse(_configuration["Jwt:RefreshTokenExpiryDays"], out var ref_exp) ? ref_exp : 30;
 
+            // Validar que no sea un placeholder
+            if (_jwtKey.Contains("***") || _jwtKey.Contains("CONFIGURADO") || _jwtKey.Contains("user-secrets"))
+            {
+                throw new InvalidOperationException(
+                    "SEGURIDAD CRÍTICA: Jwt:Key contiene texto placeholder. " +
+                    "La aplicación NO puede iniciar sin una clave JWT segura. " +
+                    "Configure con: dotnet user-secrets set \"Jwt:Key\" \"<clave-secreta-de-32-caracteres-minimo>\"");
+            }
+
             // Validar longitud mínima de la key (256 bits = 32 bytes para HS256)
             if (_jwtKey.Length < 32)
             {
