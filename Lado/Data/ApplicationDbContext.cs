@@ -59,10 +59,11 @@ namespace Lado.Data
         public DbSet<InteraccionContenido> InteraccionesContenidos { get; set; }
 
         // ========================================
-        // ⭐ DbSets NUEVOS - SISTEMA DE BLOQUEOS
+        // ⭐ DbSets NUEVOS - SISTEMA DE BLOQUEOS Y SEGURIDAD
         // ========================================
         public DbSet<BloqueoUsuario> BloqueosUsuarios { get; set; }
         public DbSet<IpBloqueada> IpsBloqueadas { get; set; }
+        public DbSet<IntentoAtaque> IntentosAtaque { get; set; }
 
         // ========================================
         // ⭐ DbSets NUEVOS - BIBLIOTECA DE MÚSICA

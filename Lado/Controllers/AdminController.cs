@@ -21,6 +21,7 @@ namespace Lado.Controllers
         private readonly IEmailService _emailService;
         private readonly ILogEventoService _logEventoService;
         private readonly IWebHostEnvironment _hostEnvironment;
+        private readonly IRateLimitService _rateLimitService;
 
         public AdminController(
             ApplicationDbContext context,
@@ -31,7 +32,8 @@ namespace Lado.Controllers
             IClaudeClassificationService claudeService,
             IEmailService emailService,
             ILogEventoService logEventoService,
-            IWebHostEnvironment hostEnvironment)
+            IWebHostEnvironment hostEnvironment,
+            IRateLimitService rateLimitService)
         {
             _context = context;
             _userManager = userManager;
@@ -42,6 +44,7 @@ namespace Lado.Controllers
             _emailService = emailService;
             _logEventoService = logEventoService;
             _hostEnvironment = hostEnvironment;
+            _rateLimitService = rateLimitService;
         }
 
         public override void OnActionExecuting(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext context)
@@ -4017,11 +4020,14 @@ namespace Lado.Controllers
                 .Take(100)
                 .ToListAsync();
 
-            // IPs bloqueadas
-            var ipsBloqueadas = await _context.IpsBloqueadas
+            // IPs bloqueadas - separar por tipo
+            var todasIpsBloqueadas = await _context.IpsBloqueadas
                 .Where(ip => ip.EstaActivo)
                 .OrderByDescending(ip => ip.FechaBloqueo)
                 .ToListAsync();
+
+            var ipsManuales = todasIpsBloqueadas.Where(ip => ip.TipoBloqueo == TipoBloqueoIp.Manual).ToList();
+            var ipsAutomaticas = todasIpsBloqueadas.Where(ip => ip.TipoBloqueo == TipoBloqueoIp.Automatico).ToList();
 
             // Usuarios desactivados por admin
             var usuariosBloqueados = await _context.Users
@@ -4029,12 +4035,27 @@ namespace Lado.Controllers
                 .OrderByDescending(u => u.FechaRegistro)
                 .ToListAsync();
 
+            // Intentos de ataque recientes
+            var intentosAtaque = await _context.IntentosAtaque
+                .OrderByDescending(i => i.Fecha)
+                .Take(50)
+                .ToListAsync();
+
+            // Estadísticas de ataques
+            var estadisticasAtaques = await _rateLimitService.GetEstadisticasAsync();
+
             ViewBag.BloqueosUsuarios = bloqueosUsuarios;
-            ViewBag.IpsBloqueadas = ipsBloqueadas;
+            ViewBag.IpsBloqueadas = todasIpsBloqueadas;
+            ViewBag.IpsManuales = ipsManuales;
+            ViewBag.IpsAutomaticas = ipsAutomaticas;
             ViewBag.UsuariosBloqueados = usuariosBloqueados;
+            ViewBag.IntentosAtaque = intentosAtaque;
+            ViewBag.EstadisticasAtaques = estadisticasAtaques;
 
             ViewBag.TotalBloqueosUsuarios = bloqueosUsuarios.Count;
-            ViewBag.TotalIpsBloqueadas = ipsBloqueadas.Count;
+            ViewBag.TotalIpsBloqueadas = todasIpsBloqueadas.Count;
+            ViewBag.TotalIpsManuales = ipsManuales.Count;
+            ViewBag.TotalIpsAutomaticas = ipsAutomaticas.Count;
             ViewBag.TotalUsuariosBloqueados = usuariosBloqueados.Count;
 
             return View();

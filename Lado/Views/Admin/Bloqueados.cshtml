@@ -1,8 +1,14 @@
+@using Lado.Models
+@using Lado.Services
 @{
-    ViewData["Title"] = "Gestión de Bloqueados";
-    var bloqueosUsuarios = ViewBag.BloqueosUsuarios as List<Lado.Models.BloqueoUsuario> ?? new List<Lado.Models.BloqueoUsuario>();
-    var ipsBloqueadas = ViewBag.IpsBloqueadas as List<Lado.Models.IpBloqueada> ?? new List<Lado.Models.IpBloqueada>();
-    var usuariosBloqueados = ViewBag.UsuariosBloqueados as List<Lado.Models.ApplicationUser> ?? new List<Lado.Models.ApplicationUser>();
+    ViewData["Title"] = "Gestión de Bloqueados y Seguridad";
+    var bloqueosUsuarios = ViewBag.BloqueosUsuarios as List<BloqueoUsuario> ?? new List<BloqueoUsuario>();
+    var ipsBloqueadas = ViewBag.IpsBloqueadas as List<IpBloqueada> ?? new List<IpBloqueada>();
+    var ipsManuales = ViewBag.IpsManuales as List<IpBloqueada> ?? new List<IpBloqueada>();
+    var ipsAutomaticas = ViewBag.IpsAutomaticas as List<IpBloqueada> ?? new List<IpBloqueada>();
+    var usuariosBloqueados = ViewBag.UsuariosBloqueados as List<ApplicationUser> ?? new List<ApplicationUser>();
+    var intentosAtaque = ViewBag.IntentosAtaque as List<IntentoAtaque> ?? new List<IntentoAtaque>();
+    var stats = ViewBag.EstadisticasAtaques as AtaqueEstadisticas ?? new AtaqueEstadisticas();
 }
 
 @Html.AntiForgeryToken()
@@ -14,15 +20,16 @@
         margin-bottom: 24px;
         border-bottom: 2px solid var(--border-color);
         padding-bottom: 0;
+        flex-wrap: wrap;
     }
 
     .tab-btn {
-        padding: 14px 24px;
+        padding: 14px 20px;
         border: none;
         background: transparent;
         color: var(--text-gray);
         font-weight: 600;
-        font-size: 0.9375rem;
+        font-size: 0.875rem;
         cursor: pointer;
         position: relative;
         transition: all 0.2s;
@@ -51,9 +58,9 @@
     }
 
     .tab-btn .badge {
-        margin-left: 8px;
-        padding: 4px 8px;
-        font-size: 0.75rem;
+        margin-left: 6px;
+        padding: 3px 7px;
+        font-size: 0.7rem;
     }
 
     .tab-content {
@@ -71,20 +78,21 @@
 
     .data-table th {
         text-align: left;
-        padding: 14px 16px;
+        padding: 12px 14px;
         background: var(--bg-light);
         font-weight: 600;
         color: var(--text-gray);
-        font-size: 0.8125rem;
+        font-size: 0.75rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         border-bottom: 2px solid var(--border-color);
     }
 
     .data-table td {
-        padding: 16px;
+        padding: 14px;
         border-bottom: 1px solid var(--border-color);
         vertical-align: middle;
+        font-size: 0.875rem;
     }
 
     .data-table tr:hover {
@@ -94,12 +102,12 @@
     .user-cell {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
     }
 
     .user-avatar {
-        width: 40px;
-        height: 40px;
+        width: 36px;
+        height: 36px;
         border-radius: 50%;
         background: var(--primary-gradient);
         display: flex;
@@ -107,7 +115,7 @@
         justify-content: center;
         color: white;
         font-weight: 700;
-        font-size: 0.875rem;
+        font-size: 0.8rem;
     }
 
     .user-info {
@@ -118,47 +126,53 @@
     .user-name {
         font-weight: 600;
         color: var(--text-dark);
+        font-size: 0.875rem;
     }
 
     .user-username {
-        font-size: 0.8125rem;
+        font-size: 0.75rem;
         color: var(--text-gray);
     }
 
     .ip-badge {
         font-family: 'SF Mono', 'Fira Code', monospace;
         background: var(--bg-light);
-        padding: 6px 12px;
+        padding: 5px 10px;
         border-radius: var(--radius-sm);
-        font-size: 0.875rem;
+        font-size: 0.8rem;
         color: var(--text-dark);
     }
 
+    .ip-badge.auto {
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
     .date-cell {
-        font-size: 0.875rem;
+        font-size: 0.8rem;
         color: var(--text-gray);
     }
 
     .reason-cell {
-        max-width: 200px;
+        max-width: 180px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        font-size: 0.875rem;
+        font-size: 0.8rem;
         color: var(--text-gray);
     }
 
     .action-btn {
-        padding: 8px 14px;
+        padding: 6px 12px;
         border: none;
         border-radius: var(--radius-sm);
         font-weight: 600;
-        font-size: 0.8125rem;
+        font-size: 0.75rem;
         cursor: pointer;
         transition: all 0.2s;
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
     }
 
     .btn-danger-soft {
@@ -183,23 +197,22 @@
 
     .empty-state {
         text-align: center;
-        padding: 60px 24px;
+        padding: 50px 24px;
         color: var(--text-gray);
     }
 
     .empty-state i {
-        font-size: 3rem;
-        margin-bottom: 16px;
+        font-size: 2.5rem;
+        margin-bottom: 14px;
         opacity: 0.5;
     }
 
     .empty-state h5 {
-        font-size: 1.125rem;
-        margin-bottom: 8px;
+        font-size: 1rem;
+        margin-bottom: 6px;
         color: var(--text-dark);
     }
 
-    /* Modal para bloquear IP */
     .modal-overlay {
         display: none;
         position: fixed;
@@ -221,9 +234,9 @@
     .modal-content {
         background: var(--bg-white);
         border-radius: var(--radius-lg);
-        padding: 32px;
+        padding: 28px;
         width: 100%;
-        max-width: 480px;
+        max-width: 440px;
         box-shadow: var(--shadow-xl);
     }
 
@@ -231,18 +244,18 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
     }
 
     .modal-header h3 {
-        font-size: 1.25rem;
+        font-size: 1.125rem;
         font-weight: 700;
         color: var(--text-dark);
     }
 
     .modal-close {
-        width: 36px;
-        height: 36px;
+        width: 32px;
+        height: 32px;
         border: none;
         background: var(--bg-light);
         border-radius: 50%;
@@ -260,23 +273,23 @@
     }
 
     .form-group {
-        margin-bottom: 20px;
+        margin-bottom: 16px;
     }
 
     .form-group label {
         display: block;
         font-weight: 600;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
         color: var(--text-dark);
-        font-size: 0.875rem;
+        font-size: 0.8rem;
     }
 
     .form-control {
         width: 100%;
-        padding: 12px 16px;
+        padding: 10px 14px;
         border: 1px solid var(--border-color);
         border-radius: var(--radius-md);
-        font-size: 0.9375rem;
+        font-size: 0.875rem;
         background: var(--bg-light);
         color: var(--text-dark);
         transition: all 0.2s;
@@ -285,54 +298,107 @@
     .form-control:focus {
         outline: none;
         border-color: var(--primary);
-        box-shadow: 0 0 0 4px var(--primary-pale);
+        box-shadow: 0 0 0 3px var(--primary-pale);
         background: var(--bg-white);
     }
 
     .form-check {
         display: flex;
         align-items: center;
-        gap: 10px;
-        margin-bottom: 16px;
+        gap: 8px;
+        margin-bottom: 14px;
     }
 
     .form-check input[type="checkbox"] {
-        width: 18px;
-        height: 18px;
+        width: 16px;
+        height: 16px;
         accent-color: var(--primary);
     }
 
     .form-check label {
-        font-size: 0.9375rem;
+        font-size: 0.875rem;
         color: var(--text-dark);
     }
 
     .modal-footer {
         display: flex;
-        gap: 12px;
+        gap: 10px;
         justify-content: flex-end;
-        margin-top: 24px;
-        padding-top: 24px;
+        margin-top: 20px;
+        padding-top: 20px;
         border-top: 1px solid var(--border-color);
-    }
-
-    .header-actions {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 24px;
     }
 
     .stats-row {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 20px;
-        margin-bottom: 32px;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 16px;
+        margin-bottom: 28px;
+    }
+
+    .attack-type-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+
+    .attack-type-badge.spam { background: rgba(245, 158, 11, 0.15); color: #d97706; }
+    .attack-type-badge.brute { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
+    .attack-type-badge.scraping { background: rgba(139, 92, 246, 0.15); color: #7c3aed; }
+    .attack-type-badge.registro { background: rgba(59, 130, 246, 0.15); color: #2563eb; }
+    .attack-type-badge.otro { background: rgba(107, 114, 128, 0.15); color: #4b5563; }
+
+    .top-attackers {
+        background: var(--bg-light);
+        border-radius: var(--radius-md);
+        padding: 16px;
+        margin-bottom: 20px;
+    }
+
+    .top-attackers h4 {
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: var(--text-dark);
+    }
+
+    .attacker-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .attacker-item:last-child {
+        border-bottom: none;
+    }
+
+    .attacker-ip {
+        font-family: monospace;
+        font-size: 0.8rem;
+        color: var(--text-dark);
+    }
+
+    .attacker-count {
+        font-weight: 700;
+        font-size: 0.8rem;
+        color: var(--danger);
+    }
+
+    @@media (max-width: 1200px) {
+        .stats-row {
+            grid-template-columns: repeat(3, 1fr);
+        }
     }
 
     @@media (max-width: 768px) {
         .stats-row {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, 1fr);
         }
 
         .tabs-container {
@@ -340,92 +406,259 @@
         }
 
         .data-table {
-            font-size: 0.875rem;
+            font-size: 0.8rem;
         }
 
         .data-table th,
         .data-table td {
-            padding: 12px 8px;
+            padding: 10px 8px;
         }
     }
 </style>
 
-<!-- Stats -->
+<!-- Stats de Seguridad -->
 <div class="stats-row">
     <div class="stat-card">
-        <div class="stat-icon bg-warning">
-            <i class="fas fa-ban" style="color: white; font-size: 1.25rem;"></i>
+        <div class="stat-icon" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
+            <i class="fas fa-skull-crossbones" style="color: white; font-size: 1.1rem;"></i>
         </div>
         <div class="stat-content">
-            <p class="stat-label">IPs Bloqueadas</p>
-            <h3 class="stat-value">@ViewBag.TotalIpsBloqueadas</h3>
+            <p class="stat-label">Ataques Hoy</p>
+            <h3 class="stat-value">@stats.AtaquesHoy</h3>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+            <i class="fas fa-chart-line" style="color: white; font-size: 1.1rem;"></i>
+        </div>
+        <div class="stat-content">
+            <p class="stat-label">Ataques Semana</p>
+            <h3 class="stat-value">@stats.AtaquesSemana</h3>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
+            <i class="fas fa-robot" style="color: white; font-size: 1.1rem;"></i>
+        </div>
+        <div class="stat-content">
+            <p class="stat-label">Auto-bloqueadas</p>
+            <h3 class="stat-value">@stats.IpsBloqueadasAuto</h3>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon bg-warning">
+            <i class="fas fa-hand-paper" style="color: white; font-size: 1.1rem;"></i>
+        </div>
+        <div class="stat-content">
+            <p class="stat-label">Manuales</p>
+            <h3 class="stat-value">@stats.IpsBloqueadasManual</h3>
         </div>
     </div>
     <div class="stat-card">
         <div class="stat-icon bg-info">
-            <i class="fas fa-user-slash" style="color: white; font-size: 1.25rem;"></i>
+            <i class="fas fa-user-slash" style="color: white; font-size: 1.1rem;"></i>
         </div>
         <div class="stat-content">
-            <p class="stat-label">Bloqueos entre Usuarios</p>
+            <p class="stat-label">Usuarios Bloq.</p>
             <h3 class="stat-value">@ViewBag.TotalBloqueosUsuarios</h3>
-        </div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-icon bg-danger">
-            <i class="fas fa-user-times" style="color: white; font-size: 1.25rem;"></i>
-        </div>
-        <div class="stat-content">
-            <p class="stat-label">Usuarios Desactivados</p>
-            <h3 class="stat-value">@ViewBag.TotalUsuariosBloqueados</h3>
         </div>
     </div>
 </div>
 
+<!-- Top IPs Atacantes -->
+@if (stats.TopIpsAtacantes.Any())
+{
+    <div class="top-attackers">
+        <h4><i class="fas fa-exclamation-triangle" style="color: var(--danger); margin-right: 8px;"></i> Top IPs Atacantes (Última Semana)</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">
+            @foreach (var (ip, intentos) in stats.TopIpsAtacantes.Take(5))
+            {
+                <div class="attacker-item">
+                    <span class="attacker-ip">@ip</span>
+                    <span class="attacker-count">@intentos intentos</span>
+                </div>
+            }
+        </div>
+    </div>
+}
+
 <div class="card">
     <div class="card-body" style="padding: 0;">
         <!-- Tabs -->
-        <div class="tabs-container" style="padding: 24px 24px 0;">
-            <button class="tab-btn active" onclick="showTab('ips')">
-                <i class="fas fa-globe"></i> IPs Bloqueadas
-                <span class="badge bg-warning">@ViewBag.TotalIpsBloqueadas</span>
+        <div class="tabs-container" style="padding: 20px 20px 0;">
+            <button class="tab-btn active" onclick="showTab('ataques')">
+                <i class="fas fa-skull"></i> Intentos de Ataque
+                <span class="badge bg-danger">@intentosAtaque.Count</span>
+            </button>
+            <button class="tab-btn" onclick="showTab('ips-auto')">
+                <i class="fas fa-robot"></i> IPs Auto-bloqueadas
+                <span class="badge" style="background: #8b5cf6;">@ipsAutomaticas.Count</span>
+            </button>
+            <button class="tab-btn" onclick="showTab('ips')">
+                <i class="fas fa-ban"></i> IPs Manuales
+                <span class="badge bg-warning">@ipsManuales.Count</span>
             </button>
             <button class="tab-btn" onclick="showTab('usuarios')">
                 <i class="fas fa-user-slash"></i> Bloqueos Usuarios
                 <span class="badge bg-info">@ViewBag.TotalBloqueosUsuarios</span>
             </button>
             <button class="tab-btn" onclick="showTab('desactivados')">
-                <i class="fas fa-user-times"></i> Usuarios Desactivados
-                <span class="badge bg-danger">@ViewBag.TotalUsuariosBloqueados</span>
+                <i class="fas fa-user-times"></i> Desactivados
+                <span class="badge bg-secondary">@ViewBag.TotalUsuariosBloqueados</span>
             </button>
         </div>
 
-        <!-- Tab: IPs Bloqueadas -->
-        <div id="tab-ips" class="tab-content active">
-            <div style="padding: 20px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
-                <button class="btn btn-primary" onclick="abrirModalBloquearIp()">
-                    <i class="fas fa-plus"></i> Bloquear IP
-                </button>
-            </div>
-            @if (ipsBloqueadas.Any())
+        <!-- Tab: Intentos de Ataque -->
+        <div id="tab-ataques" class="tab-content active">
+            @if (intentosAtaque.Any())
             {
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Dirección IP</th>
-                            <th>Razón</th>
-                            <th>Fecha Bloqueo</th>
-                            <th>Expira</th>
-                            <th>Intentos</th>
-                            <th style="width: 100px;">Acciones</th>
+                            <th>IP</th>
+                            <th>Tipo</th>
+                            <th>Endpoint</th>
+                            <th>Fecha</th>
+                            <th>Bloqueado</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var ip in ipsBloqueadas)
+                        @foreach (var intento in intentosAtaque)
+                        {
+                            var tipoClass = intento.TipoAtaque switch {
+                                TipoAtaque.SpamContenido => "spam",
+                                TipoAtaque.SpamMensajes => "spam",
+                                TipoAtaque.FuerzaBruta => "brute",
+                                TipoAtaque.Scraping => "scraping",
+                                TipoAtaque.SpamRegistro => "registro",
+                                _ => "otro"
+                            };
+                            var tipoLabel = intento.TipoAtaque switch {
+                                TipoAtaque.SpamContenido => "Spam Contenido",
+                                TipoAtaque.SpamMensajes => "Spam Mensajes",
+                                TipoAtaque.FuerzaBruta => "Fuerza Bruta",
+                                TipoAtaque.Scraping => "Scraping",
+                                TipoAtaque.SpamRegistro => "Spam Registro",
+                                _ => "Otro"
+                            };
+                            <tr>
+                                <td><span class="ip-badge">@intento.DireccionIp</span></td>
+                                <td><span class="attack-type-badge @tipoClass">@tipoLabel</span></td>
+                                <td class="reason-cell" title="@intento.Endpoint">@(intento.Endpoint ?? "-")</td>
+                                <td class="date-cell">@intento.Fecha.ToString("dd/MM HH:mm")</td>
+                                <td>
+                                    @if (intento.ResultoEnBloqueo)
+                                    {
+                                        <span class="badge bg-danger">Si</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">No</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="empty-state">
+                    <i class="fas fa-shield-alt"></i>
+                    <h5>No hay intentos de ataque recientes</h5>
+                    <p>El sistema no ha detectado actividad sospechosa</p>
+                </div>
+            }
+        </div>
+
+        <!-- Tab: IPs Auto-bloqueadas -->
+        <div id="tab-ips-auto" class="tab-content">
+            @if (ipsAutomaticas.Any())
+            {
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>IP</th>
+                            <th>Tipo Ataque</th>
+                            <th>Violaciones</th>
+                            <th>Fecha</th>
+                            <th>Expira</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var ip in ipsAutomaticas)
+                        {
+                            var tipoClass = ip.TipoAtaque switch {
+                                TipoAtaque.SpamContenido => "spam",
+                                TipoAtaque.SpamMensajes => "spam",
+                                TipoAtaque.FuerzaBruta => "brute",
+                                TipoAtaque.Scraping => "scraping",
+                                TipoAtaque.SpamRegistro => "registro",
+                                _ => "otro"
+                            };
+                            <tr>
+                                <td><span class="ip-badge auto">@ip.DireccionIp</span></td>
+                                <td><span class="attack-type-badge @tipoClass">@ip.TipoAtaque</span></td>
+                                <td><strong>@ip.ViolacionesRateLimit</strong></td>
+                                <td class="date-cell">@ip.FechaBloqueo.ToString("dd/MM HH:mm")</td>
+                                <td class="date-cell">
+                                    @if (ip.FechaExpiracion.HasValue)
+                                    {
+                                        @ip.FechaExpiracion.Value.ToString("dd/MM HH:mm")
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Permanente</span>
+                                    }
+                                </td>
+                                <td>
+                                    <button class="action-btn btn-success-soft" onclick="desbloquearIp(@ip.Id)" title="Desbloquear">
+                                        <i class="fas fa-unlock"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="empty-state">
+                    <i class="fas fa-robot"></i>
+                    <h5>No hay IPs auto-bloqueadas</h5>
+                    <p>El sistema no ha bloqueado ninguna IP automáticamente</p>
+                </div>
+            }
+        </div>
+
+        <!-- Tab: IPs Manuales -->
+        <div id="tab-ips" class="tab-content">
+            <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+                <button class="btn btn-primary btn-sm" onclick="abrirModalBloquearIp()">
+                    <i class="fas fa-plus"></i> Bloquear IP
+                </button>
+            </div>
+            @if (ipsManuales.Any())
+            {
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>IP</th>
+                            <th>Razón</th>
+                            <th>Fecha</th>
+                            <th>Expira</th>
+                            <th>Intentos</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var ip in ipsManuales)
                         {
                             <tr>
                                 <td><span class="ip-badge">@ip.DireccionIp</span></td>
                                 <td class="reason-cell" title="@ip.Razon">@(ip.Razon ?? "-")</td>
-                                <td class="date-cell">@ip.FechaBloqueo.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="date-cell">@ip.FechaBloqueo.ToString("dd/MM HH:mm")</td>
                                 <td class="date-cell">
                                     @if (ip.FechaExpiracion.HasValue)
                                     {
@@ -451,8 +684,8 @@
             {
                 <div class="empty-state">
                     <i class="fas fa-shield-alt"></i>
-                    <h5>No hay IPs bloqueadas</h5>
-                    <p>Las IPs bloqueadas aparecerán aquí</p>
+                    <h5>No hay IPs bloqueadas manualmente</h5>
+                    <p>Usa el botón "Bloquear IP" para agregar una</p>
                 </div>
             }
         </div>
@@ -468,7 +701,7 @@
                             <th>Bloqueado</th>
                             <th>Fecha</th>
                             <th>Razón</th>
-                            <th style="width: 100px;">Acciones</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -481,7 +714,7 @@
                                             @(bloqueo.Bloqueador?.UserName?.Substring(0, 1).ToUpper() ?? "?")
                                         </div>
                                         <div class="user-info">
-                                            <span class="user-name">@(bloqueo.Bloqueador?.NombreCompleto ?? "Desconocido")</span>
+                                            <span class="user-name">@(bloqueo.Bloqueador?.NombreCompleto ?? "?")</span>
                                             <span class="user-username">@@@(bloqueo.Bloqueador?.UserName ?? "?")</span>
                                         </div>
                                     </div>
@@ -492,15 +725,15 @@
                                             @(bloqueo.Bloqueado?.UserName?.Substring(0, 1).ToUpper() ?? "?")
                                         </div>
                                         <div class="user-info">
-                                            <span class="user-name">@(bloqueo.Bloqueado?.NombreCompleto ?? "Desconocido")</span>
+                                            <span class="user-name">@(bloqueo.Bloqueado?.NombreCompleto ?? "?")</span>
                                             <span class="user-username">@@@(bloqueo.Bloqueado?.UserName ?? "?")</span>
                                         </div>
                                     </div>
                                 </td>
-                                <td class="date-cell">@bloqueo.FechaBloqueo.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="date-cell">@bloqueo.FechaBloqueo.ToString("dd/MM HH:mm")</td>
                                 <td class="reason-cell" title="@bloqueo.Razon">@(bloqueo.Razon ?? "-")</td>
                                 <td>
-                                    <button class="action-btn btn-danger-soft" onclick="eliminarBloqueoUsuario(@bloqueo.Id)" title="Eliminar bloqueo">
+                                    <button class="action-btn btn-danger-soft" onclick="eliminarBloqueoUsuario(@bloqueo.Id)" title="Eliminar">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </td>
@@ -514,7 +747,6 @@
                 <div class="empty-state">
                     <i class="fas fa-users"></i>
                     <h5>No hay bloqueos entre usuarios</h5>
-                    <p>Los bloqueos entre usuarios aparecerán aquí</p>
                 </div>
             }
         </div>
@@ -528,8 +760,8 @@
                         <tr>
                             <th>Usuario</th>
                             <th>Email</th>
-                            <th>Fecha Registro</th>
-                            <th style="width: 120px;">Acciones</th>
+                            <th>Registro</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -550,7 +782,7 @@
                                 <td>@usuario.Email</td>
                                 <td class="date-cell">@usuario.FechaRegistro.ToString("dd/MM/yyyy")</td>
                                 <td>
-                                    <button class="action-btn btn-success-soft" onclick="activarUsuario('@usuario.Id')" title="Activar usuario">
+                                    <button class="action-btn btn-success-soft" onclick="activarUsuario('@usuario.Id')" title="Activar">
                                         <i class="fas fa-user-check"></i> Activar
                                     </button>
                                 </td>
@@ -563,8 +795,7 @@
             {
                 <div class="empty-state">
                     <i class="fas fa-user-check"></i>
-                    <h5>No hay usuarios desactivados</h5>
-                    <p>Todos los usuarios están activos</p>
+                    <h5>Todos los usuarios están activos</h5>
                 </div>
             }
         </div>
@@ -575,7 +806,7 @@
 <div class="modal-overlay" id="modalBloquearIp">
     <div class="modal-content">
         <div class="modal-header">
-            <h3><i class="fas fa-ban" style="color: var(--danger); margin-right: 10px;"></i> Bloquear IP</h3>
+            <h3><i class="fas fa-ban" style="color: var(--danger); margin-right: 8px;"></i> Bloquear IP</h3>
             <button class="modal-close" onclick="cerrarModal()">
                 <i class="fas fa-times"></i>
             </button>
@@ -587,7 +818,7 @@
             </div>
             <div class="form-group">
                 <label for="razonBloqueo">Razón (opcional)</label>
-                <textarea class="form-control" id="razonBloqueo" rows="3" placeholder="Motivo del bloqueo..."></textarea>
+                <textarea class="form-control" id="razonBloqueo" rows="2" placeholder="Motivo del bloqueo..."></textarea>
             </div>
             <div class="form-check">
                 <input type="checkbox" id="bloquePermanente" checked>
@@ -598,9 +829,9 @@
                 <input type="datetime-local" class="form-control" id="fechaExpiracion">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline-primary" onclick="cerrarModal()">Cancelar</button>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-ban"></i> Bloquear IP
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="cerrarModal()">Cancelar</button>
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="fas fa-ban"></i> Bloquear
                 </button>
             </div>
         </form>
@@ -612,11 +843,8 @@
     const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
 
     function showTab(tab) {
-        // Ocultar todos los tabs
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-
-        // Mostrar el tab seleccionado
         document.getElementById('tab-' + tab).classList.add('active');
         event.target.closest('.tab-btn').classList.add('active');
     }
@@ -631,15 +859,12 @@
         document.getElementById('formBloquearIp').reset();
     }
 
-    // Toggle fecha expiración
     document.getElementById('bloquePermanente').addEventListener('change', function() {
         document.getElementById('fechaExpiracionGroup').style.display = this.checked ? 'none' : 'block';
     });
 
-    // Form submit
     document.getElementById('formBloquearIp').addEventListener('submit', async function(e) {
         e.preventDefault();
-
         const data = {
             DireccionIp: document.getElementById('direccionIp').value,
             Razon: document.getElementById('razonBloqueo').value,
@@ -650,15 +875,10 @@
         try {
             const response = await fetch('/Admin/BloquearIp', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'RequestVerificationToken': token
-                },
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
                 body: JSON.stringify(data)
             });
-
             const result = await response.json();
-
             if (result.success) {
                 showToast(result.message, 'success');
                 setTimeout(() => location.reload(), 1000);
@@ -672,19 +892,13 @@
 
     async function desbloquearIp(id) {
         if (!confirm('¿Desbloquear esta IP?')) return;
-
         try {
             const response = await fetch('/Admin/DesbloquearIp', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'RequestVerificationToken': token
-                },
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
                 body: JSON.stringify({ Id: id })
             });
-
             const result = await response.json();
-
             if (result.success) {
                 showToast(result.message, 'success');
                 setTimeout(() => location.reload(), 1000);
@@ -697,20 +911,14 @@
     }
 
     async function eliminarBloqueoUsuario(id) {
-        if (!confirm('¿Eliminar este bloqueo entre usuarios?')) return;
-
+        if (!confirm('¿Eliminar este bloqueo?')) return;
         try {
             const response = await fetch('/Admin/EliminarBloqueoUsuario', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'RequestVerificationToken': token
-                },
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
                 body: JSON.stringify({ Id: id })
             });
-
             const result = await response.json();
-
             if (result.success) {
                 showToast(result.message, 'success');
                 setTimeout(() => location.reload(), 1000);
@@ -724,19 +932,13 @@
 
     async function activarUsuario(usuarioId) {
         if (!confirm('¿Activar este usuario?')) return;
-
         try {
             const response = await fetch('/Admin/ActivarUsuario', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'RequestVerificationToken': token
-                },
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
                 body: JSON.stringify({ UsuarioId: usuarioId })
             });
-
             const result = await response.json();
-
             if (result.success) {
                 showToast(result.message, 'success');
                 setTimeout(() => location.reload(), 1000);
@@ -748,18 +950,7 @@
         }
     }
 
-    // Cerrar modal con Escape
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            cerrarModal();
-        }
-    });
-
-    // Cerrar modal al hacer click fuera
-    document.getElementById('modalBloquearIp').addEventListener('click', function(e) {
-        if (e.target === this) {
-            cerrarModal();
-        }
-    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModal(); });
+    document.getElementById('modalBloquearIp').addEventListener('click', e => { if (e.target === e.currentTarget) cerrarModal(); });
 </script>
 }
