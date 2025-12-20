@@ -103,6 +103,25 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "El archivo no puede superar los 50MB" });
                 }
 
+                // ========================================
+                // 🔒 VALIDAR EXTENSIONES PERMITIDAS
+                // ========================================
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".mp4", ".mov", ".avi", ".mkv", ".pdf", ".doc", ".docx" };
+                var blockedExtensions = new[] { ".exe", ".bat", ".cmd", ".sh", ".ps1", ".vbs", ".js", ".php", ".asp", ".aspx", ".dll", ".msi" };
+                var extension = Path.GetExtension(archivo.FileName).ToLowerInvariant();
+
+                if (blockedExtensions.Contains(extension))
+                {
+                    _logger.LogWarning("🚨 ARCHIVO BLOQUEADO: Usuario {UserId} intentó subir archivo ejecutable: {Extension}", usuarioId, extension);
+                    return Json(new { success = false, message = "Este tipo de archivo no está permitido por seguridad." });
+                }
+
+                if (!allowedExtensions.Contains(extension))
+                {
+                    _logger.LogWarning("⚠️ EXTENSIÓN NO PERMITIDA: {Extension} - Usuario: {UserId}", extension, usuarioId);
+                    return Json(new { success = false, message = $"Tipo de archivo no permitido. Usa: imágenes, videos o documentos." });
+                }
+
                 // Guardar archivo
                 var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "desafios");
                 if (!Directory.Exists(uploadsFolder))

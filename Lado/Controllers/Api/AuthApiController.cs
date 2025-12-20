@@ -21,19 +21,22 @@ namespace Lado.Controllers.Api
         private readonly IJwtService _jwtService;
         private readonly IEmailService _emailService;
         private readonly ILogger<AuthApiController> _logger;
+        private readonly IRateLimitService _rateLimitService;
 
         public AuthApiController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             IJwtService jwtService,
             IEmailService emailService,
-            ILogger<AuthApiController> logger)
+            ILogger<AuthApiController> logger,
+            IRateLimitService rateLimitService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _jwtService = jwtService;
             _emailService = emailService;
             _logger = logger;
+            _rateLimitService = rateLimitService;
         }
 
         /// <summary>
@@ -45,6 +48,27 @@ namespace Lado.Controllers.Api
         {
             try
             {
+                // ========================================
+                // 🚫 RATE LIMITING - Prevenir fuerza bruta
+                // ========================================
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rateLimitKeyIp = $"auth_login_ip_{clientIp}";
+                var rateLimitKeyEmail = $"auth_login_email_{request.Email?.ToLower()}";
+
+                // Límite por IP: máximo 10 intentos por 15 minutos
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, 10, TimeSpan.FromMinutes(15)))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT LOGIN IP: IP {IP} excedió límite", clientIp);
+                    return StatusCode(429, ApiResponse<TokenResponse>.Fail("Demasiados intentos. Espera 15 minutos."));
+                }
+
+                // Límite por email: máximo 5 intentos por 15 minutos
+                if (!_rateLimitService.IsAllowed(rateLimitKeyEmail, RateLimits.Login_MaxRequests, RateLimits.Login_Window))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT LOGIN EMAIL: {Email} excedió límite - IP: {IP}", request.Email, clientIp);
+                    return StatusCode(429, ApiResponse<TokenResponse>.Fail("Demasiados intentos para este email. Espera 15 minutos."));
+                }
+
                 if (!ModelState.IsValid)
                 {
                     return BadRequest(ApiResponse<TokenResponse>.Fail(
@@ -104,6 +128,19 @@ namespace Lado.Controllers.Api
         {
             try
             {
+                // ========================================
+                // 🚫 RATE LIMITING - Prevenir registro masivo de bots
+                // ========================================
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rateLimitKeyIp = $"auth_register_ip_{clientIp}";
+
+                // Límite por IP: máximo 3 registros por hora (muy estricto)
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, 3, TimeSpan.FromHours(1)))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT REGISTER: IP {IP} excedió límite de registros", clientIp);
+                    return StatusCode(429, ApiResponse<TokenResponse>.Fail("Demasiados registros desde esta conexión. Intenta más tarde."));
+                }
+
                 if (!ModelState.IsValid)
                 {
                     return BadRequest(ApiResponse<TokenResponse>.Fail(
@@ -192,6 +229,19 @@ namespace Lado.Controllers.Api
         {
             try
             {
+                // ========================================
+                // 🚫 RATE LIMITING - Prevenir abuso de refresh
+                // ========================================
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rateLimitKeyIp = $"auth_refresh_ip_{clientIp}";
+
+                // Límite por IP: máximo 30 refresh por minuto
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, 30, TimeSpan.FromMinutes(1)))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT REFRESH: IP {IP} excedió límite", clientIp);
+                    return StatusCode(429, ApiResponse<TokenResponse>.Fail("Demasiadas solicitudes. Espera un momento."));
+                }
+
                 if (string.IsNullOrEmpty(request.RefreshToken))
                 {
                     return BadRequest(ApiResponse<TokenResponse>.Fail("Refresh token requerido"));
@@ -311,6 +361,28 @@ namespace Lado.Controllers.Api
         {
             try
             {
+                // ========================================
+                // 🚫 RATE LIMITING - Prevenir spam de emails
+                // ========================================
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rateLimitKeyIp = $"auth_forgot_ip_{clientIp}";
+                var rateLimitKeyEmail = $"auth_forgot_email_{request.Email?.ToLower()}";
+
+                // Límite por IP: máximo 5 por hora
+                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, 5, TimeSpan.FromHours(1)))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT FORGOT: IP {IP} excedió límite", clientIp);
+                    return StatusCode(429, ApiResponse.Fail("Demasiadas solicitudes. Intenta más tarde."));
+                }
+
+                // Límite por email: máximo 3 por hora
+                if (!_rateLimitService.IsAllowed(rateLimitKeyEmail, 3, TimeSpan.FromHours(1)))
+                {
+                    _logger.LogWarning("🚨 RATE LIMIT FORGOT EMAIL: {Email} excedió límite", request.Email);
+                    // No revelamos que el email existe
+                    return Ok(ApiResponse.Ok("Si el email existe, recibiras instrucciones para restablecer tu contraseña"));
+                }
+
                 var user = await _userManager.FindByEmailAsync(request.Email);
 
                 // Siempre responder ok para no revelar si el email existe
@@ -438,6 +510,16 @@ namespace Lado.Controllers.Api
         [AllowAnonymous]
         public async Task<ActionResult<ApiResponse<bool>>> CheckEmail([FromQuery] string email)
         {
+            // Rate limiting para prevenir enumeración de usuarios
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var rateLimitKey = $"check_email_ip_{clientIp}";
+
+            if (!_rateLimitService.IsAllowed(rateLimitKey, 30, TimeSpan.FromMinutes(5)))
+            {
+                _logger.LogWarning("🚨 RATE LIMIT CHECK EMAIL: IP {IP} excedió límite", clientIp);
+                return StatusCode(429, ApiResponse<bool>.Fail("Demasiadas solicitudes. Espera unos minutos."));
+            }
+
             var exists = await _userManager.FindByEmailAsync(email);
             return Ok(ApiResponse<bool>.Ok(exists == null, exists == null ? "Email disponible" : "Email ya registrado"));
         }
@@ -449,6 +531,16 @@ namespace Lado.Controllers.Api
         [AllowAnonymous]
         public async Task<ActionResult<ApiResponse<bool>>> CheckUsername([FromQuery] string username)
         {
+            // Rate limiting para prevenir enumeración de usuarios
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var rateLimitKey = $"check_username_ip_{clientIp}";
+
+            if (!_rateLimitService.IsAllowed(rateLimitKey, 30, TimeSpan.FromMinutes(5)))
+            {
+                _logger.LogWarning("🚨 RATE LIMIT CHECK USERNAME: IP {IP} excedió límite", clientIp);
+                return StatusCode(429, ApiResponse<bool>.Fail("Demasiadas solicitudes. Espera unos minutos."));
+            }
+
             var exists = await _userManager.FindByNameAsync(username);
             return Ok(ApiResponse<bool>.Ok(exists == null, exists == null ? "Username disponible" : "Username ya registrado"));
         }

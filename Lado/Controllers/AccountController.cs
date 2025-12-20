@@ -16,6 +16,7 @@ namespace Lado.Controllers
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _environment;
+        private readonly IRateLimitService _rateLimitService;
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
@@ -23,7 +24,8 @@ namespace Lado.Controllers
             ILogger<AccountController> logger,
             IEmailService emailService,
             IConfiguration configuration,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            IRateLimitService rateLimitService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
@@ -31,6 +33,7 @@ namespace Lado.Controllers
             _emailService = emailService;
             _configuration = configuration;
             _environment = environment;
+            _rateLimitService = rateLimitService;
         }
 
         // ========================================
@@ -524,6 +527,15 @@ namespace Lado.Controllers
         [HttpPost]
         public async Task<JsonResult> CheckUsernameAvailability(string username)
         {
+            // Rate limiting para prevenir enumeración de usuarios
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var rateLimitKey = $"check_user_ip_{clientIp}";
+            if (!_rateLimitService.IsAllowed(rateLimitKey, 30, TimeSpan.FromMinutes(5)))
+            {
+                _logger.LogWarning("🚨 RATE LIMIT CHECK USERNAME: IP {IP} excedió límite", clientIp);
+                return Json(new { available = false, message = "Demasiadas solicitudes. Espera unos minutos." });
+            }
+
             if (string.IsNullOrWhiteSpace(username))
             {
                 return Json(new { available = false, message = "Nombre de usuario requerido" });
@@ -542,6 +554,15 @@ namespace Lado.Controllers
         [HttpPost]
         public async Task<JsonResult> CheckEmailAvailability(string email)
         {
+            // Rate limiting para prevenir enumeración de usuarios
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var rateLimitKey = $"check_email_ip_{clientIp}";
+            if (!_rateLimitService.IsAllowed(rateLimitKey, 30, TimeSpan.FromMinutes(5)))
+            {
+                _logger.LogWarning("🚨 RATE LIMIT CHECK EMAIL: IP {IP} excedió límite", clientIp);
+                return Json(new { available = false, message = "Demasiadas solicitudes. Espera unos minutos." });
+            }
+
             if (string.IsNullOrWhiteSpace(email))
             {
                 return Json(new { available = false, message = "Email requerido" });
@@ -560,6 +581,15 @@ namespace Lado.Controllers
         [HttpPost]
         public async Task<JsonResult> CheckSeudonimoAvailability(string seudonimo)
         {
+            // Rate limiting para prevenir enumeración de usuarios
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var rateLimitKey = $"check_seud_ip_{clientIp}";
+            if (!_rateLimitService.IsAllowed(rateLimitKey, 30, TimeSpan.FromMinutes(5)))
+            {
+                _logger.LogWarning("🚨 RATE LIMIT CHECK SEUDONIMO: IP {IP} excedió límite", clientIp);
+                return Json(new { available = false, message = "Demasiadas solicitudes. Espera unos minutos." });
+            }
+
             if (string.IsNullOrWhiteSpace(seudonimo))
             {
                 return Json(new { available = false, message = "Seudónimo requerido" });

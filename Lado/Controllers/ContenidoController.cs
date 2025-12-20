@@ -753,6 +753,7 @@ namespace Lado.Controllers
         // ========================================
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CrearDesdeReels(
             IFormFile archivo,
             string descripcion,
