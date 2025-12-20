@@ -1,7 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using Lado.Data;
 using Lado.Services;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 
 namespace Lado.Middleware
 {
@@ -20,7 +21,7 @@ namespace Lado.Middleware
             _logger = logger;
         }
 
-        public async Task InvokeAsync(HttpContext context, IJwtService jwtService)
+        public async Task InvokeAsync(HttpContext context, ApplicationDbContext dbContext, IJwtService jwtService)
         {
             // Solo validar si hay un token Bearer
             var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
@@ -40,7 +41,7 @@ namespace Lado.Middleware
                 return;
             }
 
-            // Validar el token
+            // Validar el token (firma, expiración, etc.)
             var principal = jwtService.ValidateToken(token);
             if (principal == null)
             {
@@ -54,28 +55,58 @@ namespace Lado.Middleware
             var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var securityVersionStr = principal.FindFirst("security_version")?.Value;
 
-            if (string.IsNullOrEmpty(jti) || string.IsNullOrEmpty(userId))
+            if (string.IsNullOrEmpty(userId))
             {
-                _logger.LogWarning("Token sin Jti o UserId - rechazando");
+                _logger.LogWarning("Token sin UserId - rechazando");
                 await RespondUnauthorized(context, "Token inválido");
                 return;
             }
 
-            // Parsear SecurityVersion (default 1 para tokens antiguos sin este claim)
-            var securityVersion = 1;
-            if (!string.IsNullOrEmpty(securityVersionStr))
+            // Obtener el usuario actual para verificar SecurityVersion
+            var user = await dbContext.Users.FindAsync(userId);
+            if (user == null)
             {
-                int.TryParse(securityVersionStr, out securityVersion);
+                _logger.LogWarning("Usuario no encontrado: {UserId}", userId);
+                await RespondUnauthorized(context, "Usuario no encontrado");
+                return;
             }
 
-            // Verificar si el token está activo en la base de datos
-            var isActive = await jwtService.IsTokenActiveAsync(jti, userId, securityVersion);
-            if (!isActive)
+            if (!user.EstaActivo)
             {
-                _logger.LogWarning("Token revocado o SecurityVersion inválido - UserId: {UserId}, Jti: {Jti}",
-                    userId, jti[..Math.Min(8, jti.Length)] + "...");
-                await RespondUnauthorized(context, "Sesión expirada o revocada");
+                _logger.LogWarning("Usuario desactivado: {UserId}", userId);
+                await RespondUnauthorized(context, "Cuenta desactivada");
                 return;
+            }
+
+            // Verificar SecurityVersion del token vs usuario
+            if (!string.IsNullOrEmpty(securityVersionStr))
+            {
+                if (int.TryParse(securityVersionStr, out int tokenSecurityVersion))
+                {
+                    if (tokenSecurityVersion < user.SecurityVersion)
+                    {
+                        _logger.LogWarning("SecurityVersion del token ({TokenVersion}) es menor que el del usuario ({UserVersion}) - UserId: {UserId}",
+                            tokenSecurityVersion, user.SecurityVersion, userId);
+                        await RespondUnauthorized(context, "Sesión invalidada. Por favor inicia sesión nuevamente.");
+                        return;
+                    }
+                }
+            }
+
+            // Si hay Jti, verificar si está en la lista negra (revocado)
+            if (!string.IsNullOrEmpty(jti))
+            {
+                var activeToken = await dbContext.ActiveTokens
+                    .FirstOrDefaultAsync(t => t.Jti == jti);
+
+                // Si el token existe en ActiveTokens y está revocado, rechazar
+                if (activeToken != null && activeToken.IsRevoked)
+                {
+                    _logger.LogWarning("Token revocado - Jti: {Jti}, UserId: {UserId}",
+                        jti[..Math.Min(8, jti.Length)] + "...", userId);
+                    await RespondUnauthorized(context, "Sesión cerrada. Por favor inicia sesión nuevamente.");
+                    return;
+                }
             }
 
             await _next(context);

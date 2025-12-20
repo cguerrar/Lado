@@ -417,6 +417,72 @@ try
             logger.LogWarning("⚠️ No se pudo verificar tabla Notificaciones: {Message}", ex.Message);
         }
 
+        // ✅ VERIFICAR Y CREAR TABLAS JWT (RefreshTokens, ActiveTokens)
+        try
+        {
+            var dbContext = services.GetRequiredService<ApplicationDbContext>();
+
+            await dbContext.Database.ExecuteSqlRawAsync(@"
+                -- 1. Agregar SecurityVersion a AspNetUsers si no existe
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('AspNetUsers') AND name = 'SecurityVersion')
+                BEGIN
+                    ALTER TABLE AspNetUsers ADD SecurityVersion INT NOT NULL DEFAULT 1;
+                    PRINT 'SecurityVersion agregado a AspNetUsers';
+                END
+
+                -- 2. Crear tabla RefreshTokens si no existe
+                IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'RefreshTokens')
+                BEGIN
+                    CREATE TABLE RefreshTokens (
+                        Id INT IDENTITY(1,1) PRIMARY KEY,
+                        Token NVARCHAR(500) NOT NULL,
+                        UserId NVARCHAR(450) NOT NULL,
+                        ExpiryDate DATETIME2 NOT NULL,
+                        CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                        IsRevoked BIT NOT NULL DEFAULT 0,
+                        DeviceInfo NVARCHAR(500) NULL,
+                        IpAddress NVARCHAR(50) NULL,
+                        CONSTRAINT FK_RefreshTokens_Users FOREIGN KEY (UserId)
+                            REFERENCES AspNetUsers(Id) ON DELETE CASCADE
+                    );
+
+                    CREATE UNIQUE INDEX IX_RefreshTokens_Token ON RefreshTokens(Token);
+                    CREATE INDEX IX_RefreshTokens_UserId ON RefreshTokens(UserId);
+                    CREATE INDEX IX_RefreshTokens_User_Active ON RefreshTokens(UserId, IsRevoked, ExpiryDate);
+
+                    PRINT 'Tabla RefreshTokens creada';
+                END
+
+                -- 3. Crear tabla ActiveTokens si no existe
+                IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'ActiveTokens')
+                BEGIN
+                    CREATE TABLE ActiveTokens (
+                        Id INT IDENTITY(1,1) PRIMARY KEY,
+                        Jti NVARCHAR(100) NOT NULL,
+                        UserId NVARCHAR(450) NOT NULL,
+                        ExpiresAt DATETIME2 NOT NULL,
+                        CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                        IsRevoked BIT NOT NULL DEFAULT 0,
+                        DeviceInfo NVARCHAR(500) NULL,
+                        IpAddress NVARCHAR(50) NULL,
+                        CONSTRAINT FK_ActiveTokens_Users FOREIGN KEY (UserId)
+                            REFERENCES AspNetUsers(Id) ON DELETE CASCADE
+                    );
+
+                    CREATE UNIQUE INDEX IX_ActiveTokens_Jti ON ActiveTokens(Jti);
+                    CREATE INDEX IX_ActiveTokens_UserId ON ActiveTokens(UserId);
+                    CREATE INDEX IX_ActiveTokens_Cleanup ON ActiveTokens(ExpiresAt, IsRevoked);
+
+                    PRINT 'Tabla ActiveTokens creada';
+                END
+            ");
+            logger.LogInformation("✅ Tablas JWT (RefreshTokens, ActiveTokens, SecurityVersion) verificadas");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("⚠️ No se pudo verificar tablas JWT: {Message}", ex.Message);
+        }
+
         // Crear usuario admin si no existe
         var adminEmail = "admin@ladoapp.com";
         var adminUser = await userManager.FindByEmailAsync(adminEmail);
