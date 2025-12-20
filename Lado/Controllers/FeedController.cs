@@ -81,7 +81,7 @@ namespace Lado.Controllers
 
                 if (verSeudonimo)
                 {
-                    // 📌 MODO SEUDÓNIMO: Solo contenido LadoB
+                    // 📌 MODO SEUDÓNIMO: Mostrar TODO el contenido LadoB (bloqueado con blur si no suscrito)
                     _logger.LogInformation("Mostrando perfil de seudónimo para {Username}", usuario.UserName);
 
                     var contenidosComprados = await _context.ComprasContenido
@@ -89,26 +89,25 @@ namespace Lado.Controllers
                         .Select(cc => cc.ContenidoId)
                         .ToListAsync();
 
-                    // Solo contenido LadoB
-                    var contenidoLadoB = (estaSuscrito || id == usuarioActual.Id)
-                        ? await _context.Contenidos
-                            .Where(c => c.UsuarioId == id
-                                    && c.EstaActivo
-                                    && !c.EsBorrador
-                                    && !c.Censurado
-                                    && c.TipoLado == TipoLado.LadoB)
-                            .OrderByDescending(c => c.FechaPublicacion)
-                            .ToListAsync()
-                        : await _context.Contenidos
-                            .Where(c => c.UsuarioId == id
-                                    && c.EstaActivo
-                                    && !c.EsBorrador
-                                    && !c.Censurado
-                                    && c.TipoLado == TipoLado.LadoB
-                                    && contenidosComprados.Contains(c.Id))
-                            .OrderByDescending(c => c.FechaPublicacion)
-                            .ToListAsync();
+                    // Cargar TODO el contenido LadoB (se mostrará con blur si no tiene acceso)
+                    var contenidoLadoB = await _context.Contenidos
+                        .Where(c => c.UsuarioId == id
+                                && c.EstaActivo
+                                && !c.EsBorrador
+                                && !c.Censurado
+                                && c.TipoLado == TipoLado.LadoB)
+                        .OrderByDescending(c => c.FechaPublicacion)
+                        .ToListAsync();
 
+                    // Determinar qué contenidos están desbloqueados (suscrito, comprado, o es el propio usuario)
+                    var esPropio = id == usuarioActual.Id;
+                    var contenidosDesbloqueadosIds = esPropio
+                        ? contenidoLadoB.Select(c => c.Id).ToList() // Si es propio, todo desbloqueado
+                        : estaSuscrito
+                            ? contenidoLadoB.Select(c => c.Id).ToList() // Si suscrito, todo desbloqueado
+                            : contenidosComprados; // Si no suscrito, solo los comprados
+
+                    ViewBag.ContenidosDesbloqueadosIds = contenidosDesbloqueadosIds;
                     ViewBag.Contenidos = contenidoLadoB;
                     ViewBag.ContenidoLadoA = new List<Contenido>(); // Vacío en modo seudónimo
                     ViewBag.ContenidoLadoB = contenidoLadoB;
@@ -1048,50 +1047,63 @@ namespace Lado.Controllers
                 var suscripcionExistente = await _context.Suscripciones
                     .FirstOrDefaultAsync(s => s.FanId == usuarioActual.Id && s.CreadorId == id && s.TipoLado == tipo && s.EstaActiva);
 
-                bool siguiendo;
-                if (suscripcionExistente != null)
+                // Usar transacción para garantizar consistencia del contador
+                using var transaction = await _context.Database.BeginTransactionAsync();
+
+                try
                 {
-                    // Dejar de seguir
-                    suscripcionExistente.EstaActiva = false;
-                    suscripcionExistente.FechaCancelacion = DateTime.Now;
-                    creador.NumeroSeguidores = Math.Max(0, creador.NumeroSeguidores - 1);
-                    siguiendo = false;
-                }
-                else
-                {
-                    // Seguir (crear suscripción gratuita para el TipoLado específico)
-                    var nuevaSuscripcion = new Suscripcion
+                    bool siguiendo;
+                    if (suscripcionExistente != null)
                     {
-                        FanId = usuarioActual.Id,
-                        CreadorId = id,
-                        PrecioMensual = 0,
-                        Precio = 0,
-                        FechaInicio = DateTime.Now,
-                        ProximaRenovacion = DateTime.Now.AddMonths(1),
-                        EstaActiva = true,
-                        RenovacionAutomatica = false,
-                        TipoLado = tipo
-                    };
-                    _context.Suscripciones.Add(nuevaSuscripcion);
-                    creador.NumeroSeguidores++;
-                    siguiendo = true;
+                        // Dejar de seguir
+                        suscripcionExistente.EstaActiva = false;
+                        suscripcionExistente.FechaCancelacion = DateTime.Now;
+                        creador.NumeroSeguidores = Math.Max(0, creador.NumeroSeguidores - 1);
+                        siguiendo = false;
+                    }
+                    else
+                    {
+                        // Seguir (crear suscripción gratuita para el TipoLado específico)
+                        var nuevaSuscripcion = new Suscripcion
+                        {
+                            FanId = usuarioActual.Id,
+                            CreadorId = id,
+                            PrecioMensual = 0,
+                            Precio = 0,
+                            FechaInicio = DateTime.Now,
+                            ProximaRenovacion = DateTime.Now.AddMonths(1),
+                            EstaActiva = true,
+                            RenovacionAutomatica = false,
+                            TipoLado = tipo
+                        };
+                        _context.Suscripciones.Add(nuevaSuscripcion);
+                        creador.NumeroSeguidores++;
+                        siguiendo = true;
+                    }
+
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+
+                    // Notificar al creador sobre el nuevo seguidor
+                    if (siguiendo)
+                    {
+                        _ = _notificationService.NotificarNuevoSeguidorAsync(id, usuarioActual.Id);
+                    }
+
+                    return Json(new
+                    {
+                        success = true,
+                        siguiendo,
+                        seguidores = creador.NumeroSeguidores,
+                        tipoLado = (int)tipo
+                    });
                 }
-
-                await _context.SaveChangesAsync();
-
-                // Notificar al creador sobre el nuevo seguidor
-                if (siguiendo)
+                catch (Exception ex)
                 {
-                    _ = _notificationService.NotificarNuevoSeguidorAsync(id, usuarioActual.Id);
+                    await transaction.RollbackAsync();
+                    _logger.LogError(ex, "Error en transacción de seguir usuario {UserId}", id);
+                    throw;
                 }
-
-                return Json(new
-                {
-                    success = true,
-                    siguiendo,
-                    seguidores = creador.NumeroSeguidores,
-                    tipoLado = (int)tipo
-                });
             }
             catch (Exception ex)
             {
@@ -1292,21 +1304,40 @@ namespace Lado.Controllers
                     .ToListAsync();
 
                 // Separar creadores por tipo
-                var creadoresLadoA = usuarios.Where(c => !c.TieneLadoB()).ToList();
-                var creadoresLadoB = usuarios.Where(c => c.TieneLadoB()).ToList();
+                // LadoA: TODOS los creadores (muestran su identidad pública)
+                // LadoB: Solo los que tienen LadoB habilitado (muestran su identidad premium/seudónimo)
+                var creadoresLadoA = usuarios.ToList(); // Todos aparecen en Creadores
+                var creadoresLadoB = usuarios.Where(c => c.TieneLadoB()).ToList(); // Solo LadoB en Premium
+
+                // Debug: mostrar usuarios que podrían ser LadoB pero no cumplen todas las condiciones
+                var potencialesLadoB = usuarios.Where(u => u.EsCreador && !string.IsNullOrEmpty(u.Seudonimo) && !u.CreadorVerificado).ToList();
+                if (potencialesLadoB.Any())
+                {
+                    _logger.LogWarning("Usuarios con Seudonimo pero sin CreadorVerificado: {Usuarios}",
+                        string.Join(", ", potencialesLadoB.Select(u => $"{u.UserName} (CreadorVerificado={u.CreadorVerificado})")));
+                }
+
+                _logger.LogInformation("Explorar - LadoA: {LadoA}, LadoB: {LadoB}, Total: {Total}",
+                    creadoresLadoA.Count, creadoresLadoB.Count, usuarios.Count);
 
                 ViewBag.CreadoresLadoA = creadoresLadoA;
                 ViewBag.CreadoresLadoB = creadoresLadoB;
 
-                // Obtener IDs de creadores a los que el usuario está suscrito
+                // Obtener IDs de creadores a los que el usuario está suscrito (cualquier tipo)
                 var suscripcionesActivas = await _context.Suscripciones
                     .Where(s => s.FanId == usuarioActual.Id && s.EstaActiva)
                     .Select(s => s.CreadorId)
                     .ToListAsync();
                 ViewBag.SuscripcionesActivas = suscripcionesActivas;
 
+                // Suscripciones específicas a LadoB (para desbloquear contenido premium)
+                var suscripcionesLadoB = await _context.Suscripciones
+                    .Where(s => s.FanId == usuarioActual.Id && s.EstaActiva && s.TipoLado == TipoLado.LadoB)
+                    .Select(s => s.CreadorId)
+                    .ToListAsync();
+
                 // Obtener contenido para explorar (60 items iniciales)
-                // Incluye todo el contenido público (LadoA y LadoB)
+                // Mostrar TODO el contenido (LadoA y LadoB) - el LadoB se mostrará bloqueado si no está suscrito
                 var contenidoExplorar = await _context.Contenidos
                     .Include(c => c.Usuario)
                     .Where(c => c.EstaActivo
@@ -1321,6 +1352,7 @@ namespace Lado.Controllers
                     .ToListAsync();
 
                 ViewBag.ContenidoExplorar = contenidoExplorar;
+                ViewBag.SuscripcionesLadoBIds = suscripcionesLadoB; // Para verificar acceso a LadoB (solo suscripciones premium)
 
                 _logger.LogInformation("Explorar: {Creadores} creadores, {Contenido} contenidos",
                     usuarios.Count, contenidoExplorar.Count);
@@ -1364,6 +1396,12 @@ namespace Lado.Controllers
                     .Distinct()
                     .ToListAsync();
 
+                // Obtener suscripciones específicas a LadoB para verificar acceso a contenido premium
+                var suscripcionesLadoB = await _context.Suscripciones
+                    .Where(s => s.FanId == usuarioActual.Id && s.EstaActiva && s.TipoLado == TipoLado.LadoB)
+                    .Select(s => s.CreadorId)
+                    .ToListAsync();
+
                 var query = _context.Contenidos
                     .Include(c => c.Usuario)
                     .Where(c => c.EstaActivo
@@ -1371,7 +1409,7 @@ namespace Lado.Controllers
                             && !c.Censurado
                             && !c.EsPrivado
                             && !string.IsNullOrEmpty(c.RutaArchivo) // Solo contenido con media
-                            && !usuariosBloqueadosIds.Contains(c.UsuarioId));
+                            && !usuariosBloqueadosIds.Contains(c.UsuarioId)); // Mostrar todo, bloqueado se maneja en frontend
 
                 // Filtrar por tipo
                 if (tipo == "fotos")
@@ -1406,9 +1444,11 @@ namespace Lado.Controllers
                         tipoContenido = (int)c.TipoContenido,
                         tipoLado = (int)c.TipoLado,
                         esPremium = c.TipoLado == TipoLado.LadoB,
+                        bloqueado = c.TipoLado == TipoLado.LadoB && !suscripcionesLadoB.Contains(c.UsuarioId), // LadoB sin suscripción premium
                         esContenidoSensible = c.EsContenidoSensible,
                         numeroLikes = c.NumeroLikes,
                         numeroComentarios = c.NumeroComentarios,
+                        thumbnail = c.Thumbnail,
                         usuario = new
                         {
                             id = c.Usuario?.Id,
@@ -1441,6 +1481,7 @@ namespace Lado.Controllers
 
                 var contenido = await _context.Contenidos
                     .Include(c => c.Usuario)
+                    .Include(c => c.Archivos) // Incluir archivos para carrusel
                     .Include(c => c.PistaMusical) // Incluir música asociada
                     .Include(c => c.Comentarios)
                         .ThenInclude(com => com.Usuario)
@@ -1497,19 +1538,6 @@ namespace Lado.Controllers
                 {
                     contenido.NumeroVistas++;
                     await _context.SaveChangesAsync();
-
-                    // Registrar interaccion de vista (fire and forget seguro)
-                    if (_interesesService != null)
-                    {
-                        try
-                        {
-                            _ = _interesesService.RegistrarInteraccionAsync(usuarioActual.Id, id, TipoInteraccion.Vista);
-                        }
-                        catch (Exception interesEx)
-                        {
-                            _logger.LogWarning(interesEx, "Error no critico al registrar vista para contenido {Id}", id);
-                        }
-                    }
                 }
 
                 var reacciones = await _context.Reacciones
@@ -1546,8 +1574,9 @@ namespace Lado.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al cargar detalle del contenido {Id}", id);
-                TempData["Error"] = "Error al cargar el contenido";
+                _logger.LogError(ex, "Error al cargar detalle del contenido {Id}. Mensaje: {Message}. StackTrace: {StackTrace}",
+                    id, ex.Message, ex.StackTrace);
+                TempData["Error"] = $"Error al cargar el contenido: {ex.Message}";
                 return RedirectToAction("Index");
             }
         }

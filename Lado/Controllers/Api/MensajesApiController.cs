@@ -1,351 +1,396 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Lado.Data;
 using Lado.Models;
+using Lado.Hubs;
+using Lado.DTOs.Common;
+using Lado.DTOs.Usuario;
+using System.Security.Claims;
 
 namespace Lado.Controllers.Api
 {
-    [Authorize]
     [ApiController]
-    [Route("api/mensajes")]
+    [Route("api/[controller]")]
+    [Produces("application/json")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     public class MensajesApiController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
-        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IHubContext<ChatHub> _hubContext;
         private readonly ILogger<MensajesApiController> _logger;
 
         public MensajesApiController(
             ApplicationDbContext context,
-            UserManager<ApplicationUser> userManager,
+            IHubContext<ChatHub> hubContext,
             ILogger<MensajesApiController> logger)
         {
             _context = context;
-            _userManager = userManager;
+            _hubContext = hubContext;
             _logger = logger;
         }
 
         /// <summary>
-        /// Obtener lista de conversaciones para el chat flotante
+        /// Obtener lista de conversaciones
         /// </summary>
         [HttpGet("conversaciones")]
-        public async Task<IActionResult> GetConversaciones()
+        public async Task<ActionResult<ApiResponse<List<ConversacionDto>>>> GetConversaciones()
         {
             try
             {
-                var usuario = await _userManager.GetUserAsync(User);
-                if (usuario == null)
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
                 {
-                    return Unauthorized(new { error = "Usuario no autenticado" });
+                    return Unauthorized(ApiResponse<List<ConversacionDto>>.Fail("No autenticado"));
                 }
 
-                // Obtener IDs de usuarios con conversaciones
-                var conversacionesIds = await _context.MensajesPrivados
-                    .Where(m => (m.RemitenteId == usuario.Id && !m.EliminadoPorRemitente) ||
-                               (m.DestinatarioId == usuario.Id && !m.EliminadoPorDestinatario))
-                    .Select(m => m.RemitenteId == usuario.Id ? m.DestinatarioId : m.RemitenteId)
-                    .Distinct()
+                var bloqueadosIds = await _context.BloqueosUsuarios
+                    .Where(b => b.BloqueadorId == userId || b.BloqueadoId == userId)
+                    .Select(b => b.BloqueadorId == userId ? b.BloqueadoId : b.BloqueadorId)
                     .ToListAsync();
 
-                var conversaciones = new List<object>();
+                var mensajes = await _context.ChatMensajes
+                    .Include(m => m.Remitente)
+                    .Include(m => m.Destinatario)
+                    .Where(m => (m.RemitenteId == userId || m.DestinatarioId == userId) &&
+                               !bloqueadosIds.Contains(m.RemitenteId) &&
+                               !bloqueadosIds.Contains(m.DestinatarioId))
+                    .OrderByDescending(m => m.FechaEnvio)
+                    .ToListAsync();
 
-                foreach (var contactoId in conversacionesIds)
-                {
-                    var contacto = await _userManager.FindByIdAsync(contactoId);
-                    if (contacto == null) continue;
-
-                    var ultimoMensaje = await _context.MensajesPrivados
-                        .Where(m => ((m.RemitenteId == usuario.Id && m.DestinatarioId == contactoId && !m.EliminadoPorRemitente) ||
-                                    (m.RemitenteId == contactoId && m.DestinatarioId == usuario.Id && !m.EliminadoPorDestinatario)))
-                        .OrderByDescending(m => m.FechaEnvio)
-                        .FirstOrDefaultAsync();
-
-                    var noLeidos = await _context.MensajesPrivados
-                        .Where(m => m.RemitenteId == contactoId &&
-                                   m.DestinatarioId == usuario.Id &&
-                                   !m.Leido &&
-                                   !m.EliminadoPorDestinatario)
-                        .CountAsync();
-
-                    conversaciones.Add(new
+                var conversaciones = mensajes
+                    .GroupBy(m => m.RemitenteId == userId ? m.DestinatarioId : m.RemitenteId)
+                    .Select(g =>
                     {
-                        usuarioId = contacto.Id,
-                        nombreUsuario = contacto.NombreCompleto ?? contacto.UserName,
-                        seudonimo = contacto.Seudonimo ?? contacto.UserName,
-                        fotoPerfil = contacto.FotoPerfil,
-                        ultimoMensaje = ultimoMensaje?.Contenido?.Length > 50
-                            ? ultimoMensaje.Contenido.Substring(0, 47) + "..."
-                            : ultimoMensaje?.Contenido,
-                        fechaUltimoMensaje = ultimoMensaje?.FechaEnvio,
-                        noLeidos = noLeidos,
-                        enLinea = false // Por ahora no implementamos estado en línea
-                    });
-                }
+                        var ultimoMensaje = g.First();
+                        var otroUsuario = ultimoMensaje.RemitenteId == userId
+                            ? ultimoMensaje.Destinatario
+                            : ultimoMensaje.Remitente;
 
-                // Ordenar por fecha de último mensaje
-                var ordenadas = conversaciones
-                    .OrderByDescending(c => ((dynamic)c).noLeidos > 0)
-                    .ThenByDescending(c => ((dynamic)c).fechaUltimoMensaje)
+                        return new ConversacionDto
+                        {
+                            Usuario = new UsuarioDto
+                            {
+                                Id = otroUsuario.Id,
+                                UserName = otroUsuario.UserName ?? "",
+                                NombreCompleto = otroUsuario.NombreCompleto ?? "",
+                                FotoPerfil = otroUsuario.FotoPerfil,
+                                EsCreador = otroUsuario.EsCreador,
+                                EstaVerificado = otroUsuario.CreadorVerificado
+                            },
+                            UltimoMensaje = ultimoMensaje.Mensaje,
+                            FechaUltimoMensaje = ultimoMensaje.FechaEnvio,
+                            TiempoRelativo = GetTiempoRelativo(ultimoMensaje.FechaEnvio),
+                            MensajesNoLeidos = g.Count(m => m.DestinatarioId == userId && !m.Leido),
+                            EsMio = ultimoMensaje.RemitenteId == userId
+                        };
+                    })
+                    .OrderByDescending(c => c.FechaUltimoMensaje)
                     .ToList();
 
-                return Ok(ordenadas);
+                return Ok(ApiResponse<List<ConversacionDto>>.Ok(conversaciones));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al obtener conversaciones");
-                return StatusCode(500, new { error = "Error al cargar conversaciones" });
+                _logger.LogError(ex, "Error obteniendo conversaciones");
+                return StatusCode(500, ApiResponse<List<ConversacionDto>>.Fail("Error interno del servidor"));
             }
         }
 
-        /// <summary>
-        /// Obtener mensajes de una conversación específica
-        /// </summary>
-        [HttpGet("conversacion/{userId}")]
-        public async Task<IActionResult> GetMensajes(string userId)
+        [HttpGet("conversacion/{otroUserId}")]
+        public async Task<ActionResult<PaginatedResponse<MensajeDto>>> GetMensajes(
+            string otroUserId,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 50)
         {
             try
             {
-                var usuario = await _userManager.GetUserAsync(User);
-                if (usuario == null)
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
                 {
-                    return Unauthorized(new { error = "Usuario no autenticado" });
+                    return Unauthorized(ApiResponse.Fail("No autenticado"));
                 }
 
-                if (string.IsNullOrWhiteSpace(userId))
+                var bloqueado = await _context.BloqueosUsuarios
+                    .AnyAsync(b => (b.BloqueadorId == userId && b.BloqueadoId == otroUserId) ||
+                                  (b.BloqueadorId == otroUserId && b.BloqueadoId == userId));
+                if (bloqueado)
                 {
-                    return BadRequest(new { error = "ID de usuario requerido" });
+                    return NotFound(ApiResponse.Fail("Conversacion no disponible"));
                 }
 
-                var mensajes = await _context.MensajesPrivados
-                    .Where(m => ((m.RemitenteId == usuario.Id && m.DestinatarioId == userId && !m.EliminadoPorRemitente) ||
-                                (m.RemitenteId == userId && m.DestinatarioId == usuario.Id && !m.EliminadoPorDestinatario)))
-                    .OrderBy(m => m.FechaEnvio)
-                    .Select(m => new
+                var query = _context.ChatMensajes
+                    .Include(m => m.Remitente)
+                    .Where(m => (m.RemitenteId == userId && m.DestinatarioId == otroUserId) ||
+                               (m.RemitenteId == otroUserId && m.DestinatarioId == userId));
+
+                var totalItems = await query.CountAsync();
+
+                var mensajes = await query
+                    .OrderByDescending(m => m.FechaEnvio)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .Select(m => new MensajeDto
                     {
-                        id = m.Id,
-                        remitenteId = m.RemitenteId,
-                        contenido = m.Contenido,
-                        fechaEnvio = m.FechaEnvio,
-                        leido = m.Leido
+                        Id = m.Id,
+                        Contenido = m.Mensaje,
+                        FechaEnvio = m.FechaEnvio,
+                        TiempoRelativo = GetTiempoRelativo(m.FechaEnvio),
+                        Leido = m.Leido,
+                        EsMio = m.RemitenteId == userId,
+                        Remitente = new UsuarioDto
+                        {
+                            Id = m.Remitente!.Id,
+                            UserName = m.Remitente.UserName ?? "",
+                            NombreCompleto = m.Remitente.NombreCompleto ?? "",
+                            FotoPerfil = m.Remitente.FotoPerfil,
+                            EsCreador = m.Remitente.EsCreador,
+                            EstaVerificado = m.Remitente.CreadorVerificado
+                        }
                     })
                     .ToListAsync();
 
-                return Ok(mensajes);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error al obtener mensajes");
-                return StatusCode(500, new { error = "Error al cargar mensajes" });
-            }
-        }
-
-        /// <summary>
-        /// Enviar un mensaje
-        /// </summary>
-        [HttpPost("enviar")]
-        public async Task<IActionResult> EnviarMensaje([FromBody] EnviarMensajeRequest request)
-        {
-            try
-            {
-                var usuario = await _userManager.GetUserAsync(User);
-                if (usuario == null)
-                {
-                    return Unauthorized(new { error = "Usuario no autenticado" });
-                }
-
-                if (string.IsNullOrWhiteSpace(request.DestinatarioId))
-                {
-                    return BadRequest(new { error = "Destinatario requerido" });
-                }
-
-                if (string.IsNullOrWhiteSpace(request.Contenido))
-                {
-                    return BadRequest(new { error = "El mensaje no puede estar vacío" });
-                }
-
-                var destinatario = await _userManager.FindByIdAsync(request.DestinatarioId);
-                if (destinatario == null)
-                {
-                    return NotFound(new { error = "Destinatario no encontrado" });
-                }
-
-                // Verificar si existe relación de suscripción o conversación previa
-                var existeRelacion = await _context.Suscripciones
-                    .AnyAsync(s => (s.FanId == usuario.Id && s.CreadorId == request.DestinatarioId && s.EstaActiva) ||
-                                  (s.FanId == request.DestinatarioId && s.CreadorId == usuario.Id && s.EstaActiva));
-
-                var tieneConversacion = await _context.MensajesPrivados
-                    .AnyAsync(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == request.DestinatarioId) ||
-                                  (m.RemitenteId == request.DestinatarioId && m.DestinatarioId == usuario.Id));
-
-                if (!existeRelacion && !tieneConversacion)
-                {
-                    return BadRequest(new { error = "Debes estar suscrito para iniciar una conversación con este usuario" });
-                }
-
-                var mensaje = new MensajePrivado
-                {
-                    RemitenteId = usuario.Id,
-                    DestinatarioId = request.DestinatarioId,
-                    Contenido = request.Contenido.Trim(),
-                    FechaEnvio = DateTime.Now,
-                    Leido = false,
-                    EliminadoPorRemitente = false,
-                    EliminadoPorDestinatario = false
-                };
-
-                _context.MensajesPrivados.Add(mensaje);
-                await _context.SaveChangesAsync();
-
-                _logger.LogInformation("Mensaje enviado: {MensajeId} de {Remitente} a {Destinatario}",
-                    mensaje.Id, usuario.UserName, destinatario.UserName);
-
-                return Ok(new
-                {
-                    success = true,
-                    mensaje = new
-                    {
-                        id = mensaje.Id,
-                        remitenteId = mensaje.RemitenteId,
-                        contenido = mensaje.Contenido,
-                        fechaEnvio = mensaje.FechaEnvio
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error al enviar mensaje");
-                return StatusCode(500, new { error = "Error al enviar el mensaje" });
-            }
-        }
-
-        /// <summary>
-        /// Marcar mensajes de una conversación como leídos
-        /// </summary>
-        [HttpPost("marcar-leidos/{userId}")]
-        public async Task<IActionResult> MarcarComoLeidos(string userId)
-        {
-            try
-            {
-                var usuario = await _userManager.GetUserAsync(User);
-                if (usuario == null)
-                {
-                    return Unauthorized(new { error = "Usuario no autenticado" });
-                }
-
-                var mensajesNoLeidos = await _context.MensajesPrivados
-                    .Where(m => m.RemitenteId == userId &&
-                               m.DestinatarioId == usuario.Id &&
-                               !m.Leido)
+                var noLeidos = await _context.ChatMensajes
+                    .Where(m => m.RemitenteId == otroUserId && m.DestinatarioId == userId && !m.Leido)
                     .ToListAsync();
 
-                foreach (var mensaje in mensajesNoLeidos)
+                foreach (var mensaje in noLeidos)
+                {
+                    mensaje.Leido = true;
+                }
+
+                if (noLeidos.Any())
+                {
+                    await _context.SaveChangesAsync();
+                }
+
+                mensajes.Reverse();
+                return Ok(PaginatedResponse<MensajeDto>.Create(mensajes, totalItems, page, pageSize));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error obteniendo mensajes");
+                return StatusCode(500, ApiResponse.Fail("Error interno del servidor"));
+            }
+        }
+
+        [HttpPost("enviar")]
+        public async Task<ActionResult<ApiResponse<MensajeDto>>> EnviarMensaje([FromBody] EnviarMensajeRequest request)
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(ApiResponse<MensajeDto>.Fail("No autenticado"));
+                }
+
+                if (string.IsNullOrWhiteSpace(request.Mensaje))
+                {
+                    return BadRequest(ApiResponse<MensajeDto>.Fail("El mensaje no puede estar vacio"));
+                }
+
+                var destinatario = await _context.Users.FindAsync(request.DestinatarioId);
+                if (destinatario == null || !destinatario.EstaActivo)
+                {
+                    return NotFound(ApiResponse<MensajeDto>.Fail("Destinatario no encontrado"));
+                }
+
+                var bloqueado = await _context.BloqueosUsuarios
+                    .AnyAsync(b => (b.BloqueadorId == userId && b.BloqueadoId == request.DestinatarioId) ||
+                                  (b.BloqueadorId == request.DestinatarioId && b.BloqueadoId == userId));
+                if (bloqueado)
+                {
+                    return BadRequest(ApiResponse<MensajeDto>.Fail("No puedes enviar mensajes a este usuario"));
+                }
+
+                var remitente = await _context.Users.FindAsync(userId);
+                if (remitente == null)
+                {
+                    return NotFound(ApiResponse<MensajeDto>.Fail("Usuario no encontrado"));
+                }
+
+                var mensaje = new ChatMensaje
+                {
+                    RemitenteId = userId,
+                    DestinatarioId = request.DestinatarioId,
+                    Mensaje = request.Mensaje?.Trim() ?? "",
+                    FechaEnvio = DateTime.UtcNow,
+                    Leido = false
+                };
+
+                _context.ChatMensajes.Add(mensaje);
+                await _context.SaveChangesAsync();
+
+                var dto = new MensajeDto
+                {
+                    Id = mensaje.Id,
+                    Contenido = mensaje.Mensaje,
+                    FechaEnvio = mensaje.FechaEnvio,
+                    TiempoRelativo = "ahora",
+                    Leido = false,
+                    EsMio = true,
+                    Remitente = new UsuarioDto
+                    {
+                        Id = remitente.Id,
+                        UserName = remitente.UserName ?? "",
+                        NombreCompleto = remitente.NombreCompleto ?? "",
+                        FotoPerfil = remitente.FotoPerfil,
+                        EsCreador = remitente.EsCreador,
+                        EstaVerificado = remitente.CreadorVerificado
+                    }
+                };
+
+                try
+                {
+                    await _hubContext.Clients.User(request.DestinatarioId)
+                        .SendAsync("RecibirMensaje", dto);
+                }
+                catch (Exception signalREx)
+                {
+                    _logger.LogWarning(signalREx, "Error enviando notificacion SignalR");
+                }
+
+                return Ok(ApiResponse<MensajeDto>.Ok(dto, "Mensaje enviado"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error enviando mensaje");
+                return StatusCode(500, ApiResponse<MensajeDto>.Fail("Error interno del servidor"));
+            }
+        }
+
+        [HttpPost("conversacion/{otroUserId}/leer")]
+        public async Task<ActionResult<ApiResponse>> MarcarLeidos(string otroUserId)
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(ApiResponse.Fail("No autenticado"));
+                }
+
+                var mensajes = await _context.ChatMensajes
+                    .Where(m => m.RemitenteId == otroUserId && m.DestinatarioId == userId && !m.Leido)
+                    .ToListAsync();
+
+                foreach (var mensaje in mensajes)
                 {
                     mensaje.Leido = true;
                 }
 
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Marcados {Count} mensajes como leídos para usuario {Usuario}",
-                    mensajesNoLeidos.Count, usuario.UserName);
+                try
+                {
+                    await _hubContext.Clients.User(otroUserId).SendAsync("MensajesLeidos", userId);
+                }
+                catch { }
 
-                return Ok(new { success = true, marcados = mensajesNoLeidos.Count });
+                return Ok(ApiResponse.Ok("Mensajes marcados como leidos"));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al marcar mensajes como leídos");
-                return StatusCode(500, new { error = "Error al marcar como leídos" });
+                _logger.LogError(ex, "Error marcando mensajes como leidos");
+                return StatusCode(500, ApiResponse.Fail("Error interno del servidor"));
             }
         }
 
-        /// <summary>
-        /// Obtener el contador de mensajes no leídos
-        /// </summary>
-        [HttpGet("no-leidos-count")]
-        public async Task<IActionResult> GetNoLeidosCount()
+        [HttpGet("no-leidos")]
+        public async Task<ActionResult<ApiResponse<int>>> GetNoLeidos()
         {
             try
             {
-                var usuario = await _userManager.GetUserAsync(User);
-                if (usuario == null)
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
                 {
-                    return Unauthorized(new { error = "Usuario no autenticado" });
+                    return Unauthorized(ApiResponse<int>.Fail("No autenticado"));
                 }
 
-                var count = await _context.MensajesPrivados
-                    .Where(m => m.DestinatarioId == usuario.Id &&
-                               !m.Leido &&
-                               !m.EliminadoPorDestinatario)
-                    .CountAsync();
+                var count = await _context.ChatMensajes
+                    .CountAsync(m => m.DestinatarioId == userId && !m.Leido);
 
-                return Ok(new { count });
+                return Ok(ApiResponse<int>.Ok(count));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al obtener contador de no leídos");
-                return StatusCode(500, new { error = "Error al obtener contador" });
+                _logger.LogError(ex, "Error obteniendo mensajes no leidos");
+                return StatusCode(500, ApiResponse<int>.Fail("Error interno del servidor"));
             }
         }
 
-        /// <summary>
-        /// Buscar usuarios para iniciar conversación
-        /// </summary>
-        [HttpGet("buscar-usuarios")]
-        public async Task<IActionResult> BuscarUsuarios([FromQuery] string query)
+        [HttpDelete("{mensajeId}")]
+        public async Task<ActionResult<ApiResponse>> EliminarMensaje(int mensajeId)
         {
             try
             {
-                var usuario = await _userManager.GetUserAsync(User);
-                if (usuario == null)
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
                 {
-                    return Unauthorized(new { error = "Usuario no autenticado" });
+                    return Unauthorized(ApiResponse.Fail("No autenticado"));
                 }
 
-                if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+                var mensaje = await _context.ChatMensajes.FindAsync(mensajeId);
+                if (mensaje == null)
                 {
-                    return Ok(new List<object>());
+                    return NotFound(ApiResponse.Fail("Mensaje no encontrado"));
                 }
 
-                // Buscar usuarios que tengan suscripción activa con el usuario actual
-                var usuariosConSuscripcion = await _context.Suscripciones
-                    .Where(s => (s.FanId == usuario.Id || s.CreadorId == usuario.Id) && s.EstaActiva)
-                    .Select(s => s.FanId == usuario.Id ? s.CreadorId : s.FanId)
-                    .Distinct()
-                    .ToListAsync();
+                if (mensaje.RemitenteId != userId)
+                {
+                    return Forbid();
+                }
 
-                var usuarios = await _userManager.Users
-                    .Where(u => u.Id != usuario.Id &&
-                               usuariosConSuscripcion.Contains(u.Id) &&
-                               (u.NombreCompleto.Contains(query) ||
-                                u.UserName.Contains(query) ||
-                                (u.Seudonimo != null && u.Seudonimo.Contains(query))))
-                    .Take(10)
-                    .Select(u => new
-                    {
-                        id = u.Id,
-                        nombre = u.NombreCompleto ?? u.UserName,
-                        seudonimo = u.Seudonimo ?? u.UserName,
-                        fotoPerfil = u.FotoPerfil
-                    })
-                    .ToListAsync();
+                _context.ChatMensajes.Remove(mensaje);
+                await _context.SaveChangesAsync();
 
-                return Ok(usuarios);
+                return Ok(ApiResponse.Ok("Mensaje eliminado"));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al buscar usuarios");
-                return StatusCode(500, new { error = "Error al buscar usuarios" });
+                _logger.LogError(ex, "Error eliminando mensaje");
+                return StatusCode(500, ApiResponse.Fail("Error interno del servidor"));
             }
+        }
+
+        private static string GetTiempoRelativo(DateTime fecha)
+        {
+            var diff = DateTime.UtcNow - fecha;
+            if (diff.TotalMinutes < 1) return "ahora";
+            if (diff.TotalMinutes < 60) return $"hace {(int)diff.TotalMinutes}m";
+            if (diff.TotalHours < 24) return $"hace {(int)diff.TotalHours}h";
+            if (diff.TotalDays < 7) return $"hace {(int)diff.TotalDays}d";
+            return fecha.ToString("dd/MM");
         }
     }
 
-    /// <summary>
-    /// Request model para enviar mensaje
-    /// </summary>
+    public class ConversacionDto
+    {
+        public UsuarioDto Usuario { get; set; } = new();
+        public string UltimoMensaje { get; set; } = string.Empty;
+        public DateTime FechaUltimoMensaje { get; set; }
+        public string TiempoRelativo { get; set; } = string.Empty;
+        public int MensajesNoLeidos { get; set; }
+        public bool EsMio { get; set; }
+    }
+
+    public class MensajeDto
+    {
+        public int Id { get; set; }
+        public string Contenido { get; set; } = string.Empty;
+        public DateTime FechaEnvio { get; set; }
+        public string TiempoRelativo { get; set; } = string.Empty;
+        public bool Leido { get; set; }
+        public bool EsMio { get; set; }
+        public UsuarioDto Remitente { get; set; } = new();
+    }
+
     public class EnviarMensajeRequest
     {
         public string DestinatarioId { get; set; } = string.Empty;
-        public string Contenido { get; set; } = string.Empty;
+        public string? Mensaje { get; set; }
     }
 }

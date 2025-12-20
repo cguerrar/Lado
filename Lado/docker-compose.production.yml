@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  lado-app:
+    image: lado:latest
+    container_name: lado-production
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:80
+
+      # Base de datos
+      - ConnectionStrings__DefaultConnection=Data Source=sql-server;Initial Catalog=Lado;User ID=sa;Password=${DB_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true;Encrypt=True
+
+      # Google OAuth
+      - Authentication__Google__ClientId=${GOOGLE_CLIENT_ID}
+      - Authentication__Google__ClientSecret=${GOOGLE_CLIENT_SECRET}
+
+      # Email SMTP
+      - EmailSettings__SmtpServer=ladoapp.com
+      - EmailSettings__SmtpPort=465
+      - EmailSettings__SmtpUsername=noreply@ladoapp.com
+      - EmailSettings__SmtpPassword=${SMTP_PASSWORD}
+      - EmailSettings__FromEmail=noreply@ladoapp.com
+      - EmailSettings__FromName=Lado
+      - EmailSettings__EnableSsl=true
+
+      # MercadoPago
+      - MercadoPago__AccessToken=${MERCADOPAGO_ACCESS_TOKEN}
+      - MercadoPago__PublicKey=${MERCADOPAGO_PUBLIC_KEY}
+
+      # Claude API
+      - Claude__ApiKey=${CLAUDE_API_KEY}
+
+      # App Settings
+      - AppSettings__BaseUrl=https://www.ladoapp.com
+      - AppSettings__MaxFileSize=104857600
+      - AppSettings__CreatorCommission=0.20
+      - AppSettings__TipCommission=0.10
+
+    volumes:
+      - lado-uploads:/app/wwwroot/uploads
+      - lado-logs:/app/logs
+    restart: unless-stopped
+    depends_on:
+      - sql-server
+
+  sql-server:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: lado-sql
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=${DB_PASSWORD}
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sql-data:/var/opt/mssql
+    restart: unless-stopped
+
+volumes:
+  lado-uploads:
+  lado-logs:
+  sql-data:

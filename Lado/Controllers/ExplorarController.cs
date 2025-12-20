@@ -322,11 +322,15 @@ namespace Lado.Controllers
                         _logger.LogInformation("Nueva suscripción creada");
                     }
 
+                    // Calcular comisión (20%)
+                    var comision = creador.PrecioSuscripcion * 0.20m;
+                    var gananciaCreador = creador.PrecioSuscripcion - comision;
+
                     // Transacción Fan (Gasto)
                     var transaccionFan = new Transaccion
                     {
                         UsuarioId = usuarioActual.Id,
-                        Monto = creador.PrecioSuscripcion,
+                        Monto = -creador.PrecioSuscripcion,
                         TipoTransaccion = TipoTransaccion.Suscripcion,
                         Descripcion = $"Suscripción a {creador.NombreCompleto} (@{creador.Seudonimo})",
                         EstadoPago = "Completado",
@@ -335,11 +339,13 @@ namespace Lado.Controllers
                     };
                     _context.Transacciones.Add(transaccionFan);
 
-                    // Transacción Creador (Ingreso)
+                    // Transacción Creador (Ingreso con comisión)
                     var transaccionCreador = new Transaccion
                     {
                         UsuarioId = creador.Id,
-                        Monto = creador.PrecioSuscripcion,
+                        Monto = gananciaCreador,
+                        Comision = comision,
+                        MontoNeto = gananciaCreador,
                         TipoTransaccion = TipoTransaccion.IngresoSuscripcion,
                         Descripcion = $"Nueva suscripción de {usuarioActual.NombreCompleto}",
                         EstadoPago = "Completado",
@@ -348,11 +354,11 @@ namespace Lado.Controllers
                     };
                     _context.Transacciones.Add(transaccionCreador);
 
-                    // Actualizar saldos
+                    // Actualizar saldos (creador recibe monto menos comisión)
                     usuarioActual.Saldo -= creador.PrecioSuscripcion;
-                    creador.Saldo += creador.PrecioSuscripcion;
+                    creador.Saldo += gananciaCreador;
                     creador.NumeroSeguidores++;
-                    creador.TotalGanancias += creador.PrecioSuscripcion;
+                    creador.TotalGanancias += gananciaCreador;
 
                     await _userManager.UpdateAsync(usuarioActual);
                     await _userManager.UpdateAsync(creador);

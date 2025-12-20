@@ -1,0 +1,809 @@
+@model List<Lado.Models.LogEvento>
+@{
+    ViewData["Title"] = "Logs del Sistema";
+    var filtro = ViewBag.Filtro as Lado.Services.LogEventosFiltro;
+    var estadisticas = ViewBag.Estadisticas as Lado.Services.LogEventosEstadisticas;
+    var resultado = ViewBag.Resultado as Lado.Services.LogEventosResultado;
+}
+
+<style>
+    .logs-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .logs-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text-dark);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .logs-title svg {
+        width: 32px;
+        height: 32px;
+        color: var(--primary);
+    }
+
+    /* Stats Cards */
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .stat-card {
+        background: var(--bg-white);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .stat-icon.error {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+    }
+
+    .stat-icon.warning {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+    }
+
+    .stat-icon.event {
+        background: linear-gradient(135deg, #10b981, #059669);
+    }
+
+    .stat-icon.total {
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    }
+
+    .stat-icon svg {
+        width: 24px;
+        height: 24px;
+        color: white;
+    }
+
+    .stat-info h3 {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0;
+    }
+
+    .stat-info p {
+        font-size: 13px;
+        color: var(--text-gray);
+        margin: 0;
+    }
+
+    /* Filtros */
+    .filters-card {
+        background: var(--bg-white);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 24px;
+    }
+
+    .filters-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: flex-end;
+    }
+
+    .filter-group {
+        flex: 1;
+        min-width: 150px;
+    }
+
+    .filter-group label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-gray);
+        margin-bottom: 6px;
+    }
+
+    .filter-group select,
+    .filter-group input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        font-size: 14px;
+        background: var(--bg-light);
+        color: var(--text-dark);
+    }
+
+    .filter-group select:focus,
+    .filter-group input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(70, 130, 180, 0.1);
+    }
+
+    .filter-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-filter {
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s;
+    }
+
+    .btn-filter.primary {
+        background: var(--primary);
+        color: white;
+    }
+
+    .btn-filter.primary:hover {
+        background: var(--primary-dark);
+    }
+
+    .btn-filter.secondary {
+        background: var(--bg-light);
+        color: var(--text-dark);
+        border: 1px solid var(--border-color);
+    }
+
+    .btn-filter.secondary:hover {
+        background: var(--primary-pale);
+    }
+
+    /* Tabla de Logs */
+    .logs-table-container {
+        background: var(--bg-white);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .logs-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .logs-table th {
+        background: var(--bg-light);
+        padding: 14px 16px;
+        text-align: left;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-gray);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .logs-table td {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 14px;
+        color: var(--text-dark);
+        vertical-align: top;
+    }
+
+    .logs-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .logs-table tr:hover {
+        background: var(--bg-light);
+    }
+
+    .log-type {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .log-type.error {
+        background: #fef2f2;
+        color: #dc2626;
+    }
+
+    .log-type.warning {
+        background: #fffbeb;
+        color: #d97706;
+    }
+
+    .log-type.info {
+        background: #eff6ff;
+        color: #2563eb;
+    }
+
+    .log-type.evento {
+        background: #f0fdf4;
+        color: #16a34a;
+    }
+
+    .log-category {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        background: var(--bg-light);
+        color: var(--text-gray);
+        border: 1px solid var(--border-color);
+    }
+
+    .log-message {
+        max-width: 400px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .log-message.expandable {
+        cursor: pointer;
+    }
+
+    .log-message.expandable:hover {
+        color: var(--primary);
+    }
+
+    .log-user {
+        font-size: 13px;
+        color: var(--text-gray);
+    }
+
+    .log-date {
+        font-size: 13px;
+        color: var(--text-gray);
+        white-space: nowrap;
+    }
+
+    /* Paginacion */
+    .pagination-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 20px;
+        border-top: 1px solid var(--border-color);
+        background: var(--bg-light);
+    }
+
+    .pagination-info {
+        font-size: 14px;
+        color: var(--text-gray);
+    }
+
+    .pagination-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .pagination-btn {
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        border: 1px solid var(--border-color);
+        background: var(--bg-white);
+        color: var(--text-dark);
+        transition: all 0.2s;
+    }
+
+    .pagination-btn:hover:not(:disabled) {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+
+    .pagination-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* Modal de Detalle */
+    .log-detail-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .log-detail-modal.show {
+        display: flex;
+    }
+
+    .log-detail-content {
+        background: var(--bg-white, #ffffff);
+        border-radius: 16px;
+        max-width: 700px;
+        width: 100%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: var(--shadow-xl);
+    }
+
+    .log-detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border-color, #e2e8f0);
+    }
+
+    .log-detail-header h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-dark, #1a1a2e);
+        margin: 0;
+    }
+
+    .log-detail-close {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--text-gray, #64748b);
+        padding: 8px;
+    }
+
+    .log-detail-close:hover {
+        color: var(--text-dark, #1a1a2e);
+    }
+
+    .log-detail-body {
+        padding: 24px;
+    }
+
+    .detail-row {
+        margin-bottom: 16px;
+    }
+
+    .detail-row:last-child {
+        margin-bottom: 0;
+    }
+
+    .detail-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-gray, #64748b);
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }
+
+    .detail-value {
+        font-size: 14px;
+        color: var(--text-dark, #1a1a2e);
+    }
+
+    .detail-value.code {
+        background: #1e293b;
+        color: #e2e8f0;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-family: 'Monaco', 'Menlo', monospace;
+        font-size: 13px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .empty-state svg {
+        width: 64px;
+        height: 64px;
+        color: var(--text-gray);
+        margin-bottom: 16px;
+    }
+
+    .empty-state h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-dark);
+        margin-bottom: 8px;
+    }
+
+    .empty-state p {
+        font-size: 14px;
+        color: var(--text-gray);
+    }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .stats-row {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .filters-row {
+            flex-direction: column;
+        }
+
+        .filter-group {
+            width: 100%;
+        }
+
+        .logs-table {
+            display: block;
+            overflow-x: auto;
+        }
+
+        .log-message {
+            max-width: 200px;
+        }
+    }
+</style>
+
+<div class="logs-header">
+    <h1 class="logs-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+        </svg>
+        Logs del Sistema
+    </h1>
+    <button class="btn-filter secondary" onclick="limpiarLogs()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -3px; margin-right: 6px;">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+        Limpiar logs antiguos
+    </button>
+</div>
+
+<!-- Stats -->
+<div class="stats-row">
+    <div class="stat-card">
+        <div class="stat-icon error">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <h3>@(estadisticas?.ErroresHoy ?? 0)</h3>
+            <p>Errores hoy</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon warning">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <h3>@(estadisticas?.WarningsHoy ?? 0)</h3>
+            <p>Warnings hoy</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon event">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <h3>@(estadisticas?.EventosHoy ?? 0)</h3>
+            <p>Eventos hoy</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon total">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <h3>@(estadisticas?.TotalUltimos7Dias ?? 0)</h3>
+            <p>Ultimos 7 dias</p>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<form class="filters-card" method="get" asp-action="Logs">
+    <div class="filters-row">
+        <div class="filter-group">
+            <label>Tipo</label>
+            <select name="tipo" id="filtroTipo">
+                <option value="">Todos</option>
+                <option value="0" selected="@(filtro?.Tipo == Lado.Models.TipoLogEvento.Error)">Error</option>
+                <option value="1" selected="@(filtro?.Tipo == Lado.Models.TipoLogEvento.Warning)">Warning</option>
+                <option value="2" selected="@(filtro?.Tipo == Lado.Models.TipoLogEvento.Info)">Info</option>
+                <option value="3" selected="@(filtro?.Tipo == Lado.Models.TipoLogEvento.Evento)">Evento</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Categoria</label>
+            <select name="categoria" id="filtroCategoria">
+                <option value="">Todas</option>
+                <option value="0" selected="@(filtro?.Categoria == Lado.Models.CategoriaEvento.Sistema)">Sistema</option>
+                <option value="1" selected="@(filtro?.Categoria == Lado.Models.CategoriaEvento.Auth)">Auth</option>
+                <option value="2" selected="@(filtro?.Categoria == Lado.Models.CategoriaEvento.Usuario)">Usuario</option>
+                <option value="3" selected="@(filtro?.Categoria == Lado.Models.CategoriaEvento.Pago)">Pago</option>
+                <option value="4" selected="@(filtro?.Categoria == Lado.Models.CategoriaEvento.Contenido)">Contenido</option>
+                <option value="5" selected="@(filtro?.Categoria == Lado.Models.CategoriaEvento.Admin)">Admin</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Desde</label>
+            <input type="date" name="fechaDesde" value="@filtro?.FechaDesde?.ToString("yyyy-MM-dd")">
+        </div>
+        <div class="filter-group">
+            <label>Hasta</label>
+            <input type="date" name="fechaHasta" value="@filtro?.FechaHasta?.ToString("yyyy-MM-dd")">
+        </div>
+        <div class="filter-group" style="flex: 2;">
+            <label>Buscar</label>
+            <input type="text" name="busqueda" placeholder="Mensaje, usuario, detalle..." value="@filtro?.Busqueda">
+        </div>
+        <div class="filter-buttons">
+            <button type="submit" class="btn-filter primary">Filtrar</button>
+            <a href="@Url.Action("Logs")" class="btn-filter secondary">Limpiar</a>
+        </div>
+    </div>
+</form>
+
+<!-- Tabla de Logs -->
+<div class="logs-table-container">
+    @if (Model != null && Model.Any())
+    {
+        <table class="logs-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Categoria</th>
+                    <th>Mensaje</th>
+                    <th>Usuario</th>
+                    <th>IP</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var log in Model)
+                {
+                    var tipoClass = log.Tipo.ToString().ToLower();
+                    <tr onclick="verDetalle(@log.Id)" style="cursor: pointer;">
+                        <td class="log-date">@log.Fecha.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                        <td>
+                            <span class="log-type @tipoClass">
+                                @if (log.Tipo == Lado.Models.TipoLogEvento.Error)
+                                {
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <line x1="15" y1="9" x2="9" y2="15"/>
+                                        <line x1="9" y1="9" x2="15" y2="15"/>
+                                    </svg>
+                                }
+                                else if (log.Tipo == Lado.Models.TipoLogEvento.Warning)
+                                {
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                    </svg>
+                                }
+                                else
+                                {
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                    </svg>
+                                }
+                                @log.Tipo
+                            </span>
+                        </td>
+                        <td><span class="log-category">@log.Categoria</span></td>
+                        <td>
+                            <div class="log-message expandable" title="@log.Mensaje">@log.Mensaje</div>
+                        </td>
+                        <td class="log-user">@(log.UsuarioNombre ?? "-")</td>
+                        <td class="log-user">@(log.IpAddress ?? "-")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <!-- Paginacion -->
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Mostrando @((resultado?.Pagina - 1) * resultado?.TamanoPagina + 1) - @Math.Min(resultado?.Pagina * resultado?.TamanoPagina ?? 0, resultado?.Total ?? 0) de @resultado?.Total registros
+            </div>
+            <div class="pagination-buttons">
+                @if (resultado?.Pagina > 1)
+                {
+                    <a href="@Url.Action("Logs", new { tipo = filtro?.Tipo, categoria = filtro?.Categoria, fechaDesde = filtro?.FechaDesde, fechaHasta = filtro?.FechaHasta, busqueda = filtro?.Busqueda, pagina = resultado.Pagina - 1 })" class="pagination-btn">Anterior</a>
+                }
+                else
+                {
+                    <button class="pagination-btn" disabled>Anterior</button>
+                }
+
+                @if (resultado?.Pagina < resultado?.TotalPaginas)
+                {
+                    <a href="@Url.Action("Logs", new { tipo = filtro?.Tipo, categoria = filtro?.Categoria, fechaDesde = filtro?.FechaDesde, fechaHasta = filtro?.FechaHasta, busqueda = filtro?.Busqueda, pagina = resultado.Pagina + 1 })" class="pagination-btn">Siguiente</a>
+                }
+                else
+                {
+                    <button class="pagination-btn" disabled>Siguiente</button>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <h3>No hay logs</h3>
+            <p>No se encontraron registros con los filtros seleccionados</p>
+        </div>
+    }
+</div>
+
+<!-- Modal de Detalle -->
+<div class="log-detail-modal" id="detalleModal">
+    <div class="log-detail-content">
+        <div class="log-detail-header">
+            <h3>Detalle del Log</h3>
+            <button class="log-detail-close" onclick="cerrarModal()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        <div class="log-detail-body" id="detalleBody">
+            <!-- Contenido cargado dinamicamente -->
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    async function verDetalle(id) {
+        try {
+            const response = await fetch(`/Admin/ObtenerDetalleLogs?id=${id}`);
+            const data = await response.json();
+
+            if (data.success) {
+                const log = data.log;
+                document.getElementById('detalleBody').innerHTML = `
+                    <div class="detail-row">
+                        <div class="detail-label">Fecha</div>
+                        <div class="detail-value">${log.fecha}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Tipo</div>
+                        <div class="detail-value"><span class="log-type ${log.tipo.toLowerCase()}">${log.tipo}</span></div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Categoria</div>
+                        <div class="detail-value"><span class="log-category">${log.categoria}</span></div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Mensaje</div>
+                        <div class="detail-value">${log.mensaje}</div>
+                    </div>
+                    ${log.tipoExcepcion ? `
+                    <div class="detail-row">
+                        <div class="detail-label">Tipo de Excepcion</div>
+                        <div class="detail-value">${log.tipoExcepcion}</div>
+                    </div>` : ''}
+                    ${log.usuarioNombre ? `
+                    <div class="detail-row">
+                        <div class="detail-label">Usuario</div>
+                        <div class="detail-value">${log.usuarioNombre} ${log.usuarioId ? `(${log.usuarioId})` : ''}</div>
+                    </div>` : ''}
+                    ${log.url ? `
+                    <div class="detail-row">
+                        <div class="detail-label">URL</div>
+                        <div class="detail-value">${log.metodoHttp || ''} ${log.url}</div>
+                    </div>` : ''}
+                    ${log.ipAddress ? `
+                    <div class="detail-row">
+                        <div class="detail-label">IP</div>
+                        <div class="detail-value">${log.ipAddress}</div>
+                    </div>` : ''}
+                    ${log.userAgent ? `
+                    <div class="detail-row">
+                        <div class="detail-label">User Agent</div>
+                        <div class="detail-value" style="font-size: 12px; word-break: break-all;">${log.userAgent}</div>
+                    </div>` : ''}
+                    ${log.detalle ? `
+                    <div class="detail-row">
+                        <div class="detail-label">Detalle / Stack Trace</div>
+                        <div class="detail-value code">${escapeHtml(log.detalle)}</div>
+                    </div>` : ''}
+                `;
+                document.getElementById('detalleModal').classList.add('show');
+            }
+        } catch (error) {
+            console.error('Error al cargar detalle:', error);
+        }
+    }
+
+    function cerrarModal() {
+        document.getElementById('detalleModal').classList.remove('show');
+    }
+
+    document.getElementById('detalleModal').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModal();
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') cerrarModal();
+    });
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    async function limpiarLogs() {
+        if (!confirm('Esto eliminara todos los logs con mas de 30 dias de antiguedad. Continuar?')) return;
+
+        try {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            const response = await fetch('/Admin/LimpiarLogs', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': token
+                }
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('Error al limpiar logs');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error al limpiar logs');
+        }
+    }
+</script>
+}

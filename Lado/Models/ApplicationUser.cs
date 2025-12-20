@@ -111,6 +111,13 @@ namespace Lado.Models
         [Display(Name = "Usuario Verificado")]
         public bool EsVerificado { get; set; } = false;
 
+        /// <summary>
+        /// Versión de seguridad - se incrementa al cerrar sesión o cambiar contraseña
+        /// Invalida todos los tokens JWT emitidos antes del cambio
+        /// </summary>
+        [Display(Name = "Versión de Seguridad")]
+        public int SecurityVersion { get; set; } = 1;
+
         [Display(Name = "Fecha de Registro")]
         public DateTime FechaRegistro { get; set; } = DateTime.Now;
 
@@ -223,12 +230,12 @@ namespace Lado.Models
 
         /// <summary>
         /// Verifica si tiene configurada la identidad de LadoB (creador premium).
-        /// Un usuario es LadoB si es CREADOR y tiene un seudónimo configurado.
+        /// Un usuario es LadoB si es CREADOR, está VERIFICADO y tiene un seudónimo configurado.
         /// </summary>
-        /// <returns>True si es creador premium (EsCreador + tiene seudónimo)</returns>
+        /// <returns>True si es creador premium verificado (EsCreador + CreadorVerificado + tiene seudónimo)</returns>
         public bool TieneLadoB()
         {
-            return EsCreador && !string.IsNullOrEmpty(Seudonimo);
+            return EsCreador && CreadorVerificado && !string.IsNullOrEmpty(Seudonimo);
         }
 
         /// <summary>

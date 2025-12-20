@@ -1160,6 +1160,80 @@ namespace Lado.Controllers
         }
 
         // ========================================
+        // USAR COMO FOTO DE PERFIL
+        // ========================================
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UsarComoFotoPerfil(int id, string lado = "A")
+        {
+            try
+            {
+                _logger.LogInformation("UsarComoFotoPerfil iniciado - Id: {Id}, Lado: {Lado}", id, lado);
+
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
+                    return Json(new { success = false, message = "No autenticado" });
+
+                var contenido = await _context.Contenidos
+                    .FirstOrDefaultAsync(c => c.Id == id && c.UsuarioId == usuario.Id);
+
+                if (contenido == null)
+                    return Json(new { success = false, message = "Contenido no encontrado" });
+
+                _logger.LogInformation("Contenido encontrado - TipoContenido: {Tipo}, RutaArchivo: {Ruta}",
+                    contenido.TipoContenido, contenido.RutaArchivo);
+
+                // Verificar que sea una foto
+                if (contenido.TipoContenido != Models.TipoContenido.Foto &&
+                    contenido.TipoContenido != Models.TipoContenido.Imagen)
+                    return Json(new { success = false, message = "Solo se pueden usar fotos como imagen de perfil" });
+
+                if (string.IsNullOrEmpty(contenido.RutaArchivo))
+                    return Json(new { success = false, message = "El contenido no tiene archivo" });
+
+                // Copiar archivo a carpeta de perfiles - normalizar la ruta
+                var rutaNormalizada = contenido.RutaArchivo.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+                var rutaOrigen = Path.Combine(_environment.WebRootPath, rutaNormalizada);
+                _logger.LogInformation("Ruta origen: {Ruta}", rutaOrigen);
+
+                if (!System.IO.File.Exists(rutaOrigen))
+                    return Json(new { success = false, message = $"Archivo no encontrado: {rutaOrigen}" });
+
+                var extension = Path.GetExtension(contenido.RutaArchivo);
+                var nuevoNombre = $"{Guid.NewGuid()}{extension}";
+                var carpetaDestino = lado == "B" ? "perfiles-ladob" : "perfiles";
+                var rutaDestino = Path.Combine(_environment.WebRootPath, "uploads", carpetaDestino);
+
+                if (!Directory.Exists(rutaDestino))
+                    Directory.CreateDirectory(rutaDestino);
+
+                var archivoDestino = Path.Combine(rutaDestino, nuevoNombre);
+                System.IO.File.Copy(rutaOrigen, archivoDestino, true);
+
+                var rutaRelativa = $"/uploads/{carpetaDestino}/{nuevoNombre}";
+
+                // Actualizar usuario
+                if (lado == "B")
+                    usuario.FotoPerfilLadoB = rutaRelativa;
+                else
+                    usuario.FotoPerfil = rutaRelativa;
+
+                await _userManager.UpdateAsync(usuario);
+
+                _logger.LogInformation("Usuario {UserId} uso contenido {ContenidoId} como foto de perfil (Lado {Lado})",
+                    usuario.Id, id, lado);
+
+                return Json(new { success = true, message = $"Foto de perfil actualizada", nuevaRuta = rutaRelativa });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al usar contenido como foto de perfil");
+                return Json(new { success = false, message = $"Error: {ex.Message}" });
+            }
+        }
+
+        // ========================================
         // ELIMINAR CONTENIDO
         // ========================================
 

@@ -2283,27 +2283,6 @@
         pointer-events: none;
     }
 
-    /* Para pantallas grandes desktop, posicionar dentro del area de imagen */
-    @@media (min-width: 1200px) {
-        .fullscreen-credits {
-            /* Calcular para que quede ~20px dentro del borde derecho de una imagen centrada */
-            /* Imagen tipica ocupa ~70% del viewport en landscape */
-            right: calc(15vw + 20px);
-        }
-    }
-
-    @@media (min-width: 1600px) {
-        .fullscreen-credits {
-            right: calc(18vw + 20px);
-        }
-    }
-
-    @@media (min-width: 1920px) {
-        .fullscreen-credits {
-            right: calc(20vw + 20px);
-        }
-    }
-
     .credits-content {
         display: flex;
         flex-direction: column;
@@ -5444,9 +5423,6 @@
         // Ocultar sidebar y header
         document.body.classList.add('fullscreen-mode');
 
-        // Agregar listener de resize para reposicionar créditos
-        window.addEventListener('resize', onWindowResize);
-
         // Scroll al slide actual Y LUEGO reproducir
         // IMPORTANTE: NO reproducir antes del scroll para evitar audio duplicado
         setTimeout(() => {
@@ -5587,96 +5563,6 @@
     function shareTwitter(postId) {
         const url = `${window.location.origin}/Feed/Detalle/${postId}`;
         window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent('Mira este contenido en LADO')}`, '_blank');
-    }
-
-    // Calcular los límites reales del media (considerando object-fit: contain)
-    function getMediaBounds(mediaElement) {
-        if (!mediaElement) return null;
-
-        const containerRect = mediaElement.parentElement.getBoundingClientRect();
-        let mediaWidth, mediaHeight;
-
-        if (mediaElement.tagName === 'IMG') {
-            mediaWidth = mediaElement.naturalWidth;
-            mediaHeight = mediaElement.naturalHeight;
-        } else if (mediaElement.tagName === 'VIDEO') {
-            mediaWidth = mediaElement.videoWidth;
-            mediaHeight = mediaElement.videoHeight;
-        } else {
-            return containerRect;
-        }
-
-        if (!mediaWidth || !mediaHeight) return containerRect;
-
-        const containerRatio = containerRect.width / containerRect.height;
-        const mediaRatio = mediaWidth / mediaHeight;
-
-        let renderedWidth, renderedHeight;
-
-        if (mediaRatio > containerRatio) {
-            // Media es más ancho, limitado por width
-            renderedWidth = containerRect.width;
-            renderedHeight = containerRect.width / mediaRatio;
-        } else {
-            // Media es más alto, limitado por height
-            renderedHeight = containerRect.height;
-            renderedWidth = containerRect.height * mediaRatio;
-        }
-
-        const offsetX = (containerRect.width - renderedWidth) / 2;
-        const offsetY = (containerRect.height - renderedHeight) / 2;
-
-        return {
-            left: containerRect.left + offsetX,
-            top: containerRect.top + offsetY,
-            right: containerRect.left + offsetX + renderedWidth,
-            bottom: containerRect.top + offsetY + renderedHeight,
-            width: renderedWidth,
-            height: renderedHeight
-        };
-    }
-
-    // Posicionar los créditos dentro de los límites del media
-    function positionCreditsInMedia(slide) {
-        if (!slide) return;
-
-        const credits = slide.querySelector('.fullscreen-credits');
-        const media = slide.querySelector('img, video');
-
-        if (!credits || !media) return;
-
-        const bounds = getMediaBounds(media);
-        if (!bounds) return;
-
-        const slideRect = slide.getBoundingClientRect();
-        const isMobile = window.innerWidth <= 768;
-
-        // Calcular posición derecha relativa al slide
-        const rightPadding = isMobile ? 12 : 20;
-        const bottomPadding = isMobile ? 100 : 80; // 20px más arriba en móvil
-
-        const rightOffset = slideRect.right - bounds.right + rightPadding;
-        const bottomOffset = slideRect.bottom - bounds.bottom + bottomPadding;
-
-        credits.style.right = `${Math.max(rightPadding, rightOffset)}px`;
-        credits.style.bottom = `${Math.max(bottomPadding, bottomOffset)}px`;
-    }
-
-    // Actualizar posición de créditos en el slide actual
-    function updateCurrentCreditsPosition() {
-        const container = document.getElementById('fullscreenSlidesContainer');
-        if (!container) return;
-        const currentSlide = container.querySelector(`.fullscreen-slide[data-index="${currentFullscreenIndex}"]`);
-        if (currentSlide) {
-            positionCreditsInMedia(currentSlide);
-        }
-    }
-
-    // Handler de resize con debounce
-    let resizeTimeout;
-    function onWindowResize() {
-        clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(updateCurrentCreditsPosition, 100);
     }
 
     // Generar los slides
@@ -5843,11 +5729,6 @@
                 const imgEl = slide.querySelector('img');
                 imgEl.onload = () => {
                     slide.classList.add('media-loaded');
-                    // Posicionar créditos cuando la imagen carga si es el slide actual
-                    const slideIndex = parseInt(slide.dataset.index);
-                    if (slideIndex === currentFullscreenIndex) {
-                        positionCreditsInMedia(slide);
-                    }
                 };
                 // Si ya estaba en cache, marcar inmediatamente
                 if (imgEl.complete) {
@@ -6220,9 +6101,6 @@
         const postId = slide.dataset.postId;
         console.log('[DEBUG] playCurrentVideo - índice:', currentFullscreenIndex, 'postId:', postId);
 
-        // Posicionar los créditos dentro de los límites del media
-        setTimeout(() => positionCreditsInMedia(slide), 100);
-
         // Intentar desbloquear audio primero (iOS)
         unlockAudio();
 
@@ -6351,9 +6229,6 @@
 
         // Pausar todo primero
         pauseAllFullscreenMedia();
-
-        // Remover listener de resize
-        window.removeEventListener('resize', onWindowResize);
 
         const viewer = document.getElementById('fullscreenViewer');
         viewer.classList.remove('active');

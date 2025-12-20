@@ -1,0 +1,394 @@
+@model Lado.Controllers.ConfiguracionEmailViewModel
+@{
+    ViewData["Title"] = "Configuracion de Email";
+}
+
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h2><i class="fas fa-envelope text-secondary"></i> Configuracion de Email</h2>
+            <p class="text-muted">Gestiona los proveedores de envio de correos electronicos</p>
+        </div>
+        <div class="col-md-6 text-end">
+            <a href="@Url.Action("ProbarEmail", "Admin")" class="btn btn-outline-info me-2">
+                <i class="fas fa-vial"></i> Probar Emails
+            </a>
+            <a href="@Url.Action("Index", "Admin")" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Volver al Dashboard
+            </a>
+        </div>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle"></i> @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle"></i> @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <form method="post" action="@Url.Action("ActualizarConfiguracionEmail")" id="formConfigEmail">
+        @Html.AntiForgeryToken()
+
+        <div class="row g-3">
+            <!-- Proveedor Activo y Remitente -->
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cog"></i> Configuracion General
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Proveedor Activo</label>
+                                <div class="d-flex gap-3">
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="ProveedorActivo"
+                                               id="provMailjet" value="Mailjet"
+                                               @(Model.ProveedorActivo == "Mailjet" ? "checked" : "")>
+                                        <label class="form-check-label" for="provMailjet">
+                                            <i class="fas fa-paper-plane text-info"></i> Mailjet
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="ProveedorActivo"
+                                               id="provAmazonSES" value="AmazonSES"
+                                               @(Model.ProveedorActivo == "AmazonSES" ? "checked" : "")>
+                                        <label class="form-check-label" for="provAmazonSES">
+                                            <i class="fab fa-aws text-warning"></i> Amazon SES
+                                        </label>
+                                    </div>
+                                </div>
+                                <small class="text-muted">Selecciona el proveedor que se usara para enviar correos</small>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Email Remitente</label>
+                                <input type="email" name="FromEmail" class="form-control"
+                                       value="@Model.FromEmail" placeholder="noreply@tudominio.com" required>
+                                <small class="text-muted">Email que aparecera como remitente</small>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Nombre Remitente</label>
+                                <input type="text" name="FromName" class="form-control"
+                                       value="@Model.FromName" placeholder="Lado" required>
+                                <small class="text-muted">Nombre que aparecera junto al email</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mailjet -->
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100" id="cardMailjet">
+                    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-paper-plane"></i> Mailjet
+                        </h5>
+                        <span class="badge bg-light text-dark" id="badgeMailjet">
+                            @(Model.ProveedorActivo == "Mailjet" ? "ACTIVO" : "INACTIVO")
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">API Key</label>
+                            <input type="text" name="MailjetApiKey" class="form-control"
+                                   value="@Model.MailjetApiKey" placeholder="Tu API Key de Mailjet">
+                            <small class="text-muted">
+                                Obtener en <a href="https://app.mailjet.com/account/apikeys" target="_blank">Mailjet Dashboard</a>
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Secret Key</label>
+                            <div class="input-group">
+                                <input type="password" name="MailjetSecretKey" id="mailjetSecretKey" class="form-control"
+                                       value="@ViewBag.MailjetSecretKeyMasked" placeholder="Tu Secret Key de Mailjet">
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('mailjetSecretKey')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <small class="text-muted">Deja vacio para mantener la clave actual</small>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-info flex-grow-1" onclick="probarProveedor('Mailjet')">
+                                <i class="fas fa-vial"></i> Probar Conexion
+                            </button>
+                        </div>
+
+                        <div id="resultadoMailjet" class="mt-3" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Amazon SES -->
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100" id="cardAmazonSES">
+                    <div class="card-header bg-warning d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fab fa-aws"></i> Amazon SES
+                        </h5>
+                        <span class="badge bg-light text-dark" id="badgeAmazonSES">
+                            @(Model.ProveedorActivo == "AmazonSES" ? "ACTIVO" : "INACTIVO")
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Access Key ID</label>
+                            <input type="text" name="AmazonSesAccessKey" class="form-control"
+                                   value="@Model.AmazonSesAccessKey" placeholder="AKIAIOSFODNN7EXAMPLE">
+                            <small class="text-muted">
+                                Obtener en <a href="https://console.aws.amazon.com/iam/" target="_blank">AWS IAM Console</a>
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Secret Access Key</label>
+                            <div class="input-group">
+                                <input type="password" name="AmazonSesSecretKey" id="amazonSecretKey" class="form-control"
+                                       value="@ViewBag.AmazonSesSecretKeyMasked" placeholder="Tu Secret Access Key">
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('amazonSecretKey')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <small class="text-muted">Deja vacio para mantener la clave actual</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Region</label>
+                            <select name="AmazonSesRegion" id="amazonSesRegion" class="form-select">
+                                <option value="us-east-1">US East (N. Virginia) - us-east-1</option>
+                                <option value="us-east-2">US East (Ohio) - us-east-2</option>
+                                <option value="us-west-1">US West (N. California) - us-west-1</option>
+                                <option value="us-west-2">US West (Oregon) - us-west-2</option>
+                                <option value="eu-west-1">EU (Ireland) - eu-west-1</option>
+                                <option value="eu-west-2">EU (London) - eu-west-2</option>
+                                <option value="eu-central-1">EU (Frankfurt) - eu-central-1</option>
+                                <option value="ap-southeast-1">Asia Pacific (Singapore) - ap-southeast-1</option>
+                                <option value="ap-southeast-2">Asia Pacific (Sydney) - ap-southeast-2</option>
+                                <option value="ap-northeast-1">Asia Pacific (Tokyo) - ap-northeast-1</option>
+                                <option value="sa-east-1">South America (Sao Paulo) - sa-east-1</option>
+                            </select>
+                            <small class="text-muted">Region de AWS donde esta configurado SES</small>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-warning flex-grow-1" onclick="probarProveedor('AmazonSES')">
+                                <i class="fas fa-vial"></i> Probar Conexion
+                            </button>
+                        </div>
+
+                        <div id="resultadoAmazonSES" class="mt-3" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Boton Guardar -->
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-info-circle text-info"></i>
+                            <span class="text-muted">Los cambios se aplicaran inmediatamente al guardar</span>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save"></i> Guardar Configuracion
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Informacion -->
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle"></i> Informacion Importante
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-paper-plane text-info"></i> Mailjet</h6>
+                                <ul class="text-muted small">
+                                    <li>Servicio de email transaccional con buena reputacion</li>
+                                    <li>Plan gratuito: 200 emails/dia, 6,000/mes</li>
+                                    <li>Requiere verificar el dominio remitente</li>
+                                    <li><a href="https://dev.mailjet.com/" target="_blank">Documentacion de Mailjet</a></li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fab fa-aws text-warning"></i> Amazon SES</h6>
+                                <ul class="text-muted small">
+                                    <li>Servicio de email de Amazon Web Services</li>
+                                    <li>Costo: $0.10 por cada 1,000 emails</li>
+                                    <li>Requiere verificar email/dominio y salir del modo sandbox</li>
+                                    <li><a href="https://docs.aws.amazon.com/ses/" target="_blank">Documentacion de Amazon SES</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Modal para prueba de email -->
+<div class="modal fade" id="modalPrueba" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-vial"></i> Probar Proveedor: <span id="proveedorPrueba"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Email de destino</label>
+                    <input type="email" id="emailDestino" class="form-control" placeholder="tu@email.com" required>
+                    <small class="text-muted">Se enviara un email de prueba a esta direccion</small>
+                </div>
+                <div id="resultadoPrueba" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-primary" id="btnEnviarPrueba" onclick="enviarPrueba()">
+                    <i class="fas fa-paper-plane"></i> Enviar Prueba
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    let proveedorActual = '';
+
+    // Actualizar badges cuando cambia el proveedor
+    document.querySelectorAll('input[name="ProveedorActivo"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            document.getElementById('badgeMailjet').textContent = this.value === 'Mailjet' ? 'ACTIVO' : 'INACTIVO';
+            document.getElementById('badgeAmazonSES').textContent = this.value === 'AmazonSES' ? 'ACTIVO' : 'INACTIVO';
+
+            // Actualizar estilos de cards
+            document.getElementById('cardMailjet').classList.toggle('border-info', this.value === 'Mailjet');
+            document.getElementById('cardAmazonSES').classList.toggle('border-warning', this.value === 'AmazonSES');
+        });
+    });
+
+    function togglePassword(inputId) {
+        const input = document.getElementById(inputId);
+        input.type = input.type === 'password' ? 'text' : 'password';
+    }
+
+    function probarProveedor(proveedor) {
+        proveedorActual = proveedor;
+        document.getElementById('proveedorPrueba').textContent = proveedor;
+        document.getElementById('resultadoPrueba').style.display = 'none';
+        document.getElementById('emailDestino').value = '';
+
+        const modal = new bootstrap.Modal(document.getElementById('modalPrueba'));
+        modal.show();
+    }
+
+    async function enviarPrueba() {
+        const emailDestino = document.getElementById('emailDestino').value;
+        const btn = document.getElementById('btnEnviarPrueba');
+        const resultado = document.getElementById('resultadoPrueba');
+
+        if (!emailDestino) {
+            alert('Ingresa un email de destino');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+
+        try {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]');
+            if (!token) {
+                throw new Error('Token de verificacion no encontrado');
+            }
+
+            const response = await fetch('@Url.Action("ProbarProveedorEmail", "Admin")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': token.value
+                },
+                body: `proveedor=${encodeURIComponent(proveedorActual)}&destinatario=${encodeURIComponent(emailDestino)}`
+            });
+
+            // Verificar si la respuesta es exitosa
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Error HTTP ${response.status}: ${errorText || 'Sin detalles'}`);
+            }
+
+            const text = await response.text();
+            if (!text) {
+                throw new Error('Respuesta vacia del servidor');
+            }
+
+            const data = JSON.parse(text);
+
+            if (data.success) {
+                resultado.innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i>
+                        <strong>Exito!</strong> ${data.message}
+                        ${data.messageId ? `<br><small>ID: ${data.messageId}</small>` : ''}
+                    </div>
+                `;
+            } else {
+                resultado.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-times-circle"></i>
+                        <strong>Error:</strong> ${data.message}
+                        ${data.details ? `<br><small class="text-muted">${data.details}</small>` : ''}
+                    </div>
+                `;
+            }
+            resultado.style.display = 'block';
+        } catch (error) {
+            resultado.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-times-circle"></i>
+                    <strong>Error:</strong> ${error.message}
+                </div>
+            `;
+            resultado.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Prueba';
+        }
+    }
+
+    // Inicializar estilos
+    document.addEventListener('DOMContentLoaded', function() {
+        const proveedorActivo = document.querySelector('input[name="ProveedorActivo"]:checked').value;
+        document.getElementById('cardMailjet').classList.toggle('border-info', proveedorActivo === 'Mailjet');
+        document.getElementById('cardAmazonSES').classList.toggle('border-warning', proveedorActivo === 'AmazonSES');
+
+        // Establecer la region seleccionada
+        const regionGuardada = '@Model.AmazonSesRegion';
+        if (regionGuardada) {
+            document.getElementById('amazonSesRegion').value = regionGuardada;
+        }
+    });
+</script>
+}

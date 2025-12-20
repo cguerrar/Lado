@@ -3,14 +3,20 @@
     ViewData["Title"] = Model.NombreCompleto;
     var estaSuscrito = (bool)ViewBag.EstaSuscrito;
     var contenidos = ViewBag.Contenidos as List<Lado.Models.Contenido>;
-    var mostrandoSeudonimo = ViewBag.MostrandoSeudonimo ?? false;
+    var mostrandoSeudonimo = (bool)(ViewBag.MostrandoSeudonimo ?? false);
     var nombreMostrado = ViewBag.NombreMostrado ?? Model.NombreCompleto;
     var usernameMostrado = ViewBag.UsernameMostrado ?? $"@{Model.UserName}";
     var puedeRecibirPropinas = ViewBag.PuedeRecibirPropinas ?? false;
+    // Lista de IDs de contenidos desbloqueados (para modo seudónimo)
+    var contenidosDesbloqueadosIds = ViewBag.ContenidosDesbloqueadosIds as List<int> ?? new List<int>();
     // Seleccionar foto de perfil segun el modo (LadoA o LadoB)
     var fotoPerfilMostrar = mostrandoSeudonimo
-        ? (Model.FotoPerfilLadoB ?? Model.FotoPerfil)
+        ? (!string.IsNullOrEmpty(Model.FotoPerfilLadoB) ? Model.FotoPerfilLadoB : Model.FotoPerfil)
         : Model.FotoPerfil;
+    // Seleccionar biografía según el modo
+    var biografiaMostrar = mostrandoSeudonimo
+        ? (!string.IsNullOrEmpty(Model.BiografiaLadoB) ? Model.BiografiaLadoB : Model.Biografia)
+        : Model.Biografia;
 }
 
 <style>
@@ -955,6 +961,7 @@
 </style>
 
 <div class="profile-container">
+    <!-- DEBUG: mostrandoSeudonimo=@mostrandoSeudonimo, FotoPerfilLadoB=@(Model.FotoPerfilLadoB ?? "NULL"), fotoPerfilMostrar=@(fotoPerfilMostrar ?? "NULL") -->
     <!-- HEADER -->
     <div class="profile-header">
         <div class="profile-pic-wrapper">
@@ -1024,9 +1031,9 @@
             <div class="profile-bio">
                 @* ⭐ NOMBRE MOSTRADO DEPENDIENDO DEL MODO *@
                 <span class="bio-fullname">@nombreMostrado</span>
-                @if (!string.IsNullOrEmpty(Model.Biografia))
+                @if (!string.IsNullOrEmpty(biografiaMostrar))
                 {
-                    <span class="bio-text">@Model.Biografia</span>
+                    <span class="bio-text">@biografiaMostrar</span>
                 }
             </div>
 
@@ -1052,10 +1059,24 @@
         <div class="posts-grid">
             @foreach (var contenido in contenidos)
             {
-                <div class="post-item" onclick="window.location.href='/Feed/Detalle/@contenido.Id'">
-                    @if (contenido.EsPremium && !estaSuscrito)
+                @* Determinar si el contenido está bloqueado *@
+                var estaBloqueado = mostrandoSeudonimo && !contenidosDesbloqueadosIds.Contains(contenido.Id);
+                var clickUrl = estaBloqueado
+                    ? $"/Feed/Perfil/{Model.Id}?verSeudonimo=true"
+                    : $"/Feed/Detalle/{contenido.Id}";
+
+                <div class="post-item" onclick="window.location.href='@clickUrl'">
+                    @if (estaBloqueado)
                     {
-                        <img src="@(contenido.RutaArchivo ?? "/images/placeholder.jpg")" alt="Premium" style="filter: blur(20px);">
+                        @* Contenido bloqueado - mostrar con blur *@
+                        @if (!string.IsNullOrEmpty(contenido.RutaArchivo))
+                        {
+                            <img src="@contenido.RutaArchivo" alt="Premium" style="filter: blur(20px);">
+                        }
+                        else
+                        {
+                            <div style="width:100%;height:100%;background:linear-gradient(135deg,#4682B4,#36648B);"></div>
+                        }
                         <div class="post-lock">
                             <div class="lock-icon-circle">
                                 <svg viewBox="0 0 24 24" fill="none">

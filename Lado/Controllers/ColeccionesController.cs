@@ -184,66 +184,109 @@ namespace Lado.Controllers
                     });
                 }
 
-                // Crear compra de colección
-                var compra = new CompraColeccion
+                // Obtener creador de la colección
+                var creador = await _userManager.FindByIdAsync(coleccion.CreadorId);
+                if (creador == null)
                 {
-                    ColeccionId = coleccionId,
-                    CompradorId = usuarioId,
-                    Precio = coleccion.Precio,
-                    FechaCompra = DateTime.Now
-                };
-
-                _context.ComprasColeccion.Add(compra);
-
-                // Descontar saldo
-                usuario.Saldo -= coleccion.Precio;
-
-                // Crear transacción
-                var transaccion = new Transaccion
-                {
-                    UsuarioId = usuarioId,
-                    TipoTransaccion = TipoTransaccion.CompraContenido,
-                    Monto = -coleccion.Precio,
-                    Descripcion = $"Compra de colección: {coleccion.Nombre}",
-                    FechaTransaccion = DateTime.Now,
-                    EstadoTransaccion = EstadoTransaccion.Completada
-                };
-
-                _context.Transacciones.Add(transaccion);
-
-                // Dar acceso a todos los contenidos de la colección
-                foreach (var contenidoColeccion in coleccion.Contenidos)
-                {
-                    // Verificar que no haya comprado ya ese contenido individualmente
-                    var yaComproContenido = await _context.ComprasContenido
-                        .AnyAsync(cc => cc.UsuarioId == usuarioId
-                                     && cc.ContenidoId == contenidoColeccion.ContenidoId);
-
-                    if (!yaComproContenido)
-                    {
-                        var compraContenido = new CompraContenido
-                        {
-                            UsuarioId = usuarioId,
-                            ContenidoId = contenidoColeccion.ContenidoId,
-                            Monto = 0, // Ya pagó en la colección
-                            FechaCompra = DateTime.Now
-                        };
-
-                        _context.ComprasContenido.Add(compraContenido);
-                    }
+                    return Json(new { success = false, message = "Creador no encontrado" });
                 }
 
-                await _context.SaveChangesAsync();
+                // Calcular comisión (20%)
+                var comision = coleccion.Precio * 0.20m;
+                var gananciaCreador = coleccion.Precio - comision;
 
-                _logger.LogInformation("Colección {ColeccionId} comprada por usuario {UserId} por ${Precio}",
-                    coleccionId, usuarioId, coleccion.Precio);
+                // TRANSACCIÓN ATÓMICA - todas las operaciones o ninguna
+                using var transaction = await _context.Database.BeginTransactionAsync();
 
-                return Json(new
+                try
                 {
-                    success = true,
-                    message = "Colección comprada exitosamente",
-                    saldoRestante = usuario.Saldo
-                });
+                    // Crear compra de colección
+                    var compra = new CompraColeccion
+                    {
+                        ColeccionId = coleccionId,
+                        CompradorId = usuarioId,
+                        Precio = coleccion.Precio,
+                        FechaCompra = DateTime.Now
+                    };
+
+                    _context.ComprasColeccion.Add(compra);
+
+                    // Descontar saldo del comprador
+                    usuario.Saldo -= coleccion.Precio;
+
+                    // Agregar ganancia al creador
+                    creador.Saldo += gananciaCreador;
+                    creador.TotalGanancias += gananciaCreador;
+
+                    // Transacción del comprador (gasto)
+                    var transaccionComprador = new Transaccion
+                    {
+                        UsuarioId = usuarioId,
+                        TipoTransaccion = TipoTransaccion.CompraContenido,
+                        Monto = -coleccion.Precio,
+                        Descripcion = $"Compra de colección: {coleccion.Nombre}",
+                        FechaTransaccion = DateTime.Now,
+                        EstadoTransaccion = EstadoTransaccion.Completada
+                    };
+
+                    _context.Transacciones.Add(transaccionComprador);
+
+                    // Transacción del creador (ingreso)
+                    var transaccionCreador = new Transaccion
+                    {
+                        UsuarioId = creador.Id,
+                        TipoTransaccion = TipoTransaccion.VentaContenido,
+                        Monto = gananciaCreador,
+                        Comision = comision,
+                        MontoNeto = gananciaCreador,
+                        Descripcion = $"Venta de colección: {coleccion.Nombre}",
+                        FechaTransaccion = DateTime.Now,
+                        EstadoTransaccion = EstadoTransaccion.Completada
+                    };
+
+                    _context.Transacciones.Add(transaccionCreador);
+
+                    // Dar acceso a todos los contenidos de la colección
+                    foreach (var contenidoColeccion in coleccion.Contenidos)
+                    {
+                        // Verificar que no haya comprado ya ese contenido individualmente
+                        var yaComproContenido = await _context.ComprasContenido
+                            .AnyAsync(cc => cc.UsuarioId == usuarioId
+                                         && cc.ContenidoId == contenidoColeccion.ContenidoId);
+
+                        if (!yaComproContenido)
+                        {
+                            var compraContenido = new CompraContenido
+                            {
+                                UsuarioId = usuarioId,
+                                ContenidoId = contenidoColeccion.ContenidoId,
+                                Monto = 0, // Ya pagó en la colección
+                                FechaCompra = DateTime.Now
+                            };
+
+                            _context.ComprasContenido.Add(compraContenido);
+                        }
+                    }
+
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+
+                    _logger.LogInformation("Colección {ColeccionId} comprada por usuario {UserId} por ${Precio} (comisión: ${Comision})",
+                        coleccionId, usuarioId, coleccion.Precio, comision);
+
+                    return Json(new
+                    {
+                        success = true,
+                        message = "Colección comprada exitosamente",
+                        saldoRestante = usuario.Saldo
+                    });
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    _logger.LogError(ex, "Error en transacción de compra de colección {ColeccionId}", coleccionId);
+                    throw;
+                }
             }
             catch (Exception ex)
             {

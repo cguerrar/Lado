@@ -730,7 +730,7 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "No puedes enviar mensajes a este usuario" });
                 }
 
-                // Si hay propina, procesarla
+                // Si hay propina, procesarla con transacción atómica
                 if (request.Monto > 0)
                 {
                     // Verificar si el receptor puede recibir propinas (tiene contenido LadoB o es creador verificado)
@@ -756,52 +756,83 @@ namespace Lado.Controllers
                         });
                     }
 
-                    // Descontar saldo
-                    usuario.Saldo -= request.Monto;
-
                     // Calcular comisión (10%)
                     var comision = request.Monto * 0.10m;
                     var gananciaReceptor = request.Monto - comision;
 
-                    // Agregar al receptor
-                    receptor.Saldo += gananciaReceptor;
-                    receptor.TotalGanancias += gananciaReceptor;
+                    // TRANSACCIÓN ATÓMICA - todas las operaciones o ninguna
+                    using var transaction = await _context.Database.BeginTransactionAsync();
 
-                    // Registrar tip
-                    var tip = new Tip
+                    try
                     {
-                        FanId = usuario.Id,
-                        CreadorId = receptor.Id,
-                        Monto = request.Monto,
-                        Mensaje = request.Mensaje,
-                        FechaEnvio = DateTime.Now
-                    };
-                    _context.Tips.Add(tip);
+                        // Descontar saldo
+                        usuario.Saldo -= request.Monto;
 
-                    // Registrar transacciones
-                    _context.Transacciones.Add(new Transaccion
-                    {
-                        UsuarioId = usuario.Id,
-                        TipoTransaccion = TipoTransaccion.Tip,
-                        Monto = -request.Monto,
-                        FechaTransaccion = DateTime.Now,
-                        Descripcion = $"Propina enviada a {receptor.NombreCompleto}"
-                    });
+                        // Agregar al receptor
+                        receptor.Saldo += gananciaReceptor;
+                        receptor.TotalGanancias += gananciaReceptor;
 
-                    _context.Transacciones.Add(new Transaccion
+                        // Registrar tip
+                        var tip = new Tip
+                        {
+                            FanId = usuario.Id,
+                            CreadorId = receptor.Id,
+                            Monto = request.Monto,
+                            Mensaje = request.Mensaje,
+                            FechaEnvio = DateTime.Now
+                        };
+                        _context.Tips.Add(tip);
+
+                        // Registrar transacciones
+                        _context.Transacciones.Add(new Transaccion
+                        {
+                            UsuarioId = usuario.Id,
+                            TipoTransaccion = TipoTransaccion.Tip,
+                            Monto = -request.Monto,
+                            FechaTransaccion = DateTime.Now,
+                            Descripcion = $"Propina enviada a {receptor.NombreCompleto}"
+                        });
+
+                        _context.Transacciones.Add(new Transaccion
+                        {
+                            UsuarioId = receptor.Id,
+                            TipoTransaccion = TipoTransaccion.IngresoPropina,
+                            Monto = gananciaReceptor,
+                            Comision = comision,
+                            MontoNeto = gananciaReceptor,
+                            FechaTransaccion = DateTime.Now,
+                            Descripcion = $"Propina de @{usuario.UserName}"
+                        });
+
+                        // Crear el mensaje con indicador de propina
+                        var mensaje = new MensajePrivado
+                        {
+                            RemitenteId = usuario.Id,
+                            DestinatarioId = receptor.Id,
+                            Contenido = $"💰 Propina de ${request.Monto:N0}\n\n{request.Mensaje.Trim()}",
+                            FechaEnvio = DateTime.Now,
+                            Leido = false
+                        };
+
+                        _context.MensajesPrivados.Add(mensaje);
+                        await _context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+
+                        _logger.LogInformation("Mensaje con propina enviado de {Remitente} a {Destinatario}, monto: ${Monto} (comisión: ${Comision})",
+                            usuario.UserName, receptor.UserName, request.Monto, comision);
+
+                        return Json(new { success = true });
+                    }
+                    catch (Exception ex)
                     {
-                        UsuarioId = receptor.Id,
-                        TipoTransaccion = TipoTransaccion.IngresoPropina,
-                        Monto = gananciaReceptor,
-                        Comision = comision,
-                        MontoNeto = gananciaReceptor,
-                        FechaTransaccion = DateTime.Now,
-                        Descripcion = $"Propina de @{usuario.UserName}"
-                    });
+                        await transaction.RollbackAsync();
+                        _logger.LogError(ex, "Error en transacción de propina");
+                        return Json(new { success = false, message = "Error al procesar la propina" });
+                    }
                 }
 
-                // Crear el mensaje
-                var mensaje = new MensajePrivado
+                // Mensaje sin propina (no requiere transacción)
+                var mensajeSinPropina = new MensajePrivado
                 {
                     RemitenteId = usuario.Id,
                     DestinatarioId = receptor.Id,
@@ -810,17 +841,11 @@ namespace Lado.Controllers
                     Leido = false
                 };
 
-                // Si tiene propina, agregar indicador al mensaje
-                if (request.Monto > 0)
-                {
-                    mensaje.Contenido = $"💰 Propina de ${request.Monto:N0}\n\n{mensaje.Contenido}";
-                }
-
-                _context.MensajesPrivados.Add(mensaje);
+                _context.MensajesPrivados.Add(mensajeSinPropina);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Mensaje enviado de {Remitente} a {Destinatario}, propina: ${Monto}",
-                    usuario.UserName, receptor.UserName, request.Monto);
+                _logger.LogInformation("Mensaje enviado de {Remitente} a {Destinatario}",
+                    usuario.UserName, receptor.UserName);
 
                 return Json(new { success = true });
             }

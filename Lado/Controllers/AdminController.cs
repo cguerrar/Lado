@@ -19,6 +19,8 @@ namespace Lado.Controllers
         private readonly IVisitasService _visitasService;
         private readonly IClaudeClassificationService _claudeService;
         private readonly IEmailService _emailService;
+        private readonly ILogEventoService _logEventoService;
+        private readonly IWebHostEnvironment _hostEnvironment;
 
         public AdminController(
             ApplicationDbContext context,
@@ -27,7 +29,9 @@ namespace Lado.Controllers
             IConfiguration configuration,
             IVisitasService visitasService,
             IClaudeClassificationService claudeService,
-            IEmailService emailService)
+            IEmailService emailService,
+            ILogEventoService logEventoService,
+            IWebHostEnvironment hostEnvironment)
         {
             _context = context;
             _userManager = userManager;
@@ -36,6 +40,8 @@ namespace Lado.Controllers
             _visitasService = visitasService;
             _claudeService = claudeService;
             _emailService = emailService;
+            _logEventoService = logEventoService;
+            _hostEnvironment = hostEnvironment;
         }
 
         public override void OnActionExecuting(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext context)
@@ -503,10 +509,29 @@ namespace Lado.Controllers
             if (usuario != null)
             {
                 usuario.EsVerificado = true;
+                usuario.CreadorVerificado = true; // Habilita LadoB para monetización
                 await _context.SaveChangesAsync();
                 return Json(new { success = true });
             }
             return Json(new { success = false });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleCreadorVerificado(string userId, bool habilitar)
+        {
+            var usuario = await _context.Users.FindAsync(userId);
+            if (usuario != null)
+            {
+                usuario.CreadorVerificado = habilitar;
+                if (habilitar)
+                {
+                    usuario.EsCreador = true; // Activar también EsCreador
+                }
+                await _context.SaveChangesAsync();
+                return Json(new { success = true });
+            }
+            return Json(new { success = false, message = "Usuario no encontrado" });
         }
 
         // ========================================
@@ -668,6 +693,76 @@ namespace Lado.Controllers
             }
 
             return RedirectToAction(nameof(Contenido));
+        }
+
+        /// <summary>
+        /// Eliminar múltiples contenidos de un usuario
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarContenidosMasivo([FromBody] EliminarContenidosMasivoRequest request)
+        {
+            if (request?.Ids == null || !request.Ids.Any())
+            {
+                return Json(new { success = false, message = "No se seleccionaron contenidos" });
+            }
+
+            try
+            {
+                var contenidos = await _context.Contenidos
+                    .Where(c => request.Ids.Contains(c.Id))
+                    .ToListAsync();
+
+                if (!contenidos.Any())
+                {
+                    return Json(new { success = false, message = "No se encontraron los contenidos" });
+                }
+
+                // Eliminar archivos físicos
+                foreach (var contenido in contenidos)
+                {
+                    if (!string.IsNullOrEmpty(contenido.RutaArchivo))
+                    {
+                        var rutaCompleta = Path.Combine(_hostEnvironment.WebRootPath, contenido.RutaArchivo.TrimStart('/'));
+                        if (System.IO.File.Exists(rutaCompleta))
+                        {
+                            System.IO.File.Delete(rutaCompleta);
+                        }
+                    }
+
+                    // Eliminar archivos adicionales si existen
+                    var archivosAdicionales = await _context.ArchivosContenido
+                        .Where(a => a.ContenidoId == contenido.Id)
+                        .ToListAsync();
+
+                    foreach (var archivo in archivosAdicionales)
+                    {
+                        if (!string.IsNullOrEmpty(archivo.RutaArchivo))
+                        {
+                            var rutaArchivo = Path.Combine(_hostEnvironment.WebRootPath, archivo.RutaArchivo.TrimStart('/'));
+                            if (System.IO.File.Exists(rutaArchivo))
+                            {
+                                System.IO.File.Delete(rutaArchivo);
+                            }
+                        }
+                    }
+                    _context.ArchivosContenido.RemoveRange(archivosAdicionales);
+                }
+
+                _context.Contenidos.RemoveRange(contenidos);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = $"{contenidos.Count} contenidos eliminados correctamente", count = contenidos.Count });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Error al eliminar: " + ex.Message });
+            }
+        }
+
+        public class EliminarContenidosMasivoRequest
+        {
+            public List<int> Ids { get; set; } = new();
         }
 
         [HttpPost]
@@ -3847,6 +3942,564 @@ namespace Lado.Controllers
 
             return Json(new { success = true, message = "Configuracion restablecida a valores por defecto" });
         }
+
+        // ========================================
+        // LOGS DEL SISTEMA
+        // ========================================
+
+        public async Task<IActionResult> Logs(
+            TipoLogEvento? tipo = null,
+            CategoriaEvento? categoria = null,
+            DateTime? fechaDesde = null,
+            DateTime? fechaHasta = null,
+            string? busqueda = null,
+            int pagina = 1)
+        {
+            var filtro = new LogEventosFiltro
+            {
+                Tipo = tipo,
+                Categoria = categoria,
+                FechaDesde = fechaDesde,
+                FechaHasta = fechaHasta,
+                Busqueda = busqueda,
+                Pagina = pagina,
+                TamanoPagina = 50
+            };
+
+            var resultado = await _logEventoService.ObtenerLogsAsync(filtro);
+            var estadisticas = await _logEventoService.ObtenerEstadisticasAsync();
+
+            ViewBag.Filtro = filtro;
+            ViewBag.Estadisticas = estadisticas;
+            ViewBag.Resultado = resultado;
+
+            return View(resultado.Logs);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ObtenerLogs(
+            TipoLogEvento? tipo = null,
+            CategoriaEvento? categoria = null,
+            DateTime? fechaDesde = null,
+            DateTime? fechaHasta = null,
+            string? busqueda = null,
+            int pagina = 1)
+        {
+            var filtro = new LogEventosFiltro
+            {
+                Tipo = tipo,
+                Categoria = categoria,
+                FechaDesde = fechaDesde,
+                FechaHasta = fechaHasta,
+                Busqueda = busqueda,
+                Pagina = pagina,
+                TamanoPagina = 50
+            };
+
+            var resultado = await _logEventoService.ObtenerLogsAsync(filtro);
+
+            return Json(new
+            {
+                success = true,
+                logs = resultado.Logs.Select(l => new
+                {
+                    l.Id,
+                    fecha = l.Fecha.ToString("dd/MM/yyyy HH:mm:ss"),
+                    tipo = l.Tipo.ToString(),
+                    categoria = l.Categoria.ToString(),
+                    l.Mensaje,
+                    l.Detalle,
+                    l.UsuarioNombre,
+                    l.IpAddress,
+                    l.Url,
+                    l.TipoExcepcion
+                }),
+                total = resultado.Total,
+                pagina = resultado.Pagina,
+                totalPaginas = resultado.TotalPaginas
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> LimpiarLogs(int dias = 30)
+        {
+            var eliminados = await _logEventoService.LimpiarLogsAntiguosAsync(dias);
+
+            await _logEventoService.RegistrarEventoAsync(
+                $"Limpieza manual de logs: {eliminados} registros eliminados (>{dias} dias)",
+                CategoriaEvento.Admin,
+                TipoLogEvento.Info,
+                User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                User.Identity?.Name);
+
+            return Json(new { success = true, eliminados, message = $"Se eliminaron {eliminados} logs antiguos" });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ObtenerEstadisticasLogs()
+        {
+            var stats = await _logEventoService.ObtenerEstadisticasAsync();
+            return Json(stats);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ObtenerDetalleLogs(int id)
+        {
+            var log = await _context.LogEventos.FindAsync(id);
+            if (log == null)
+                return Json(new { success = false, message = "Log no encontrado" });
+
+            return Json(new
+            {
+                success = true,
+                log = new
+                {
+                    log.Id,
+                    fecha = log.Fecha.ToString("dd/MM/yyyy HH:mm:ss"),
+                    tipo = log.Tipo.ToString(),
+                    categoria = log.Categoria.ToString(),
+                    log.Mensaje,
+                    log.Detalle,
+                    log.UsuarioId,
+                    log.UsuarioNombre,
+                    log.IpAddress,
+                    log.UserAgent,
+                    log.Url,
+                    log.MetodoHttp,
+                    log.TipoExcepcion
+                }
+            });
+        }
+
+        // ========================================
+        // PRUEBA DE EMAIL
+        // ========================================
+        public async Task<IActionResult> ProbarEmail()
+        {
+            ViewData["Title"] = "Probar Emails";
+
+            // Obtener configuracion de Mailjet para mostrar estado
+            var apiKey = _configuration["Mailjet:ApiKey"];
+            var secretKey = _configuration["Mailjet:SecretKey"];
+            var fromEmail = _configuration["Mailjet:FromEmail"];
+            var fromName = _configuration["Mailjet:FromName"];
+
+            ViewBag.MailjetConfigurado = !string.IsNullOrEmpty(apiKey) && !string.IsNullOrEmpty(secretKey);
+            ViewBag.FromEmail = fromEmail ?? "No configurado";
+            ViewBag.FromName = fromName ?? "No configurado";
+            ViewBag.ApiKeyPresente = !string.IsNullOrEmpty(apiKey);
+            ViewBag.SecretKeyPresente = !string.IsNullOrEmpty(secretKey);
+
+            // Obtener ultimos logs de email
+            var logsEmail = await _context.LogEventos
+                .Where(l => l.Mensaje.Contains("email") || l.Mensaje.Contains("Email") || l.Mensaje.Contains("Mailjet"))
+                .OrderByDescending(l => l.Fecha)
+                .Take(50)
+                .ToListAsync();
+
+            return View(logsEmail);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EnviarEmailPrueba(string destinatario, string tipoEmail)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(destinatario))
+                {
+                    TempData["Error"] = "Debe especificar un email destinatario.";
+                    return RedirectToAction(nameof(ProbarEmail));
+                }
+
+                // Registrar inicio del envio
+                await _logEventoService.RegistrarEventoAsync(
+                    $"Iniciando envio de email de prueba tipo '{tipoEmail}' a {destinatario}",
+                    CategoriaEvento.Sistema,
+                    TipoLogEvento.Info,
+                    null,
+                    User.Identity?.Name,
+                    $"Usuario admin: {User.Identity?.Name}"
+                );
+
+                // Usar el método con resultado detallado para obtener información del error
+                Services.EmailResult? emailResult = null;
+                bool resultado = false;
+                string mensajeResultado = "";
+
+                switch (tipoEmail)
+                {
+                    case "simple":
+                        emailResult = await _emailService.SendEmailWithResultAsync(
+                            destinatario,
+                            "Email de Prueba - Lado",
+                            @"<html>
+                                <body style='font-family: Arial, sans-serif; padding: 20px;'>
+                                    <h1 style='color: #4682B4;'>Email de Prueba</h1>
+                                    <p>Este es un email de prueba enviado desde el panel de administracion de Lado.</p>
+                                    <p>Fecha y hora: " + DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss") + @"</p>
+                                    <p>Si recibes este mensaje, la configuracion de Mailjet esta funcionando correctamente.</p>
+                                </body>
+                            </html>"
+                        );
+                        resultado = emailResult.Success;
+                        mensajeResultado = "Email simple de prueba";
+                        break;
+
+                    case "confirmacion":
+                        resultado = await _emailService.SendConfirmationEmailAsync(
+                            destinatario,
+                            "Usuario de Prueba",
+                            "https://ladoapp.com/confirmar?token=test123"
+                        );
+                        mensajeResultado = "Email de confirmacion de cuenta";
+                        break;
+
+                    case "recuperar":
+                        resultado = await _emailService.SendPasswordResetEmailAsync(
+                            destinatario,
+                            "Usuario de Prueba",
+                            "https://ladoapp.com/recuperar?token=test123"
+                        );
+                        mensajeResultado = "Email de recuperacion de password";
+                        break;
+
+                    case "bienvenida":
+                        resultado = await _emailService.SendWelcomeEmailAsync(
+                            destinatario,
+                            "Usuario de Prueba",
+                            "usuario_test",
+                            "Password123!"
+                        );
+                        mensajeResultado = "Email de bienvenida";
+                        break;
+
+                    case "suscriptor":
+                        resultado = await _emailService.SendNewSubscriberNotificationAsync(
+                            destinatario,
+                            "Creador de Prueba",
+                            "NuevoSuscriptor123"
+                        );
+                        mensajeResultado = "Email de nuevo suscriptor";
+                        break;
+
+                    case "pago":
+                        resultado = await _emailService.SendPaymentReceivedNotificationAsync(
+                            destinatario,
+                            "Usuario de Prueba",
+                            25.99m,
+                            "Propina de prueba"
+                        );
+                        mensajeResultado = "Email de pago recibido";
+                        break;
+
+                    default:
+                        TempData["Error"] = "Tipo de email no valido.";
+                        return RedirectToAction(nameof(ProbarEmail));
+                }
+
+                // Registrar resultado
+                if (resultado)
+                {
+                    await _logEventoService.RegistrarEventoAsync(
+                        $"Email de prueba enviado exitosamente: {mensajeResultado} a {destinatario}",
+                        CategoriaEvento.Sistema,
+                        TipoLogEvento.Info,
+                        null,
+                        User.Identity?.Name
+                    );
+                    TempData["Success"] = $"Email enviado exitosamente a {destinatario}. Tipo: {mensajeResultado}";
+                }
+                else
+                {
+                    // Construir mensaje de error detallado
+                    var errorMsg = emailResult != null
+                        ? $"Error Mailjet: {emailResult.ErrorMessage}"
+                        : "El servicio de email retorno false";
+
+                    var errorDetails = emailResult?.ErrorDetails ?? "Sin detalles adicionales";
+
+                    await _logEventoService.RegistrarEventoAsync(
+                        $"Fallo envio de email de prueba: {mensajeResultado} a {destinatario}",
+                        CategoriaEvento.Sistema,
+                        TipoLogEvento.Error,
+                        null,
+                        User.Identity?.Name,
+                        errorDetails
+                    );
+
+                    // Mostrar error detallado en la interfaz
+                    if (emailResult != null && !string.IsNullOrEmpty(emailResult.ErrorMessage))
+                    {
+                        TempData["Error"] = $"Error al enviar email: {emailResult.ErrorMessage}";
+                        TempData["ErrorDetails"] = emailResult.ErrorDetails;
+                    }
+                    else
+                    {
+                        TempData["Error"] = $"Error al enviar email a {destinatario}. Revisa la configuracion de Mailjet y los logs.";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                await _logEventoService.RegistrarEventoAsync(
+                    $"Excepcion al enviar email de prueba a {destinatario}",
+                    CategoriaEvento.Sistema,
+                    TipoLogEvento.Error,
+                    null,
+                    User.Identity?.Name,
+                    ex.ToString()
+                );
+                TempData["Error"] = $"Error: {ex.Message}";
+            }
+
+            return RedirectToAction(nameof(ProbarEmail));
+        }
+
+        // ========================================
+        // CONFIGURACIÓN DE EMAIL
+        // ========================================
+
+        public async Task<IActionResult> ConfiguracionEmail()
+        {
+            ViewData["Title"] = "Configuracion de Email";
+
+            // Cargar configuraciones de email desde BD
+            var configuraciones = await _context.ConfiguracionesPlataforma
+                .Where(c => c.Categoria == "Email")
+                .ToDictionaryAsync(c => c.Clave, c => c.Valor);
+
+            var modelo = new ConfiguracionEmailViewModel
+            {
+                ProveedorActivo = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.EMAIL_PROVEEDOR_ACTIVO, "Mailjet"),
+                FromEmail = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.EMAIL_FROM_EMAIL, ""),
+                FromName = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.EMAIL_FROM_NAME, ""),
+
+                // Mailjet
+                MailjetApiKey = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.MAILJET_API_KEY, ""),
+                MailjetSecretKey = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.MAILJET_SECRET_KEY, ""),
+
+                // Amazon SES
+                AmazonSesAccessKey = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_ACCESS_KEY, ""),
+                AmazonSesSecretKey = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_SECRET_KEY, ""),
+                AmazonSesRegion = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_REGION, "us-east-1")
+            };
+
+            // Enmascarar claves secretas para mostrar (solo ultimos 4 caracteres)
+            ViewBag.MailjetSecretKeyMasked = EnmascararClave(modelo.MailjetSecretKey);
+            ViewBag.AmazonSesSecretKeyMasked = EnmascararClave(modelo.AmazonSesSecretKey);
+
+            return View(modelo);
+        }
+
+        private string EnmascararClave(string clave)
+        {
+            if (string.IsNullOrEmpty(clave) || clave.Length < 4)
+                return string.IsNullOrEmpty(clave) ? "" : "****";
+            return new string('*', clave.Length - 4) + clave.Substring(clave.Length - 4);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ActualizarConfiguracionEmail(ConfiguracionEmailViewModel modelo)
+        {
+            try
+            {
+                var ahora = DateTime.Now;
+
+                // Guardar proveedor activo
+                await ActualizarConfiguracionEmailAsync(ConfiguracionPlataforma.EMAIL_PROVEEDOR_ACTIVO, modelo.ProveedorActivo, ahora);
+                await ActualizarConfiguracionEmailAsync(ConfiguracionPlataforma.EMAIL_FROM_EMAIL, modelo.FromEmail, ahora);
+                await ActualizarConfiguracionEmailAsync(ConfiguracionPlataforma.EMAIL_FROM_NAME, modelo.FromName, ahora);
+
+                // Guardar configuracion de Mailjet
+                await ActualizarConfiguracionEmailAsync(ConfiguracionPlataforma.MAILJET_API_KEY, modelo.MailjetApiKey, ahora);
+
+                // Solo actualizar SecretKey si se proporciono un valor nuevo (no enmascarado)
+                if (!string.IsNullOrEmpty(modelo.MailjetSecretKey) && !modelo.MailjetSecretKey.StartsWith("*"))
+                {
+                    await ActualizarConfiguracionEmailAsync(ConfiguracionPlataforma.MAILJET_SECRET_KEY, modelo.MailjetSecretKey, ahora);
+                }
+
+                // Guardar configuracion de Amazon SES
+                await ActualizarConfiguracionEmailAsync(ConfiguracionPlataforma.AMAZONSES_ACCESS_KEY, modelo.AmazonSesAccessKey, ahora);
+                await ActualizarConfiguracionEmailAsync(ConfiguracionPlataforma.AMAZONSES_REGION, modelo.AmazonSesRegion, ahora);
+
+                // Solo actualizar SecretKey si se proporciono un valor nuevo (no enmascarado)
+                if (!string.IsNullOrEmpty(modelo.AmazonSesSecretKey) && !modelo.AmazonSesSecretKey.StartsWith("*"))
+                {
+                    await ActualizarConfiguracionEmailAsync(ConfiguracionPlataforma.AMAZONSES_SECRET_KEY, modelo.AmazonSesSecretKey, ahora);
+                }
+
+                await _context.SaveChangesAsync();
+
+                await _logEventoService.RegistrarEventoAsync(
+                    $"Configuracion de email actualizada. Proveedor activo: {modelo.ProveedorActivo}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Info,
+                    User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                    User.Identity?.Name);
+
+                TempData["Success"] = $"Configuracion de email actualizada correctamente. Proveedor activo: {modelo.ProveedorActivo}";
+            }
+            catch (Exception ex)
+            {
+                await _logEventoService.RegistrarEventoAsync(
+                    $"Error al actualizar configuracion de email: {ex.Message}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Error,
+                    User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                    User.Identity?.Name,
+                    ex.ToString());
+
+                TempData["Error"] = $"Error al actualizar la configuracion: {ex.Message}";
+            }
+
+            return RedirectToAction(nameof(ConfiguracionEmail));
+        }
+
+        private async Task ActualizarConfiguracionEmailAsync(string clave, string valor, DateTime fecha)
+        {
+            var config = await _context.ConfiguracionesPlataforma.FirstOrDefaultAsync(c => c.Clave == clave);
+            if (config != null)
+            {
+                config.Valor = valor ?? "";
+                config.UltimaModificacion = fecha;
+            }
+            else
+            {
+                _context.ConfiguracionesPlataforma.Add(new ConfiguracionPlataforma
+                {
+                    Clave = clave,
+                    Valor = valor ?? "",
+                    Categoria = "Email",
+                    UltimaModificacion = fecha
+                });
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ProbarProveedorEmail(string proveedor, string destinatario)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(destinatario))
+                {
+                    return Json(new { success = false, message = "Debe especificar un email destinatario" });
+                }
+
+                // Cargar configuraciones de email
+                var configuraciones = await _context.ConfiguracionesPlataforma
+                    .Where(c => c.Categoria == "Email")
+                    .ToDictionaryAsync(c => c.Clave, c => c.Valor);
+
+                var fromEmail = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.EMAIL_FROM_EMAIL, "noreply@ladoapp.com");
+                var fromName = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.EMAIL_FROM_NAME, "Lado");
+
+                IEmailProvider? emailProvider = null;
+
+                if (proveedor == "Mailjet")
+                {
+                    var apiKey = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.MAILJET_API_KEY, "");
+                    var secretKey = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.MAILJET_SECRET_KEY, "");
+
+                    if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(secretKey))
+                    {
+                        return Json(new { success = false, message = "Credenciales de Mailjet no configuradas" });
+                    }
+
+                    emailProvider = new MailjetEmailProvider(apiKey, secretKey);
+                }
+                else if (proveedor == "AmazonSES")
+                {
+                    var accessKey = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_ACCESS_KEY, "");
+                    var secretKey = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_SECRET_KEY, "");
+                    var region = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_REGION, "us-east-1");
+
+                    if (string.IsNullOrEmpty(accessKey) || string.IsNullOrEmpty(secretKey))
+                    {
+                        return Json(new { success = false, message = "Credenciales de Amazon SES no configuradas" });
+                    }
+
+                    emailProvider = new AmazonSesEmailProvider(accessKey, secretKey, region);
+                }
+                else
+                {
+                    return Json(new { success = false, message = $"Proveedor no reconocido: {proveedor}" });
+                }
+
+                // Enviar email de prueba
+                var resultado = await emailProvider.SendEmailAsync(
+                    destinatario,
+                    $"Prueba de {proveedor} - Lado",
+                    $@"<html>
+                        <body style='font-family: Arial, sans-serif; padding: 20px;'>
+                            <h2>Prueba de conexion exitosa</h2>
+                            <p>Este es un email de prueba enviado desde el panel de administracion de Lado.</p>
+                            <p><strong>Proveedor:</strong> {proveedor}</p>
+                            <p><strong>Fecha:</strong> {DateTime.Now:dd/MM/yyyy HH:mm:ss}</p>
+                            <hr>
+                            <p style='color: #666; font-size: 12px;'>Este mensaje fue generado automaticamente.</p>
+                        </body>
+                    </html>",
+                    fromEmail,
+                    fromName);
+
+                if (resultado.Success)
+                {
+                    await _logEventoService.RegistrarEventoAsync(
+                        $"Prueba de email exitosa con {proveedor} a {destinatario}",
+                        CategoriaEvento.Admin,
+                        TipoLogEvento.Info,
+                        User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                        User.Identity?.Name);
+
+                    return Json(new { success = true, message = $"Email enviado correctamente via {proveedor}", messageId = resultado.MessageId });
+                }
+                else
+                {
+                    await _logEventoService.RegistrarEventoAsync(
+                        $"Error en prueba de email con {proveedor}: {resultado.ErrorMessage}",
+                        CategoriaEvento.Admin,
+                        TipoLogEvento.Error,
+                        User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                        User.Identity?.Name,
+                        resultado.ErrorDetails);
+
+                    return Json(new { success = false, message = resultado.ErrorMessage, details = resultado.ErrorDetails });
+                }
+            }
+            catch (Exception ex)
+            {
+                await _logEventoService.RegistrarEventoAsync(
+                    $"Excepcion en prueba de email: {ex.Message}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Error,
+                    User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                    User.Identity?.Name,
+                    ex.ToString());
+
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+    }
+
+    public class ConfiguracionEmailViewModel
+    {
+        public string ProveedorActivo { get; set; } = "Mailjet";
+        public string FromEmail { get; set; } = "";
+        public string FromName { get; set; } = "";
+
+        // Mailjet
+        public string MailjetApiKey { get; set; } = "";
+        public string MailjetSecretKey { get; set; } = "";
+
+        // Amazon SES
+        public string AmazonSesAccessKey { get; set; } = "";
+        public string AmazonSesSecretKey { get; set; } = "";
+        public string AmazonSesRegion { get; set; } = "us-east-1";
     }
 
     public class ConfiguracionAlgoritmosViewModel

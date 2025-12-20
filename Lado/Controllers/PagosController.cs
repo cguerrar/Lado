@@ -249,16 +249,7 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "Este contenido no es premium" });
                 }
 
-                // Verificar si ya tiene acceso
-                var yaDesbloqueado = await _context.ComprasContenido
-                    .AnyAsync(cc => cc.UsuarioId == usuarioId && cc.ContenidoId == request.ContenidoId);
-
-                if (yaDesbloqueado)
-                {
-                    return Json(new { success = true, message = "Ya tienes acceso a este contenido" });
-                }
-
-                // Verificar saldo
+                // Verificar saldo primero (optimización para evitar transacción innecesaria)
                 if (usuario.Saldo < contenido.PrecioDesbloqueo)
                 {
                     var faltante = contenido.PrecioDesbloqueo - usuario.Saldo;
@@ -270,13 +261,32 @@ namespace Lado.Controllers
                     });
                 }
 
-                // Procesar el desbloqueo
-                using var transaction = await _context.Database.BeginTransactionAsync();
+                // Procesar el desbloqueo con transacción serializable para evitar race condition
+                using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
                 try
                 {
+                    // Verificar DENTRO de la transacción si ya tiene acceso (evita race condition)
+                    var yaDesbloqueado = await _context.ComprasContenido
+                        .AnyAsync(cc => cc.UsuarioId == usuarioId && cc.ContenidoId == request.ContenidoId);
+
+                    if (yaDesbloqueado)
+                    {
+                        await transaction.RollbackAsync();
+                        return Json(new { success = true, message = "Ya tienes acceso a este contenido" });
+                    }
+
+                    // Re-verificar saldo dentro de la transacción (por si cambió)
+                    var usuarioActualizado = await _context.Users.FindAsync(usuarioId);
+                    if (usuarioActualizado == null || usuarioActualizado.Saldo < contenido.PrecioDesbloqueo)
+                    {
+                        await transaction.RollbackAsync();
+                        return Json(new { success = false, requiereRecarga = true, message = "Saldo insuficiente" });
+                    }
+
                     // 1. Descontar saldo del fan
-                    usuario.Saldo -= contenido.PrecioDesbloqueo.Value;
+                    usuarioActualizado.Saldo -= contenido.PrecioDesbloqueo.Value;
+                    usuario = usuarioActualizado; // Actualizar referencia para retorno
 
                     // 2. Agregar ganancia al creador
                     var creador = contenido.Usuario;

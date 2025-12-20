@@ -4,6 +4,7 @@
     var creadoresLadoA = ViewBag.CreadoresLadoA as List<Lado.Models.ApplicationUser> ?? new List<Lado.Models.ApplicationUser>();
     var creadoresLadoB = ViewBag.CreadoresLadoB as List<Lado.Models.ApplicationUser> ?? new List<Lado.Models.ApplicationUser>();
     var suscripcionesActivas = ViewBag.SuscripcionesActivas as List<string> ?? new List<string>();
+    var suscripcionesLadoB = ViewBag.SuscripcionesLadoBIds as List<string> ?? new List<string>();
     var contenidoExplorar = ViewBag.ContenidoExplorar as List<Lado.Models.Contenido> ?? new List<Lado.Models.Contenido>();
 }
 
@@ -218,8 +219,42 @@
         height: 100%;
         object-fit: cover;
         display: block;
-        transition: transform 0.3s ease;
+        transition: transform 0.3s ease, opacity 0.3s ease;
         background: var(--bg-tertiary);
+    }
+
+    /* Carga progresiva - estado inicial oculto */
+    .explore-item img:not(.loaded),
+    .explore-item video:not(.loaded) {
+        opacity: 0;
+    }
+
+    .explore-item img.loaded,
+    .explore-item video.loaded {
+        opacity: 1;
+    }
+
+    /* Skeleton shimmer mientras carga */
+    .explore-item::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg,
+            var(--bg-tertiary) 0%,
+            var(--bg-secondary) 50%,
+            var(--bg-tertiary) 100%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+        z-index: 0;
+    }
+
+    .explore-item.media-loaded::before {
+        display: none;
+    }
+
+    @@keyframes shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
     }
 
     .explore-item:hover img,
@@ -296,6 +331,51 @@
 
     .premium-badge i {
         font-size: 10px;
+    }
+
+    /* ========================================
+       CONTENIDO BLOQUEADO (LadoB sin suscripción)
+       ======================================== */
+    .explore-item.bloqueado .explore-thumb {
+        filter: blur(15px);
+        transform: scale(1.1);
+    }
+
+    .explore-item.bloqueado:hover .explore-thumb {
+        filter: blur(12px);
+        transform: scale(1.15);
+    }
+
+    .locked-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 5;
+    }
+
+    .locked-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        color: white;
+        text-align: center;
+    }
+
+    .locked-content i {
+        font-size: 28px;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    }
+
+    .locked-content span {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
     }
 
     /* ========================================
@@ -1099,10 +1179,13 @@
             {
                 var esVideo = (int)item.TipoContenido == 2;
                 var esPremium = item.TipoLado == Lado.Models.TipoLado.LadoB;
+                var estaBloqueado = esPremium && !suscripcionesLadoB.Contains(item.UsuarioId);
                 // Usar thumbnail si existe, sino usar placeholder para videos o la imagen original
                 var tieneThumb = !string.IsNullOrEmpty(item.Thumbnail);
                 var imagenSrc = tieneThumb ? item.Thumbnail : (esVideo ? "/images/video-placeholder.svg" : item.RutaArchivo);
-                <div class="explore-item" onclick="@(item.EsContenidoSensible ? "" : "window.location.href='/Feed/Detalle/" + item.Id + "'")" data-tipo="@((int)item.TipoContenido)" data-post-id="@item.Id" data-video-src="@(esVideo ? item.RutaArchivo : "")">
+                var itemClass = estaBloqueado ? "explore-item bloqueado" : "explore-item";
+                var clickAction = estaBloqueado ? $"window.location.href='/Feed/Perfil/{item.UsuarioId}'" : (item.EsContenidoSensible ? "" : $"window.location.href='/Feed/Detalle/{item.Id}'");
+                <div class="@itemClass" onclick="@clickAction" data-tipo="@((int)item.TipoContenido)" data-post-id="@item.Id" data-video-src="@(esVideo ? item.RutaArchivo : "")" data-bloqueado="@estaBloqueado.ToString().ToLower()">
                     <!-- Siempre usar imagen para preview (más rápido y compatible con iOS) -->
                     <img src="@imagenSrc" alt="" loading="lazy" decoding="async" class="explore-thumb">
                     @if (esVideo)
@@ -1117,7 +1200,16 @@
                             <i class="fas fa-crown"></i>
                         </div>
                     }
-                    @if (item.EsContenidoSensible)
+                    @if (estaBloqueado)
+                    {
+                        <div class="locked-overlay">
+                            <div class="locked-content">
+                                <i class="fas fa-lock"></i>
+                                <span>Suscríbete</span>
+                            </div>
+                        </div>
+                    }
+                    else if (item.EsContenidoSensible)
                     {
                         <div class="sensitive-content-overlay" data-post-id="@item.Id">
                             <div class="sensitive-warning">
@@ -1364,16 +1456,70 @@
 }
 
 <script>
-        // Manejar errores de carga de imágenes
+        // ========================================
+        // CARGA PROGRESIVA DE IMAGENES
+        // ========================================
+        function setupProgressiveLoading(container) {
+            const items = container ? container.querySelectorAll('.explore-item') : document.querySelectorAll('.explore-item');
+
+            items.forEach((item) => {
+                const img = item.querySelector('img');
+                const video = item.querySelector('video');
+
+                if (img && !img.classList.contains('loaded')) {
+                    // Si ya está en cache, mostrar inmediatamente
+                    if (img.complete && img.naturalHeight !== 0) {
+                        img.classList.add('loaded');
+                        item.classList.add('media-loaded');
+                    } else {
+                        // Agregar listener para cuando cargue
+                        img.addEventListener('load', function() {
+                            // Delay aleatorio pequeño para efecto visual de "llenado"
+                            const delay = Math.random() * 200;
+                            setTimeout(() => {
+                                this.classList.add('loaded');
+                                item.classList.add('media-loaded');
+                            }, delay);
+                        });
+
+                        // Manejar errores de carga
+                        img.addEventListener('error', function() {
+                            this.classList.add('error');
+                            this.classList.add('loaded');
+                            item.classList.add('media-loaded');
+                            this.src = '/images/video-placeholder.svg';
+                        });
+                    }
+                }
+
+                if (video) {
+                    // Para videos, marcar como cargado cuando tenga metadata
+                    video.addEventListener('loadeddata', function() {
+                        const delay = Math.random() * 200;
+                        setTimeout(() => {
+                            this.classList.add('loaded');
+                            item.classList.add('media-loaded');
+                        }, delay);
+                    });
+
+                    // Si ya tiene datos
+                    if (video.readyState >= 2) {
+                        video.classList.add('loaded');
+                        item.classList.add('media-loaded');
+                    }
+
+                    video.addEventListener('error', function() {
+                        item.classList.add('media-loaded');
+                    });
+                }
+            });
+        }
+
+        // Inicializar carga progresiva al cargar la página
         document.addEventListener('DOMContentLoaded', function() {
             const exploreGrid = document.getElementById('exploreGrid');
             if (exploreGrid) {
-                exploreGrid.querySelectorAll('.explore-thumb').forEach(img => {
-                    img.addEventListener('error', function() {
-                        this.classList.add('error');
-                        this.src = '/images/video-placeholder.svg';
-                    });
-                });
+                setupProgressiveLoading(exploreGrid);
             }
         });
 
@@ -1475,20 +1621,34 @@
 
                     data.items.forEach(item => {
                         const div = document.createElement('div');
-                        div.className = 'explore-item';
+                        div.className = item.bloqueado ? 'explore-item bloqueado' : 'explore-item';
                         div.setAttribute('data-tipo', item.tipoContenido);
                         div.setAttribute('data-post-id', item.id);
+                        div.setAttribute('data-bloqueado', item.bloqueado);
 
-                        // Solo agregar onclick si NO es contenido sensible
-                        if (!item.esContenidoSensible) {
+                        // Click action: si está bloqueado ir al perfil, si no al detalle
+                        if (item.bloqueado) {
+                            div.onclick = () => window.location.href = '/Feed/Perfil/' + item.usuario.id;
+                        } else if (!item.esContenidoSensible) {
                             div.onclick = () => window.location.href = '/Feed/Detalle/' + item.id;
                         }
 
                         const isVideo = item.tipoContenido === 2;
+                        const imageSrc = item.thumbnail || item.rutaArchivo;
                         const premiumBadge = item.esPremium ? '<div class="premium-badge"><i class="fas fa-crown"></i></div>' : '';
 
+                        // Overlay de contenido bloqueado (LadoB sin suscripción)
+                        const lockedOverlay = item.bloqueado ? `
+                            <div class="locked-overlay">
+                                <div class="locked-content">
+                                    <i class="fas fa-lock"></i>
+                                    <span>Suscríbete</span>
+                                </div>
+                            </div>
+                        ` : '';
+
                         // Overlay de contenido sensible
-                        const sensitiveOverlay = item.esContenidoSensible ? `
+                        const sensitiveOverlay = !item.bloqueado && item.esContenidoSensible ? `
                             <div class="sensitive-content-overlay" data-post-id="${item.id}">
                                 <div class="sensitive-warning">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="sensitive-icon">
@@ -1502,33 +1662,30 @@
                             </div>
                         ` : '';
 
-                        // Overlay normal de estadísticas (solo si no es sensible)
-                        const statsOverlay = item.esContenidoSensible ? '' : `
+                        // Overlay normal de estadísticas (solo si no es sensible ni bloqueado)
+                        const statsOverlay = (item.esContenidoSensible || item.bloqueado) ? '' : `
                             <div class="explore-overlay">
                                 <div class="explore-stat"><i class="fas fa-heart"></i><span>${item.numeroLikes}</span></div>
                                 <div class="explore-stat"><i class="fas fa-comment"></i><span>${item.numeroComentarios}</span></div>
                             </div>
                         `;
 
-                        if (isVideo) {
-                            div.innerHTML = `
-                                <video src="${item.rutaArchivo}" muted preload="metadata"></video>
-                                <div class="video-badge"><i class="fas fa-play"></i></div>
-                                ${premiumBadge}
-                                ${sensitiveOverlay}
-                                ${statsOverlay}
-                            `;
-                        } else {
-                            div.innerHTML = `
-                                <img src="${item.rutaArchivo}" alt="" loading="lazy">
-                                ${premiumBadge}
-                                ${sensitiveOverlay}
-                                ${statsOverlay}
-                            `;
-                        }
+                        const videoBadge = isVideo ? '<div class="video-badge"><i class="fas fa-play"></i></div>' : '';
+
+                        div.innerHTML = `
+                            <img src="${imageSrc}" alt="" loading="lazy" class="explore-thumb">
+                            ${videoBadge}
+                            ${premiumBadge}
+                            ${lockedOverlay}
+                            ${sensitiveOverlay}
+                            ${statsOverlay}
+                        `;
 
                         grid.appendChild(div);
                     });
+
+                    // Aplicar carga progresiva a los nuevos items
+                    setupProgressiveLoading(grid);
 
                     currentPage++;
                     hasMore = data.hasMore;

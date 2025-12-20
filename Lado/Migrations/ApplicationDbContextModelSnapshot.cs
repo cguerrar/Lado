@@ -1008,7 +1008,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "ComisionBilleteraElectronica",
                             Descripcion = "Comision por usar billetera electronica (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 17, 21, 6, 29, 480, DateTimeKind.Local).AddTicks(4234),
+                            UltimaModificacion = new DateTime(2025, 12, 18, 22, 58, 40, 991, DateTimeKind.Local).AddTicks(846),
                             Valor = "2.5"
                         },
                         new
@@ -1017,7 +1017,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "TiempoProcesoRetiro",
                             Descripcion = "Tiempo estimado para procesar retiros",
-                            UltimaModificacion = new DateTime(2025, 12, 17, 21, 6, 29, 480, DateTimeKind.Local).AddTicks(4305),
+                            UltimaModificacion = new DateTime(2025, 12, 18, 22, 58, 40, 991, DateTimeKind.Local).AddTicks(907),
                             Valor = "3-5 dias habiles"
                         },
                         new
@@ -1026,7 +1026,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMinimoRecarga",
                             Descripcion = "Monto minimo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 17, 21, 6, 29, 480, DateTimeKind.Local).AddTicks(4310),
+                            UltimaModificacion = new DateTime(2025, 12, 18, 22, 58, 40, 991, DateTimeKind.Local).AddTicks(910),
                             Valor = "5"
                         },
                         new
@@ -1035,7 +1035,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMaximoRecarga",
                             Descripcion = "Monto maximo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 17, 21, 6, 29, 480, DateTimeKind.Local).AddTicks(4313),
+                            UltimaModificacion = new DateTime(2025, 12, 18, 22, 58, 40, 991, DateTimeKind.Local).AddTicks(911),
                             Valor = "1000"
                         },
                         new
@@ -1044,7 +1044,7 @@ namespace Lado.Migrations
                             Categoria = "General",
                             Clave = "ComisionPlataforma",
                             Descripcion = "Comision general de la plataforma (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 17, 21, 6, 29, 480, DateTimeKind.Local).AddTicks(4317),
+                            UltimaModificacion = new DateTime(2025, 12, 18, 22, 58, 40, 991, DateTimeKind.Local).AddTicks(912),
                             Valor = "20"
                         });
                 });
@@ -1651,6 +1651,66 @@ namespace Lado.Migrations
                         .HasDatabaseName("IX_Likes_Usuario_Contenido_Unique");
 
                     b.ToTable("Likes");
+                });
+
+            modelBuilder.Entity("Lado.Models.LogEvento", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Categoria")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Detalle")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("nvarchar(45)");
+
+                    b.Property<string>("Mensaje")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("MetodoHttp")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int>("Tipo")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TipoExcepcion")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Url")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("UsuarioId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("UsuarioNombre")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("LogEventos");
                 });
 
             modelBuilder.Entity("Lado.Models.MensajePrivado", b =>
@@ -3051,6 +3111,15 @@ namespace Lado.Migrations
                         .IsRequired();
 
                     b.Navigation("Contenido");
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("Lado.Models.LogEvento", b =>
+                {
+                    b.HasOne("Lado.Models.ApplicationUser", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId");
 
                     b.Navigation("Usuario");
                 });

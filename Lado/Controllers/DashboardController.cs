@@ -88,6 +88,21 @@ namespace Lado.Controllers
                 .Take(5)
                 .ToListAsync();
 
+            // Últimos seguidores (suscriptores)
+            ViewBag.UltimosSeguidores = await _context.Suscripciones
+                .Where(s => s.CreadorId == usuario.Id && s.EstaActiva)
+                .Include(s => s.Fan)
+                .OrderByDescending(s => s.FechaInicio)
+                .Take(10)
+                .Select(s => new {
+                    Id = s.Fan.Id,
+                    UserName = s.Fan.UserName,
+                    NombreCompleto = s.Fan.NombreCompleto,
+                    FotoPerfil = s.Fan.FotoPerfil,
+                    FechaSuscripcion = s.FechaInicio
+                })
+                .ToListAsync();
+
             // OPTIMIZADO: Cálculo de ingresos por semana (últimas 4 semanas) en UNA sola consulta
             var hoy = DateTime.Now;
             var hace4Semanas = hoy.AddDays(-28);

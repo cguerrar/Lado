@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Lado.Data;
+using Lado.Models;
 
 namespace Lado.Controllers
 {
@@ -16,6 +17,7 @@ namespace Lado.Controllers
         public async Task<IActionResult> Index()
         {
             // Obtener imagenes para el mosaico del hero (solo fotos, no videos)
+            // IMPORTANTE: Solo contenido de LadoA (público) - NO mostrar LadoB en landing
             // Preferir thumbnail si existe para carga más rápida
             var contenidoMosaico = await _context.Contenidos
                 .Where(c => c.EstaActivo
@@ -23,6 +25,7 @@ namespace Lado.Controllers
                         && !c.Censurado
                         && !c.EsPrivado
                         && !c.EsContenidoSensible
+                        && c.TipoLado == TipoLado.LadoA // Solo contenido público LadoA
                         && !string.IsNullOrEmpty(c.RutaArchivo)
                         && (c.RutaArchivo.EndsWith(".jpg")
                             || c.RutaArchivo.EndsWith(".jpeg")

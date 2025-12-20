@@ -41,6 +41,7 @@ namespace Lado.Controllers
                 ViewBag.EstaAutenticado = estaAutenticado;
 
                 // 1. CONTENIDO PÚBLICO para el mosaico - obtener mas contenido
+                // IMPORTANTE: Solo LadoA (público) - NO mostrar LadoB en feed público
                 var contenidoPublico = await _context.Contenidos
                     .Include(c => c.Usuario)
                     .Where(c => c.EstaActivo
@@ -48,6 +49,7 @@ namespace Lado.Controllers
                             && !c.Censurado
                             && !c.EsPrivado
                             && !c.EsContenidoSensible  // Excluir contenido sensible del mosaico publico
+                            && c.TipoLado == TipoLado.LadoA  // Solo contenido público LadoA
                             && !string.IsNullOrEmpty(c.RutaArchivo)  // Solo contenido con media
                             && c.Usuario != null
                             && c.Usuario.EstaActivo)

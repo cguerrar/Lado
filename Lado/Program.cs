@@ -7,10 +7,13 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
+using Microsoft.IdentityModel.Tokens;
 using System.Globalization;
 using System.Security.Principal;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -74,19 +77,59 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
 var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
 
+// ========================================
+// CONFIGURACIÓN JWT BEARER (API Móvil)
+// ========================================
+var jwtKey = builder.Configuration["Jwt:Key"] ?? "LadoApp_DefaultKey_ChangeInProduction123!";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "LadoApp";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "LadoAppMobile";
+
+var authBuilder = builder.Services.AddAuthentication(options =>
+{
+    // Identity usa cookies por defecto para web
+    options.DefaultScheme = IdentityConstants.ApplicationScheme;
+    options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
+});
+
+// Agregar JWT Bearer para API móvil
+authBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+        ClockSkew = TimeSpan.Zero // Sin tolerancia de tiempo
+    };
+
+    // Soporte JWT en SignalR via query string
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/chatHub"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
+    };
+});
+
+// Agregar Google si está configurado
 if (!string.IsNullOrEmpty(googleClientId) && !string.IsNullOrEmpty(googleClientSecret))
 {
-    builder.Services.AddAuthentication()
-        .AddGoogle(options =>
-        {
-            options.ClientId = googleClientId;
-            options.ClientSecret = googleClientSecret;
-        });
-}
-else
-{
-    // Sin Google Auth configurado - solo usar autenticacion local
-    builder.Services.AddAuthentication();
+    authBuilder.AddGoogle(options =>
+    {
+        options.ClientId = googleClientId;
+        options.ClientSecret = googleClientSecret;
+    });
 }
 
 // ========================================
@@ -157,13 +200,21 @@ builder.Services.AddSession(options =>
 builder.Services.AddScoped<Lado.Services.StripeSimuladoService>();
 builder.Services.AddScoped<Lado.Services.IAdService, Lado.Services.AdService>();
 builder.Services.AddSingleton<Lado.Services.IServerMetricsService, Lado.Services.ServerMetricsService>();
-builder.Services.AddScoped<Lado.Services.IEmailService, Lado.Services.MailjetEmailService>();
+builder.Services.AddScoped<Lado.Services.IEmailService, Lado.Services.EmailService>();
 builder.Services.AddScoped<Lado.Services.IVisitasService, Lado.Services.VisitasService>();
 builder.Services.AddScoped<Lado.Services.INotificationService, Lado.Services.NotificationService>();
 builder.Services.AddScoped<Lado.Services.IFeedAlgorithmService, Lado.Services.FeedAlgorithmService>();
 builder.Services.AddScoped<Lado.Services.IImageService, Lado.Services.ImageService>();
 builder.Services.AddScoped<Lado.Services.IDateTimeService, Lado.Services.DateTimeService>();
 builder.Services.AddScoped<Lado.Services.IInteresesService, Lado.Services.InteresesService>();
+builder.Services.AddScoped<Lado.Services.ILogEventoService, Lado.Services.LogEventoService>();
+builder.Services.AddHostedService<Lado.Services.LogCleanupService>();
+builder.Services.AddHostedService<Lado.Services.TokenCleanupService>();
+
+// ========================================
+// CONFIGURACIÓN JWT SERVICE (API Móvil)
+// ========================================
+builder.Services.AddScoped<Lado.Services.IJwtService, Lado.Services.JwtService>();
 
 // ========================================
 // CONFIGURACIÓN DE CLAUDE API (Clasificación de contenido)
@@ -218,6 +269,11 @@ if (!app.Environment.IsDevelopment())
 }
 
 // ========================================
+// LOGGING DE EXCEPCIONES A BASE DE DATOS
+// ========================================
+app.UseExceptionLogging();
+
+// ========================================
 // CRITICO: ForwardedHeaders DEBE ir PRIMERO para IIS/Plesk
 // ========================================
 app.UseForwardedHeaders();
@@ -247,6 +303,7 @@ app.UseStaticFiles(); // Sirve archivos desde wwwroot
 app.UseRouting();
 
 app.UseAuthentication();
+app.UseJwtValidation(); // Validación de tokens JWT contra BD (revocación inmediata)
 app.UseRequestLocalization(); // Localización (i18n)
 app.UseAgeVerification();
 app.UseAuthorization();

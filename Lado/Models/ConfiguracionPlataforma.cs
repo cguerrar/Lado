@@ -67,5 +67,21 @@ namespace Lado.Models
         // ========================================
         public const string INTERESES_PESO_CATEGORIA = "Intereses_PesoCategoria";       // Default: 80
         public const string INTERESES_PESO_DESCUBRIMIENTO = "Intereses_PesoDescubrimiento"; // Default: 20
+
+        // ========================================
+        // CONFIGURACIÓN DE EMAIL
+        // ========================================
+        public const string EMAIL_PROVEEDOR_ACTIVO = "Email_ProveedorActivo";   // "Mailjet" o "AmazonSES"
+        public const string EMAIL_FROM_EMAIL = "Email_FromEmail";               // Email del remitente
+        public const string EMAIL_FROM_NAME = "Email_FromName";                 // Nombre del remitente
+
+        // Mailjet
+        public const string MAILJET_API_KEY = "Mailjet_ApiKey";
+        public const string MAILJET_SECRET_KEY = "Mailjet_SecretKey";
+
+        // Amazon SES
+        public const string AMAZONSES_ACCESS_KEY = "AmazonSES_AccessKey";
+        public const string AMAZONSES_SECRET_KEY = "AmazonSES_SecretKey";
+        public const string AMAZONSES_REGION = "AmazonSES_Region";              // Default: us-east-1
     }
 }

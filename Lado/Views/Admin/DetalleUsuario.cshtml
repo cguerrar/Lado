@@ -1,408 +1,835 @@
-﻿@model Lado.Models.ApplicationUser
+@model Lado.Models.ApplicationUser
 @{
     ViewData["Title"] = "Detalle de Usuario";
+    Layout = "_AdminLayout";
     var usuario = Model;
     var suscripciones = ViewBag.Suscripciones as List<Lado.Models.Suscripcion>;
     var contenidos = ViewBag.Contenidos as List<Lado.Models.Contenido>;
     var transacciones = ViewBag.Transacciones as List<Lado.Models.Transaccion>;
 }
 
-<div class="container-fluid py-4">
-    <!-- Encabezado con foto de portada -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card shadow-sm border-0 overflow-hidden">
-                <!-- Portada -->
-                <div class="position-relative" style="height: 200px; background: #4682B4;">
-                    @if (!string.IsNullOrEmpty(usuario.FotoPortada))
-                    {
-                        <img src="@usuario.FotoPortada"
-                             class="w-100 h-100"
-                             style="object-fit: cover; opacity: 0.9;"
-                             alt="Portada">
-                    }
+<style>
+    .user-header {
+        background: linear-gradient(135deg, #4682B4 0%, #2c5f8a 100%);
+        border-radius: 16px;
+        overflow: hidden;
+        margin-bottom: 24px;
+    }
 
-                    <!-- Botón de regreso -->
-                    <a href="/Admin/Usuarios" class="btn btn-light position-absolute top-0 start-0 m-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="19" y1="12" x2="5" y2="12"></line>
-                            <polyline points="12 19 5 12 12 5"></polyline>
-                        </svg>
-                        Volver
-                    </a>
+    .cover-section {
+        height: 180px;
+        position: relative;
+        background: rgba(0,0,0,0.1);
+    }
 
-                    <!-- Estado del usuario -->
-                    <div class="position-absolute top-0 end-0 m-3">
-                        @if (usuario.EstaActivo)
-                        {
-                            <span class="badge bg-success fs-6">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="20 6 9 17 4 12"></polyline>
-                                </svg>
-                                Activo
-                            </span>
-                        }
-                        else
-                        {
-                            <span class="badge bg-danger fs-6">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
-                                </svg>
-                                Suspendido
-                            </span>
-                        }
-                        @if (usuario.EsVerificado)
-                        {
-                            <span class="badge bg-primary fs-6 ms-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                                </svg>
-                                Verificado
-                            </span>
-                        }
-                    </div>
-                </div>
+    .cover-section img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0.8;
+    }
 
-                <!-- Perfil -->
-                <div class="card-body pt-0">
-                    <div class="row">
-                        <div class="col-md-3 text-center" style="margin-top: -50px;">
-                            @if (!string.IsNullOrEmpty(usuario.FotoPerfil))
-                            {
-                                <img src="@usuario.FotoPerfil"
-                                     class="rounded-circle border border-5 border-white shadow"
-                                     style="width: 120px; height: 120px; object-fit: cover;"
-                                     alt="@usuario.NombreCompleto">
-                            }
-                            else
-                            {
-                                <div class="rounded-circle border border-5 border-white shadow bg-gradient-primary d-inline-flex align-items-center justify-content-center text-white"
-                                     style="width: 120px; height: 120px; font-size: 48px;">
-                                    @usuario.NombreCompleto?.Substring(0, 1).ToUpper()
-                                </div>
-                            }
-                        </div>
+    .profile-section {
+        padding: 0 24px 24px;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 24px;
+        align-items: end;
+        margin-top: -50px;
+        position: relative;
+    }
 
-                        <div class="col-md-6">
-                            <h3 class="mb-1 mt-3">
-                                @usuario.NombreCompleto
-                                @if (usuario.EsVerificado)
-                                {
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="text-primary">
-                                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                                    </svg>
-                                }
-                            </h3>
-                            <p class="text-muted mb-2">@@@usuario.UserName</p>
+    .avatar-wrapper {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        border: 4px solid white;
+        overflow: hidden;
+        background: #fff;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
 
-                           @if (!string.IsNullOrEmpty(usuario.Biografia))
-                            {
-                                <p class="mb-2">@usuario.Biografia</p>
-                            }
+    .avatar-wrapper img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
 
-                            <div class="d-flex gap-2 mb-2">
-                                @if (!string.IsNullOrEmpty(usuario.Email))
-                                {
-                                    <small class="text-muted">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-                                            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
-                                        </svg>
-                                        @usuario.Email
-                                    </small>
-                                }
+    .avatar-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-size: 48px;
+        font-weight: 600;
+    }
 
-                                @if (!string.IsNullOrEmpty(usuario.PhoneNumber))
-                                {
-                                    <small class="text-muted">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                                        </svg>
-                                        @usuario.PhoneNumber
-                                    </small>
-                                }
-                            </div>
+    .user-info {
+        color: white;
+        padding-bottom: 8px;
+    }
 
-                            <!-- ✅ CORREGIDO: ToString sin argumentos problemáticos -->
-                            <small class="text-muted">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                    <line x1="16" y1="2" x2="16" y2="6"></line>
-                                    <line x1="8" y1="2" x2="8" y2="6"></line>
-                                    <line x1="3" y1="10" x2="21" y2="10"></line>
-                                </svg>
-                                Registro: @usuario.FechaRegistro.ToString("dd/MM/yyyy")
-                            </small>
-                        </div>
+    .user-info h2 {
+        margin: 0 0 4px;
+        font-size: 1.5rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
 
-                        <div class="col-md-3">
-                            <div class="d-grid gap-2 mt-3">
-                                @if (usuario.EstaActivo)
-                                {
-                                    <button class="btn btn-danger" onclick="suspenderUsuario('@usuario.Id')">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <circle cx="12" cy="12" r="10"></circle>
-                                            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
-                                        </svg>
-                                        Suspender Usuario
-                                    </button>
-                                }
-                                else
-                                {
-                                    <button class="btn btn-success" onclick="activarUsuario('@usuario.Id')">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <polyline points="20 6 9 17 4 12"></polyline>
-                                        </svg>
-                                        Activar Usuario
-                                    </button>
-                                }
+    .user-info .username {
+        opacity: 0.9;
+        font-size: 1rem;
+    }
 
-                                @if (!usuario.EsVerificado)
-                                {
-                                    <button class="btn btn-primary" onclick="verificarUsuario('@usuario.Id')">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                                        </svg>
-                                        Verificar Usuario
-                                    </button>
-                                }
+    .user-info .meta {
+        display: flex;
+        gap: 16px;
+        margin-top: 8px;
+        font-size: 0.875rem;
+        opacity: 0.85;
+    }
 
-                                <a href="/Mensajes/Chat/@usuario.Id" class="btn btn-outline-primary">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                                    </svg>
-                                    Enviar Mensaje
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    .user-actions {
+        display: flex;
+        gap: 8px;
+        padding-bottom: 8px;
+    }
 
-    <!-- Estadísticas -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card shadow-sm border-0 text-center">
-                <div class="card-body">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary mb-2">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="9" cy="7" r="4"></circle>
-                        <line x1="19" y1="8" x2="19" y2="14"></line>
-                        <line x1="22" y1="11" x2="16" y2="11"></line>
-                    </svg>
-                    <h3 class="mb-0">@(suscripciones?.Count ?? 0)</h3>
-                    <small class="text-muted">Suscripciones</small>
-                </div>
-            </div>
-        </div>
+    .badge-status {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
 
-        <div class="col-md-3">
-            <div class="card shadow-sm border-0 text-center">
-                <div class="card-body">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-success mb-2">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <circle cx="9" cy="9" r="2"></circle>
-                        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
-                    </svg>
-                    <h3 class="mb-0">@(contenidos?.Count ?? 0)</h3>
-                    <small class="text-muted">Contenidos</small>
-                </div>
-            </div>
-        </div>
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
 
-        <div class="col-md-3">
-            <div class="card shadow-sm border-0 text-center">
-                <div class="card-body">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-warning mb-2">
-                        <line x1="12" y1="1" x2="12" y2="23"></line>
-                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                    </svg>
-                    <h3 class="mb-0">$@usuario.Saldo.ToString("N2")</h3>
-                    <small class="text-muted">Saldo</small>
-                </div>
-            </div>
-        </div>
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e5e7eb;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
 
-        <div class="col-md-3">
-            <div class="card shadow-sm border-0 text-center">
-                <div class="card-body">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-info mb-2">
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-                    </svg>
-                    <h3 class="mb-0">$@usuario.TotalGanancias.ToString("N2")</h3>
-                    <small class="text-muted">Ganancias Totales</small>
-                </div>
-            </div>
-        </div>
-    </div>
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
 
-    <!-- Tabs -->
-    <ul class="nav nav-tabs mb-4" role="tablist">
-        <li class="nav-item">
-            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#contenidos">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                    <circle cx="9" cy="9" r="2"></circle>
-                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
-                </svg>
-                Contenidos
-            </button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#transacciones">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="12" y1="1" x2="12" y2="23"></line>
-                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                </svg>
-                Transacciones
-            </button>
-        </li>
-    </ul>
+    .stat-card .icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 12px;
+    }
 
-    <!-- Contenido de tabs -->
-    <div class="tab-content">
-        <!-- Tab Contenidos -->
-        <div class="tab-pane fade show active" id="contenidos">
-            @if (contenidos != null && contenidos.Any())
+    .stat-card .value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1f2937;
+    }
+
+    .stat-card .label {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+
+    .content-toolbar {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e5e7eb;
+    }
+
+    .content-toolbar .left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .content-toolbar .right {
+        display: flex;
+        gap: 8px;
+    }
+
+    .selection-info {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+
+    .selection-info strong {
+        color: #4682B4;
+    }
+
+    .content-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 16px;
+    }
+
+    .content-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 2px solid transparent;
+        transition: all 0.2s;
+        position: relative;
+    }
+
+    .content-card:hover {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    }
+
+    .content-card.selected {
+        border-color: #4682B4;
+        background: #f0f7ff;
+    }
+
+    .content-card .checkbox-overlay {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        z-index: 10;
+    }
+
+    .content-card .checkbox-overlay input[type="checkbox"] {
+        width: 22px;
+        height: 22px;
+        cursor: pointer;
+        accent-color: #4682B4;
+    }
+
+    .content-card .media {
+        height: 180px;
+        background: #f3f4f6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+
+    .content-card .media img,
+    .content-card .media video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .content-card .media .no-media {
+        color: #9ca3af;
+        font-size: 2rem;
+    }
+
+    .content-card .badges {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        display: flex;
+        gap: 4px;
+    }
+
+    .content-card .info {
+        padding: 12px;
+    }
+
+    .content-card .description {
+        font-size: 0.875rem;
+        color: #374151;
+        margin-bottom: 8px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .content-card .meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        color: #9ca3af;
+    }
+
+    .tab-buttons {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 20px;
+    }
+
+    .tab-btn {
+        padding: 10px 20px;
+        border: none;
+        background: #f3f4f6;
+        border-radius: 8px;
+        font-weight: 500;
+        color: #6b7280;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .tab-btn:hover {
+        background: #e5e7eb;
+    }
+
+    .tab-btn.active {
+        background: #4682B4;
+        color: white;
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    .btn-action {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+    }
+
+    .btn-primary-custom {
+        background: #4682B4;
+        color: white;
+    }
+
+    .btn-primary-custom:hover {
+        background: #3a6d96;
+    }
+
+    .btn-danger-custom {
+        background: #ef4444;
+        color: white;
+    }
+
+    .btn-danger-custom:hover {
+        background: #dc2626;
+    }
+
+    .btn-outline-custom {
+        background: white;
+        border: 1px solid #d1d5db;
+        color: #374151;
+    }
+
+    .btn-outline-custom:hover {
+        background: #f9fafb;
+        border-color: #9ca3af;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #9ca3af;
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 16px;
+    }
+
+    .table-modern {
+        width: 100%;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .table-modern th {
+        background: #f9fafb;
+        padding: 12px 16px;
+        text-align: left;
+        font-weight: 600;
+        color: #374151;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .table-modern td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    .table-modern tr:last-child td {
+        border-bottom: none;
+    }
+
+    .table-modern tr:hover td {
+        background: #f9fafb;
+    }
+
+    @@media (max-width: 768px) {
+        .profile-section {
+            grid-template-columns: 1fr;
+            text-align: center;
+            gap: 16px;
+        }
+
+        .avatar-wrapper {
+            margin: 0 auto;
+        }
+
+        .user-actions {
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .content-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+</style>
+
+<!-- Header del usuario -->
+<div class="user-header">
+    <div class="cover-section">
+        @if (!string.IsNullOrEmpty(usuario.FotoPortada))
+        {
+            <img src="@usuario.FotoPortada" alt="Portada">
+        }
+        <a href="/Admin/Usuarios" class="btn btn-light position-absolute" style="top: 12px; left: 12px;">
+            <i class="fas fa-arrow-left"></i> Volver
+        </a>
+        <div class="position-absolute" style="top: 12px; right: 12px; display: flex; gap: 8px;">
+            @if (usuario.EstaActivo)
             {
-                <div class="row g-3">
-                    @foreach (var contenido in contenidos)
-                    {
-                        <div class="col-md-3">
-                            <div class="card shadow-sm border-0">
-                                @if (!string.IsNullOrEmpty(contenido.RutaArchivo))
-                                {
-                                    <img src="@contenido.RutaArchivo" class="card-img-top" style="height: 200px; object-fit: cover;" alt="Contenido">
-                                }
-                                <div class="card-body">
-                                    <p class="small mb-2">@contenido.Descripcion</p>
-                                    <div class="d-flex justify-content-between">
-                                        <small class="text-muted">@contenido.FechaPublicacion.ToString("dd/MM/yyyy")</small>
-                                        @if (contenido.Censurado)
-                                        {
-                                            <span class="badge bg-danger">Censurado</span>
-                                        }
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    }
-                </div>
+                <span class="badge bg-success badge-status"><i class="fas fa-check"></i> Activo</span>
             }
             else
             {
-                <p class="text-muted text-center py-5">No hay contenidos</p>
+                <span class="badge bg-danger badge-status"><i class="fas fa-ban"></i> Suspendido</span>
+            }
+            @if (usuario.CreadorVerificado)
+            {
+                <span class="badge bg-primary badge-status"><i class="fas fa-star"></i> LadoB</span>
             }
         </div>
+    </div>
 
-        <!-- Tab Transacciones -->
-        <div class="tab-pane fade" id="transacciones">
-            @if (transacciones != null && transacciones.Any())
+    <div class="profile-section">
+        <div class="avatar-wrapper">
+            @if (!string.IsNullOrEmpty(usuario.FotoPerfil))
             {
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Fecha</th>
-                                <th>Tipo</th>
-                                <th>Descripción</th>
-                                <th>Monto</th>
-                                <th>Estado</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var trans in transacciones)
-                            {
-                                <tr>
-                                    <td>@trans.FechaTransaccion.ToString("dd/MM/yyyy")</td>
-                                    <td>@trans.TipoTransaccion</td>
-                                    <td>@trans.Descripcion</td>
-                                    <td>$@trans.Monto.ToString("N2")</td>
-                                    <td>
-                                        <span class="badge bg-success">@trans.EstadoPago</span>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
+                <img src="@usuario.FotoPerfil" alt="@usuario.NombreCompleto">
             }
             else
             {
-                <p class="text-muted text-center py-5">No hay transacciones</p>
+                <div class="avatar-placeholder">@usuario.NombreCompleto?.Substring(0, 1).ToUpper()</div>
             }
+        </div>
+
+        <div class="user-info">
+            <h2>
+                @usuario.NombreCompleto
+                @if (usuario.EsVerificado)
+                {
+                    <i class="fas fa-check-circle text-info"></i>
+                }
+            </h2>
+            <div class="username">@@@usuario.UserName</div>
+            <div class="meta">
+                <span><i class="fas fa-envelope"></i> @usuario.Email</span>
+                <span><i class="fas fa-calendar"></i> @usuario.FechaRegistro.ToString("dd/MM/yyyy")</span>
+                @if (!string.IsNullOrEmpty(usuario.Pais))
+                {
+                    <span><i class="fas fa-globe"></i> @usuario.Pais</span>
+                }
+            </div>
+        </div>
+
+        <div class="user-actions">
+            @if (usuario.EstaActivo)
+            {
+                <button class="btn btn-danger btn-sm" onclick="suspenderUsuario('@usuario.Id')">
+                    <i class="fas fa-ban"></i> Suspender
+                </button>
+            }
+            else
+            {
+                <button class="btn btn-success btn-sm" onclick="activarUsuario('@usuario.Id')">
+                    <i class="fas fa-check"></i> Activar
+                </button>
+            }
+            @if (usuario.CreadorVerificado)
+            {
+                <button class="btn btn-warning btn-sm" onclick="toggleCreadorVerificado('@usuario.Id', false)">
+                    <i class="fas fa-times"></i> Quitar LadoB
+                </button>
+            }
+            else
+            {
+                <button class="btn btn-primary btn-sm" onclick="toggleCreadorVerificado('@usuario.Id', true)">
+                    <i class="fas fa-star"></i> Habilitar LadoB
+                </button>
+            }
+            <a href="/Mensajes/Chat/@usuario.Id" class="btn btn-outline-light btn-sm">
+                <i class="fas fa-comment"></i> Mensaje
+            </a>
         </div>
     </div>
 </div>
 
+<!-- Estadísticas -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="icon" style="background: rgba(59, 130, 246, 0.1);">
+            <i class="fas fa-users" style="color: #3b82f6; font-size: 1.25rem;"></i>
+        </div>
+        <div class="value">@(suscripciones?.Count ?? 0)</div>
+        <div class="label">Suscripciones</div>
+    </div>
+    <div class="stat-card">
+        <div class="icon" style="background: rgba(16, 185, 129, 0.1);">
+            <i class="fas fa-images" style="color: #10b981; font-size: 1.25rem;"></i>
+        </div>
+        <div class="value">@(contenidos?.Count ?? 0)</div>
+        <div class="label">Contenidos</div>
+    </div>
+    <div class="stat-card">
+        <div class="icon" style="background: rgba(245, 158, 11, 0.1);">
+            <i class="fas fa-wallet" style="color: #f59e0b; font-size: 1.25rem;"></i>
+        </div>
+        <div class="value">$@usuario.Saldo.ToString("N0")</div>
+        <div class="label">Saldo</div>
+    </div>
+    <div class="stat-card">
+        <div class="icon" style="background: rgba(139, 92, 246, 0.1);">
+            <i class="fas fa-chart-line" style="color: #8b5cf6; font-size: 1.25rem;"></i>
+        </div>
+        <div class="value">$@usuario.TotalGanancias.ToString("N0")</div>
+        <div class="label">Ganancias Totales</div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="tab-buttons">
+    <button class="tab-btn active" onclick="showTab('contenidos')">
+        <i class="fas fa-images"></i> Contenidos (@(contenidos?.Count ?? 0))
+    </button>
+    <button class="tab-btn" onclick="showTab('transacciones')">
+        <i class="fas fa-receipt"></i> Transacciones (@(transacciones?.Count ?? 0))
+    </button>
+</div>
+
+<!-- Tab Contenidos -->
+<div id="tab-contenidos" class="tab-content active">
+    @if (contenidos != null && contenidos.Any())
+    {
+        <!-- Toolbar de contenidos -->
+        <div class="content-toolbar">
+            <div class="left">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="selectAll" style="width: 18px; height: 18px; accent-color: #4682B4;">
+                    <span>Seleccionar todo</span>
+                </label>
+                <span class="selection-info">
+                    <strong id="selectedCount">0</strong> de @contenidos.Count seleccionados
+                </span>
+            </div>
+            <div class="right">
+                <button class="btn-action btn-danger-custom" id="btnDeleteSelected" style="display: none;" onclick="eliminarSeleccionados()">
+                    <i class="fas fa-trash"></i> Eliminar seleccionados
+                </button>
+            </div>
+        </div>
+
+        <!-- Grid de contenidos -->
+        <div class="content-grid">
+            @foreach (var contenido in contenidos)
+            {
+                <div class="content-card" data-id="@contenido.Id">
+                    <div class="checkbox-overlay">
+                        <input type="checkbox" class="content-checkbox" value="@contenido.Id">
+                    </div>
+                    <div class="media">
+                        @if (!string.IsNullOrEmpty(contenido.RutaArchivo))
+                        {
+                            if (contenido.TipoContenido == Lado.Models.TipoContenido.Video)
+                            {
+                                <video src="@contenido.RutaArchivo" muted></video>
+                                <div class="position-absolute" style="bottom: 8px; right: 8px;">
+                                    <span class="badge bg-dark"><i class="fas fa-play"></i></span>
+                                </div>
+                            }
+                            else
+                            {
+                                <img src="@contenido.RutaArchivo" alt="">
+                            }
+                        }
+                        else
+                        {
+                            <i class="fas fa-image no-media"></i>
+                        }
+                        <div class="badges">
+                            @if (contenido.Censurado)
+                            {
+                                <span class="badge bg-danger">Censurado</span>
+                            }
+                            @if (contenido.TipoLado == Lado.Models.TipoLado.LadoB)
+                            {
+                                <span class="badge bg-purple" style="background: #8b5cf6;">LadoB</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="info">
+                        <div class="description">@(contenido.Descripcion ?? "Sin descripción")</div>
+                        <div class="meta">
+                            <span>@contenido.FechaPublicacion.ToString("dd/MM/yy")</span>
+                            <span><i class="fas fa-heart"></i> @contenido.NumeroLikes</span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="empty-state">
+            <i class="fas fa-images"></i>
+            <p>Este usuario no tiene contenidos</p>
+        </div>
+    }
+</div>
+
+<!-- Tab Transacciones -->
+<div id="tab-transacciones" class="tab-content">
+    @if (transacciones != null && transacciones.Any())
+    {
+        <table class="table-modern">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Descripción</th>
+                    <th>Monto</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var trans in transacciones)
+                {
+                    <tr>
+                        <td>@trans.FechaTransaccion.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td><span class="badge bg-secondary">@trans.TipoTransaccion</span></td>
+                        <td>@trans.Descripcion</td>
+                        <td><strong>$@trans.Monto.ToString("N2")</strong></td>
+                        <td>
+                            @if (trans.EstadoPago == "Completado")
+                            {
+                                <span class="badge bg-success">@trans.EstadoPago</span>
+                            }
+                            else if (trans.EstadoPago == "Pendiente")
+                            {
+                                <span class="badge bg-warning">@trans.EstadoPago</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">@trans.EstadoPago</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="empty-state">
+            <i class="fas fa-receipt"></i>
+            <p>No hay transacciones registradas</p>
+        </div>
+    }
+</div>
+
 @section Scripts {
+    @Html.AntiForgeryToken()
+
     <script>
-        function suspenderUsuario(userId) {
-            if (!confirm('¿Suspender este usuario?')) return;
+        // Tabs
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+            document.getElementById('tab-' + tabName).classList.add('active');
+            event.target.closest('.tab-btn').classList.add('active');
+        }
+
+        // Selección de contenidos
+        const checkboxes = document.querySelectorAll('.content-checkbox');
+        const selectAllCheckbox = document.getElementById('selectAll');
+        const selectedCountEl = document.getElementById('selectedCount');
+        const btnDeleteSelected = document.getElementById('btnDeleteSelected');
+
+        function updateSelectionUI() {
+            const selected = document.querySelectorAll('.content-checkbox:checked').length;
+            selectedCountEl.textContent = selected;
+            btnDeleteSelected.style.display = selected > 0 ? 'inline-flex' : 'none';
+
+            // Actualizar estado visual de las cards
+            document.querySelectorAll('.content-card').forEach(card => {
+                const checkbox = card.querySelector('.content-checkbox');
+                if (checkbox.checked) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            });
+
+            // Actualizar "Seleccionar todo"
+            selectAllCheckbox.checked = selected === checkboxes.length && checkboxes.length > 0;
+            selectAllCheckbox.indeterminate = selected > 0 && selected < checkboxes.length;
+        }
+
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', updateSelectionUI);
+        });
+
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                checkboxes.forEach(cb => cb.checked = this.checked);
+                updateSelectionUI();
+            });
+        }
+
+        // Click en la card para seleccionar
+        document.querySelectorAll('.content-card').forEach(card => {
+            card.addEventListener('click', function(e) {
+                if (e.target.type !== 'checkbox') {
+                    const checkbox = this.querySelector('.content-checkbox');
+                    checkbox.checked = !checkbox.checked;
+                    updateSelectionUI();
+                }
+            });
+        });
+
+        // Eliminar seleccionados
+        async function eliminarSeleccionados() {
+            const selected = Array.from(document.querySelectorAll('.content-checkbox:checked'))
+                .map(cb => parseInt(cb.value));
+
+            if (selected.length === 0) {
+                alert('No hay contenidos seleccionados');
+                return;
+            }
+
+            if (!confirm(`¿Eliminar ${selected.length} contenido(s) permanentemente?\n\nEsta acción no se puede deshacer.`)) {
+                return;
+            }
 
             const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
 
-            fetch('/Admin/SuspenderUsuario', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `userId=${userId}&__RequestVerificationToken=${token}`
-            })
-            .then(response => response.json())
-            .then(data => {
+            try {
+                const response = await fetch('/Admin/EliminarContenidosMasivo', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify({ ids: selected })
+                });
+
+                const data = await response.json();
+
                 if (data.success) {
-                    alert('Usuario suspendido');
+                    alert(data.message);
                     location.reload();
+                } else {
+                    alert('Error: ' + data.message);
                 }
-            });
+            } catch (error) {
+                alert('Error de conexión: ' + error.message);
+            }
+        }
+
+        // Funciones de usuario
+        function suspenderUsuario(userId) {
+            if (!confirm('¿Suspender este usuario?')) return;
+            accionUsuario('/Admin/SuspenderUsuario', userId, 'Usuario suspendido');
         }
 
         function activarUsuario(userId) {
             if (!confirm('¿Activar este usuario?')) return;
-
-            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
-
-            fetch('/Admin/ActivarUsuario', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `userId=${userId}&__RequestVerificationToken=${token}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Usuario activado');
-                    location.reload();
-                }
-            });
+            accionUsuario('/Admin/ActivarUsuario', userId, 'Usuario activado');
         }
 
         function verificarUsuario(userId) {
             if (!confirm('¿Verificar este usuario?')) return;
+            accionUsuario('/Admin/VerificarUsuario', userId, 'Usuario verificado');
+        }
+
+        function toggleCreadorVerificado(userId, habilitar) {
+            const mensaje = habilitar ? '¿Habilitar LadoB para este usuario?' : '¿Quitar LadoB a este usuario?';
+            if (!confirm(mensaje)) return;
 
             const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
 
-            fetch('/Admin/VerificarUsuario', {
+            fetch('/Admin/ToggleCreadorVerificado', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `userId=${userId}&habilitar=${habilitar}&__RequestVerificationToken=${token}`
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert(habilitar ? 'LadoB habilitado' : 'LadoB deshabilitado');
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            });
+        }
+
+        function accionUsuario(url, userId, mensajeExito) {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+            fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: `userId=${userId}&__RequestVerificationToken=${token}`
             })
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    alert('Usuario verificado');
+                    alert(mensajeExito);
                     location.reload();
                 }
             });
         }
     </script>
-
-    @Html.AntiForgeryToken()
 }
-
-<style>
-    .bg-gradient-primary {
-        background: #4682B4;
-    }
-</style>

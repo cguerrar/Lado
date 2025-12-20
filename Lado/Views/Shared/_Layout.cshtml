@@ -2691,5 +2691,280 @@
 			}
 		})();
 	</script>
+
+	<!-- Service Worker & PWA Install -->
+	<script>
+		(function() {
+			// ========================================
+			// REGISTRO DEL SERVICE WORKER
+			// ========================================
+			if ('serviceWorker' in navigator) {
+				window.addEventListener('load', async () => {
+					try {
+						const registration = await navigator.serviceWorker.register('/sw.js', {
+							scope: '/'
+						});
+
+						console.log('[PWA] Service Worker registrado:', registration.scope);
+
+						// Verificar actualizaciones
+						registration.addEventListener('updatefound', () => {
+							const newWorker = registration.installing;
+							console.log('[PWA] Nueva version del SW encontrada');
+
+							newWorker.addEventListener('statechange', () => {
+								if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+									showUpdateAvailable();
+								}
+							});
+						});
+
+						// Verificar actualizaciones cada hora
+						setInterval(() => registration.update(), 60 * 60 * 1000);
+
+					} catch (error) {
+						console.error('[PWA] Error registrando Service Worker:', error);
+					}
+				});
+			}
+
+			// ========================================
+			// BANNER DE INSTALACION PWA
+			// ========================================
+			let deferredPrompt = null;
+			const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+			const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches ||
+									   window.navigator.standalone === true;
+
+			// Capturar evento beforeinstallprompt (Android/Chrome)
+			window.addEventListener('beforeinstallprompt', (e) => {
+				console.log('[PWA] beforeinstallprompt capturado');
+				e.preventDefault();
+				deferredPrompt = e;
+
+				const visitCount = parseInt(localStorage.getItem('lado_visit_count') || '0') + 1;
+				localStorage.setItem('lado_visit_count', visitCount.toString());
+
+				if (visitCount >= 3 && !isInStandaloneMode && !localStorage.getItem('lado_pwa_dismissed')) {
+					setTimeout(() => showInstallBanner(false), 3000);
+				}
+			});
+
+			// Para iOS, mostrar instrucciones manuales
+			if (isIOS && !isInStandaloneMode) {
+				const visitCount = parseInt(localStorage.getItem('lado_visit_count') || '0') + 1;
+				localStorage.setItem('lado_visit_count', visitCount.toString());
+
+				if (visitCount >= 3 && !localStorage.getItem('lado_pwa_dismissed')) {
+					setTimeout(() => showInstallBanner(true), 3000);
+				}
+			}
+
+			function showInstallBanner(isIOSDevice) {
+				if (document.getElementById('pwa-install-banner')) return;
+
+				const banner = document.createElement('div');
+				banner.id = 'pwa-install-banner';
+				banner.innerHTML = `
+					<style>
+						#pwa-install-banner {
+							position: fixed;
+							bottom: 80px;
+							left: 16px;
+							right: 16px;
+							max-width: 400px;
+							margin: 0 auto;
+							background: white;
+							border-radius: 16px;
+							box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+							padding: 20px;
+							z-index: 9999;
+							animation: slideUpBanner 0.4s ease;
+							font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+						}
+						@@keyframes slideUpBanner {
+							from { opacity: 0; transform: translateY(30px); }
+							to { opacity: 1; transform: translateY(0); }
+						}
+						#pwa-install-banner .pwa-header {
+							display: flex;
+							align-items: center;
+							gap: 12px;
+							margin-bottom: 12px;
+						}
+						#pwa-install-banner .pwa-icon {
+							width: 48px;
+							height: 48px;
+							background: linear-gradient(135deg, #4682B4 0%, #2c5f8a 100%);
+							border-radius: 12px;
+							display: flex;
+							align-items: center;
+							justify-content: center;
+							color: white;
+							font-size: 24px;
+							font-weight: 900;
+						}
+						#pwa-install-banner .pwa-title {
+							flex: 1;
+						}
+						#pwa-install-banner .pwa-title h4 {
+							margin: 0;
+							font-size: 16px;
+							font-weight: 700;
+							color: #111;
+						}
+						#pwa-install-banner .pwa-title p {
+							margin: 4px 0 0;
+							font-size: 13px;
+							color: #666;
+						}
+						#pwa-install-banner .pwa-close {
+							position: absolute;
+							top: 12px;
+							right: 12px;
+							background: none;
+							border: none;
+							font-size: 20px;
+							color: #999;
+							cursor: pointer;
+							padding: 4px;
+							line-height: 1;
+						}
+						#pwa-install-banner .pwa-buttons {
+							display: flex;
+							gap: 10px;
+							margin-top: 16px;
+						}
+						#pwa-install-banner .pwa-btn {
+							flex: 1;
+							padding: 12px 16px;
+							border-radius: 10px;
+							font-size: 14px;
+							font-weight: 600;
+							cursor: pointer;
+							border: none;
+							transition: all 0.2s;
+						}
+						#pwa-install-banner .pwa-btn-primary {
+							background: #4682B4;
+							color: white;
+						}
+						#pwa-install-banner .pwa-btn-primary:hover {
+							background: #36648B;
+						}
+						#pwa-install-banner .pwa-btn-secondary {
+							background: #f3f4f6;
+							color: #666;
+						}
+						#pwa-install-banner .pwa-ios-steps {
+							margin-top: 12px;
+							padding: 12px;
+							background: #f8fafc;
+							border-radius: 10px;
+							font-size: 13px;
+							color: #555;
+							line-height: 1.6;
+						}
+						#pwa-install-banner .pwa-ios-steps strong {
+							color: #111;
+						}
+					</style>
+					<button class="pwa-close" onclick="closePwaBanner(true)">&times;</button>
+					<div class="pwa-header">
+						<div class="pwa-icon">L</div>
+						<div class="pwa-title">
+							<h4>Instalar LADO</h4>
+							<p>Acceso rapido desde tu pantalla de inicio</p>
+						</div>
+					</div>
+					${isIOSDevice ? `
+						<div class="pwa-ios-steps">
+							<strong>Para instalar en iPhone/iPad:</strong><br>
+							1. Toca el boton <strong>Compartir</strong> (cuadro con flecha)<br>
+							2. Desplaza y toca <strong>"Agregar a Inicio"</strong><br>
+							3. Confirma tocando <strong>"Agregar"</strong>
+						</div>
+						<div class="pwa-buttons">
+							<button class="pwa-btn pwa-btn-secondary" onclick="closePwaBanner(true)">Ahora no</button>
+							<button class="pwa-btn pwa-btn-primary" onclick="closePwaBanner(false)">Entendido</button>
+						</div>
+					` : `
+						<div class="pwa-buttons">
+							<button class="pwa-btn pwa-btn-secondary" onclick="closePwaBanner(true)">Ahora no</button>
+							<button class="pwa-btn pwa-btn-primary" onclick="installPwa()">Instalar</button>
+						</div>
+					`}
+				`;
+				document.body.appendChild(banner);
+			}
+
+			window.closePwaBanner = function(dismiss) {
+				const banner = document.getElementById('pwa-install-banner');
+				if (banner) {
+					banner.style.animation = 'none';
+					banner.style.opacity = '0';
+					banner.style.transform = 'translateY(30px)';
+					banner.style.transition = 'all 0.3s ease';
+					setTimeout(() => banner.remove(), 300);
+				}
+				if (dismiss) {
+					localStorage.setItem('lado_pwa_dismissed', Date.now().toString());
+				}
+			};
+
+			window.installPwa = async function() {
+				if (!deferredPrompt) return;
+
+				deferredPrompt.prompt();
+				const { outcome } = await deferredPrompt.userChoice;
+				console.log('[PWA] Usuario eligio:', outcome);
+
+				deferredPrompt = null;
+				closePwaBanner(outcome === 'accepted');
+			};
+
+			// Limpiar dismissal despues de 7 dias
+			const dismissedTime = localStorage.getItem('lado_pwa_dismissed');
+			if (dismissedTime && Date.now() - parseInt(dismissedTime) > 7 * 24 * 60 * 60 * 1000) {
+				localStorage.removeItem('lado_pwa_dismissed');
+			}
+
+			// Notificacion de actualizacion
+			function showUpdateAvailable() {
+				const toast = document.createElement('div');
+				toast.id = 'pwa-update-toast';
+				toast.style.cssText = `
+					position: fixed;
+					bottom: 20px;
+					left: 50%;
+					transform: translateX(-50%);
+					background: #111;
+					color: white;
+					padding: 14px 20px;
+					border-radius: 12px;
+					font-size: 14px;
+					z-index: 9999;
+					display: flex;
+					align-items: center;
+					gap: 12px;
+					box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+					font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+				`;
+				toast.innerHTML = `
+					<span>Nueva version disponible</span>
+					<button onclick="location.reload()" style="
+						background: #4682B4;
+						color: white;
+						border: none;
+						padding: 8px 16px;
+						border-radius: 8px;
+						font-weight: 600;
+						cursor: pointer;
+					">Actualizar</button>
+				`;
+				document.body.appendChild(toast);
+			}
+		})();
+	</script>
 </body>
 </html>

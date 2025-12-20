@@ -79,6 +79,17 @@ namespace Lado.Data
         public DbSet<Notificacion> Notificaciones { get; set; }
 
         // ========================================
+        // ⭐ DbSets NUEVOS - LOGS Y EVENTOS
+        // ========================================
+        public DbSet<LogEvento> LogEventos { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - JWT TOKENS
+        // ========================================
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
+        public DbSet<ActiveToken> ActiveTokens { get; set; }
+
+        // ========================================
         // ⭐ DbSets NUEVOS - CONTADOR DE VISITAS
         // ========================================
         public DbSet<VisitaApp> VisitasApp { get; set; }
@@ -1142,6 +1153,79 @@ namespace Lado.Data
                 entity.HasIndex(p => p.UsuarioId)
                     .IsUnique()
                     .HasDatabaseName("IX_PreferenciasAlgoritmoUsuario_UsuarioId");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE REFRESH TOKENS (JWT)
+            // ========================================
+            modelBuilder.Entity<RefreshToken>(entity =>
+            {
+                entity.HasKey(r => r.Id);
+
+                entity.HasOne(r => r.User)
+                    .WithMany()
+                    .HasForeignKey(r => r.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(r => r.Token)
+                    .HasMaxLength(500)
+                    .IsRequired();
+
+                entity.Property(r => r.DeviceInfo)
+                    .HasMaxLength(500)
+                    .IsRequired(false);
+
+                entity.Property(r => r.IpAddress)
+                    .HasMaxLength(50)
+                    .IsRequired(false);
+
+                // Índices
+                entity.HasIndex(r => r.Token)
+                    .IsUnique()
+                    .HasDatabaseName("IX_RefreshTokens_Token");
+
+                entity.HasIndex(r => r.UserId)
+                    .HasDatabaseName("IX_RefreshTokens_UserId");
+
+                entity.HasIndex(r => new { r.UserId, r.IsRevoked, r.ExpiryDate })
+                    .HasDatabaseName("IX_RefreshTokens_User_Active");
+            });
+
+            // ========================================
+            // ⭐ ACTIVE TOKENS (VALIDACIÓN JWT EN TIEMPO REAL)
+            // ========================================
+            modelBuilder.Entity<ActiveToken>(entity =>
+            {
+                entity.HasKey(a => a.Id);
+
+                entity.HasOne(a => a.User)
+                    .WithMany()
+                    .HasForeignKey(a => a.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(a => a.Jti)
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                entity.Property(a => a.DeviceInfo)
+                    .HasMaxLength(500)
+                    .IsRequired(false);
+
+                entity.Property(a => a.IpAddress)
+                    .HasMaxLength(50)
+                    .IsRequired(false);
+
+                // Índices para búsqueda rápida
+                entity.HasIndex(a => a.Jti)
+                    .IsUnique()
+                    .HasDatabaseName("IX_ActiveTokens_Jti");
+
+                entity.HasIndex(a => a.UserId)
+                    .HasDatabaseName("IX_ActiveTokens_UserId");
+
+                // Índice para limpieza de tokens expirados
+                entity.HasIndex(a => new { a.ExpiresAt, a.IsRevoked })
+                    .HasDatabaseName("IX_ActiveTokens_Cleanup");
             });
 
             // ========================================
