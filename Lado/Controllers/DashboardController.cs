@@ -88,12 +88,27 @@ namespace Lado.Controllers
                 .Take(5)
                 .ToListAsync();
 
-            // Últimos seguidores (suscriptores)
-            ViewBag.UltimosSeguidores = await _context.Suscripciones
-                .Where(s => s.CreadorId == usuario.Id && s.EstaActiva)
+            // Últimos seguidores LadoA
+            ViewBag.UltimosSeguidoresLadoA = await _context.Suscripciones
+                .Where(s => s.CreadorId == usuario.Id && s.EstaActiva && s.TipoLado == TipoLado.LadoA)
                 .Include(s => s.Fan)
                 .OrderByDescending(s => s.FechaInicio)
-                .Take(10)
+                .Take(5)
+                .Select(s => new {
+                    Id = s.Fan.Id,
+                    UserName = s.Fan.UserName,
+                    NombreCompleto = s.Fan.NombreCompleto,
+                    FotoPerfil = s.Fan.FotoPerfil,
+                    FechaSuscripcion = s.FechaInicio
+                })
+                .ToListAsync();
+
+            // Últimos seguidores LadoB
+            ViewBag.UltimosSeguidoresLadoB = await _context.Suscripciones
+                .Where(s => s.CreadorId == usuario.Id && s.EstaActiva && s.TipoLado == TipoLado.LadoB)
+                .Include(s => s.Fan)
+                .OrderByDescending(s => s.FechaInicio)
+                .Take(5)
                 .Select(s => new {
                     Id = s.Fan.Id,
                     UserName = s.Fan.UserName,
