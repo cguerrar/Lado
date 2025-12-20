@@ -566,6 +566,9 @@
                 <button class="btn-action btn-danger-custom" id="btnDeleteSelected" style="display: none;" onclick="eliminarSeleccionados()">
                     <i class="fas fa-trash"></i> Eliminar seleccionados
                 </button>
+                <button class="btn-action btn-outline-custom" onclick="eliminarTodoContenido()" style="border-color: #dc2626; color: #dc2626;">
+                    <i class="fas fa-trash-alt"></i> Eliminar TODO (@contenidos.Count)
+                </button>
             </div>
         </div>
 
@@ -752,17 +755,19 @@
                 return;
             }
 
-            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
-
             try {
                 const response = await fetch('/Admin/EliminarContenidosMasivo', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'RequestVerificationToken': token
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ ids: selected })
                 });
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}`);
+                }
 
                 const data = await response.json();
 
@@ -773,7 +778,50 @@
                     alert('Error: ' + data.message);
                 }
             } catch (error) {
-                alert('Error de conexión: ' + error.message);
+                console.error('Error:', error);
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Eliminar TODO el contenido del usuario
+        async function eliminarTodoContenido() {
+            const userId = '@usuario.Id';
+            const totalContenidos = @(contenidos?.Count ?? 0);
+
+            if (!confirm(`¿ELIMINAR TODO el contenido de este usuario?\n\n${totalContenidos} publicaciones serán eliminadas permanentemente.\n\nEsta acción NO se puede deshacer.`)) {
+                return;
+            }
+
+            // Segunda confirmación
+            if (!confirm('¿Estás COMPLETAMENTE seguro? Escribe OK para confirmar.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/Admin/EliminarTodoContenidoUsuario', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ userId: userId })
+                });
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error: ' + error.message);
             }
         }
 

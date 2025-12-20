@@ -699,7 +699,6 @@ namespace Lado.Controllers
         /// Eliminar múltiples contenidos de un usuario
         /// </summary>
         [HttpPost]
-        [ValidateAntiForgeryToken]
         public async Task<IActionResult> EliminarContenidosMasivo([FromBody] EliminarContenidosMasivoRequest request)
         {
             if (request?.Ids == null || !request.Ids.Any())
@@ -709,50 +708,8 @@ namespace Lado.Controllers
 
             try
             {
-                var contenidos = await _context.Contenidos
-                    .Where(c => request.Ids.Contains(c.Id))
-                    .ToListAsync();
-
-                if (!contenidos.Any())
-                {
-                    return Json(new { success = false, message = "No se encontraron los contenidos" });
-                }
-
-                // Eliminar archivos físicos
-                foreach (var contenido in contenidos)
-                {
-                    if (!string.IsNullOrEmpty(contenido.RutaArchivo))
-                    {
-                        var rutaCompleta = Path.Combine(_hostEnvironment.WebRootPath, contenido.RutaArchivo.TrimStart('/'));
-                        if (System.IO.File.Exists(rutaCompleta))
-                        {
-                            System.IO.File.Delete(rutaCompleta);
-                        }
-                    }
-
-                    // Eliminar archivos adicionales si existen
-                    var archivosAdicionales = await _context.ArchivosContenido
-                        .Where(a => a.ContenidoId == contenido.Id)
-                        .ToListAsync();
-
-                    foreach (var archivo in archivosAdicionales)
-                    {
-                        if (!string.IsNullOrEmpty(archivo.RutaArchivo))
-                        {
-                            var rutaArchivo = Path.Combine(_hostEnvironment.WebRootPath, archivo.RutaArchivo.TrimStart('/'));
-                            if (System.IO.File.Exists(rutaArchivo))
-                            {
-                                System.IO.File.Delete(rutaArchivo);
-                            }
-                        }
-                    }
-                    _context.ArchivosContenido.RemoveRange(archivosAdicionales);
-                }
-
-                _context.Contenidos.RemoveRange(contenidos);
-                await _context.SaveChangesAsync();
-
-                return Json(new { success = true, message = $"{contenidos.Count} contenidos eliminados correctamente", count = contenidos.Count });
+                var resultado = await EliminarContenidosPorIdsAsync(request.Ids);
+                return Json(resultado);
             }
             catch (Exception ex)
             {
@@ -760,9 +717,112 @@ namespace Lado.Controllers
             }
         }
 
+        /// <summary>
+        /// Eliminar TODO el contenido de un usuario
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> EliminarTodoContenidoUsuario([FromBody] EliminarContenidoUsuarioRequest request)
+        {
+            if (string.IsNullOrEmpty(request?.UserId))
+            {
+                return Json(new { success = false, message = "UserId no proporcionado" });
+            }
+
+            try
+            {
+                // Obtener todos los IDs de contenido del usuario
+                var ids = await _context.Contenidos
+                    .Where(c => c.UsuarioId == request.UserId)
+                    .Select(c => c.Id)
+                    .ToListAsync();
+
+                if (!ids.Any())
+                {
+                    return Json(new { success = false, message = "El usuario no tiene contenidos" });
+                }
+
+                var resultado = await EliminarContenidosPorIdsAsync(ids);
+                return Json(resultado);
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Error al eliminar: " + ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Método interno para eliminar contenidos por IDs
+        /// </summary>
+        private async Task<object> EliminarContenidosPorIdsAsync(List<int> ids)
+        {
+            var contenidos = await _context.Contenidos
+                .Include(c => c.Archivos)
+                .Where(c => ids.Contains(c.Id))
+                .ToListAsync();
+
+            if (!contenidos.Any())
+            {
+                return new { success = false, message = "No se encontraron los contenidos" };
+            }
+
+            int archivosEliminados = 0;
+
+            // Eliminar archivos físicos
+            foreach (var contenido in contenidos)
+            {
+                // Archivo principal
+                if (!string.IsNullOrEmpty(contenido.RutaArchivo))
+                {
+                    var ruta = contenido.RutaArchivo.TrimStart('/').Replace("/", "\\");
+                    var rutaCompleta = Path.Combine(_hostEnvironment.WebRootPath, ruta);
+
+                    if (System.IO.File.Exists(rutaCompleta))
+                    {
+                        System.IO.File.Delete(rutaCompleta);
+                        archivosEliminados++;
+                    }
+                }
+
+                // Archivos adicionales
+                if (contenido.Archivos != null)
+                {
+                    foreach (var archivo in contenido.Archivos)
+                    {
+                        if (!string.IsNullOrEmpty(archivo.RutaArchivo))
+                        {
+                            var ruta = archivo.RutaArchivo.TrimStart('/').Replace("/", "\\");
+                            var rutaArchivo = Path.Combine(_hostEnvironment.WebRootPath, ruta);
+
+                            if (System.IO.File.Exists(rutaArchivo))
+                            {
+                                System.IO.File.Delete(rutaArchivo);
+                                archivosEliminados++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Eliminar de la base de datos (cascade elimina los archivos relacionados)
+            _context.Contenidos.RemoveRange(contenidos);
+            await _context.SaveChangesAsync();
+
+            return new {
+                success = true,
+                message = $"{contenidos.Count} contenidos eliminados ({archivosEliminados} archivos físicos)",
+                count = contenidos.Count,
+                files = archivosEliminados
+            };
+        }
+
         public class EliminarContenidosMasivoRequest
         {
             public List<int> Ids { get; set; } = new();
+        }
+
+        public class EliminarContenidoUsuarioRequest
+        {
+            public string UserId { get; set; } = string.Empty;
         }
 
         [HttpPost]
