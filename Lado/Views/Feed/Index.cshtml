@@ -611,6 +611,29 @@
         opacity: 1;
     }
 
+    /* 🍎 iOS: Indicador de que se requiere tap */
+    .ios-needs-tap::after {
+        content: 'Toca para reproducir';
+        position: absolute;
+        bottom: 50%;
+        left: 50%;
+        transform: translate(-50%, 50%);
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 25px;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 15;
+        pointer-events: none;
+        animation: iosTapPulse 2s ease-in-out infinite;
+    }
+
+    @@keyframes iosTapPulse {
+        0%, 100% { opacity: 0.9; transform: translate(-50%, 50%) scale(1); }
+        50% { opacity: 1; transform: translate(-50%, 50%) scale(1.05); }
+    }
+
     .video-mute-btn {
         position: absolute;
         bottom: 16px;
@@ -3259,7 +3282,7 @@
                                 }
                                 else if (esVideo)
                                 {
-                                    <video src="@post.RutaArchivo" class="feed-video" muted preload="none" poster=""></video>
+                                    <video src="@post.RutaArchivo" class="feed-video" muted loop playsinline webkit-playsinline preload="none" poster=""></video>
                                 }
                                 else if (esAudio)
                                 {
@@ -3426,6 +3449,7 @@
                                    muted
                                    loop
                                    playsinline
+                                   webkit-playsinline
                                    preload="none"
                                    data-post-id="@post.Id">
                             </video>
@@ -4209,6 +4233,58 @@
     // Estado global de mute (false = con sonido, true = silenciado)
     let isGlobalMuted = false;
 
+    // 🍎 iOS Detection y Video Unlock
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    let iosVideoUnlocked = false;
+
+    // En iOS, los videos deben empezar muted
+    if (isIOSDevice) {
+        isGlobalMuted = true;
+        console.log('[iOS] Detectado - videos iniciarán silenciados');
+    }
+
+    // Función para desbloquear videos en iOS después de primera interacción
+    function unlockIOSVideos() {
+        if (iosVideoUnlocked) return;
+        iosVideoUnlocked = true;
+        console.log('[iOS] Videos desbloqueados por interacción del usuario');
+
+        // Intentar reproducir el video visible actualmente
+        const visibleVideo = document.querySelector('.feed-video:not([data-observed="false"])');
+        if (visibleVideo && visibleVideo.paused) {
+            visibleVideo.muted = true; // Siempre muted en iOS para autoplay
+            visibleVideo.play().catch(() => {});
+        }
+
+        // Remover listeners después del primer desbloqueo
+        document.removeEventListener('touchstart', unlockIOSVideos);
+        document.removeEventListener('click', unlockIOSVideos);
+    }
+
+    // En iOS, esperar primera interacción
+    if (isIOSDevice) {
+        document.addEventListener('touchstart', unlockIOSVideos, { passive: true, once: true });
+        document.addEventListener('click', unlockIOSVideos, { passive: true, once: true });
+
+        // Handler para reproducir video al tocar en iOS
+        document.addEventListener('click', function(e) {
+            const postMedia = e.target.closest('.post-media.ios-needs-tap');
+            if (postMedia) {
+                const video = postMedia.querySelector('video.feed-video');
+                if (video) {
+                    iosVideoUnlocked = true;
+                    video.muted = true;
+                    video.play().then(() => {
+                        postMedia.classList.remove('video-paused', 'ios-needs-tap');
+                        console.log('[iOS] Video reproducido por tap');
+                    }).catch(err => {
+                        console.warn('[iOS] Error al reproducir video:', err);
+                    });
+                }
+            }
+        });
+    }
+
     // Función para actualizar iconos de mute en todos los botones
     function updateAllMuteIcons() {
         document.querySelectorAll('.video-mute-btn').forEach(btn => {
@@ -4237,34 +4313,49 @@
                     }
                 });
 
-                // Aplicar estado global de mute
-                video.muted = isGlobalMuted;
+                // 🍎 iOS: Si no está desbloqueado, mostrar indicador y esperar
+                if (isIOSDevice && !iosVideoUnlocked) {
+                    postMedia?.classList.add('video-paused', 'ios-needs-tap');
+                    video.muted = true;
+                    // No intentar play() - esperar a que el usuario toque
+                    return;
+                }
+
+                // Aplicar estado global de mute (en iOS siempre muted para autoplay)
+                video.muted = isIOSDevice ? true : isGlobalMuted;
 
                 // Reproducir este video
                 video.play().then(() => {
-                    postMedia?.classList.remove('video-paused');
-                    // Actualizar iconos de mute
+                    postMedia?.classList.remove('video-paused', 'ios-needs-tap');
                     updateAllMuteIcons();
                 }).catch(err => {
                     console.log('Autoplay bloqueado:', err);
-                    // Si falla el autoplay con sonido, intentar con mute
+                    // Si falla el autoplay, intentar con mute
                     if (!video.muted) {
                         video.muted = true;
                         isGlobalMuted = true;
                         video.play().then(() => {
-                            postMedia?.classList.remove('video-paused');
+                            postMedia?.classList.remove('video-paused', 'ios-needs-tap');
                             updateAllMuteIcons();
                         }).catch(() => {
                             postMedia?.classList.add('video-paused');
+                            // En iOS mostrar indicador de tap
+                            if (isIOSDevice) {
+                                postMedia?.classList.add('ios-needs-tap');
+                            }
                         });
                     } else {
                         postMedia?.classList.add('video-paused');
+                        if (isIOSDevice) {
+                            postMedia?.classList.add('ios-needs-tap');
+                        }
                     }
                 });
             } else {
                 // El video ya no es visible - pausar
                 video.pause();
                 postMedia?.classList.add('video-paused');
+                postMedia?.classList.remove('ios-needs-tap');
             }
         });
     }, {
