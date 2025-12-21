@@ -26,6 +26,16 @@ namespace Lado.Services
         Task<bool> IsIpBlockedAsync(string ip);
 
         /// <summary>
+        /// Elimina una IP de la cache de bloqueados (para desbloqueo inmediato)
+        /// </summary>
+        void RemoveIpFromCache(string ip);
+
+        /// <summary>
+        /// Fuerza un refresco de la cache de IPs bloqueadas
+        /// </summary>
+        Task RefreshBlockedIpsCacheAsync();
+
+        /// <summary>
         /// Obtiene estadísticas de ataques
         /// </summary>
         Task<AtaqueEstadisticas> GetEstadisticasAsync();
@@ -282,6 +292,17 @@ namespace Lado.Services
         public void Reset(string key)
         {
             _entries.TryRemove(key, out _);
+        }
+
+        public void RemoveIpFromCache(string ip)
+        {
+            _ipsBloqueadasCache.Remove(ip);
+            _logger.LogInformation("✅ IP removida de cache de bloqueados: {Ip}", ip);
+        }
+
+        public async Task RefreshBlockedIpsCacheAsync()
+        {
+            await RefrescarCacheIpsBloqueadasAsync();
         }
 
         private class RateLimitEntry

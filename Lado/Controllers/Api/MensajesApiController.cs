@@ -199,14 +199,16 @@ namespace Lado.Controllers.Api
                 var rateLimitKeyIp = $"api_message_send_ip_{clientIp}";
 
                 // Límite por IP: máximo 60 mensajes por minuto
-                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, 60, TimeSpan.FromMinutes(1)))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyIp, 60, TimeSpan.FromMinutes(1),
+                    TipoAtaque.SpamMensajes, "/api/Mensajes/enviar", userId))
                 {
                     _logger.LogWarning("🚨 RATE LIMIT IP API MENSAJE: IP {IP} excedió límite - Usuario: {UserId}", clientIp, userId);
                     return StatusCode(429, ApiResponse<MensajeDto>.Fail("Demasiadas solicitudes. Espera un momento."));
                 }
 
                 // Límite por usuario: máximo 30 mensajes por minuto
-                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.Messaging_MaxRequests, RateLimits.Messaging_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKey, RateLimits.Messaging_MaxRequests, RateLimits.Messaging_Window,
+                    TipoAtaque.SpamMensajes, "/api/Mensajes/enviar", userId))
                 {
                     _logger.LogWarning("🚫 RATE LIMIT API MENSAJE: Usuario {UserId} excedió límite - IP: {IP}", userId, clientIp);
                     return StatusCode(429, ApiResponse<MensajeDto>.Fail("Estás enviando mensajes muy rápido. Espera un momento."));
@@ -313,7 +315,10 @@ namespace Lado.Controllers.Api
                 {
                     await _hubContext.Clients.User(otroUserId).SendAsync("MensajesLeidos", userId);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error al notificar mensajes leídos via SignalR al usuario {UserId}", otroUserId);
+                }
 
                 return Ok(ApiResponse.Ok("Mensajes marcados como leidos"));
             }

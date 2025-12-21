@@ -134,7 +134,10 @@ namespace Lado.Services
                                 }
                             }
                         }
-                        catch { }
+                        catch (Exception parseEx)
+                        {
+                            _logger?.LogDebug(parseEx, "Error al parsear respuesta de error de Mailjet");
+                        }
                     }
 
                     _logger?.LogError("Error Mailjet: {Error}", mainError);

@@ -1106,7 +1106,13 @@
             <img src="/images/angelito.png" alt="" style="height: 24px; margin-right: 8px;">
             Últimos Seguidores LadoA
         </h3>
-        <span class="badge badge-success">Público</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="badge badge-success">Público</span>
+            @if ((ViewBag.TotalSeguidoresLadoA ?? 0) > 0)
+            {
+                <button type="button" class="btn-ver-todos" onclick="console.log('Click en ver todos LadoA'); abrirModalSeguidores('ladoA');">Ver todos (@ViewBag.TotalSeguidoresLadoA)</button>
+            }
+        </div>
     </div>
     @if (ViewBag.UltimosSeguidoresLadoA != null && ((IEnumerable<dynamic>)ViewBag.UltimosSeguidoresLadoA).Any())
     {
@@ -1150,7 +1156,13 @@
             <img src="/images/diablito.png" alt="" style="height: 24px; margin-right: 8px;">
             Últimos Seguidores LadoB
         </h3>
-        <span class="badge" style="background: var(--accent-light); color: var(--accent);">Premium</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="badge" style="background: var(--accent-light); color: var(--accent);">Premium</span>
+            @if ((ViewBag.TotalSeguidoresLadoB ?? 0) > 0)
+            {
+                <button type="button" class="btn-ver-todos" onclick="console.log('Click en ver todos LadoB'); abrirModalSeguidores('ladoB');">Ver todos (@ViewBag.TotalSeguidoresLadoB)</button>
+            }
+        </div>
     </div>
     @if (ViewBag.UltimosSeguidoresLadoB != null && ((IEnumerable<dynamic>)ViewBag.UltimosSeguidoresLadoB).Any())
     {
@@ -1311,4 +1323,321 @@
 
         animateWalletBlobs();
     }
+
+    // ========================================
+    // MODAL DE SEGUIDORES
+    // ========================================
+    let currentTipoLado = null;
+    let currentPage = 1;
+    let isLoading = false;
+    let hasMore = true;
+
+    function abrirModalSeguidores(tipoLado) {
+        console.log('abrirModalSeguidores llamado con:', tipoLado);
+        currentTipoLado = tipoLado;
+        currentPage = 1;
+        hasMore = true;
+
+        const modal = document.getElementById('modalSeguidores');
+        const titulo = document.getElementById('modalSeguidoresTitulo');
+        const lista = document.getElementById('listaSeguidores');
+
+        console.log('Elementos encontrados:', { modal: !!modal, titulo: !!titulo, lista: !!lista });
+
+        if (!modal) {
+            console.error('Modal no encontrado!');
+            alert('Error: Modal no encontrado');
+            return;
+        }
+
+        titulo.innerHTML = tipoLado === 'ladoA'
+            ? '<img src="/images/angelito.png" alt="" style="height: 24px; margin-right: 8px;">Seguidores LadoA'
+            : '<img src="/images/diablito.png" alt="" style="height: 24px; margin-right: 8px;">Seguidores LadoB';
+
+        lista.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
+        modal.classList.add('active');
+        console.log('Modal activado, clase active añadida');
+
+        cargarSeguidores();
+    }
+
+    function cerrarModalSeguidores() {
+        document.getElementById('modalSeguidores').classList.remove('active');
+    }
+
+    async function cargarSeguidores() {
+        console.log('cargarSeguidores llamado, isLoading:', isLoading, 'hasMore:', hasMore);
+        if (isLoading || !hasMore) {
+            console.log('Saliendo temprano de cargarSeguidores');
+            return;
+        }
+        isLoading = true;
+
+        try {
+            const url = '/Dashboard/ObtenerTodosSeguidores?tipoLado=' + currentTipoLado + '&page=' + currentPage;
+            console.log('Fetching URL:', url);
+            const response = await fetch(url);
+
+            console.log('Response status:', response.status);
+            if (!response.ok) {
+                const text = await response.text();
+                console.error('Response text:', text);
+                throw new Error('Error HTTP: ' + response.status);
+            }
+
+            const data = await response.json();
+            console.log('Respuesta JSON:', data);
+
+            if (data.success) {
+                const lista = document.getElementById('listaSeguidores');
+
+                if (currentPage === 1) {
+                    lista.innerHTML = '';
+                }
+
+                data.seguidores.forEach(s => {
+                    const item = document.createElement('a');
+                    item.href = '/' + escapeHtml(s.username);
+                    item.className = 'seguidor-item';
+                    item.innerHTML = `
+                        ${s.fotoPerfil
+                            ? `<img src="${escapeHtml(s.fotoPerfil)}" alt="${escapeHtml(s.username)}" class="seguidor-avatar">`
+                            : `<div class="seguidor-avatar-placeholder"><i class="fas fa-user"></i></div>`
+                        }
+                        <div class="seguidor-info">
+                            <div class="seguidor-nombre">${escapeHtml(s.nombreCompleto || s.username)}</div>
+                            <div class="seguidor-username">@("@")${escapeHtml(s.username)}</div>
+                        </div>
+                        <div class="seguidor-fecha">
+                            <i class="fas fa-calendar-alt"></i>
+                            ${new Date(s.fechaSuscripcion).toLocaleDateString('es', { day: 'numeric', month: 'short' })}
+                        </div>
+                    `;
+                    lista.appendChild(item);
+                });
+
+                hasMore = data.hasMore;
+                currentPage++;
+
+                if (hasMore) {
+                    if (!document.getElementById('btnCargarMas')) {
+                        const btn = document.createElement('button');
+                        btn.id = 'btnCargarMas';
+                        btn.className = 'btn-cargar-mas';
+                        btn.textContent = 'Cargar más';
+                        btn.onclick = cargarSeguidores;
+                        lista.after(btn);
+                    }
+                } else {
+                    const btnExistente = document.getElementById('btnCargarMas');
+                    if (btnExistente) btnExistente.remove();
+                }
+            }
+        } catch (error) {
+            console.error('Error al cargar seguidores:', error);
+            const lista = document.getElementById('listaSeguidores');
+            lista.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--muted);">Error al cargar seguidores</div>';
+        } finally {
+            isLoading = false;
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Cerrar modal al hacer clic fuera - esperar a que el DOM esté listo
+    document.addEventListener('DOMContentLoaded', function() {
+        const modal = document.getElementById('modalSeguidores');
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    cerrarModalSeguidores();
+                }
+            });
+            console.log('Event listener para cerrar modal registrado');
+        } else {
+            console.error('Modal no encontrado al cargar DOM');
+        }
+    });
 </script>
+
+<!-- MODAL DE SEGUIDORES -->
+<div class="modal-overlay-seguidores" id="modalSeguidores">
+    <div class="modal-seguidores">
+        <div class="modal-seguidores-header">
+            <h3 id="modalSeguidoresTitulo">Seguidores</h3>
+            <button class="modal-close-btn" onclick="cerrarModalSeguidores()">&times;</button>
+        </div>
+        <div class="modal-seguidores-body">
+            <div id="listaSeguidores" class="lista-seguidores"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Botón Ver todos */
+    .btn-ver-todos {
+        background: rgba(255,255,255,0.1);
+        border: none;
+        color: var(--primary);
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-ver-todos:hover {
+        background: var(--primary);
+        color: white;
+    }
+
+    /* Modal de seguidores */
+    .modal-overlay-seguidores {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.7);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .modal-overlay-seguidores.active {
+        display: flex;
+    }
+
+    .modal-seguidores {
+        background: var(--bg);
+        border-radius: 16px;
+        width: 90%;
+        max-width: 500px;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .modal-seguidores-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .modal-seguidores-header h3 {
+        margin: 0;
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+    }
+
+    .modal-close-btn {
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: var(--muted);
+        cursor: pointer;
+        padding: 0;
+        line-height: 1;
+    }
+
+    .modal-seguidores-body {
+        padding: 16px;
+        overflow-y: auto;
+        flex: 1;
+    }
+
+    .lista-seguidores {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .seguidor-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: rgba(255,255,255,0.03);
+        border-radius: 12px;
+        text-decoration: none;
+        color: inherit;
+        transition: background 0.2s;
+    }
+
+    .seguidor-item:hover {
+        background: rgba(255,255,255,0.08);
+    }
+
+    .seguidor-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .seguidor-avatar-placeholder {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+    }
+
+    .seguidor-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .seguidor-nombre {
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .seguidor-username {
+        font-size: 13px;
+        color: var(--muted);
+    }
+
+    .seguidor-fecha {
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .btn-cargar-mas {
+        width: 100%;
+        padding: 12px;
+        margin-top: 12px;
+        background: rgba(255,255,255,0.1);
+        border: none;
+        border-radius: 8px;
+        color: var(--fg);
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    .btn-cargar-mas:hover {
+        background: rgba(255,255,255,0.15);
+    }
+
+    .loading-spinner {
+        text-align: center;
+        padding: 40px;
+        color: var(--muted);
+    }
+</style>

@@ -4101,7 +4101,9 @@ namespace Lado.Controllers
                     Razon = request.Razon,
                     FechaExpiracion = request.Permanente ? null : request.FechaExpiracion,
                     AdminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
-                    EstaActivo = true
+                    EstaActivo = true,
+                    TipoBloqueo = TipoBloqueoIp.Manual,
+                    TipoAtaque = TipoAtaque.Ninguno
                 };
                 _context.IpsBloqueadas.Add(nuevaIp);
             }
@@ -4130,6 +4132,9 @@ namespace Lado.Controllers
 
             ip.EstaActivo = false;
             await _context.SaveChangesAsync();
+
+            // Remover IP de cache inmediatamente para que el desbloqueo sea efectivo al instante
+            _rateLimitService.RemoveIpFromCache(ip.DireccionIp);
 
             await _logEventoService.RegistrarEventoAsync(
                 $"IP desbloqueada: {ip.DireccionIp}",
@@ -4754,6 +4759,343 @@ namespace Lado.Controllers
                     ex.ToString());
 
                 return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        // ========================================
+        // LIMPIEZA DE COMENTARIOS SPAM
+        // ========================================
+
+        [HttpGet]
+        public async Task<IActionResult> ComentariosSpam()
+        {
+            // Obtener posts con más de 50 comentarios (sospechosos)
+            var postsConMuchosComentarios = await _context.Contenidos
+                .Where(c => c.NumeroComentarios > 50)
+                .OrderByDescending(c => c.NumeroComentarios)
+                .Select(c => new
+                {
+                    c.Id,
+                    c.Descripcion,
+                    c.NumeroComentarios,
+                    Usuario = c.Usuario.UserName,
+                    c.FechaPublicacion
+                })
+                .Take(20)
+                .ToListAsync();
+
+            return Json(new { success = true, posts = postsConMuchosComentarios });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DetalleComentariosSpam(int contenidoId)
+        {
+            // Comentarios agrupados por usuario
+            var comentariosPorUsuario = await _context.Comentarios
+                .Where(c => c.ContenidoId == contenidoId && c.EstaActivo)
+                .GroupBy(c => new { c.UsuarioId, c.Usuario.UserName })
+                .Select(g => new
+                {
+                    UsuarioId = g.Key.UsuarioId,
+                    UserName = g.Key.UserName,
+                    Cantidad = g.Count(),
+                    PrimerComentario = g.Min(c => c.FechaCreacion),
+                    UltimoComentario = g.Max(c => c.FechaCreacion)
+                })
+                .OrderByDescending(x => x.Cantidad)
+                .Take(50)
+                .ToListAsync();
+
+            var totalComentarios = await _context.Comentarios
+                .CountAsync(c => c.ContenidoId == contenidoId && c.EstaActivo);
+
+            return Json(new
+            {
+                success = true,
+                contenidoId,
+                totalComentarios,
+                comentariosPorUsuario
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> LimpiarComentariosSpam(int contenidoId, string? usuarioId = null, int? mantenerPrimeros = 3)
+        {
+            try
+            {
+                var adminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                int eliminados = 0;
+
+                if (!string.IsNullOrEmpty(usuarioId))
+                {
+                    // Eliminar comentarios de un usuario específico (mantener los primeros N)
+                    var comentariosUsuario = await _context.Comentarios
+                        .Where(c => c.ContenidoId == contenidoId && c.UsuarioId == usuarioId && c.EstaActivo)
+                        .OrderBy(c => c.FechaCreacion)
+                        .ToListAsync();
+
+                    var aEliminar = comentariosUsuario.Skip(mantenerPrimeros ?? 3).ToList();
+                    foreach (var c in aEliminar)
+                    {
+                        c.EstaActivo = false;
+                    }
+                    eliminados = aEliminar.Count;
+                }
+                else
+                {
+                    // Eliminar comentarios excesivos de TODOS los usuarios (mantener primeros N de cada uno)
+                    var comentarios = await _context.Comentarios
+                        .Where(c => c.ContenidoId == contenidoId && c.EstaActivo)
+                        .OrderBy(c => c.UsuarioId)
+                        .ThenBy(c => c.FechaCreacion)
+                        .ToListAsync();
+
+                    var porUsuario = comentarios.GroupBy(c => c.UsuarioId);
+                    foreach (var grupo in porUsuario)
+                    {
+                        var aEliminar = grupo.Skip(mantenerPrimeros ?? 3).ToList();
+                        foreach (var c in aEliminar)
+                        {
+                            c.EstaActivo = false;
+                        }
+                        eliminados += aEliminar.Count;
+                    }
+                }
+
+                // Actualizar contador del contenido
+                var contenido = await _context.Contenidos.FindAsync(contenidoId);
+                if (contenido != null)
+                {
+                    contenido.NumeroComentarios = await _context.Comentarios
+                        .CountAsync(c => c.ContenidoId == contenidoId && c.EstaActivo);
+                }
+
+                await _context.SaveChangesAsync();
+
+                await _logEventoService.RegistrarEventoAsync(
+                    $"Limpieza de spam: {eliminados} comentarios desactivados en contenido {contenidoId}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Warning,
+                    adminId,
+                    User.Identity?.Name);
+
+                return Json(new { success = true, eliminados, message = $"Se desactivaron {eliminados} comentarios spam" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> BloquearSpammer(string usuarioId, string razon = "Spam de comentarios")
+        {
+            try
+            {
+                var usuario = await _context.Users.FindAsync(usuarioId);
+                if (usuario == null)
+                    return Json(new { success = false, message = "Usuario no encontrado" });
+
+                usuario.EstaActivo = false;
+                await _context.SaveChangesAsync();
+
+                var adminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                await _logEventoService.RegistrarEventoAsync(
+                    $"Usuario bloqueado por spam: {usuario.UserName} ({usuarioId}). Razón: {razon}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Warning,
+                    adminId,
+                    User.Identity?.Name);
+
+                return Json(new { success = true, message = $"Usuario {usuario.UserName} bloqueado" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        // ========================================
+        // CONFIGURACIÓN DE NIVELES DE CONFIANZA
+        // ========================================
+
+        public async Task<IActionResult> ConfigurarConfianza()
+        {
+            var config = await _context.ConfiguracionesConfianza.FirstOrDefaultAsync();
+
+            if (config == null)
+            {
+                config = new ConfiguracionConfianza();
+                _context.ConfiguracionesConfianza.Add(config);
+                await _context.SaveChangesAsync();
+            }
+
+            ViewData["Title"] = "Configurar Niveles de Confianza";
+            return View(config);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> GuardarConfiguracionConfianza(ConfiguracionConfianza model)
+        {
+            try
+            {
+                var config = await _context.ConfiguracionesConfianza.FirstOrDefaultAsync();
+
+                if (config == null)
+                {
+                    config = new ConfiguracionConfianza();
+                    _context.ConfiguracionesConfianza.Add(config);
+                }
+
+                // Actualizar criterio 1: Verificación de identidad
+                config.VerificacionIdentidadHabilitada = model.VerificacionIdentidadHabilitada;
+                config.PuntosVerificacionIdentidad = model.PuntosVerificacionIdentidad;
+                config.DescripcionVerificacionIdentidad = model.DescripcionVerificacionIdentidad;
+
+                // Actualizar criterio 2: Verificación de edad
+                config.VerificacionEdadHabilitada = model.VerificacionEdadHabilitada;
+                config.PuntosVerificacionEdad = model.PuntosVerificacionEdad;
+                config.DescripcionVerificacionEdad = model.DescripcionVerificacionEdad;
+
+                // Actualizar criterio 3: Tasa de respuesta
+                config.TasaRespuestaHabilitada = model.TasaRespuestaHabilitada;
+                config.PuntosTasaRespuesta = model.PuntosTasaRespuesta;
+                config.PorcentajeMinimoRespuesta = model.PorcentajeMinimoRespuesta;
+                config.DescripcionTasaRespuesta = model.DescripcionTasaRespuesta;
+
+                // Actualizar criterio 4: Actividad reciente
+                config.ActividadRecienteHabilitada = model.ActividadRecienteHabilitada;
+                config.PuntosActividadReciente = model.PuntosActividadReciente;
+                config.HorasMaximasInactividad = model.HorasMaximasInactividad;
+                config.DescripcionActividadReciente = model.DescripcionActividadReciente;
+
+                // Actualizar criterio 5: Contenido publicado
+                config.ContenidoPublicadoHabilitado = model.ContenidoPublicadoHabilitado;
+                config.PuntosContenidoPublicado = model.PuntosContenidoPublicado;
+                config.MinimoPublicaciones = model.MinimoPublicaciones;
+                config.DescripcionContenidoPublicado = model.DescripcionContenidoPublicado;
+
+                // Actualizar configuración general
+                config.NivelMaximo = model.NivelMaximo;
+                config.MostrarBadgesEnPerfil = model.MostrarBadgesEnPerfil;
+                config.MostrarEstrellasEnPerfil = model.MostrarEstrellasEnPerfil;
+
+                // Auditoría
+                config.FechaModificacion = DateTime.Now;
+                config.ModificadoPor = User.Identity?.Name;
+
+                await _context.SaveChangesAsync();
+
+                // Invalidar cache del TrustService
+                Services.TrustService.InvalidarCache();
+
+                await _logEventoService.RegistrarEventoAsync(
+                    "Configuración de niveles de confianza actualizada",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Info,
+                    User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                    User.Identity?.Name);
+
+                TempData["Success"] = "Configuración de confianza actualizada correctamente";
+                return RedirectToAction("ConfigurarConfianza");
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error al guardar: {ex.Message}";
+                return RedirectToAction("ConfigurarConfianza");
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ObtenerConfiguracionConfianza()
+        {
+            var config = await _context.ConfiguracionesConfianza.FirstOrDefaultAsync();
+            if (config == null)
+            {
+                return Json(new { success = false, message = "Configuración no encontrada" });
+            }
+
+            return Json(new
+            {
+                success = true,
+                config = new
+                {
+                    // Criterio 1
+                    config.VerificacionIdentidadHabilitada,
+                    config.PuntosVerificacionIdentidad,
+                    config.DescripcionVerificacionIdentidad,
+                    // Criterio 2
+                    config.VerificacionEdadHabilitada,
+                    config.PuntosVerificacionEdad,
+                    config.DescripcionVerificacionEdad,
+                    // Criterio 3
+                    config.TasaRespuestaHabilitada,
+                    config.PuntosTasaRespuesta,
+                    config.PorcentajeMinimoRespuesta,
+                    config.DescripcionTasaRespuesta,
+                    // Criterio 4
+                    config.ActividadRecienteHabilitada,
+                    config.PuntosActividadReciente,
+                    config.HorasMaximasInactividad,
+                    config.DescripcionActividadReciente,
+                    // Criterio 5
+                    config.ContenidoPublicadoHabilitado,
+                    config.PuntosContenidoPublicado,
+                    config.MinimoPublicaciones,
+                    config.DescripcionContenidoPublicado,
+                    // General
+                    config.NivelMaximo,
+                    config.MostrarBadgesEnPerfil,
+                    config.MostrarEstrellasEnPerfil,
+                    // Auditoría
+                    config.FechaModificacion,
+                    config.ModificadoPor
+                }
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResetearConfiguracionConfianza()
+        {
+            try
+            {
+                var config = await _context.ConfiguracionesConfianza.FirstOrDefaultAsync();
+                if (config != null)
+                {
+                    _context.ConfiguracionesConfianza.Remove(config);
+                    await _context.SaveChangesAsync();
+                }
+
+                // Crear nueva configuración con valores por defecto
+                var nuevaConfig = new ConfiguracionConfianza
+                {
+                    FechaModificacion = DateTime.Now,
+                    ModificadoPor = User.Identity?.Name
+                };
+                _context.ConfiguracionesConfianza.Add(nuevaConfig);
+                await _context.SaveChangesAsync();
+
+                // Invalidar cache
+                Services.TrustService.InvalidarCache();
+
+                await _logEventoService.RegistrarEventoAsync(
+                    "Configuración de niveles de confianza reseteada a valores por defecto",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Warning,
+                    User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                    User.Identity?.Name);
+
+                TempData["Success"] = "Configuración reseteada a valores por defecto";
+                return RedirectToAction("ConfigurarConfianza");
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error al resetear: {ex.Message}";
+                return RedirectToAction("ConfigurarConfianza");
             }
         }
     }

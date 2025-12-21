@@ -40,6 +40,13 @@ namespace Lado.Models
         [StringLength(500)]
         public string? BiografiaLadoB { get; set; }
 
+        /// <summary>
+        /// Si es true, usuarios que no siguen el LadoA no pueden ver el perfil LadoA.
+        /// Protege la identidad real de creadores LadoB.
+        /// </summary>
+        [Display(Name = "Ocultar Identidad LadoA")]
+        public bool OcultarIdentidadLadoA { get; set; } = true;
+
         // === TIPO DE USUARIO ===
         [Display(Name = "Tipo de Usuario")]
         public int TipoUsuario { get; set; } = 0; // 0 = Fan, 1 = Creador, 2 = Agencia (Admin se maneja por Roles)

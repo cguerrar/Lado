@@ -521,6 +521,9 @@ namespace Lado.Migrations
                     b.Property<int>("NumeroSeguidores")
                         .HasColumnType("int");
 
+                    b.Property<bool>("OcultarIdentidadLadoA")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Pais")
                         .HasMaxLength(5)
                         .HasColumnType("nvarchar(5)");
@@ -1180,7 +1183,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "ComisionBilleteraElectronica",
                             Descripcion = "Comision por usar billetera electronica (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 20, 22, 50, 3, 476, DateTimeKind.Local).AddTicks(1570),
+                            UltimaModificacion = new DateTime(2025, 12, 21, 19, 20, 24, 914, DateTimeKind.Local).AddTicks(2894),
                             Valor = "2.5"
                         },
                         new
@@ -1189,7 +1192,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "TiempoProcesoRetiro",
                             Descripcion = "Tiempo estimado para procesar retiros",
-                            UltimaModificacion = new DateTime(2025, 12, 20, 22, 50, 3, 476, DateTimeKind.Local).AddTicks(1633),
+                            UltimaModificacion = new DateTime(2025, 12, 21, 19, 20, 24, 914, DateTimeKind.Local).AddTicks(3010),
                             Valor = "3-5 dias habiles"
                         },
                         new
@@ -1198,7 +1201,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMinimoRecarga",
                             Descripcion = "Monto minimo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 20, 22, 50, 3, 476, DateTimeKind.Local).AddTicks(1635),
+                            UltimaModificacion = new DateTime(2025, 12, 21, 19, 20, 24, 914, DateTimeKind.Local).AddTicks(3011),
                             Valor = "5"
                         },
                         new
@@ -1207,7 +1210,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMaximoRecarga",
                             Descripcion = "Monto maximo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 20, 22, 50, 3, 476, DateTimeKind.Local).AddTicks(1636),
+                            UltimaModificacion = new DateTime(2025, 12, 21, 19, 20, 24, 914, DateTimeKind.Local).AddTicks(3013),
                             Valor = "1000"
                         },
                         new
@@ -1216,7 +1219,7 @@ namespace Lado.Migrations
                             Categoria = "General",
                             Clave = "ComisionPlataforma",
                             Descripcion = "Comision general de la plataforma (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 20, 22, 50, 3, 476, DateTimeKind.Local).AddTicks(1637),
+                            UltimaModificacion = new DateTime(2025, 12, 21, 19, 20, 24, 914, DateTimeKind.Local).AddTicks(3014),
                             Valor = "20"
                         });
                 });
@@ -1359,6 +1362,18 @@ namespace Lado.Migrations
                     b.HasIndex("TipoLado");
 
                     b.HasIndex("UsuarioId");
+
+                    b.HasIndex("NumeroLikes", "NumeroComentarios", "FechaPublicacion")
+                        .HasDatabaseName("IX_Contenidos_Popularidad");
+
+                    b.HasIndex("TipoLado", "EstaActivo", "Latitud", "Longitud")
+                        .HasDatabaseName("IX_Contenidos_Mapa_Optimizado");
+
+                    b.HasIndex("EstaActivo", "EsBorrador", "Censurado", "EsPrivado", "UsuarioId")
+                        .HasDatabaseName("IX_Contenidos_Usuario_Activo");
+
+                    b.HasIndex("EstaActivo", "EsBorrador", "Censurado", "EsPrivado", "TipoLado", "FechaPublicacion")
+                        .HasDatabaseName("IX_Contenidos_Explorar_Optimizado");
 
                     b.ToTable("Contenidos");
                 });

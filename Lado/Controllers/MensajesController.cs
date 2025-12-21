@@ -281,18 +281,21 @@ namespace Lado.Controllers
                 // 🚫 RATE LIMITING - Prevenir abuso
                 // ========================================
                 var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var userAgent = Request.Headers["User-Agent"].ToString();
                 var rateLimitKey = $"message_send_{usuario.Id}";
                 var rateLimitKeyIp = $"message_send_ip_{clientIp}";
 
-                // Límite por IP: máximo 60 mensajes por minuto
-                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, 60, TimeSpan.FromMinutes(1)))
+                // Límite por IP: máximo 60 mensajes por minuto (registra en BD)
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyIp, 60, TimeSpan.FromMinutes(1),
+                    TipoAtaque.SpamMensajes, "/Mensajes/Enviar", usuario.Id, userAgent))
                 {
                     _logger.LogWarning("🚨 RATE LIMIT IP MENSAJE: IP {IP} excedió límite - Usuario: {UserId}", clientIp, usuario.Id);
                     return Json(new { success = false, message = "Demasiados mensajes enviados. Espera un momento." });
                 }
 
-                // Límite por usuario: máximo 30 mensajes por minuto
-                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.Messaging_MaxRequests, RateLimits.Messaging_Window))
+                // Límite por usuario: máximo 30 mensajes por minuto (registra en BD)
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKey, RateLimits.Messaging_MaxRequests, RateLimits.Messaging_Window,
+                    TipoAtaque.SpamMensajes, "/Mensajes/Enviar", usuario.Id, userAgent))
                 {
                     _logger.LogWarning("🚫 RATE LIMIT MENSAJE: Usuario {UserId} excedió límite - IP: {IP}", usuario.Id, clientIp);
                     return Json(new { success = false, message = "Estás enviando mensajes muy rápido. Espera un momento." });
@@ -709,6 +712,92 @@ namespace Lado.Controllers
         }
 
         // ========================================
+        // BUSCAR USUARIOS (para nuevo mensaje)
+        // ========================================
+
+        [HttpGet]
+        [Route("api/mensajes/buscar-usuarios")]
+        public async Task<IActionResult> BuscarUsuarios([FromQuery] string query)
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
+                {
+                    return Unauthorized();
+                }
+
+                if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+                {
+                    return Json(new List<object>());
+                }
+
+                // Obtener IDs de usuarios bloqueados
+                var usuariosBloqueadosIds = await _context.BloqueosUsuarios
+                    .Where(b => b.BloqueadorId == usuario.Id || b.BloqueadoId == usuario.Id)
+                    .Select(b => b.BloqueadorId == usuario.Id ? b.BloqueadoId : b.BloqueadorId)
+                    .Distinct()
+                    .ToListAsync();
+
+                // Buscar usuarios que coincidan con el query
+                var queryNormalizado = query.ToLower().Trim();
+                var usuarios = await _context.Users
+                    .Where(u => u.Id != usuario.Id && // No incluir al usuario actual
+                               u.EstaActivo && // Solo usuarios activos
+                               !usuariosBloqueadosIds.Contains(u.Id) && // Excluir bloqueados
+                               (u.UserName!.ToLower().Contains(queryNormalizado) ||
+                                u.NombreCompleto.ToLower().Contains(queryNormalizado) ||
+                                (u.Seudonimo != null && u.Seudonimo.ToLower().Contains(queryNormalizado))))
+                    .Take(10) // Limitar resultados
+                    .Select(u => new
+                    {
+                        id = u.Id,
+                        userName = u.UserName,
+                        nombre = u.NombreCompleto,
+                        fotoPerfil = u.FotoPerfil,
+                        esVerificado = u.CreadorVerificado,
+                        esCreador = u.EsCreador
+                    })
+                    .ToListAsync();
+
+                return Json(usuarios);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error buscando usuarios con query: {Query}", query);
+                return StatusCode(500);
+            }
+        }
+
+        // ========================================
+        // CONTAR MENSAJES NO LEÍDOS
+        // ========================================
+
+        [HttpGet]
+        [Route("api/mensajes/no-leidos-count")]
+        public async Task<IActionResult> NoLeidosCount()
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
+                {
+                    return Json(new { count = 0 });
+                }
+
+                var count = await _context.ChatMensajes
+                    .CountAsync(m => m.DestinatarioId == usuario.Id && !m.Leido);
+
+                return Json(new { count });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error obteniendo mensajes no leídos");
+                return Json(new { count = 0 });
+            }
+        }
+
+        // ========================================
         // ENVIAR MENSAJE DIRECTO (desde perfil)
         // ========================================
 
@@ -731,15 +820,17 @@ namespace Lado.Controllers
                 var rateLimitKey = $"message_send_{usuario.Id}";
                 var rateLimitKeyIp = $"message_send_ip_{clientIp}";
 
-                // Límite por IP
-                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, 60, TimeSpan.FromMinutes(1)))
+                // Límite por IP (registra en BD)
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyIp, 60, TimeSpan.FromMinutes(1),
+                    TipoAtaque.SpamMensajes, "/Mensajes/EnviarMensajeDirecto", usuario.Id))
                 {
                     _logger.LogWarning("🚨 RATE LIMIT IP MENSAJE DIRECTO: IP {IP} excedió límite - Usuario: {UserId}", clientIp, usuario.Id);
                     return Json(new { success = false, message = "Demasiados mensajes enviados. Espera un momento." });
                 }
 
-                // Límite por usuario
-                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.Messaging_MaxRequests, RateLimits.Messaging_Window))
+                // Límite por usuario (registra en BD)
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKey, RateLimits.Messaging_MaxRequests, RateLimits.Messaging_Window,
+                    TipoAtaque.SpamMensajes, "/Mensajes/EnviarMensajeDirecto", usuario.Id))
                 {
                     _logger.LogWarning("🚫 RATE LIMIT MENSAJE DIRECTO: Usuario {UserId} excedió límite - IP: {IP}", usuario.Id, clientIp);
                     return Json(new { success = false, message = "Estás enviando mensajes muy rápido. Espera un momento." });
@@ -899,6 +990,99 @@ namespace Lado.Controllers
             {
                 _logger.LogError(ex, "Error al enviar mensaje directo");
                 return Json(new { success = false, message = "Error al enviar el mensaje" });
+            }
+        }
+
+        // ========================================
+        // CONVERSACIONES API (para popup del feed)
+        // ========================================
+
+        [HttpGet]
+        [Route("api/mensajes/conversaciones")]
+        public async Task<IActionResult> ObtenerConversacionesApi()
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
+                {
+                    return Json(new List<object>());
+                }
+
+                // Obtener usuarios bloqueados
+                var bloqueadosIds = await _context.BloqueosUsuarios
+                    .Where(b => b.BloqueadorId == usuario.Id || b.BloqueadoId == usuario.Id)
+                    .Select(b => b.BloqueadorId == usuario.Id ? b.BloqueadoId : b.BloqueadorId)
+                    .ToListAsync();
+
+                // Obtener mensajes (tanto MensajesPrivados como ChatMensajes)
+                var mensajesPrivados = await _context.MensajesPrivados
+                    .Include(m => m.Remitente)
+                    .Include(m => m.Destinatario)
+                    .Where(m => (m.RemitenteId == usuario.Id || m.DestinatarioId == usuario.Id) &&
+                               !bloqueadosIds.Contains(m.RemitenteId) &&
+                               !bloqueadosIds.Contains(m.DestinatarioId))
+                    .ToListAsync();
+
+                var chatMensajes = await _context.ChatMensajes
+                    .Include(m => m.Remitente)
+                    .Include(m => m.Destinatario)
+                    .Where(m => (m.RemitenteId == usuario.Id || m.DestinatarioId == usuario.Id) &&
+                               !bloqueadosIds.Contains(m.RemitenteId) &&
+                               !bloqueadosIds.Contains(m.DestinatarioId))
+                    .ToListAsync();
+
+                // Combinar todos los mensajes en una estructura común
+                var todosMensajes = new List<(string OtroUsuarioId, ApplicationUser OtroUsuario, string UltimoMensaje, DateTime Fecha, bool NoLeido)>();
+
+                foreach (var m in mensajesPrivados)
+                {
+                    var otroId = m.RemitenteId == usuario.Id ? m.DestinatarioId : m.RemitenteId;
+                    var otroUsuario = m.RemitenteId == usuario.Id ? m.Destinatario : m.Remitente;
+                    var noLeido = m.DestinatarioId == usuario.Id && !m.Leido;
+                    todosMensajes.Add((otroId, otroUsuario, m.Contenido ?? "", m.FechaEnvio, noLeido));
+                }
+
+                foreach (var m in chatMensajes)
+                {
+                    var otroId = m.RemitenteId == usuario.Id ? m.DestinatarioId : m.RemitenteId;
+                    var otroUsuario = m.RemitenteId == usuario.Id ? m.Destinatario : m.Remitente;
+                    var noLeido = m.DestinatarioId == usuario.Id && !m.Leido;
+                    todosMensajes.Add((otroId, otroUsuario, m.Mensaje ?? "", m.FechaEnvio, noLeido));
+                }
+
+                // Agrupar por usuario y tomar el mensaje más reciente
+                var conversaciones = todosMensajes
+                    .Where(m => m.OtroUsuario != null)
+                    .GroupBy(m => m.OtroUsuarioId)
+                    .Select(g =>
+                    {
+                        var ultimo = g.OrderByDescending(m => m.Fecha).First();
+                        var noLeidos = g.Count(m => m.NoLeido);
+
+                        return new
+                        {
+                            usuarioId = ultimo.OtroUsuarioId,
+                            nombreUsuario = ultimo.OtroUsuario?.NombreCompleto ?? ultimo.OtroUsuario?.UserName ?? "Usuario",
+                            fotoPerfil = ultimo.OtroUsuario?.FotoPerfil,
+                            ultimoMensaje = ultimo.UltimoMensaje.Length > 50
+                                ? ultimo.UltimoMensaje.Substring(0, 50) + "..."
+                                : ultimo.UltimoMensaje,
+                            fechaUltimoMensaje = ultimo.Fecha,
+                            noLeidos = noLeidos,
+                            enLinea = false // Se puede implementar después con SignalR
+                        };
+                    })
+                    .OrderByDescending(c => c.fechaUltimoMensaje)
+                    .Take(20)
+                    .ToList();
+
+                return Json(conversaciones);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error obteniendo conversaciones para popup");
+                return Json(new List<object>());
             }
         }
     }

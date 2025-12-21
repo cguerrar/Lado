@@ -1371,12 +1371,36 @@ class ReelsCreator {
                 console.log('⚠️ editMetadata es null/undefined');
             }
 
+            // Obtener el token CSRF
+            const tokenElement = document.querySelector('input[name="__RequestVerificationToken"]');
+            const csrfToken = tokenElement ? tokenElement.value : '';
+
             const response = await fetch('/Contenido/CrearDesdeReels', {
                 method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                },
                 body: formData
             });
 
-            const result = await response.json();
+            // Verificar si la respuesta es válida antes de parsear
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Server error:', response.status, errorText.substring(0, 500));
+                this.showMessage(`Error del servidor: ${response.status}`, 'error');
+                return;
+            }
+
+            // Intentar parsear JSON de forma segura
+            let result;
+            try {
+                const text = await response.text();
+                result = JSON.parse(text);
+            } catch (parseError) {
+                console.error('JSON parse error:', parseError);
+                this.showMessage('Error al procesar respuesta del servidor', 'error');
+                return;
+            }
 
             if (result.success) {
                 this.showMessage('Publicado exitosamente!', 'success');
@@ -1394,7 +1418,7 @@ class ReelsCreator {
             }
         } catch (error) {
             console.error('Error publishing:', error);
-            this.showMessage('Error al publicar el contenido', 'error');
+            this.showMessage('Error al publicar: ' + error.message, 'error');
         } finally {
             this.showLoading(false);
         }

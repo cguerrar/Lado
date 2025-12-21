@@ -4,6 +4,8 @@
     var totalNoLeidas = ViewBag.TotalNoLeidas ?? 0;
 }
 
+@Html.AntiForgeryToken()
+
 <style>
     .notifications-page {
         max-width: 680px;
@@ -681,12 +683,19 @@
         });
     });
 
+    function getAntiForgeryToken() {
+        return document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+    }
+
     async function marcarLeida(id) {
         try {
+            const formData = new FormData();
+            formData.append('__RequestVerificationToken', getAntiForgeryToken());
+            formData.append('NotificacionId', id);
+
             await fetch('/Usuario/MarcarNotificacionLeida', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ NotificacionId: id })
+                body: formData
             });
             const item = document.querySelector(`.notification-item[data-id="${id}"]`);
             if (item) item.classList.remove('unread');
@@ -697,9 +706,12 @@
 
     async function marcarTodasLeidas() {
         try {
+            const formData = new FormData();
+            formData.append('__RequestVerificationToken', getAntiForgeryToken());
+
             const response = await fetch('/Usuario/MarcarTodasLeidas', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                body: formData
             });
             const data = await response.json();
             if (data.success) {
@@ -732,10 +744,13 @@
         item.style.transform = 'translateX(50px)';
 
         try {
+            const formData = new FormData();
+            formData.append('__RequestVerificationToken', getAntiForgeryToken());
+            formData.append('NotificacionId', id);
+
             const response = await fetch('/Usuario/EliminarNotificacion', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ NotificacionId: id })
+                body: formData
             });
             const data = await response.json();
             if (data.success) {
@@ -759,32 +774,41 @@
             return;
         }
 
-        const items = document.querySelectorAll('.notification-item');
-        let eliminadas = 0;
+        try {
+            const formData = new FormData();
+            formData.append('__RequestVerificationToken', getAntiForgeryToken());
 
-        for (const item of items) {
-            const id = item.dataset.id;
-            try {
-                await fetch('/Usuario/EliminarNotificacion', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ NotificacionId: parseInt(id) })
+            const response = await fetch('/Usuario/EliminarTodasNotificaciones', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                const items = document.querySelectorAll('.notification-item');
+                items.forEach(item => {
+                    item.style.transition = 'all 0.2s ease';
+                    item.style.opacity = '0';
                 });
-                item.style.transition = 'all 0.2s ease';
-                item.style.opacity = '0';
-                eliminadas++;
-            } catch (e) {
-                console.error('Error eliminando:', e);
+
+                setTimeout(() => {
+                    items.forEach(item => item.remove());
+                    verificarListaVacia();
+                    if (window.showToast) {
+                        showToast('success', 'Listo', `${data.eliminadas} notificaciones eliminadas`);
+                    }
+                }, 300);
+            } else {
+                if (window.showToast) {
+                    showToast('error', 'Error', data.message || 'No se pudieron eliminar las notificaciones');
+                }
+            }
+        } catch (e) {
+            console.error('Error eliminando:', e);
+            if (window.showToast) {
+                showToast('error', 'Error', 'Error al eliminar las notificaciones');
             }
         }
-
-        setTimeout(() => {
-            items.forEach(item => item.remove());
-            verificarListaVacia();
-            if (window.showToast) {
-                showToast('success', 'Listo', `${eliminadas} notificaciones eliminadas`);
-            }
-        }, 300);
     }
 
     function verificarListaVacia() {

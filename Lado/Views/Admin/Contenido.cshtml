@@ -466,6 +466,14 @@
 </div>
 
 <script>
+    // Función de escape para prevenir XSS
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     // Reclasificar contenido con IA
     async function reclasificarContenido(id) {
         const icon = document.getElementById('icon-reclasificar-' + id);
@@ -494,26 +502,23 @@
                     </div>
                 `;
                 icon.className = 'fas fa-check text-success';
-                // Mostrar mensaje si se creo categoria nueva
-                if (data.categoriaCreada) {
-                    alert('Nueva categoria creada: ' + data.categoriaNombre);
-                }
                 setTimeout(() => { icon.className = 'fas fa-robot'; }, 2000);
             } else {
-                // Mostrar error detallado
-                let errorMsg = data.message || 'Error desconocido';
-                if (data.detalle) {
-                    errorMsg += '\n\nDetalle: ' + data.detalle;
-                }
-                if (data.tiempoMs) {
-                    errorMsg += '\n\nTiempo: ' + data.tiempoMs + 'ms';
-                }
-                alert(errorMsg);
-                icon.className = 'fas fa-robot';
+                // Mostrar error visual sin alert - el detalle queda en el log del servidor
+                icon.className = 'fas fa-times text-danger';
+                categoriaContainer.innerHTML = `
+                    <small class="text-danger" title="${data.detalle || data.message || 'Error'}">
+                        <i class="fas fa-exclamation-triangle"></i> Error IA
+                    </small>
+                `;
+                console.warn('Error clasificacion IA:', data.message, data.detalle);
+                setTimeout(() => { icon.className = 'fas fa-robot'; }, 3000);
             }
         } catch (error) {
-            alert('Error de conexion: ' + error.message);
-            icon.className = 'fas fa-robot';
+            // Error de conexion - mostrar visual sin alert
+            icon.className = 'fas fa-times text-danger';
+            console.error('Error conexion clasificacion:', error.message);
+            setTimeout(() => { icon.className = 'fas fa-robot'; }, 3000);
         }
     }
 
@@ -569,9 +574,9 @@
                             item.type = 'button';
                             item.className = 'list-group-item list-group-item-action d-flex align-items-center gap-2';
                             item.innerHTML = (user.fotoPerfil ?
-                                '<img src="' + user.fotoPerfil + '" class="rounded-circle" style="width:30px;height:30px;object-fit:cover;">' :
-                                '<div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:30px;height:30px;font-size:0.8rem;"><strong>' + user.userName.substring(0,1).toUpperCase() + '</strong></div>') +
-                                '<span><strong>' + user.userName + '</strong>' + (user.esCreador ? ' <span class="badge bg-success">Creador</span>' : '') + '</span>';
+                                '<img src="' + escapeHtml(user.fotoPerfil) + '" class="rounded-circle" style="width:30px;height:30px;object-fit:cover;">' :
+                                '<div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:30px;height:30px;font-size:0.8rem;"><strong>' + escapeHtml(user.userName?.substring(0,1)?.toUpperCase() || '') + '</strong></div>') +
+                                '<span><strong>' + escapeHtml(user.userName) + '</strong>' + (user.esCreador ? ' <span class="badge bg-success">Creador</span>' : '') + '</span>';
                             item.onclick = function() {
                                 seleccionarUsuario(user.id, user.userName, user.fotoPerfil);
                             };
@@ -591,9 +596,9 @@
         document.getElementById('usuarioSeleccionado').innerHTML =
             '<div class="d-flex align-items-center gap-2">' +
             (fotoPerfil ?
-                '<img src="' + fotoPerfil + '" class="rounded-circle" style="width:40px;height:40px;object-fit:cover;">' :
-                '<div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:40px;height:40px;"><strong>' + userName.substring(0,1).toUpperCase() + '</strong></div>') +
-            '<strong>' + userName + '</strong></div>';
+                '<img src="' + escapeHtml(fotoPerfil) + '" class="rounded-circle" style="width:40px;height:40px;object-fit:cover;">' :
+                '<div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:40px;height:40px;"><strong>' + escapeHtml(userName?.substring(0,1)?.toUpperCase() || '') + '</strong></div>') +
+            '<strong>' + escapeHtml(userName) + '</strong></div>';
         document.getElementById('btnTransferir').disabled = false;
         document.getElementById('resultadosUsuarios').style.display = 'none';
         document.getElementById('buscarUsuario').value = '';

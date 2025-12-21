@@ -17,17 +17,20 @@ namespace Lado.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IInteresesService _interesesService;
         private readonly ILogger<InteresesController> _logger;
+        private readonly IRateLimitService _rateLimitService;
 
         public InteresesController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             IInteresesService interesesService,
-            ILogger<InteresesController> logger)
+            ILogger<InteresesController> logger,
+            IRateLimitService rateLimitService)
         {
             _context = context;
             _userManager = userManager;
             _interesesService = interesesService;
             _logger = logger;
+            _rateLimitService = rateLimitService;
         }
 
         /// <summary>
@@ -99,6 +102,14 @@ namespace Lado.Controllers
             if (usuario == null)
                 return Unauthorized();
 
+            // Rate limiting: máximo 50 cambios de intereses por 5 minutos
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            if (!await _rateLimitService.IsAllowedAsync(clientIp, $"intereses_user_{usuario.Id}", 50, TimeSpan.FromMinutes(5),
+                TipoAtaque.Otro, "/api/Intereses/agregar", usuario.Id))
+            {
+                return StatusCode(429, new { message = "Demasiadas solicitudes. Espera unos minutos." });
+            }
+
             var categoriaExiste = await _context.CategoriasIntereses
                 .AnyAsync(c => c.Id == categoriaId && c.EstaActiva);
 
@@ -141,6 +152,14 @@ namespace Lado.Controllers
             if (usuario == null)
                 return Unauthorized();
 
+            // Rate limiting: máximo 5 recálculos por hora (operación costosa)
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            if (!await _rateLimitService.IsAllowedAsync(clientIp, $"recalcular_user_{usuario.Id}", 5, TimeSpan.FromHours(1),
+                TipoAtaque.Otro, "/api/Intereses/recalcular", usuario.Id))
+            {
+                return StatusCode(429, new { message = "Demasiados recálculos. Espera una hora." });
+            }
+
             await _interesesService.RecalcularPesosUsuarioAsync(usuario.Id);
 
             return Ok(new { success = true, message = "Pesos recalculados correctamente" });
@@ -155,6 +174,14 @@ namespace Lado.Controllers
             var usuario = await _userManager.GetUserAsync(User);
             if (usuario == null)
                 return Unauthorized();
+
+            // Rate limiting: máximo 10 guardados por hora
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            if (!await _rateLimitService.IsAllowedAsync(clientIp, $"guardar_intereses_user_{usuario.Id}", 10, TimeSpan.FromHours(1),
+                TipoAtaque.Otro, "/api/Intereses/guardar-multiples", usuario.Id))
+            {
+                return StatusCode(429, new { message = "Demasiadas solicitudes. Espera una hora." });
+            }
 
             if (categoriaIds == null || !categoriaIds.Any())
                 return BadRequest(new { message = "Debe seleccionar al menos una categoria" });

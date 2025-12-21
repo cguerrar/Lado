@@ -201,14 +201,16 @@ namespace Lado.Controllers
                 var rateLimitKeyIp = $"story_create_ip_{clientIp}";
 
                 // Límite por IP: máximo 20 stories por 5 minutos
-                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window,
+                    TipoAtaque.SpamContenido, "/Stories/Crear", usuarioId))
                 {
                     _logger.LogWarning("🚨 RATE LIMIT IP STORY: IP {IP} excedió límite - Usuario: {UserId}", clientIp, usuarioId);
                     return Json(new { success = false, message = "Demasiadas solicitudes desde tu conexión. Espera unos minutos." });
                 }
 
                 // Límite por usuario: máximo 10 stories por 5 minutos
-                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window,
+                    TipoAtaque.SpamContenido, "/Stories/Crear", usuarioId))
                 {
                     _logger.LogWarning("🚫 RATE LIMIT STORY: Usuario {UserId} excedió límite de 5 min - IP: {IP}", usuarioId, clientIp);
                     return Json(new { success = false, message = "Has creado demasiadas stories en poco tiempo. Espera unos minutos." });

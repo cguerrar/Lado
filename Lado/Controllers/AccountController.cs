@@ -62,6 +62,20 @@ namespace Lado.Controllers
                 return View(model);
             }
 
+            // Rate limiting: máximo 3 registros por hora por IP
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            if (!await _rateLimitService.IsAllowedAsync(
+                clientIp,
+                $"register_ip_{clientIp}",
+                3,
+                TimeSpan.FromHours(1),
+                TipoAtaque.SpamRegistro,
+                "/Account/Register"))
+            {
+                ModelState.AddModelError(string.Empty, "Demasiados intentos de registro. Intenta más tarde.");
+                return View(model);
+            }
+
             try
             {
                 // ✅ Verificar que el nombre de usuario no exista
@@ -176,6 +190,20 @@ namespace Lado.Controllers
             if (!ModelState.IsValid)
             {
                 _logger.LogWarning("ModelState inválido en Login");
+                return View(model);
+            }
+
+            // Rate limiting: máximo 10 intentos de login por 15 minutos por IP
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            if (!await _rateLimitService.IsAllowedAsync(
+                clientIp,
+                $"login_ip_{clientIp}",
+                10,
+                TimeSpan.FromMinutes(15),
+                TipoAtaque.FuerzaBruta,
+                "/Account/Login"))
+            {
+                ModelState.AddModelError(string.Empty, "Demasiados intentos de inicio de sesión. Intenta en 15 minutos.");
                 return View(model);
             }
 
@@ -529,8 +557,10 @@ namespace Lado.Controllers
         {
             // Rate limiting para prevenir enumeración de usuarios
             var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var userAgent = Request.Headers["User-Agent"].ToString();
             var rateLimitKey = $"check_user_ip_{clientIp}";
-            if (!_rateLimitService.IsAllowed(rateLimitKey, 30, TimeSpan.FromMinutes(5)))
+            if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKey, 30, TimeSpan.FromMinutes(5),
+                TipoAtaque.Scraping, "/Account/CheckUsernameAvailability", null, userAgent))
             {
                 _logger.LogWarning("🚨 RATE LIMIT CHECK USERNAME: IP {IP} excedió límite", clientIp);
                 return Json(new { available = false, message = "Demasiadas solicitudes. Espera unos minutos." });
@@ -556,8 +586,10 @@ namespace Lado.Controllers
         {
             // Rate limiting para prevenir enumeración de usuarios
             var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var userAgent = Request.Headers["User-Agent"].ToString();
             var rateLimitKey = $"check_email_ip_{clientIp}";
-            if (!_rateLimitService.IsAllowed(rateLimitKey, 30, TimeSpan.FromMinutes(5)))
+            if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKey, 30, TimeSpan.FromMinutes(5),
+                TipoAtaque.Scraping, "/Account/CheckEmailAvailability", null, userAgent))
             {
                 _logger.LogWarning("🚨 RATE LIMIT CHECK EMAIL: IP {IP} excedió límite", clientIp);
                 return Json(new { available = false, message = "Demasiadas solicitudes. Espera unos minutos." });
@@ -583,8 +615,10 @@ namespace Lado.Controllers
         {
             // Rate limiting para prevenir enumeración de usuarios
             var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var userAgent = Request.Headers["User-Agent"].ToString();
             var rateLimitKey = $"check_seud_ip_{clientIp}";
-            if (!_rateLimitService.IsAllowed(rateLimitKey, 30, TimeSpan.FromMinutes(5)))
+            if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKey, 30, TimeSpan.FromMinutes(5),
+                TipoAtaque.Scraping, "/Account/CheckSeudonimoAvailability", null, userAgent))
             {
                 _logger.LogWarning("🚨 RATE LIMIT CHECK SEUDONIMO: IP {IP} excedió límite", clientIp);
                 return Json(new { available = false, message = "Demasiadas solicitudes. Espera unos minutos." });

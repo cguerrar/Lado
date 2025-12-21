@@ -118,6 +118,12 @@ namespace Lado.Controllers
                 })
                 .ToListAsync();
 
+            // Total de seguidores para botón "Ver todos"
+            ViewBag.TotalSeguidoresLadoA = await _context.Suscripciones
+                .CountAsync(s => s.CreadorId == usuario.Id && s.EstaActiva && s.TipoLado == TipoLado.LadoA);
+            ViewBag.TotalSeguidoresLadoB = await _context.Suscripciones
+                .CountAsync(s => s.CreadorId == usuario.Id && s.EstaActiva && s.TipoLado == TipoLado.LadoB);
+
             // OPTIMIZADO: Cálculo de ingresos por semana (últimas 4 semanas) en UNA sola consulta
             var hoy = DateTime.Now;
             var hace4Semanas = hoy.AddDays(-28);
@@ -196,6 +202,75 @@ namespace Lado.Controllers
                 .ToListAsync();
 
             ViewBag.ActividadesFan = actividadesFan;
+        }
+
+        // ========================================
+        // OBTENER TODOS LOS SEGUIDORES
+        // ========================================
+
+        [HttpGet]
+        public async Task<IActionResult> ObtenerTodosSeguidores(string tipoLado, int page = 1, int pageSize = 20)
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            TipoLado tipo = tipoLado?.ToLower() == "ladob" ? TipoLado.LadoB : TipoLado.LadoA;
+
+            var query = _context.Suscripciones
+                .Where(s => s.CreadorId == usuario.Id && s.EstaActiva && s.TipoLado == tipo)
+                .Include(s => s.Fan)
+                .OrderByDescending(s => s.FechaInicio);
+
+            var totalSeguidores = await query.CountAsync();
+
+            var seguidores = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(s => new
+                {
+                    id = s.Fan.Id,
+                    username = s.Fan.UserName,
+                    nombreCompleto = s.Fan.NombreCompleto,
+                    fotoPerfil = s.Fan.FotoPerfil,
+                    fechaSuscripcion = s.FechaInicio
+                })
+                .ToListAsync();
+
+            return Json(new
+            {
+                success = true,
+                seguidores,
+                total = totalSeguidores,
+                page,
+                pageSize,
+                hasMore = page * pageSize < totalSeguidores
+            });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ObtenerConteoSeguidores()
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            var totalLadoA = await _context.Suscripciones
+                .CountAsync(s => s.CreadorId == usuario.Id && s.EstaActiva && s.TipoLado == TipoLado.LadoA);
+
+            var totalLadoB = await _context.Suscripciones
+                .CountAsync(s => s.CreadorId == usuario.Id && s.EstaActiva && s.TipoLado == TipoLado.LadoB);
+
+            return Json(new
+            {
+                success = true,
+                totalLadoA,
+                totalLadoB
+            });
         }
     }
 }

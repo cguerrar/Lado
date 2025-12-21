@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Iconos PWA - LADO</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+            color: white;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+        .subtitle {
+            text-align: center;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 40px;
+        }
+        .preview-section {
+            background: rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+        .preview-section h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .preview-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            justify-content: center;
+        }
+        .preview-item {
+            text-align: center;
+        }
+        .preview-item canvas {
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        }
+        .preview-item p {
+            margin-top: 8px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+        }
+        .btn-download-all {
+            display: block;
+            width: 100%;
+            max-width: 400px;
+            margin: 32px auto 0;
+            padding: 18px 32px;
+            background: linear-gradient(135deg, #4682B4 0%, #2c5f8a 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-download-all:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(70, 130, 180, 0.4);
+        }
+        .instructions {
+            background: rgba(70, 130, 180, 0.2);
+            border: 1px solid rgba(70, 130, 180, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 32px;
+        }
+        .instructions h3 {
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        .instructions ol {
+            padding-left: 20px;
+            line-height: 1.8;
+            color: rgba(255,255,255,0.8);
+        }
+        .instructions code {
+            background: rgba(0,0,0,0.3);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .progress {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+            color: #4682B4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Generador de Iconos PWA</h1>
+        <p class="subtitle">Iconos para la aplicacion LADO</p>
+
+        <div class="preview-section">
+            <h2>Vista previa de iconos</h2>
+            <div class="preview-grid" id="previewGrid"></div>
+        </div>
+
+        <button class="btn-download-all" onclick="downloadAllIcons()">
+            Descargar todos los iconos (ZIP)
+        </button>
+
+        <p class="progress" id="progress">Generando iconos...</p>
+
+        <div class="instructions">
+            <h3>Instrucciones:</h3>
+            <ol>
+                <li>Haz clic en "Descargar todos los iconos"</li>
+                <li>Se descargara un archivo ZIP con todos los iconos</li>
+                <li>Extrae el ZIP</li>
+                <li>Copia todos los archivos PNG a: <code>wwwroot/images/icons/</code></li>
+                <li>Elimina este archivo (generate-icons.html) cuando termines</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- JSZip para crear el ZIP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <script>
+        const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+        const canvases = {};
+
+        // Generar icono en canvas
+        function generateIcon(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Fondo con gradiente
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#4682B4');
+            gradient.addColorStop(1, '#2c5f8a');
+            ctx.fillStyle = gradient;
+
+            // Fondo redondeado (para maskable)
+            const radius = size * 0.2;
+            ctx.beginPath();
+            ctx.roundRect(0, 0, size, size, radius);
+            ctx.fill();
+
+            // Letra "L" estilizada
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${size * 0.55}px -apple-system, BlinkMacSystemFont, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('L', size / 2, size / 2);
+
+            // Linea decorativa debajo de la L
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            const lineY = size * 0.72;
+            const lineWidth = size * 0.35;
+            const lineHeight = size * 0.04;
+            ctx.fillRect((size - lineWidth) / 2, lineY, lineWidth, lineHeight);
+
+            return canvas;
+        }
+
+        // Mostrar previews
+        function showPreviews() {
+            const grid = document.getElementById('previewGrid');
+            grid.innerHTML = '';
+
+            // Mostrar solo algunos tamaños para preview
+            const previewSizes = [72, 144, 192, 512];
+
+            previewSizes.forEach(size => {
+                const canvas = generateIcon(size);
+                canvases[size] = canvas;
+
+                const item = document.createElement('div');
+                item.className = 'preview-item';
+
+                // Escalar para vista previa
+                const displaySize = Math.min(size, 128);
+                canvas.style.width = displaySize + 'px';
+                canvas.style.height = displaySize + 'px';
+
+                item.appendChild(canvas);
+                item.innerHTML += `<p>${size}x${size}</p>`;
+                grid.appendChild(item);
+            });
+
+            // Generar el resto sin mostrar
+            sizes.forEach(size => {
+                if (!canvases[size]) {
+                    canvases[size] = generateIcon(size);
+                }
+            });
+        }
+
+        // Descargar todos como ZIP
+        async function downloadAllIcons() {
+            const progress = document.getElementById('progress');
+            progress.style.display = 'block';
+            progress.textContent = 'Generando iconos...';
+
+            try {
+                const zip = new JSZip();
+
+                for (const size of sizes) {
+                    progress.textContent = `Generando icon-${size}x${size}.png...`;
+
+                    const canvas = generateIcon(size);
+                    const blob = await new Promise(resolve => {
+                        canvas.toBlob(resolve, 'image/png');
+                    });
+
+                    zip.file(`icon-${size}x${size}.png`, blob);
+                }
+
+                progress.textContent = 'Creando archivo ZIP...';
+
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+                // Descargar
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(zipBlob);
+                link.download = 'lado-pwa-icons.zip';
+                link.click();
+
+                progress.textContent = 'Descarga completada!';
+                progress.style.color = '#10B981';
+
+                setTimeout(() => {
+                    progress.style.display = 'none';
+                    progress.style.color = '#4682B4';
+                }, 3000);
+
+            } catch (error) {
+                progress.textContent = 'Error: ' + error.message;
+                progress.style.color = '#EF4444';
+                console.error(error);
+            }
+        }
+
+        // Inicializar
+        showPreviews();
+    </script>
+</body>
+</html>

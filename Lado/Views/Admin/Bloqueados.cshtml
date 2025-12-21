@@ -875,7 +875,7 @@
         try {
             const response = await fetch('/Admin/BloquearIp', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
                 body: JSON.stringify(data)
             });
             const result = await response.json();
@@ -895,18 +895,27 @@
         try {
             const response = await fetch('/Admin/DesbloquearIp', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
                 body: JSON.stringify({ Id: id })
             });
+
+            if (!response.ok) {
+                const text = await response.text();
+                console.error('Error response:', response.status, text);
+                showToast(`Error ${response.status}: ${response.statusText}`, 'error');
+                return;
+            }
+
             const result = await response.json();
             if (result.success) {
                 showToast(result.message, 'success');
                 setTimeout(() => location.reload(), 1000);
             } else {
-                showToast(result.message, 'error');
+                showToast(result.message || 'Error desconocido', 'error');
             }
         } catch (error) {
-            showToast('Error al desbloquear IP', 'error');
+            console.error('Error desbloquearIp:', error);
+            showToast('Error al desbloquear IP: ' + error.message, 'error');
         }
     }
 
@@ -915,7 +924,7 @@
         try {
             const response = await fetch('/Admin/EliminarBloqueoUsuario', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
                 body: JSON.stringify({ Id: id })
             });
             const result = await response.json();
@@ -935,7 +944,7 @@
         try {
             const response = await fetch('/Admin/ActivarUsuario', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
                 body: JSON.stringify({ UsuarioId: usuarioId })
             });
             const result = await response.json();

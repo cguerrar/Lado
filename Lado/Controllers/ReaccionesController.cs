@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Lado.Data;
 using Lado.Models;
+using Lado.Services;
 
 namespace Lado.Controllers
 {
@@ -13,13 +14,16 @@ namespace Lado.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger<ReaccionesController> _logger;
+        private readonly IRateLimitService _rateLimitService;
 
         public ReaccionesController(
             ApplicationDbContext context,
-            ILogger<ReaccionesController> logger)
+            ILogger<ReaccionesController> logger,
+            IRateLimitService rateLimitService)
         {
             _context = context;
             _logger = logger;
+            _rateLimitService = rateLimitService;
         }
 
         // ========================================
@@ -28,6 +32,7 @@ namespace Lado.Controllers
         // ========================================
 
         [HttpPost("Reaccionar")]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Reaccionar(int contenidoId, string tipo)
         {
             try
@@ -37,6 +42,20 @@ namespace Lado.Controllers
                 if (string.IsNullOrEmpty(usuarioId))
                 {
                     return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                // Rate limiting: máximo 100 reacciones por minuto por usuario
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                if (!await _rateLimitService.IsAllowedAsync(
+                    clientIp,
+                    $"reaccion_user_{usuarioId}",
+                    100,
+                    TimeSpan.FromMinutes(1),
+                    TipoAtaque.SpamContenido,
+                    "/Reacciones/Reaccionar",
+                    usuarioId))
+                {
+                    return Json(new { success = false, message = "Demasiadas reacciones. Espera un momento." });
                 }
 
                 // Parsear el tipo de reacción
@@ -114,6 +133,7 @@ namespace Lado.Controllers
         /// Quitar reacción de un contenido
         /// </summary>
         [HttpPost("Quitar/{contenidoId}")]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> QuitarReaccion(int contenidoId)
         {
             try

@@ -231,11 +231,18 @@
         color: #6b7280;
     }
 
-        .quick-amount-btn:hover {
+        .quick-amount-btn:hover,
+        .quick-amount-btn.selected {
             border-color: var(--primary);
             background: var(--primary-light);
             color: var(--primary);
             transform: scale(1.05);
+        }
+
+        .quick-amount-btn.selected {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
         }
 
     @@media (max-width: 768px) {
@@ -902,16 +909,16 @@
                         <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 12px;">Montos Rapidos</label>
                         <div class="row g-2">
                             <div class="col-3">
-                                <button type="button" class="quick-amount-btn w-100" data-amount="10">$10</button>
+                                <button type="button" class="quick-amount-btn w-100" onclick="document.getElementById('inputMonto').value='10'; this.parentElement.parentElement.querySelectorAll('.quick-amount-btn').forEach(b=>b.classList.remove('selected')); this.classList.add('selected');">$10</button>
                             </div>
                             <div class="col-3">
-                                <button type="button" class="quick-amount-btn w-100" data-amount="25">$25</button>
+                                <button type="button" class="quick-amount-btn w-100" onclick="document.getElementById('inputMonto').value='25'; this.parentElement.parentElement.querySelectorAll('.quick-amount-btn').forEach(b=>b.classList.remove('selected')); this.classList.add('selected');">$25</button>
                             </div>
                             <div class="col-3">
-                                <button type="button" class="quick-amount-btn w-100" data-amount="50">$50</button>
+                                <button type="button" class="quick-amount-btn w-100" onclick="document.getElementById('inputMonto').value='50'; this.parentElement.parentElement.querySelectorAll('.quick-amount-btn').forEach(b=>b.classList.remove('selected')); this.classList.add('selected');">$50</button>
                             </div>
                             <div class="col-3">
-                                <button type="button" class="quick-amount-btn w-100" data-amount="100">$100</button>
+                                <button type="button" class="quick-amount-btn w-100" onclick="document.getElementById('inputMonto').value='100'; this.parentElement.parentElement.querySelectorAll('.quick-amount-btn').forEach(b=>b.classList.remove('selected')); this.classList.add('selected');">$100</button>
                             </div>
                         </div>
                     </div>
@@ -1047,9 +1054,8 @@
     </div>
 }
 
-@section Scripts {
 <script>
-(function() {
+document.addEventListener('DOMContentLoaded', function() {
     var esCreador = @(esCreador.ToString().ToLower());
     var comisionRetiro = @Model.ComisionRetiro;
     var retencionImpuestos = @(ViewBag.RetencionImpuestos != null ? (decimal)ViewBag.RetencionImpuestos : 0);
@@ -1076,12 +1082,28 @@
         var btn = e.target.closest('.quick-amount-btn');
         if (btn) {
             e.preventDefault();
+            e.stopPropagation();
             var amount = btn.getAttribute('data-amount');
-            var inputMonto = document.getElementById('inputMonto');
+            console.log('Monto rápido seleccionado:', amount);
+
+            // Buscar el input dentro del modal que está actualmente abierto
+            var modal = btn.closest('.modal');
+            var inputMonto = modal ? modal.querySelector('#inputMonto') : document.getElementById('inputMonto');
+
+            console.log('Input encontrado:', inputMonto);
             if (inputMonto) {
                 inputMonto.value = amount;
+                inputMonto.focus();
+                // Disparar eventos para que cualquier listener reaccione
                 inputMonto.dispatchEvent(new Event('input', { bubbles: true }));
+                inputMonto.dispatchEvent(new Event('change', { bubbles: true }));
+                console.log('Valor asignado:', inputMonto.value);
             }
+
+            // Marcar el botón como seleccionado visualmente
+            var allBtns = modal ? modal.querySelectorAll('.quick-amount-btn') : document.querySelectorAll('.quick-amount-btn');
+            allBtns.forEach(function(b) { b.classList.remove('selected'); });
+            btn.classList.add('selected');
         }
     });
 
@@ -1143,6 +1165,7 @@
 
         animateBlobs();
     }
-})();
+
+    console.log('Billetera: Script cargado correctamente');
+});
 </script>
-}

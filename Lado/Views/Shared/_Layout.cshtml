@@ -382,8 +382,15 @@
 			padding: 8px;
 			cursor: pointer;
 			color: var(--muted);
-			transition: color 0.2s;
+			transition: color 0.2s, transform 0.1s;
 			border-radius: var(--radius-sm);
+			/* Fix para móviles */
+			-webkit-tap-highlight-color: transparent;
+			touch-action: manipulation;
+			user-select: none;
+			-webkit-user-select: none;
+			min-width: 44px;
+			min-height: 44px;
 		}
 
 			.hamburger-btn:hover {
@@ -391,10 +398,16 @@
 				background: var(--light-bg);
 			}
 
+			.hamburger-btn:active {
+				opacity: 0.7;
+				transform: scale(0.95);
+			}
+
 			.hamburger-btn svg {
 				width: 24px;
 				height: 24px;
 				stroke: currentColor;
+				pointer-events: none;
 			}
 
 		.search-box {
@@ -827,7 +840,20 @@
 				box-shadow: var(--primary-glow);
 			}
 
-		/* Add Content Button - Filled style */
+		/* Create Post Button - Same style as Feed button */
+		.create-post-btn {
+			background: var(--surface);
+			border: 2px solid var(--primary);
+			color: var(--primary);
+		}
+
+			.create-post-btn:hover {
+				background: var(--primary);
+				color: white;
+				box-shadow: var(--primary-glow);
+			}
+
+		/* Create Reel Button - Primary gradient */
 		.add-content-btn {
 			background: var(--primary-gradient);
 			color: white;
@@ -1050,7 +1076,7 @@
 			}
 
 			.hamburger-btn {
-				display: block;
+				display: flex;
 			}
 
 			.top-navbar {
@@ -1322,7 +1348,22 @@
 <body class="@(User.Identity?.IsAuthenticated != true ? "no-sidebar" : "")">
 	@if (User.Identity?.IsAuthenticated == true)
 	{
-		<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+		<div class="sidebar-overlay" id="sidebarOverlay"></div>
+	<script>
+	(function(){
+		var o = document.getElementById('sidebarOverlay');
+		if (!o) return;
+		function close(e) {
+			if (e) { e.preventDefault(); }
+			var s = document.getElementById('sidebar');
+			if (s) s.classList.remove('active');
+			o.classList.remove('active');
+			document.body.classList.remove('sidebar-open');
+		}
+		o.addEventListener('click', close);
+		o.addEventListener('touchstart', close, {passive: false});
+	})();
+	</script>
 
 		<!-- SIDEBAR -->
 		<div class="sidebar" id="sidebar">
@@ -1523,13 +1564,32 @@
 	<!-- MAIN CONTENT -->
 	<div class="main-content">
 		<div class="top-navbar">
-			<button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle menu">
+			<button class="hamburger-btn" aria-label="Toggle menu" id="hamburgerBtn">
 				<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 					<line x1="3" y1="12" x2="21" y2="12"></line>
 					<line x1="3" y1="6" x2="21" y2="6"></line>
 					<line x1="3" y1="18" x2="21" y2="18"></line>
 				</svg>
 			</button>
+			<script>
+			(function(){
+				var btn = document.getElementById('hamburgerBtn');
+				if (!btn) return;
+				function toggle(e) {
+					if (e) { e.preventDefault(); e.stopPropagation(); }
+					var s = document.getElementById('sidebar');
+					var o = document.querySelector('.sidebar-overlay');
+					if (s) s.classList.toggle('active');
+					if (o) o.classList.toggle('active');
+					document.body.classList.toggle('sidebar-open');
+				}
+				btn.addEventListener('click', toggle);
+				btn.addEventListener('touchstart', function(e) {
+					e.preventDefault();
+					toggle();
+				}, {passive: false});
+			})();
+			</script>
 
 			<div class="search-box">
 				<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1548,8 +1608,17 @@
 					</svg>
 				</a>
 
-				<!-- Add Content Button - Opens Reels Creator -->
-				<button type="button" onclick="abrirCreadorReels()" class="nav-action-btn add-content-btn" title="@Localizer.Get("Content_Create")">
+				<!-- Crear Post Button - Goes to /Contenido/Crear (blanco) -->
+				<a href="/Contenido/Crear" class="nav-action-btn create-post-btn" title="Crear Post">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+						<line x1="12" y1="8" x2="12" y2="16"></line>
+						<line x1="8" y1="12" x2="16" y2="12"></line>
+					</svg>
+				</a>
+
+				<!-- Crear Reel Button - Opens Reels Creator (color) -->
+				<button type="button" onclick="abrirCreadorReels()" class="nav-action-btn add-content-btn" title="Crear Reel">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 						<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
 						<line x1="12" y1="8" x2="12" y2="16"></line>
@@ -1846,7 +1915,11 @@
 			}
 		});
 
-		function toggleSidebar() {
+		function toggleSidebar(e) {
+			if (e) {
+				e.preventDefault();
+				e.stopPropagation();
+			}
 			const sidebar = document.getElementById('sidebar');
 			const overlay = document.querySelector('.sidebar-overlay');
 			const body = document.body;
@@ -1855,6 +1928,7 @@
 			overlay.classList.toggle('active');
 			body.classList.toggle('sidebar-open');
 		}
+
 
 		document.querySelectorAll('.sidebar .nav-link').forEach(link => {
 			link.addEventListener('click', function() {
@@ -2231,8 +2305,15 @@
 					toastNotification.classList.remove('show');
 
 					setTimeout(() => {
-						toastTitle.textContent = title;
-						toastMessage.textContent = message;
+						// Ocultar título si está vacío
+						if (title && title.trim() !== '') {
+							toastTitle.textContent = title;
+							toastTitle.style.display = 'block';
+						} else {
+							toastTitle.textContent = '';
+							toastTitle.style.display = 'none';
+						}
+						toastMessage.textContent = message || '';
 
 						// Limpiar clases
 						toastNotification.className = 'toast-notification';
@@ -2281,27 +2362,19 @@
 				// Verificar TempData al cargar
 		@if (TempData["Success"] != null)
 		{
-			<text>
-									showToast('success', '¡Éxito!', '@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["Success"]?.ToString() ?? ""))'.replace(/^"|"$/g, ''));
-			</text>
+			<text>showToast('success', '¡Éxito!', @System.Text.Json.JsonSerializer.Serialize(TempData["Success"]?.ToString() ?? ""));</text>
 		}
 		@if (TempData["Error"] != null)
 		{
-			<text>
-									showToast('error', 'Error', '@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["Error"]?.ToString() ?? ""))'.replace(/^"|"$/g, ''));
-			</text>
+			<text>showToast('error', 'Error', @System.Text.Json.JsonSerializer.Serialize(TempData["Error"]?.ToString() ?? ""));</text>
 		}
 		@if (TempData["Warning"] != null)
 		{
-			<text>
-									showToast('warning', 'Aviso', '@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["Warning"]?.ToString() ?? ""))'.replace(/^"|"$/g, ''));
-			</text>
+			<text>showToast('warning', 'Aviso', @System.Text.Json.JsonSerializer.Serialize(TempData["Warning"]?.ToString() ?? ""));</text>
 		}
 		@if (TempData["Info"] != null)
 		{
-			<text>
-									showToast('success', 'Información', '@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["Info"]?.ToString() ?? ""))'.replace(/^"|"$/g, ''));
-			</text>
+			<text>showToast('success', 'Información', @System.Text.Json.JsonSerializer.Serialize(TempData["Info"]?.ToString() ?? ""));</text>
 		}
 
 			});

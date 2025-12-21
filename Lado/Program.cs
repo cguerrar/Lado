@@ -14,6 +14,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.Globalization;
 using System.Security.Principal;
 using System.Text;
+using System.IO.Compression;
+using Microsoft.AspNetCore.ResponseCompression;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -155,6 +157,35 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
+
+// ========================================
+// COMPRESIÓN DE RESPUESTAS (gzip/brotli)
+// ========================================
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[]
+    {
+        "application/javascript",
+        "application/json",
+        "text/css",
+        "text/html",
+        "text/plain",
+        "image/svg+xml"
+    });
+});
+
+builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Fastest;
+});
+
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Optimal;
+});
 
 // ========================================
 // CONFIGURACION ANTIFORGERY PARA AJAX/JSON
@@ -306,6 +337,9 @@ app.Use(async (context, next) =>
     await next();
 });
 
+// Compresión de respuestas (gzip/brotli)
+app.UseResponseCompression();
+
 // ⭐ CRÍTICO: UseStaticFiles DEBE estar ANTES de UseRouting
 app.UseStaticFiles(); // Sirve archivos desde wwwroot
 
@@ -322,6 +356,35 @@ app.UseSession();
 
 // Contador de visitas
 app.UseVisitasMiddleware();
+
+// ========================================
+// CACHE-CONTROL HEADERS
+// ========================================
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value?.ToLower() ?? "";
+
+    // Archivos estáticos: cache largo (30 días)
+    if (path.StartsWith("/css") || path.StartsWith("/js") ||
+        path.StartsWith("/lib") || path.StartsWith("/images"))
+    {
+        context.Response.Headers.CacheControl = "public, max-age=2592000"; // 30 días
+    }
+    // Uploads: cache medio (7 días)
+    else if (path.StartsWith("/uploads"))
+    {
+        context.Response.Headers.CacheControl = "public, max-age=604800"; // 7 días
+    }
+    // API endpoints: sin cache
+    else if (path.Contains("/api/") || path.Contains("/cargarmas") ||
+             path.Contains("/obtener") || path.Contains("/buscar"))
+    {
+        context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+        context.Response.Headers.Pragma = "no-cache";
+    }
+
+    await next();
+});
 
 // ⭐⭐⭐ CORRECCIÓN CRÍTICA: Línea estaba incompleta
 app.MapControllerRoute(

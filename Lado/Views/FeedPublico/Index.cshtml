@@ -629,7 +629,7 @@
                 }
                 else
                 {
-                    <img src="@imagenSrc" alt="" loading="lazy">
+                    <img data-src="@imagenSrc" alt="">
                 }
             </div>
         }
@@ -715,46 +715,60 @@
             // ========================================
             // CARGA PROGRESIVA DE IMAGENES
             // ========================================
+            function loadImage(img, item, retryCount = 0) {
+                const src = img.getAttribute('data-src');
+                if (!src) return;
+
+                // Crear nueva imagen para precargar
+                const tempImg = new Image();
+
+                tempImg.onload = function() {
+                    img.src = src;
+                    img.removeAttribute('data-src');
+                    // Delay aleatorio para efecto visual
+                    const delay = Math.random() * 150;
+                    setTimeout(() => {
+                        img.classList.add('loaded');
+                        item.classList.add('media-loaded');
+                    }, delay);
+                };
+
+                tempImg.onerror = function() {
+                    // Reintentar hasta 2 veces con cache-bust
+                    if (retryCount < 2) {
+                        setTimeout(() => {
+                            const bustSrc = src + (src.includes('?') ? '&' : '?') + '_t=' + Date.now();
+                            img.setAttribute('data-src', bustSrc);
+                            loadImage(img, item, retryCount + 1);
+                        }, 500 * (retryCount + 1));
+                    } else {
+                        item.style.visibility = 'hidden';
+                    }
+                };
+
+                tempImg.src = src;
+            }
+
             function setupProgressiveLoading() {
+                const imagesToLoad = [];
+
                 items.forEach((item, index) => {
-                    const img = item.querySelector('img');
+                    const img = item.querySelector('img[data-src]');
                     const video = item.querySelector('video');
 
                     if (img) {
-                        // Si ya está en cache, mostrar inmediatamente
-                        if (img.complete && img.naturalHeight !== 0) {
-                            img.classList.add('loaded');
-                            item.classList.add('media-loaded');
-                        } else {
-                            // Agregar listener para cuando cargue
-                            img.addEventListener('load', function() {
-                                // Delay aleatorio pequeño para efecto visual de "llenado"
-                                const delay = Math.random() * 200;
-                                setTimeout(() => {
-                                    this.classList.add('loaded');
-                                    item.classList.add('media-loaded');
-                                }, delay);
-                            });
-
-                            // Manejar errores de carga
-                            img.addEventListener('error', function() {
-                                // Ocultar item si falla la carga
-                                item.style.visibility = 'hidden';
-                            });
-                        }
+                        imagesToLoad.push({ img, item, index });
                     }
 
                     if (video) {
-                        // Para videos, marcar como cargado cuando tenga metadata
                         video.addEventListener('loadeddata', function() {
-                            const delay = Math.random() * 200;
+                            const delay = Math.random() * 150;
                             setTimeout(() => {
                                 this.classList.add('loaded');
                                 item.classList.add('media-loaded');
                             }, delay);
                         });
 
-                        // Si ya tiene datos
                         if (video.readyState >= 2) {
                             video.classList.add('loaded');
                             item.classList.add('media-loaded');
@@ -765,10 +779,38 @@
                         });
                     }
                 });
+
+                // Cargar imagenes en lotes para no saturar
+                const batchSize = 10;
+                let currentBatch = 0;
+
+                function loadNextBatch() {
+                    const start = currentBatch * batchSize;
+                    const end = Math.min(start + batchSize, imagesToLoad.length);
+
+                    for (let i = start; i < end; i++) {
+                        const { img, item } = imagesToLoad[i];
+                        loadImage(img, item);
+                    }
+
+                    currentBatch++;
+                    if (end < imagesToLoad.length) {
+                        setTimeout(loadNextBatch, 50);
+                    }
+                }
+
+                // Iniciar carga
+                if (imagesToLoad.length > 0) {
+                    loadNextBatch();
+                }
             }
 
-            // Iniciar carga progresiva inmediatamente
-            setupProgressiveLoading();
+            // Iniciar carga progresiva cuando el DOM esté listo
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', setupProgressiveLoading);
+            } else {
+                setupProgressiveLoading();
+            }
 
             function setupGrid() {
                 const vw = window.innerWidth;

@@ -28,5 +28,13 @@ namespace Lado.Models
         public DateTime FechaCreacion { get; set; } = DateTime.Now;
 
         public bool EstaActivo { get; set; } = true;
+
+        // Campos para respuestas en hilo
+        public int? ComentarioPadreId { get; set; }
+
+        [ForeignKey("ComentarioPadreId")]
+        public virtual Comentario? ComentarioPadre { get; set; }
+
+        public virtual ICollection<Comentario> Respuestas { get; set; } = new List<Comentario>();
     }
 }

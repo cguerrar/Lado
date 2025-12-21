@@ -1,0 +1,413 @@
+@model Lado.Models.ConfiguracionConfianza
+@{
+    ViewData["Title"] = "Configurar Niveles de Confianza";
+}
+
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2><i class="fas fa-shield-alt text-primary"></i> Configurar Niveles de Confianza</h2>
+            <p class="text-muted">
+                Configura los criterios que determinan el nivel de confianza de los creadores (0-@Model.NivelMaximo estrellas).
+                Cada criterio habilitado otorga puntos hacia el nivel total.
+            </p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="@Url.Action("Index", "Admin")" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Volver al Dashboard
+            </a>
+        </div>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle"></i> @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle"></i> @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <form method="post" action="@Url.Action("GuardarConfiguracionConfianza")" id="formConfianza">
+        @Html.AntiForgeryToken()
+
+        <div class="row g-4">
+            <!-- Columna izquierda: Criterios -->
+            <div class="col-lg-8">
+                <!-- Criterio 1: Verificación de Identidad -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-id-card"></i> Criterio 1: Verificación de Identidad
+                        </h5>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   name="VerificacionIdentidadHabilitada" id="chkIdentidad"
+                                   @(Model.VerificacionIdentidadHabilitada ? "checked" : "")
+                                   onchange="toggleCriterio('identidad', this.checked)">
+                            <label class="form-check-label text-white" for="chkIdentidad">Habilitado</label>
+                        </div>
+                    </div>
+                    <div class="card-body" id="criterioIdentidad">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Puntos</label>
+                                <input type="number" name="PuntosVerificacionIdentidad" class="form-control"
+                                       value="@Model.PuntosVerificacionIdentidad" min="0" max="5">
+                                <small class="text-muted">Puntos otorgados si cumple</small>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label">Descripción del badge</label>
+                                <input type="text" name="DescripcionVerificacionIdentidad" class="form-control"
+                                       value="@Model.DescripcionVerificacionIdentidad" maxlength="200">
+                                <small class="text-muted">Texto que aparece en el tooltip del badge</small>
+                            </div>
+                        </div>
+                        <div class="mt-3 p-3 bg-light rounded">
+                            <small><i class="fas fa-info-circle text-info"></i>
+                                Se otorga cuando el creador tiene <strong>CreadorVerificado = true</strong>
+                                (verificación de identidad con documento)
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Criterio 2: Verificación de Edad -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-birthday-cake"></i> Criterio 2: Verificación de Edad
+                        </h5>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   name="VerificacionEdadHabilitada" id="chkEdad"
+                                   @(Model.VerificacionEdadHabilitada ? "checked" : "")
+                                   onchange="toggleCriterio('edad', this.checked)">
+                            <label class="form-check-label text-white" for="chkEdad">Habilitado</label>
+                        </div>
+                    </div>
+                    <div class="card-body" id="criterioEdad">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Puntos</label>
+                                <input type="number" name="PuntosVerificacionEdad" class="form-control"
+                                       value="@Model.PuntosVerificacionEdad" min="0" max="5">
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label">Descripción del badge</label>
+                                <input type="text" name="DescripcionVerificacionEdad" class="form-control"
+                                       value="@Model.DescripcionVerificacionEdad" maxlength="200">
+                            </div>
+                        </div>
+                        <div class="mt-3 p-3 bg-light rounded">
+                            <small><i class="fas fa-info-circle text-info"></i>
+                                Se otorga cuando el usuario tiene <strong>AgeVerified = true</strong>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Criterio 3: Tasa de Respuesta -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-comment-dots"></i> Criterio 3: Tasa de Respuesta
+                        </h5>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   name="TasaRespuestaHabilitada" id="chkRespuesta"
+                                   @(Model.TasaRespuestaHabilitada ? "checked" : "")
+                                   onchange="toggleCriterio('respuesta', this.checked)">
+                            <label class="form-check-label text-white" for="chkRespuesta">Habilitado</label>
+                        </div>
+                    </div>
+                    <div class="card-body" id="criterioRespuesta">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Puntos</label>
+                                <input type="number" name="PuntosTasaRespuesta" class="form-control"
+                                       value="@Model.PuntosTasaRespuesta" min="0" max="5">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">% Mínimo</label>
+                                <div class="input-group">
+                                    <input type="number" name="PorcentajeMinimoRespuesta" class="form-control"
+                                           value="@Model.PorcentajeMinimoRespuesta" min="0" max="100">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Descripción del badge</label>
+                                <input type="text" name="DescripcionTasaRespuesta" class="form-control"
+                                       value="@Model.DescripcionTasaRespuesta" maxlength="200">
+                            </div>
+                        </div>
+                        <div class="mt-3 p-3 bg-light rounded">
+                            <small><i class="fas fa-info-circle text-info"></i>
+                                Se otorga cuando la tasa de respuesta a mensajes es ≥ <strong>@Model.PorcentajeMinimoRespuesta%</strong>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Criterio 4: Actividad Reciente -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-bolt"></i> Criterio 4: Actividad Reciente
+                        </h5>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   name="ActividadRecienteHabilitada" id="chkActividad"
+                                   @(Model.ActividadRecienteHabilitada ? "checked" : "")
+                                   onchange="toggleCriterio('actividad', this.checked)">
+                            <label class="form-check-label" for="chkActividad">Habilitado</label>
+                        </div>
+                    </div>
+                    <div class="card-body" id="criterioActividad">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Puntos</label>
+                                <input type="number" name="PuntosActividadReciente" class="form-control"
+                                       value="@Model.PuntosActividadReciente" min="0" max="5">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Horas máx.</label>
+                                <div class="input-group">
+                                    <input type="number" name="HorasMaximasInactividad" class="form-control"
+                                           value="@Model.HorasMaximasInactividad" min="1" max="168">
+                                    <span class="input-group-text">h</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Descripción del badge</label>
+                                <input type="text" name="DescripcionActividadReciente" class="form-control"
+                                       value="@Model.DescripcionActividadReciente" maxlength="200">
+                            </div>
+                        </div>
+                        <div class="mt-3 p-3 bg-light rounded">
+                            <small><i class="fas fa-info-circle text-info"></i>
+                                Se otorga si la última actividad fue hace menos de <strong>@Model.HorasMaximasInactividad horas</strong>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Criterio 5: Contenido Publicado -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-images"></i> Criterio 5: Contenido Publicado
+                        </h5>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   name="ContenidoPublicadoHabilitado" id="chkContenido"
+                                   @(Model.ContenidoPublicadoHabilitado ? "checked" : "")
+                                   onchange="toggleCriterio('contenido', this.checked)">
+                            <label class="form-check-label text-white" for="chkContenido">Habilitado</label>
+                        </div>
+                    </div>
+                    <div class="card-body" id="criterioContenido">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Puntos</label>
+                                <input type="number" name="PuntosContenidoPublicado" class="form-control"
+                                       value="@Model.PuntosContenidoPublicado" min="0" max="5">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Mín. publicaciones</label>
+                                <input type="number" name="MinimoPublicaciones" class="form-control"
+                                       value="@Model.MinimoPublicaciones" min="1" max="100">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Descripción del badge</label>
+                                <input type="text" name="DescripcionContenidoPublicado" class="form-control"
+                                       value="@Model.DescripcionContenidoPublicado" maxlength="200">
+                            </div>
+                        </div>
+                        <div class="mt-3 p-3 bg-light rounded">
+                            <small><i class="fas fa-info-circle text-info"></i>
+                                Se otorga cuando el creador tiene ≥ <strong>@Model.MinimoPublicaciones publicaciones</strong> activas
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna derecha: Configuración General y Preview -->
+            <div class="col-lg-4">
+                <!-- Configuración General -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-sliders-h"></i> Configuración General</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Nivel Máximo</label>
+                            <input type="number" name="NivelMaximo" class="form-control"
+                                   value="@Model.NivelMaximo" min="1" max="10">
+                            <small class="text-muted">Cantidad máxima de estrellas (1-10)</small>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   name="MostrarBadgesEnPerfil" id="chkBadges"
+                                   @(Model.MostrarBadgesEnPerfil ? "checked" : "")>
+                            <label class="form-check-label" for="chkBadges">
+                                Mostrar badges en perfil
+                            </label>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   name="MostrarEstrellasEnPerfil" id="chkEstrellas"
+                                   @(Model.MostrarEstrellasEnPerfil ? "checked" : "")>
+                            <label class="form-check-label" for="chkEstrellas">
+                                Mostrar estrellas en perfil
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-eye"></i> Vista Previa</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="mb-3">
+                            <strong>Puntos Totales Posibles:</strong>
+                            <span id="puntosTotales" class="badge bg-primary fs-5 ms-2">
+                                @(Model.PuntosVerificacionIdentidad + Model.PuntosVerificacionEdad +
+                                  Model.PuntosTasaRespuesta + Model.PuntosActividadReciente +
+                                  Model.PuntosContenidoPublicado)
+                            </span>
+                        </div>
+                        <div class="mb-3" id="previewEstrellas">
+                            @for (int i = 0; i < Model.NivelMaximo; i++)
+                            {
+                                <i class="fas fa-star text-warning fs-4"></i>
+                            }
+                        </div>
+                        <small class="text-muted">
+                            Un usuario que cumpla todos los criterios tendrá
+                            <span id="nivelMaximoPreview">@Model.NivelMaximo</span> estrellas
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Auditoría -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-history"></i> Última Modificación</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-1">
+                            <strong>Fecha:</strong>
+                            @Model.FechaModificacion.ToString("dd/MM/yyyy HH:mm")
+                        </p>
+                        <p class="mb-0">
+                            <strong>Por:</strong>
+                            @(Model.ModificadoPor ?? "Sistema")
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Botones de acción -->
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-save"></i> Guardar Configuración
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" onclick="confirmarReset()">
+                        <i class="fas fa-undo"></i> Resetear a valores por defecto
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Modal de confirmación para reset -->
+<div class="modal fade" id="modalReset" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i> Confirmar Reset</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que deseas resetear la configuración a los valores por defecto?</p>
+                <p class="text-muted mb-0">Esta acción no se puede deshacer.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form method="post" action="@Url.Action("ResetearConfiguracionConfianza")" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-undo"></i> Sí, resetear
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function toggleCriterio(criterio, habilitado) {
+        const elemento = document.getElementById('criterio' + criterio.charAt(0).toUpperCase() + criterio.slice(1));
+        if (elemento) {
+            elemento.style.opacity = habilitado ? '1' : '0.5';
+            const inputs = elemento.querySelectorAll('input:not([type="checkbox"])');
+            inputs.forEach(input => input.disabled = !habilitado);
+        }
+        actualizarPreview();
+    }
+
+    function actualizarPreview() {
+        let total = 0;
+        const criterios = [
+            { check: 'chkIdentidad', puntos: 'PuntosVerificacionIdentidad' },
+            { check: 'chkEdad', puntos: 'PuntosVerificacionEdad' },
+            { check: 'chkRespuesta', puntos: 'PuntosTasaRespuesta' },
+            { check: 'chkActividad', puntos: 'PuntosActividadReciente' },
+            { check: 'chkContenido', puntos: 'PuntosContenidoPublicado' }
+        ];
+
+        criterios.forEach(c => {
+            if (document.getElementById(c.check)?.checked) {
+                const input = document.querySelector(`input[name="${c.puntos}"]`);
+                if (input) total += parseInt(input.value) || 0;
+            }
+        });
+
+        document.getElementById('puntosTotales').textContent = total;
+    }
+
+    function confirmarReset() {
+        new bootstrap.Modal(document.getElementById('modalReset')).show();
+    }
+
+    // Inicializar estado de criterios
+    document.addEventListener('DOMContentLoaded', function() {
+        ['Identidad', 'Edad', 'Respuesta', 'Actividad', 'Contenido'].forEach(criterio => {
+            const checkbox = document.getElementById('chk' + criterio);
+            if (checkbox) {
+                toggleCriterio(criterio.toLowerCase(), checkbox.checked);
+            }
+        });
+
+        // Actualizar preview cuando cambien los puntos
+        document.querySelectorAll('input[type="number"]').forEach(input => {
+            input.addEventListener('change', actualizarPreview);
+        });
+    });
+</script>
+}

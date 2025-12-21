@@ -173,6 +173,11 @@ namespace Lado.Controllers
 
                 // Verificar saldo
                 var usuario = await _userManager.FindByIdAsync(usuarioId);
+                if (usuario == null)
+                {
+                    return Json(new { success = false, message = "Usuario no encontrado" });
+                }
+
                 if (usuario.Saldo < coleccion.Precio)
                 {
                     return Json(new

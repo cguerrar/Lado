@@ -118,6 +118,11 @@ namespace Lado.Data
         public DbSet<ConfiguracionPlataforma> ConfiguracionesPlataforma { get; set; }
         public DbSet<PreferenciaAlgoritmoUsuario> PreferenciasAlgoritmoUsuario { get; set; }
 
+        // ========================================
+        // ⭐ DbSets NUEVOS - SISTEMA DE CONFIANZA
+        // ========================================
+        public DbSet<ConfiguracionConfianza> ConfiguracionesConfianza { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -574,6 +579,19 @@ namespace Lado.Data
                 entity.HasIndex(e => e.EstaActivo);
                 entity.HasIndex(e => e.FechaPublicacion);
                 entity.HasIndex(e => e.TipoLado);
+
+                // ⚡ Índices compuestos para optimizar Explorar
+                entity.HasIndex(e => new { e.EstaActivo, e.EsBorrador, e.Censurado, e.EsPrivado, e.TipoLado, e.FechaPublicacion })
+                    .HasDatabaseName("IX_Contenidos_Explorar_Optimizado");
+
+                entity.HasIndex(e => new { e.EstaActivo, e.EsBorrador, e.Censurado, e.EsPrivado, e.UsuarioId })
+                    .HasDatabaseName("IX_Contenidos_Usuario_Activo");
+
+                entity.HasIndex(e => new { e.TipoLado, e.EstaActivo, e.Latitud, e.Longitud })
+                    .HasDatabaseName("IX_Contenidos_Mapa_Optimizado");
+
+                entity.HasIndex(e => new { e.NumeroLikes, e.NumeroComentarios, e.FechaPublicacion })
+                    .HasDatabaseName("IX_Contenidos_Popularidad");
             });
 
             // ========================================
@@ -721,15 +739,23 @@ namespace Lado.Data
             });
 
             // ========================================
-            // CONFIGURACIÓN DE COMENTARIOS (EXISTENTE)
+            // CONFIGURACIÓN DE COMENTARIOS (EXISTENTE + HILOS)
             // ========================================
             modelBuilder.Entity<Comentario>(entity =>
             {
                 entity.HasKey(e => e.Id);
 
+                // Relación self-referencing para respuestas en hilo
+                entity.HasOne(e => e.ComentarioPadre)
+                    .WithMany(e => e.Respuestas)
+                    .HasForeignKey(e => e.ComentarioPadreId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
                 entity.HasIndex(e => e.ContenidoId);
                 entity.HasIndex(e => e.UsuarioId);
                 entity.HasIndex(e => e.FechaCreacion);
+                entity.HasIndex(e => e.ComentarioPadreId)
+                    .HasDatabaseName("IX_Comentarios_ComentarioPadreId");
             });
 
             // ========================================

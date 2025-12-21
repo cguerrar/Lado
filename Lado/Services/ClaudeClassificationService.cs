@@ -358,7 +358,14 @@ RESPUESTA:";
                 }
 
                 // Extraer el ID de la categoria existente
-                if (int.TryParse(textResponse, out int categoriaId))
+                // Manejar formatos: "808", "ID:808", "ID: 808", etc.
+                var cleanedResponse = textResponse ?? "";
+                if (cleanedResponse.StartsWith("ID:", StringComparison.OrdinalIgnoreCase))
+                {
+                    cleanedResponse = cleanedResponse.Substring(3).Trim();
+                }
+
+                if (int.TryParse(cleanedResponse, out int categoriaId))
                 {
                     // Verificar que la categoria existe
                     var categoriaValida = categorias.FirstOrDefault(c => c.Id == categoriaId);

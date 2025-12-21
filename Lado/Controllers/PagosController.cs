@@ -1,5 +1,6 @@
 ﻿using Lado.Data;
 using Lado.Models;
+using Lado.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -14,15 +15,18 @@ namespace Lado.Controllers
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILogger<PagosController> _logger;
+        private readonly IRateLimitService _rateLimitService;
 
         public PagosController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
-            ILogger<PagosController> logger)
+            ILogger<PagosController> logger,
+            IRateLimitService rateLimitService)
         {
             _context = context;
             _userManager = userManager;
             _logger = logger;
+            _rateLimitService = rateLimitService;
         }
 
         // ============================================
@@ -31,11 +35,27 @@ namespace Lado.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Suscribirse(string creadorId, int? tipoLado = null)
+        public async Task<IActionResult> Suscribirse(string creadorId, int? tipoLado = null, int? duracion = null)
         {
             try
             {
                 var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                // Rate limiting: máximo 10 suscripciones por 5 minutos por usuario (evita fraude)
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                if (!await _rateLimitService.IsAllowedAsync(
+                    clientIp,
+                    $"suscribir_user_{usuarioId}",
+                    10,
+                    TimeSpan.FromMinutes(5),
+                    TipoAtaque.Otro,
+                    "/Pagos/Suscribirse",
+                    usuarioId))
+                {
+                    TempData["Error"] = "Demasiadas solicitudes. Espera unos minutos.";
+                    return RedirectToAction("Index", "Feed");
+                }
+
                 var usuario = await _userManager.FindByIdAsync(usuarioId);
                 var creador = await _userManager.FindByIdAsync(creadorId);
 
@@ -48,10 +68,20 @@ namespace Lado.Controllers
                 // Determinar tipo de suscripción
                 var tipo = tipoLado.HasValue ? (TipoLado)tipoLado.Value : TipoLado.LadoA;
 
+                // Determinar duración (default: mensual)
+                var tipoDuracion = duracion.HasValue
+                    ? (DuracionSuscripcion)duracion.Value
+                    : DuracionSuscripcion.Mes;
+
                 // IMPORTANTE: Solo LadoB cobra, LadoA es GRATIS (seguir)
-                var precio = tipo == TipoLado.LadoB
+                var precioMensual = tipo == TipoLado.LadoB
                     ? (creador.PrecioSuscripcionLadoB ?? creador.PrecioSuscripcion)
                     : 0m; // LadoA es gratis
+
+                // Calcular precio según duración
+                var precio = tipo == TipoLado.LadoB
+                    ? Suscripcion.CalcularPrecio(precioMensual, tipoDuracion)
+                    : 0m;
 
                 // Verificar si ya está suscrito a este TipoLado específico
                 var suscripcionExistente = await _context.Suscripciones
@@ -96,15 +126,23 @@ namespace Lado.Controllers
                     // Incrementar seguidores siempre
                     creador.NumeroSeguidores++;
 
-                    // 4. Crear suscripción
+                    // 4. Crear suscripción con duración
+                    var fechaInicio = DateTime.Now;
+                    var fechaFin = Suscripcion.CalcularFechaFin(fechaInicio, tipoDuracion);
+
                     var suscripcion = new Suscripcion
                     {
                         FanId = usuarioId,
                         CreadorId = creadorId,
-                        FechaInicio = DateTime.Now,
-                        PrecioMensual = precio,
+                        FechaInicio = fechaInicio,
+                        FechaFin = fechaFin,
+                        ProximaRenovacion = fechaFin,
+                        PrecioMensual = precioMensual,
+                        Precio = precio,
                         EstaActiva = true,
-                        TipoLado = tipo
+                        TipoLado = tipo,
+                        Duracion = tipoDuracion,
+                        RenovacionAutomatica = tipoDuracion == DuracionSuscripcion.Mes // Solo mensual renueva automático
                     };
 
                     _context.Suscripciones.Add(suscripcion);
@@ -112,13 +150,15 @@ namespace Lado.Controllers
                     // 5. Registrar transacciones solo si hubo cobro
                     if (precio > 0)
                     {
+                        var textoDuracion = Suscripcion.ObtenerTextoDuracion(tipoDuracion);
+
                         var transaccionFan = new Transaccion
                         {
                             UsuarioId = usuarioId,
                             TipoTransaccion = TipoTransaccion.Suscripcion,
                             Monto = -precio,
                             FechaTransaccion = DateTime.Now,
-                            Descripcion = $"Suscripción Premium a {creador.Seudonimo ?? creador.NombreCompleto}"
+                            Descripcion = $"Suscripción Premium ({textoDuracion}) a {creador.Seudonimo ?? creador.NombreCompleto}"
                         };
 
                         var transaccionCreador = new Transaccion
@@ -129,7 +169,7 @@ namespace Lado.Controllers
                             Comision = comision,
                             MontoNeto = gananciaCreador,
                             FechaTransaccion = DateTime.Now,
-                            Descripcion = $"Nueva suscripción premium de @{usuario.UserName}"
+                            Descripcion = $"Nueva suscripción premium ({textoDuracion}) de @{usuario.UserName}"
                         };
 
                         _context.Transacciones.AddRange(transaccionFan, transaccionCreador);
@@ -138,12 +178,13 @@ namespace Lado.Controllers
                     await _context.SaveChangesAsync();
                     await transaction.CommitAsync();
 
+                    var textoDuracionMsg = Suscripcion.ObtenerTextoDuracion(tipoDuracion);
                     var mensaje = tipo == TipoLado.LadoB
-                        ? $"¡Te has suscrito al contenido premium de {creador.Seudonimo ?? creador.NombreCompleto}!"
+                        ? $"¡Te has suscrito por {textoDuracionMsg} al contenido premium de {creador.Seudonimo ?? creador.NombreCompleto}!"
                         : $"¡Ahora sigues a {creador.NombreCompleto}!";
 
-                    _logger.LogInformation("Suscripción creada: Fan {FanId} -> Creador {CreadorId}, Tipo: {Tipo}, Precio: {Precio}",
-                        usuarioId, creadorId, tipo, precio);
+                    _logger.LogInformation("Suscripción creada: Fan {FanId} -> Creador {CreadorId}, Tipo: {Tipo}, Duración: {Duracion}, Precio: {Precio}",
+                        usuarioId, creadorId, tipo, tipoDuracion, precio);
 
                     TempData["Success"] = mensaje;
                     return RedirectToAction("Perfil", "Feed", new { id = creadorId });
@@ -276,12 +317,23 @@ namespace Lado.Controllers
                         return Json(new { success = true, message = "Ya tienes acceso a este contenido" });
                     }
 
-                    // Re-verificar saldo dentro de la transacción (por si cambió)
-                    var usuarioActualizado = await _context.Users.FindAsync(usuarioId);
+                    // CRÍTICO: Forzar lectura fresca de BD (evita cache de EF Core)
+                    // Detach la entidad cacheada para forzar re-lectura
+                    _context.Entry(usuario).State = EntityState.Detached;
+
+                    // Re-obtener usuario con lectura fresca de la BD dentro de la transacción
+                    var usuarioActualizado = await _context.Users
+                        .FirstOrDefaultAsync(u => u.Id == usuarioId);
+
                     if (usuarioActualizado == null || usuarioActualizado.Saldo < contenido.PrecioDesbloqueo)
                     {
                         await transaction.RollbackAsync();
-                        return Json(new { success = false, requiereRecarga = true, message = "Saldo insuficiente" });
+                        var faltante = contenido.PrecioDesbloqueo - (usuarioActualizado?.Saldo ?? 0);
+                        return Json(new {
+                            success = false,
+                            requiereRecarga = true,
+                            message = $"Saldo insuficiente. Necesitas ${faltante:N2} más."
+                        });
                     }
 
                     // 1. Descontar saldo del fan
@@ -289,7 +341,16 @@ namespace Lado.Controllers
                     usuario = usuarioActualizado; // Actualizar referencia para retorno
 
                     // 2. Agregar ganancia al creador
-                    var creador = contenido.Usuario;
+                    // CRÍTICO: Re-obtener creador con lectura fresca (evita race condition con compras simultáneas)
+                    _context.Entry(contenido.Usuario).State = EntityState.Detached;
+                    var creador = await _context.Users.FirstOrDefaultAsync(u => u.Id == contenido.UsuarioId);
+
+                    if (creador == null)
+                    {
+                        await transaction.RollbackAsync();
+                        return Json(new { success = false, message = "Creador no encontrado" });
+                    }
+
                     var comision = contenido.PrecioDesbloqueo.Value * 0.20m; // 20% comisión
                     var gananciaCreador = contenido.PrecioDesbloqueo.Value - comision;
 

@@ -1182,6 +1182,7 @@
         <!-- Input Area -->
         <div class="chat-input-area">
             <form id="formEnviarMensaje" class="chat-input-form" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
                 <input type="hidden" id="destinatarioId" value="@otroUsuario?.Id">
                 <input type="hidden" id="mensajeRespondidoId" value="">
                 <input type="file" id="fileInput" accept="image/*,video/*" onchange="previewArchivo(this)">
@@ -1432,11 +1433,16 @@
             const btnEnviar = document.getElementById('btnEnviar');
             btnEnviar.disabled = true;
 
-            const formData = new FormData();
-            formData.append('destinatarioId', otroUsuarioId);
-            formData.append('contenido', contenido);
-            if (archivoSeleccionado) formData.append('archivo', archivoSeleccionado);
-            if (mensajeRespondidoId) formData.append('mensajeRespondidoId', mensajeRespondidoId);
+            // Crear FormData desde el formulario para incluir el token CSRF
+            const formData = new FormData(document.getElementById('formEnviarMensaje'));
+            formData.set('destinatarioId', otroUsuarioId);
+            formData.set('contenido', contenido);
+            if (archivoSeleccionado) {
+                formData.set('archivo', archivoSeleccionado);
+            }
+            if (mensajeRespondidoId) {
+                formData.set('mensajeRespondidoId', mensajeRespondidoId);
+            }
 
             try {
                 const response = await fetch('/Mensajes/EnviarMensajeConArchivo', { method: 'POST', body: formData });
@@ -1486,8 +1492,8 @@
         // Delete Conversation
         function eliminarConversacion() {
             if (!confirm('¿Eliminar esta conversacion?')) return;
-            const formData = new FormData();
-            formData.append('contactoId', otroUsuarioId);
+            const formData = new FormData(document.getElementById('formEnviarMensaje'));
+            formData.set('contactoId', otroUsuarioId);
             fetch('/Mensajes/EliminarConversacion', { method: 'POST', body: formData })
                 .then(() => window.location.href = '/Mensajes');
         }

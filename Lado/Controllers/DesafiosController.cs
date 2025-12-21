@@ -54,14 +54,16 @@ namespace Lado.Controllers
                 var rateLimitKeyIp = $"desafio_entrega_ip_{clientIp}";
 
                 // Límite por IP
-                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window,
+                    TipoAtaque.SpamContenido, "/Desafios/Entregar", usuarioId))
                 {
                     _logger.LogWarning("🚨 RATE LIMIT IP DESAFIO: IP {IP} excedió límite - Usuario: {UserId}", clientIp, usuarioId);
                     return Json(new { success = false, message = "Demasiadas solicitudes. Espera unos minutos." });
                 }
 
                 // Límite por usuario
-                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window,
+                    TipoAtaque.SpamContenido, "/Desafios/Entregar", usuarioId))
                 {
                     _logger.LogWarning("🚫 RATE LIMIT DESAFIO: Usuario {UserId} excedió límite - IP: {IP}", usuarioId, clientIp);
                     return Json(new { success = false, message = "Has enviado demasiadas entregas. Espera unos minutos." });
@@ -189,7 +191,8 @@ namespace Lado.Controllers
                 var rateLimitKeyIp = $"desafio_crear_ip_{clientIp}";
 
                 // Límite por IP
-                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window,
+                    TipoAtaque.SpamContenido, "/Desafios/Crear", usuarioId))
                 {
                     _logger.LogWarning("🚨 RATE LIMIT IP CREAR DESAFIO: IP {IP} excedió límite - Usuario: {UserId}", clientIp, usuarioId);
                     TempData["Error"] = "Demasiadas solicitudes. Espera unos minutos.";
@@ -197,7 +200,8 @@ namespace Lado.Controllers
                 }
 
                 // Límite por usuario
-                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window,
+                    TipoAtaque.SpamContenido, "/Desafios/Crear", usuarioId))
                 {
                     _logger.LogWarning("🚫 RATE LIMIT CREAR DESAFIO: Usuario {UserId} excedió límite - IP: {IP}", usuarioId, clientIp);
                     TempData["Error"] = "Has creado demasiados desafíos. Espera unos minutos.";
@@ -600,6 +604,7 @@ namespace Lado.Controllers
         // APROBAR CONTENIDO (AGREGAR AL CONTROLADOR)
         // ========================================
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> AprobarContenido([FromBody] AprobarContenidoRequest request)
         {
             try
@@ -662,6 +667,7 @@ namespace Lado.Controllers
         // RECHAZAR CONTENIDO (SOLICITAR CORRECCIÓN)
         // ========================================
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> RechazarContenido([FromBody] RechazarContenidoRequest request)
         {
             try
@@ -742,6 +748,7 @@ namespace Lado.Controllers
         // ACEPTAR/RECHAZAR DESAFÍO DIRECTO
         // ========================================
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> AceptarDesafioDirecto(int desafioId)
         {
             try
@@ -775,6 +782,7 @@ namespace Lado.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> RechazarDesafioDirecto(int desafioId, string razon)
         {
             try
@@ -812,6 +820,7 @@ namespace Lado.Controllers
         // CANCELAR DESAFÍO
         // ========================================
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CancelarDesafio(int desafioId)
         {
             try
