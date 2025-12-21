@@ -45,7 +45,7 @@ namespace Lado.Models
         /// Protege la identidad real de creadores LadoB.
         /// </summary>
         [Display(Name = "Ocultar Identidad LadoA")]
-        public bool OcultarIdentidadLadoA { get; set; } = true;
+        public bool OcultarIdentidadLadoA { get; set; } = false;
 
         // === TIPO DE USUARIO ===
         [Display(Name = "Tipo de Usuario")]
