@@ -860,6 +860,22 @@
                                 </label>
                             </div>
 
+                            @if (Model.EsCreador && !string.IsNullOrEmpty(Model.Seudonimo))
+                            {
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Ocultar Identidad LadoA</h6>
+                                        <p>Si activas esta opción, solo quienes te sigan en LadoA podrán ver tu perfil público. Los demás serán redirigidos a tu perfil LadoB (@Model.Seudonimo).</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="OcultarIdentidadLadoA" id="ocultarIdentidadLadoA"
+                                               @(Model.OcultarIdentidadLadoA ? "checked" : "")
+                                               onchange="actualizarOcultarIdentidad(this.checked)">
+                                        <span class="config-switch-slider"></span>
+                                    </label>
+                                </div>
+                            }
+
                             <div class="config-settings-row" style="border-top: 1px solid var(--config-border); padding-top: 20px; margin-top: 20px;">
                                 <div class="config-settings-info">
                                     <h6>Usuarios Bloqueados</h6>
@@ -1260,6 +1276,30 @@
 
         // Marcar nav item como activo
         event.target.closest('.config-nav-item').classList.add('active');
+    }
+
+    // Actualizar preferencia de ocultar identidad LadoA
+    async function actualizarOcultarIdentidad(habilitado) {
+        try {
+            const response = await fetch('/Usuario/ActualizarOcultarIdentidad', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                },
+                body: JSON.stringify({ ocultar: habilitado })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                console.error('Error al actualizar preferencia');
+                document.getElementById('ocultarIdentidadLadoA').checked = !habilitado;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            document.getElementById('ocultarIdentidadLadoA').checked = !habilitado;
+        }
     }
 
     // Actualizar preferencia de deteccion de ubicacion

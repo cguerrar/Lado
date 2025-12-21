@@ -639,6 +639,29 @@ namespace Lado.Controllers
             return Json(new { success = true, message = request.Habilitado ? "Detección de ubicación habilitada" : "Detección de ubicación deshabilitada" });
         }
 
+        // POST: /Usuario/ActualizarOcultarIdentidad
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ActualizarOcultarIdentidad([FromBody] ActualizarOcultarIdentidadRequest request)
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            // Solo permitir para creadores con seudónimo
+            if (!usuario.EsCreador || string.IsNullOrEmpty(usuario.Seudonimo))
+            {
+                return Json(new { success = false, message = "Esta opción solo está disponible para creadores con LadoB" });
+            }
+
+            usuario.OcultarIdentidadLadoA = request.Ocultar;
+            await _userManager.UpdateAsync(usuario);
+
+            return Json(new { success = true, message = request.Ocultar ? "Tu identidad LadoA ahora está oculta" : "Tu identidad LadoA ahora es pública" });
+        }
+
         // POST: /Usuario/CambiarLadoPreferido
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -1410,6 +1433,11 @@ namespace Lado.Controllers
     public class ActualizarDeteccionUbicacionRequest
     {
         public bool Habilitado { get; set; } = false;
+    }
+
+    public class ActualizarOcultarIdentidadRequest
+    {
+        public bool Ocultar { get; set; } = false;
     }
 
     public class CambiarLadoPreferidoRequest
