@@ -584,6 +584,7 @@ namespace Lado.Controllers
 
         // POST: /Usuario/CambiarIdioma
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CambiarIdioma([FromBody] CambiarIdiomaRequest request)
         {
             // Validar idioma
@@ -621,8 +622,26 @@ namespace Lado.Controllers
             return Json(new { success = true, message = $"Idioma cambiado a {nombreIdioma}" });
         }
 
+        // POST: /Usuario/ActualizarDeteccionUbicacion
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ActualizarDeteccionUbicacion([FromBody] ActualizarDeteccionUbicacionRequest request)
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            usuario.DetectarUbicacionAutomaticamente = request.Habilitado;
+            await _userManager.UpdateAsync(usuario);
+
+            return Json(new { success = true, message = request.Habilitado ? "Detección de ubicación habilitada" : "Detección de ubicación deshabilitada" });
+        }
+
         // POST: /Usuario/CambiarLadoPreferido
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CambiarLadoPreferido([FromBody] CambiarLadoPreferidoRequest request)
         {
             // Validar lado
@@ -841,6 +860,7 @@ namespace Lado.Controllers
         /// Bloquear a un usuario
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> BloquearUsuario([FromBody] BloquearUsuarioRequest request)
         {
             var usuario = await _userManager.GetUserAsync(User);
@@ -914,6 +934,7 @@ namespace Lado.Controllers
         /// Desbloquear a un usuario
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> DesbloquearUsuario([FromBody] DesbloquearUsuarioRequest request)
         {
             var usuario = await _userManager.GetUserAsync(User);
@@ -1136,7 +1157,8 @@ namespace Lado.Controllers
         /// API: Marcar notificación como leída
         /// </summary>
         [HttpPost]
-        public async Task<IActionResult> MarcarNotificacionLeida([FromBody] MarcarNotificacionRequest request)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MarcarNotificacionLeida([FromForm] MarcarNotificacionRequest request)
         {
             var usuario = await _userManager.GetUserAsync(User);
             if (usuario == null)
@@ -1163,6 +1185,7 @@ namespace Lado.Controllers
         /// API: Marcar todas las notificaciones como leídas
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> MarcarTodasLeidas()
         {
             var usuario = await _userManager.GetUserAsync(User);
@@ -1190,7 +1213,8 @@ namespace Lado.Controllers
         /// API: Eliminar una notificación
         /// </summary>
         [HttpPost]
-        public async Task<IActionResult> EliminarNotificacion([FromBody] MarcarNotificacionRequest request)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarNotificacion([FromForm] MarcarNotificacionRequest request)
         {
             var usuario = await _userManager.GetUserAsync(User);
             if (usuario == null)
@@ -1210,6 +1234,36 @@ namespace Lado.Controllers
             await _context.SaveChangesAsync();
 
             return Json(new { success = true });
+        }
+
+        /// <summary>
+        /// API: Eliminar TODAS las notificaciones del usuario
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarTodasNotificaciones()
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            // Desactivar todas las notificaciones del usuario
+            var notificaciones = await _context.Notificaciones
+                .Where(n => n.UsuarioId == usuario.Id && n.EstaActiva)
+                .ToListAsync();
+
+            var totalEliminadas = notificaciones.Count;
+
+            foreach (var notificacion in notificaciones)
+            {
+                notificacion.EstaActiva = false;
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, eliminadas = totalEliminadas });
         }
 
         /// <summary>
@@ -1271,6 +1325,7 @@ namespace Lado.Controllers
         /// Guardar intereses seleccionados en onboarding
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> GuardarIntereses([FromBody] GuardarInteresesRequest request)
         {
             var usuario = await _userManager.GetUserAsync(User);
@@ -1316,6 +1371,7 @@ namespace Lado.Controllers
         /// Omitir seleccion de intereses en onboarding
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public IActionResult OmitirIntereses()
         {
             return Json(new { success = true, redirectUrl = "/Feed" });
@@ -1349,6 +1405,11 @@ namespace Lado.Controllers
     public class CambiarIdiomaRequest
     {
         public string Idioma { get; set; } = "es";
+    }
+
+    public class ActualizarDeteccionUbicacionRequest
+    {
+        public bool Habilitado { get; set; } = false;
     }
 
     public class CambiarLadoPreferidoRequest

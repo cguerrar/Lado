@@ -20,6 +20,7 @@ namespace Lado.Controllers
         private readonly IImageService _imageService;
         private readonly IClaudeClassificationService _classificationService;
         private readonly IRateLimitService _rateLimitService;
+        private readonly IExifService _exifService;
 
         public ContenidoController(
             ApplicationDbContext context,
@@ -29,7 +30,8 @@ namespace Lado.Controllers
             INotificationService notificationService,
             IImageService imageService,
             IClaudeClassificationService classificationService,
-            IRateLimitService rateLimitService)
+            IRateLimitService rateLimitService,
+            IExifService exifService)
         {
             _context = context;
             _userManager = userManager;
@@ -39,6 +41,7 @@ namespace Lado.Controllers
             _imageService = imageService;
             _classificationService = classificationService;
             _rateLimitService = rateLimitService;
+            _exifService = exifService;
         }
 
         // ========================================
@@ -148,14 +151,16 @@ namespace Lado.Controllers
                 // 🚫 RATE LIMITING - Prevenir abuso
                 // ========================================
                 var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var userAgent = Request.Headers["User-Agent"].ToString();
                 var rateLimitKey = $"content_create_{usuario.Id}";
                 var rateLimitKeyHourly = $"content_create_hourly_{usuario.Id}";
                 var rateLimitKeyDaily = $"content_create_daily_{usuario.Id}";
                 var rateLimitKeyIp = $"content_create_ip_{clientIp}";
                 var rateLimitKeyIpHourly = $"content_create_ip_hourly_{clientIp}";
 
-                // 🚨 Rate limit por IP (detectar ataques multi-cuenta)
-                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window))
+                // 🚨 Rate limit por IP (detectar ataques multi-cuenta) - registra en BD
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window,
+                    TipoAtaque.SpamContenido, "/Contenido/Crear", usuario.Id, userAgent))
                 {
                     _logger.LogWarning("🚨 RATE LIMIT IP: IP {IP} excedió límite de 5 min - Usuario: {UserId} ({UserName})",
                         clientIp, usuario.Id, usuario.UserName);
@@ -163,7 +168,8 @@ namespace Lado.Controllers
                     return RedirectToAction("Index");
                 }
 
-                if (!_rateLimitService.IsAllowed(rateLimitKeyIpHourly, RateLimits.ContentCreation_IP_Hourly_MaxRequests, RateLimits.ContentCreation_IP_Hourly_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyIpHourly, RateLimits.ContentCreation_IP_Hourly_MaxRequests, RateLimits.ContentCreation_IP_Hourly_Window,
+                    TipoAtaque.SpamContenido, "/Contenido/Crear", usuario.Id, userAgent))
                 {
                     _logger.LogWarning("🚨 RATE LIMIT IP HORARIO: IP {IP} excedió límite de 1 hora - Usuario: {UserId}",
                         clientIp, usuario.Id);
@@ -172,7 +178,8 @@ namespace Lado.Controllers
                 }
 
                 // Límite por usuario - 5 minutos: máximo 10 contenidos
-                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window,
+                    TipoAtaque.SpamContenido, "/Contenido/Crear", usuario.Id, userAgent))
                 {
                     _logger.LogWarning("🚫 RATE LIMIT: Usuario {UserId} ({UserName}) excedió límite de 5 min - IP: {IP}",
                         usuario.Id, usuario.UserName, clientIp);
@@ -181,7 +188,8 @@ namespace Lado.Controllers
                 }
 
                 // Límite por hora: máximo 50 contenidos
-                if (!_rateLimitService.IsAllowed(rateLimitKeyHourly, RateLimits.ContentCreation_Hourly_MaxRequests, RateLimits.ContentCreation_Hourly_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyHourly, RateLimits.ContentCreation_Hourly_MaxRequests, RateLimits.ContentCreation_Hourly_Window,
+                    TipoAtaque.SpamContenido, "/Contenido/Crear", usuario.Id, userAgent))
                 {
                     _logger.LogWarning("🚫 RATE LIMIT HORARIO: Usuario {UserId} ({UserName}) excedió límite de 1 hora",
                         usuario.Id, usuario.UserName);
@@ -190,7 +198,8 @@ namespace Lado.Controllers
                 }
 
                 // Límite diario: máximo 100 contenidos
-                if (!_rateLimitService.IsAllowed(rateLimitKeyDaily, RateLimits.ContentCreation_Daily_MaxRequests, RateLimits.ContentCreation_Daily_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyDaily, RateLimits.ContentCreation_Daily_MaxRequests, RateLimits.ContentCreation_Daily_Window,
+                    TipoAtaque.SpamContenido, "/Contenido/Crear", usuario.Id, userAgent))
                 {
                     _logger.LogWarning("🚫 RATE LIMIT DIARIO: Usuario {UserId} ({UserName}) excedió límite de 24 horas",
                         usuario.Id, usuario.UserName);
@@ -322,6 +331,25 @@ namespace Lado.Controllers
                         {
                             contenido.Thumbnail = thumbnail;
                             _logger.LogInformation("Thumbnail generado: {Thumbnail}", thumbnail);
+                        }
+
+                        // Extraer ubicación EXIF si el usuario lo tiene habilitado
+                        if (usuario.DetectarUbicacionAutomaticamente)
+                        {
+                            var coordenadas = _exifService.ExtraerCoordenadas(filePath);
+                            if (coordenadas.HasValue)
+                            {
+                                contenido.Latitud = coordenadas.Value.Lat;
+                                contenido.Longitud = coordenadas.Value.Lon;
+
+                                // Obtener nombre de ubicación
+                                var nombreUbicacion = await _exifService.ObtenerNombreUbicacion(
+                                    coordenadas.Value.Lat, coordenadas.Value.Lon);
+                                contenido.NombreUbicacion = nombreUbicacion;
+
+                                _logger.LogInformation("Ubicación detectada: {Ubicacion} ({Lat}, {Lon})",
+                                    nombreUbicacion, coordenadas.Value.Lat, coordenadas.Value.Lon);
+                            }
                         }
                     }
                 }
@@ -465,14 +493,16 @@ namespace Lado.Controllers
                 var rateLimitKeyIpHourly = $"content_create_ip_hourly_{clientIp}";
 
                 // 🚨 Rate limit por IP (detectar ataques multi-cuenta)
-                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window,
+                    TipoAtaque.SpamContenido, "/Contenido/CrearCarrusel", usuario.Id))
                 {
                     _logger.LogWarning("🚨 RATE LIMIT IP CARRUSEL: IP {IP} excedió límite de 5 min - Usuario: {UserId} ({UserName})",
                         clientIp, usuario.Id, usuario.UserName);
                     return Json(new { success = false, message = "Demasiadas solicitudes desde tu conexión. Espera unos minutos." });
                 }
 
-                if (!_rateLimitService.IsAllowed(rateLimitKeyIpHourly, RateLimits.ContentCreation_IP_Hourly_MaxRequests, RateLimits.ContentCreation_IP_Hourly_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyIpHourly, RateLimits.ContentCreation_IP_Hourly_MaxRequests, RateLimits.ContentCreation_IP_Hourly_Window,
+                    TipoAtaque.SpamContenido, "/Contenido/CrearCarrusel", usuario.Id))
                 {
                     _logger.LogWarning("🚨 RATE LIMIT IP HORARIO CARRUSEL: IP {IP} excedió límite de 1 hora - Usuario: {UserId}",
                         clientIp, usuario.Id);
@@ -480,7 +510,8 @@ namespace Lado.Controllers
                 }
 
                 // Límite por usuario - 5 minutos: máximo 10 contenidos
-                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window,
+                    TipoAtaque.SpamContenido, "/Contenido/CrearCarrusel", usuario.Id))
                 {
                     _logger.LogWarning("🚫 RATE LIMIT CARRUSEL: Usuario {UserId} ({UserName}) excedió límite de 5 min - IP: {IP}",
                         usuario.Id, usuario.UserName, clientIp);
@@ -488,7 +519,8 @@ namespace Lado.Controllers
                 }
 
                 // Límite por hora: máximo 50 contenidos
-                if (!_rateLimitService.IsAllowed(rateLimitKeyHourly, RateLimits.ContentCreation_Hourly_MaxRequests, RateLimits.ContentCreation_Hourly_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyHourly, RateLimits.ContentCreation_Hourly_MaxRequests, RateLimits.ContentCreation_Hourly_Window,
+                    TipoAtaque.SpamContenido, "/Contenido/CrearCarrusel", usuario.Id))
                 {
                     _logger.LogWarning("🚫 RATE LIMIT HORARIO CARRUSEL: Usuario {UserId} ({UserName}) excedió límite de 1 hora",
                         usuario.Id, usuario.UserName);
@@ -496,7 +528,8 @@ namespace Lado.Controllers
                 }
 
                 // Límite diario: máximo 100 contenidos
-                if (!_rateLimitService.IsAllowed(rateLimitKeyDaily, RateLimits.ContentCreation_Daily_MaxRequests, RateLimits.ContentCreation_Daily_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyDaily, RateLimits.ContentCreation_Daily_MaxRequests, RateLimits.ContentCreation_Daily_Window,
+                    TipoAtaque.SpamContenido, "/Contenido/CrearCarrusel", usuario.Id))
                 {
                     _logger.LogWarning("🚫 RATE LIMIT DIARIO CARRUSEL: Usuario {UserId} ({UserName}) excedió límite de 24 horas",
                         usuario.Id, usuario.UserName);
@@ -655,6 +688,28 @@ namespace Lado.Controllers
                 {
                     // Usar thumbnail generado si existe, sino usar imagen original
                     contenido.Thumbnail = primeraImagen.Thumbnail ?? primeraImagen.RutaArchivo;
+
+                    // Extraer ubicación EXIF de la primera imagen si el usuario lo tiene habilitado
+                    if (usuario.DetectarUbicacionAutomaticamente)
+                    {
+                        var rutaCompleta = Path.Combine(_environment.WebRootPath, primeraImagen.RutaArchivo.TrimStart('/'));
+                        if (System.IO.File.Exists(rutaCompleta))
+                        {
+                            var coordenadas = _exifService.ExtraerCoordenadas(rutaCompleta);
+                            if (coordenadas.HasValue)
+                            {
+                                contenido.Latitud = coordenadas.Value.Lat;
+                                contenido.Longitud = coordenadas.Value.Lon;
+
+                                var nombreUbicacion = await _exifService.ObtenerNombreUbicacion(
+                                    coordenadas.Value.Lat, coordenadas.Value.Lon);
+                                contenido.NombreUbicacion = nombreUbicacion;
+
+                                _logger.LogInformation("Carrusel: Ubicación detectada: {Ubicacion} ({Lat}, {Lon})",
+                                    nombreUbicacion, coordenadas.Value.Lat, coordenadas.Value.Lon);
+                            }
+                        }
+                    }
                 }
                 // Si solo hay videos, dejar Thumbnail null para que la vista use el tag <video>
 
@@ -789,14 +844,16 @@ namespace Lado.Controllers
                 var rateLimitKeyIpHourly = $"content_create_ip_hourly_{clientIp}";
 
                 // 🚨 Rate limit por IP (detectar ataques multi-cuenta)
-                if (!_rateLimitService.IsAllowed(rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyIp, RateLimits.ContentCreation_IP_MaxRequests, RateLimits.ContentCreation_IP_Window,
+                    TipoAtaque.SpamContenido, "/Contenido/CrearReel", usuario.Id))
                 {
                     _logger.LogWarning("🚨 RATE LIMIT IP REELS: IP {IP} excedió límite de 5 min - Usuario: {UserId} ({UserName})",
                         clientIp, usuario.Id, usuario.UserName);
                     return Json(new { success = false, message = "Demasiadas solicitudes desde tu conexión. Espera unos minutos." });
                 }
 
-                if (!_rateLimitService.IsAllowed(rateLimitKeyIpHourly, RateLimits.ContentCreation_IP_Hourly_MaxRequests, RateLimits.ContentCreation_IP_Hourly_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyIpHourly, RateLimits.ContentCreation_IP_Hourly_MaxRequests, RateLimits.ContentCreation_IP_Hourly_Window,
+                    TipoAtaque.SpamContenido, "/Contenido/CrearReel", usuario.Id))
                 {
                     _logger.LogWarning("🚨 RATE LIMIT IP HORARIO REELS: IP {IP} excedió límite de 1 hora - Usuario: {UserId}",
                         clientIp, usuario.Id);
@@ -804,7 +861,8 @@ namespace Lado.Controllers
                 }
 
                 // Límite por usuario - 5 minutos: máximo 10 contenidos
-                if (!_rateLimitService.IsAllowed(rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKey, RateLimits.ContentCreation_MaxRequests, RateLimits.ContentCreation_Window,
+                    TipoAtaque.SpamContenido, "/Contenido/CrearReel", usuario.Id))
                 {
                     _logger.LogWarning("🚫 RATE LIMIT REELS: Usuario {UserId} ({UserName}) excedió límite de 5 min - IP: {IP}",
                         usuario.Id, usuario.UserName, clientIp);
@@ -812,7 +870,8 @@ namespace Lado.Controllers
                 }
 
                 // Límite por hora: máximo 50 contenidos
-                if (!_rateLimitService.IsAllowed(rateLimitKeyHourly, RateLimits.ContentCreation_Hourly_MaxRequests, RateLimits.ContentCreation_Hourly_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyHourly, RateLimits.ContentCreation_Hourly_MaxRequests, RateLimits.ContentCreation_Hourly_Window,
+                    TipoAtaque.SpamContenido, "/Contenido/CrearReel", usuario.Id))
                 {
                     _logger.LogWarning("🚫 RATE LIMIT HORARIO REELS: Usuario {UserId} ({UserName}) excedió límite de 1 hora",
                         usuario.Id, usuario.UserName);
@@ -820,7 +879,8 @@ namespace Lado.Controllers
                 }
 
                 // Límite diario: máximo 100 contenidos
-                if (!_rateLimitService.IsAllowed(rateLimitKeyDaily, RateLimits.ContentCreation_Daily_MaxRequests, RateLimits.ContentCreation_Daily_Window))
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKeyDaily, RateLimits.ContentCreation_Daily_MaxRequests, RateLimits.ContentCreation_Daily_Window,
+                    TipoAtaque.SpamContenido, "/Contenido/CrearReel", usuario.Id))
                 {
                     _logger.LogWarning("🚫 RATE LIMIT DIARIO REELS: Usuario {UserId} ({UserName}) excedió límite de 24 horas",
                         usuario.Id, usuario.UserName);
@@ -904,10 +964,30 @@ namespace Lado.Controllers
 
                 // Generar thumbnail para imágenes
                 string? thumbnailPath = null;
+                double? latitud = null;
+                double? longitud = null;
+                string? nombreUbicacion = null;
+
                 if (tipoContenido == TipoContenido.Foto && _imageService.EsImagenValida(extension))
                 {
                     thumbnailPath = await _imageService.GenerarThumbnailAsync(filePath, 400, 400, 75);
                     _logger.LogInformation("Thumbnail generado: {Thumbnail}", thumbnailPath);
+
+                    // Extraer ubicación EXIF si el usuario lo tiene habilitado
+                    if (usuario.DetectarUbicacionAutomaticamente)
+                    {
+                        var coordenadas = _exifService.ExtraerCoordenadas(filePath);
+                        if (coordenadas.HasValue)
+                        {
+                            latitud = coordenadas.Value.Lat;
+                            longitud = coordenadas.Value.Lon;
+                            nombreUbicacion = await _exifService.ObtenerNombreUbicacion(
+                                coordenadas.Value.Lat, coordenadas.Value.Lon);
+
+                            _logger.LogInformation("Reel: Ubicación detectada: {Ubicacion} ({Lat}, {Lon})",
+                                nombreUbicacion, latitud, longitud);
+                        }
+                    }
                 }
 
                 // Crear contenido
@@ -930,6 +1010,10 @@ namespace Lado.Controllers
                     RutaArchivo = rutaArchivo,
                     Thumbnail = thumbnailPath,
                     EsPublicoGeneral = esPublicoGeneral,
+                    // Ubicación EXIF
+                    Latitud = latitud,
+                    Longitud = longitud,
+                    NombreUbicacion = nombreUbicacion,
                     // Música asociada
                     PistaMusicalId = audioTrackId,
                     MusicaVolumen = audioVolume,

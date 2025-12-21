@@ -208,8 +208,10 @@ builder.Services.AddScoped<Lado.Services.IImageService, Lado.Services.ImageServi
 builder.Services.AddScoped<Lado.Services.IDateTimeService, Lado.Services.DateTimeService>();
 builder.Services.AddScoped<Lado.Services.IInteresesService, Lado.Services.InteresesService>();
 builder.Services.AddScoped<Lado.Services.ILogEventoService, Lado.Services.LogEventoService>();
+builder.Services.AddScoped<Lado.Services.ITrustService, Lado.Services.TrustService>();
 builder.Services.AddHostedService<Lado.Services.LogCleanupService>();
 builder.Services.AddHostedService<Lado.Services.TokenCleanupService>();
+builder.Services.AddHostedService<Lado.Services.SuscripcionExpirationService>();
 
 // ========================================
 // CONFIGURACIÓN JWT SERVICE (API Móvil)
@@ -231,6 +233,12 @@ builder.Services.AddScoped<Lado.Services.IClaudeClassificationService, Lado.Serv
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<Lado.Services.ICacheService, Lado.Services.CacheService>();
 builder.Services.AddSingleton<Lado.Services.IRateLimitService, Lado.Services.RateLimitService>();
+
+// ========================================
+// SERVICIO DE EXTRACCIÓN EXIF (Ubicación)
+// ========================================
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<Lado.Services.IExifService, Lado.Services.ExifService>();
 
 // ========================================
 // CONFIGURACIÓN DE SIGNALR (Chat en tiempo real)
@@ -302,6 +310,8 @@ app.Use(async (context, next) =>
 app.UseStaticFiles(); // Sirve archivos desde wwwroot
 
 app.UseRouting();
+
+app.UseIpBlocking(); // Bloquear IPs en lista negra
 
 app.UseAuthentication();
 app.UseJwtValidation(); // Validación de tokens JWT contra BD (revocación inmediata)

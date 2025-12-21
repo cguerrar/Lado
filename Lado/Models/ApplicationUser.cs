@@ -158,10 +158,40 @@ namespace Lado.Models
         public DateTime? FechaVerificacion { get; set; }
 
         // ========================================
+        // SISTEMA DE CONFIANZA
+        // ========================================
+        [Display(Name = "Última Actividad")]
+        public DateTime? UltimaActividad { get; set; }
+
+        [Display(Name = "Mensajes Recibidos (total)")]
+        public int MensajesRecibidosTotal { get; set; } = 0;
+
+        [Display(Name = "Mensajes Respondidos (total)")]
+        public int MensajesRespondidosTotal { get; set; } = 0;
+
+        [Display(Name = "Tiempo Promedio de Respuesta (minutos)")]
+        public int? TiempoPromedioRespuesta { get; set; }
+
+        [Display(Name = "Reportes Recibidos")]
+        public int ReportesRecibidos { get; set; } = 0;
+
+        [Display(Name = "Contenidos Publicados")]
+        public int ContenidosPublicados { get; set; } = 0;
+
+        // ========================================
         // PUBLICIDAD Y AGENCIA
         // ========================================
         [Display(Name = "Permite Publicidad Personalizada")]
         public bool PermitePublicidadPersonalizada { get; set; } = true;
+
+        // ========================================
+        // PRIVACIDAD DE UBICACIÓN
+        // ========================================
+        /// <summary>
+        /// Si es true, detecta ubicación automáticamente desde metadatos EXIF de las fotos
+        /// </summary>
+        [Display(Name = "Detectar Ubicación Automáticamente")]
+        public bool DetectarUbicacionAutomaticamente { get; set; } = false;
 
         // ========================================
         // PREFERENCIAS DE IDIOMA
@@ -312,11 +342,100 @@ namespace Lado.Models
         /// <returns>La primera letra del nombre/seudónimo</returns>
         public string ObtenerInicial(bool usarLadoB = false)
         {
-            if (usarLadoB && !string.IsNullOrEmpty(Seudonimo))
+            if (usarLadoB && !string.IsNullOrEmpty(Seudonimo) && Seudonimo.Length > 0)
             {
                 return Seudonimo.Substring(0, 1).ToUpper();
             }
-            return NombreCompleto.Substring(0, 1).ToUpper();
+            if (!string.IsNullOrEmpty(NombreCompleto) && NombreCompleto.Length > 0)
+            {
+                return NombreCompleto.Substring(0, 1).ToUpper();
+            }
+            return "U"; // Default si no hay nombre
+        }
+
+        // ========================================
+        // MÉTODOS DE CONFIANZA
+        // ========================================
+
+        /// <summary>
+        /// Calcula la tasa de respuesta a mensajes (0-100%)
+        /// </summary>
+        public int ObtenerTasaRespuesta()
+        {
+            if (MensajesRecibidosTotal == 0) return 0;
+            return (int)Math.Round((double)MensajesRespondidosTotal / MensajesRecibidosTotal * 100);
+        }
+
+        /// <summary>
+        /// Determina si el creador está activo (actividad en últimas 48h)
+        /// </summary>
+        public bool EstaActivoReciente()
+        {
+            if (!UltimaActividad.HasValue) return false;
+            return (DateTime.Now - UltimaActividad.Value).TotalHours <= 48;
+        }
+
+        /// <summary>
+        /// Obtiene el nivel de confianza (0-5 estrellas)
+        /// </summary>
+        public int ObtenerNivelConfianza()
+        {
+            int nivel = 0;
+
+            // +1 por verificación de identidad
+            if (CreadorVerificado) nivel++;
+
+            // +1 por verificación de edad
+            if (AgeVerified) nivel++;
+
+            // +1 por tasa de respuesta > 70%
+            if (ObtenerTasaRespuesta() >= 70) nivel++;
+
+            // +1 por estar activo recientemente
+            if (EstaActivoReciente()) nivel++;
+
+            // +1 por tener contenido (más de 5 publicaciones)
+            if (ContenidosPublicados >= 5) nivel++;
+
+            return nivel;
+        }
+
+        /// <summary>
+        /// Obtiene texto descriptivo del tiempo de respuesta
+        /// </summary>
+        public string ObtenerTextoTiempoRespuesta()
+        {
+            if (!TiempoPromedioRespuesta.HasValue || TiempoPromedioRespuesta == 0)
+                return "Sin datos";
+
+            var minutos = TiempoPromedioRespuesta.Value;
+
+            if (minutos < 60)
+                return $"~{minutos} min";
+            if (minutos < 1440) // menos de 24h
+                return $"~{minutos / 60}h";
+            return $"~{minutos / 1440}d";
+        }
+
+        /// <summary>
+        /// Obtiene el estado de actividad como texto
+        /// </summary>
+        public string ObtenerEstadoActividad()
+        {
+            if (!UltimaActividad.HasValue)
+                return "Sin actividad";
+
+            var diferencia = DateTime.Now - UltimaActividad.Value;
+
+            if (diferencia.TotalMinutes < 5)
+                return "En línea";
+            if (diferencia.TotalHours < 1)
+                return $"Hace {(int)diferencia.TotalMinutes} min";
+            if (diferencia.TotalHours < 24)
+                return $"Hace {(int)diferencia.TotalHours}h";
+            if (diferencia.TotalDays < 7)
+                return $"Hace {(int)diferencia.TotalDays}d";
+            return "Hace más de 1 semana";
         }
     }
 }

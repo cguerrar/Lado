@@ -13,7 +13,17 @@
     var algoritmosDisponibles = ViewBag.AlgoritmosDisponibles as List<AlgoritmoFeed> ?? new List<AlgoritmoFeed>();
 }
 
+@Html.AntiForgeryToken()
+
 <style>
+    /* Ocultar toast en el feed */
+    .toast-notification,
+    #toastNotification {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+
     /* ========================================
        FEED INSTAGRAM-STYLE - REDISEÑO COMPLETO
        ======================================== */
@@ -258,21 +268,23 @@
     .post-badge {
         font-size: 10px;
         font-weight: 600;
-        padding: 2px 8px;
+        padding: 2px 6px;
         border-radius: 4px;
-        margin-left: 8px;
+        margin-left: 6px;
     }
 
     .badge-ladob {
         background: linear-gradient(135deg, #a855f7, #7c3aed);
         color: white;
-        padding: 3px 10px;
-        border-radius: 12px;
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        box-shadow: 0 2px 4px rgba(168, 85, 247, 0.3);
+    }
+
+    .verified-icon {
+        width: 16px;
+        height: 16px;
+        margin-left: 4px;
+        vertical-align: middle;
+        flex-shrink: 0;
+        display: inline-block;
     }
 
     .post-menu {
@@ -381,6 +393,37 @@
 
     .video-controls-overlay > * {
         pointer-events: auto;
+    }
+
+    /* Location Badge */
+    .location-badge {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        padding: 4px 10px;
+        border-radius: 16px;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        z-index: 10;
+        backdrop-filter: blur(4px);
+        max-width: 70%;
+        overflow: hidden;
+    }
+
+    .location-badge svg {
+        width: 12px;
+        height: 12px;
+        flex-shrink: 0;
+    }
+
+    .location-badge span {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .video-play-icon {
@@ -887,33 +930,6 @@
         cursor: not-allowed;
     }
 
-    /* TOAST */
-    #feedPageToast {
-        position: fixed;
-        bottom: 24px;
-        left: 50%;
-        transform: translateX(-50%) translateY(100px);
-        background-color: #262626;
-        color: #fff;
-        padding: 14px 28px;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 500;
-        z-index: 999999;
-        opacity: 0;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-        pointer-events: none;
-        text-align: center;
-        min-width: 150px;
-        max-width: 350px;
-        line-height: 1.4;
-    }
-
-    #feedPageToast.visible {
-        transform: translateX(-50%) translateY(0);
-        opacity: 1;
-    }
 
     /* ========================================
        ANUNCIO EN FEED (ESTILO POST)
@@ -2952,9 +2968,16 @@
                         <div class="post-user-info">
                             <span class="post-username">
                                 @usernameMostrado
+                                @if (post.Usuario?.CreadorVerificado == true)
+                                {
+                                    <svg class="verified-icon" viewBox="0 0 24 24" fill="#10b981" width="16" height="16" title="Creador verificado">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                        <polyline points="9 12 12 15 16 10" fill="none" stroke="white" stroke-width="2"></polyline>
+                                    </svg>
+                                }
                                 @if (post.TipoLado == TipoLado.LadoB)
                                 {
-                                    <span class="post-badge badge-ladob">Lado B</span>
+                                    <span class="post-badge badge-ladob">B</span>
                                 }
                             </span>
                             <span class="post-time">@tiempoTexto</span>
@@ -3162,6 +3185,17 @@
                         @if (esImagen)
                         {
                             <img src="@post.RutaArchivo" alt="" loading="lazy">
+                            @if (!string.IsNullOrEmpty(post.NombreUbicacion))
+                            {
+                                <!-- Badge de ubicación -->
+                                <div class="location-badge">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                        <circle cx="12" cy="10" r="3"></circle>
+                                    </svg>
+                                    <span>@post.NombreUbicacion</span>
+                                </div>
+                            }
                             @if (post.PistaMusical != null)
                             {
                                 <!-- Badge de música estilo Instagram para foto -->
@@ -3223,6 +3257,17 @@
                         else
                         {
                             <img src="@post.RutaArchivo" alt="" loading="lazy" onerror="this.style.display='none'">
+                            @if (!string.IsNullOrEmpty(post.NombreUbicacion))
+                            {
+                                <!-- Badge de ubicación -->
+                                <div class="location-badge">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                        <circle cx="12" cy="10" r="3"></circle>
+                                    </svg>
+                                    <span>@post.NombreUbicacion</span>
+                                </div>
+                            }
                             @if (post.PistaMusical != null)
                             {
                                 <!-- Badge de música estilo Instagram -->
@@ -3566,8 +3611,6 @@
     </div>
 </div>
 
-<!-- Toast -->
-<div id="feedPageToast"></div>
 
 @functions {
     string GetTimeAgo(DateTime fecha)
@@ -3584,13 +3627,27 @@
 <script>
     let currentShareUrl = '';
 
-    // Toast
-    function showToast(msg) {
-        const toast = document.getElementById('feedPageToast');
-        toast.textContent = msg;
-        toast.classList.add('visible');
-        setTimeout(() => toast.classList.remove('visible'), 2500);
+    // Función de escape para prevenir XSS
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
+
+    // Toast deshabilitado en el feed
+    function showToast(msg) {
+        // No hacer nada - toasts deshabilitados en el feed
+    }
+
+    // Sobrescribir window.showToast DESPUÉS de que el layout lo defina
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            window.showToast = function(type, title, msg) {
+                // No hacer nada - toasts deshabilitados en el feed
+            };
+        }, 100);
+    });
 
     // ========================================
     // PHOTO MUSIC PLAYER - Reproducción automática
@@ -3749,11 +3806,9 @@
                 if (data.success) {
                     this.classList.toggle('bookmarked', data.esFavorito);
                     this.title = data.esFavorito ? 'Quitar de favoritos' : 'Guardar en favoritos';
-                    showToast(data.message);
                 }
             } catch (err) {
                 console.error('Error:', err);
-                showToast('Error al procesar');
             }
         });
     });
@@ -3786,10 +3841,14 @@
             this.disabled = true;
 
             try {
+                const formData = new FormData();
+                formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value);
+                formData.append('id', postId);
+                formData.append('texto', texto);
+
                 const res = await fetch('/Feed/Comentar', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `id=${postId}&texto=${encodeURIComponent(texto)}`
+                    body: formData
                 });
                 const data = await res.json();
 
@@ -3808,7 +3867,7 @@
 
                     const newComment = document.createElement('div');
                     newComment.className = 'comment-preview';
-                    newComment.innerHTML = `<span class="comment-preview-username">${data.comentario.username}</span><span class="comment-preview-text">${data.comentario.texto}</span>`;
+                    newComment.innerHTML = `<span class="comment-preview-username">${escapeHtml(data.comentario.username)}</span><span class="comment-preview-text">${escapeHtml(data.comentario.texto)}</span>`;
                     preview.appendChild(newComment);
                 } else {
                     showToast(data.message || 'Error al comentar');
@@ -3919,14 +3978,14 @@
 
         friendsList.innerHTML = friends.map(friend => `
             <div class="friend-item ${selectedFriends.has(friend.id) ? 'selected' : ''}"
-                 data-id="${friend.id}" onclick="toggleFriendSelection('${friend.id}')">
+                 data-id="${escapeHtml(friend.id)}" onclick="toggleFriendSelection('${escapeHtml(friend.id)}')">
                 ${friend.fotoPerfil
-                    ? `<img src="${friend.fotoPerfil}" alt="" class="friend-avatar">`
-                    : `<div class="friend-avatar" style="display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--fg);">${friend.nombre.charAt(0).toUpperCase()}</div>`
+                    ? `<img src="${escapeHtml(friend.fotoPerfil)}" alt="" class="friend-avatar">`
+                    : `<div class="friend-avatar" style="display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--fg);">${escapeHtml(friend.nombre?.charAt(0)?.toUpperCase() || '')}</div>`
                 }
                 <div class="friend-info">
-                    <div class="friend-name">${friend.nombre}</div>
-                    <div class="friend-username">@@${friend.username}</div>
+                    <div class="friend-name">${escapeHtml(friend.nombre)}</div>
+                    <div class="friend-username">@@${escapeHtml(friend.username)}</div>
                 </div>
                 <div class="friend-check">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -4263,7 +4322,7 @@
             const data = await res.json();
 
             if (data.success) {
-                showToast(data.message);
+                showToast(data.message || (data.esFavorito ? 'Guardado en favoritos' : 'Eliminado de favoritos'));
                 // Actualizar texto del boton
                 const textNode = btn.childNodes[btn.childNodes.length - 1];
                 textNode.textContent = data.esFavorito ? ' Quitar de favoritos' : ' Agregar a favoritos';
@@ -5463,13 +5522,13 @@
             <div class="fullscreen-credits">
                 <div class="credits-content">
                     <!-- Info del creador -->
-                    <div class="credits-creator-info" onclick="event.stopPropagation(); window.location.href='/Feed/Perfil/${post.creatorId}${post.isLadoB ? '?verSeudonimo=true' : ''}'">
+                    <div class="credits-creator-info" onclick="event.stopPropagation(); window.location.href='/Feed/Perfil/${escapeHtml(post.creatorId)}${post.isLadoB ? '?verSeudonimo=true' : ''}'">
                         <div class="credits-name">
-                            ${post.creatorName}
+                            ${escapeHtml(post.creatorName)}
                             ${verifiedHtml}
                             ${ladoBBadge}
                         </div>
-                        <div class="credits-username">@@${post.creatorUsername || post.creatorName}</div>
+                        <div class="credits-username">@@${escapeHtml(post.creatorUsername || post.creatorName)}</div>
                         ${musicHtml}
                     </div>
 
@@ -5990,37 +6049,8 @@
         });
     }
 
-    function showToast(message) {
-        // Crear toast si no existe
-        let toast = document.getElementById('fullscreen-toast');
-        if (!toast) {
-            toast = document.createElement('div');
-            toast.id = 'fullscreen-toast';
-            toast.style.cssText = `
-                position: fixed;
-                bottom: 100px;
-                left: 50%;
-                transform: translateX(-50%);
-                background: rgba(0, 0, 0, 0.9);
-                color: white;
-                padding: 12px 24px;
-                border-radius: 8px;
-                font-size: 14px;
-                z-index: 10001;
-                opacity: 0;
-                transition: opacity 0.3s ease;
-                pointer-events: none;
-            `;
-            document.body.appendChild(toast);
-        }
-
-        toast.textContent = message;
-        toast.style.opacity = '1';
-
-        setTimeout(() => {
-            toast.style.opacity = '0';
-        }, 2500);
-    }
+    // Esta función se elimina porque ya existe showToast arriba (línea 3607)
+    // que usa #feedPageToast. La función original es suficiente.
 
     // Scroll handler para detectar el slide actual
     let scrollTimeout;
@@ -6609,7 +6639,8 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-Requested-With': 'XMLHttpRequest'
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
                 body: `algoritmoId=${algoritmoId}`
             });
@@ -6624,20 +6655,14 @@
             console.log('Data recibida:', data);
 
             if (data.success) {
-                showToast(data.message || 'Algoritmo actualizado');
-                console.log('Recargando página en 500ms...');
                 // Recargar pagina para aplicar nuevo algoritmo
-                setTimeout(() => {
-                    window.location.reload();
-                }, 500);
+                window.location.reload();
             } else {
                 console.error('Error del servidor:', data.message);
-                showToast(data.message || 'Error al cambiar algoritmo');
                 if (select) select.disabled = false;
             }
         } catch (error) {
             console.error('Error en cambiarAlgoritmoSelect:', error);
-            showToast('Error al cambiar algoritmo: ' + error.message);
             if (select) select.disabled = false;
         }
     };

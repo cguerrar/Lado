@@ -847,6 +847,19 @@
                                 </label>
                             </div>
 
+                            <div class="config-settings-row">
+                                <div class="config-settings-info">
+                                    <h6>Detectar Ubicacion en Fotos</h6>
+                                    <p>Extrae automaticamente la ubicacion de tus fotos y la muestra en el feed</p>
+                                </div>
+                                <label class="config-switch">
+                                    <input type="checkbox" name="DetectarUbicacionAutomaticamente" id="detectarUbicacion"
+                                           @(Model.DetectarUbicacionAutomaticamente ? "checked" : "")
+                                           onchange="actualizarDetectarUbicacion(this.checked)">
+                                    <span class="config-switch-slider"></span>
+                                </label>
+                            </div>
+
                             <div class="config-settings-row" style="border-top: 1px solid var(--config-border); padding-top: 20px; margin-top: 20px;">
                                 <div class="config-settings-info">
                                     <h6>Usuarios Bloqueados</h6>
@@ -1236,17 +1249,44 @@
         document.querySelectorAll('.config-tab-content').forEach(tab => {
             tab.classList.remove('active');
         });
-        
+
         // Remover active de nav items
         document.querySelectorAll('.config-nav-item').forEach(item => {
             item.classList.remove('active');
         });
-        
+
         // Mostrar el tab seleccionado
         document.getElementById(tabId).classList.add('active');
-        
+
         // Marcar nav item como activo
         event.target.closest('.config-nav-item').classList.add('active');
+    }
+
+    // Actualizar preferencia de deteccion de ubicacion
+    async function actualizarDetectarUbicacion(habilitado) {
+        try {
+            const response = await fetch('/Usuario/ActualizarDeteccionUbicacion', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                },
+                body: JSON.stringify({ habilitado: habilitado })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                console.log('Preferencia de ubicacion actualizada');
+            } else {
+                console.error('Error al actualizar preferencia');
+                // Revertir el checkbox si fallo
+                document.getElementById('detectarUbicacion').checked = !habilitado;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            document.getElementById('detectarUbicacion').checked = !habilitado;
+        }
     }
 
     // Modal
@@ -1311,7 +1351,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                    'X-CSRF-TOKEN': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
                 },
                 body: JSON.stringify({ idioma: idioma })
             });
@@ -1380,7 +1420,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                    'X-CSRF-TOKEN': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
                 },
                 body: JSON.stringify({ ladoPreferido: lado })
             });

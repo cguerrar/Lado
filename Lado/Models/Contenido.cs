@@ -125,6 +125,26 @@ namespace Lado.Models
         public bool ComentariosDesactivados { get; set; } = false;
 
         // ========================================
+        // UBICACIÓN GEOGRÁFICA (desde EXIF)
+        // ========================================
+
+        /// <summary>
+        /// Latitud extraída de los metadatos EXIF de la imagen
+        /// </summary>
+        public double? Latitud { get; set; }
+
+        /// <summary>
+        /// Longitud extraída de los metadatos EXIF de la imagen
+        /// </summary>
+        public double? Longitud { get; set; }
+
+        /// <summary>
+        /// Nombre de la ubicación (ej: "Santiago, Chile")
+        /// </summary>
+        [StringLength(200)]
+        public string? NombreUbicacion { get; set; }
+
+        // ========================================
         // MÉTRICAS
         // ========================================
 
