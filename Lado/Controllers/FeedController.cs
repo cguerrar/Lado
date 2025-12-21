@@ -129,51 +129,30 @@ namespace Lado.Controllers
                 }
 
                 // ⭐ PROTECCIÓN DE PRIVACIDAD LADOA/LADOB
-                // Si el usuario tiene seudónimo (LadoB), su identidad LadoA está protegida por defecto
                 var tieneSeudonimoActivo = !string.IsNullOrEmpty(usuario.Seudonimo);
                 var esPerfilPropio = usuarioActual.Id == id;
 
-                // ⭐ PROTECCIÓN BIDIRECCIONAL DE IDENTIDADES
-                // Los perfiles LadoA y LadoB son COMPLETAMENTE SEPARADOS
-                // Solo puedes ver el lado al que estás suscrito
+                // ⭐ REGLAS DE ACCESO:
+                // - LadoA es PÚBLICO: siempre visible para todos
+                // - LadoB es PREMIUM: visible para suscriptores (o preview para suscribirse)
+                // - Si creador tiene OcultarIdentidadLadoA=true: desde LadoB no se puede acceder a LadoA
+                //   (a menos que sigas en LadoA)
 
-                if (tieneSeudonimoActivo && !esPerfilPropio)
+                if (tieneSeudonimoActivo && !esPerfilPropio && !verSeudonimo && usuario.OcultarIdentidadLadoA)
                 {
-                    // Verificar suscripciones del visitante
+                    // Intentando ver LadoA de un creador que oculta su identidad
+                    // Solo permitir si el visitante sigue en LadoA
                     var sigueEnLadoA = await _context.Suscripciones
                         .AnyAsync(s => s.FanId == usuarioActual.Id &&
                                       s.CreadorId == id &&
                                       s.TipoLado == TipoLado.LadoA &&
                                       s.EstaActiva);
 
-                    var sigueEnLadoB = await _context.Suscripciones
-                        .AnyAsync(s => s.FanId == usuarioActual.Id &&
-                                      s.CreadorId == id &&
-                                      s.TipoLado == TipoLado.LadoB &&
-                                      s.EstaActiva);
-
-                    _logger.LogInformation("🔒 Protección: Usuario={User}, verSeudonimo={Ver}, SigueA={A}, SigueB={B}",
-                        usuario.UserName, verSeudonimo, sigueEnLadoA, sigueEnLadoB);
-
-                    if (verSeudonimo)
+                    if (!sigueEnLadoA)
                     {
-                        // Intentando ver LadoB: Solo permitir si sigue en LadoB
-                        if (!sigueEnLadoB)
-                        {
-                            // No sigue en LadoB → Mostrar perfil pero con contenido bloqueado (para que pueda suscribirse)
-                            // Esto es correcto, dejamos que vea el perfil LadoB para suscribirse
-                            _logger.LogInformation("🔒 Visitante no suscrito a LadoB, mostrando perfil con contenido bloqueado");
-                        }
-                    }
-                    else
-                    {
-                        // Intentando ver LadoA: Solo permitir si sigue en LadoA
-                        if (!sigueEnLadoA)
-                        {
-                            // No sigue en LadoA → Redirigir a LadoB
-                            _logger.LogInformation("🔒 Redirigiendo a LadoB: visitante no sigue en LadoA");
-                            return RedirectToAction("Perfil", new { id = id, verSeudonimo = true });
-                        }
+                        // No sigue en LadoA y el creador oculta su identidad → Redirigir a LadoB
+                        _logger.LogInformation("🔒 Redirigiendo a LadoB: creador oculta identidad LadoA y visitante no lo sigue");
+                        return RedirectToAction("Perfil", new { id = id, verSeudonimo = true });
                     }
                 }
 
