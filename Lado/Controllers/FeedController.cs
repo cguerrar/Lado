@@ -322,7 +322,7 @@ namespace Lado.Controllers
                     await _context.SaveChangesAsync();
                 }
 
-                return View(usuario);
+                return View("Perfil", usuario);
             }
             catch (Exception ex)
             {
