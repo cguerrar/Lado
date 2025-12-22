@@ -762,15 +762,13 @@ namespace Lado.Controllers
 
                         if (tieneAcceso)
                         {
-                            // Usuario tiene acceso - insertar al inicio del feed
+                            // Usuario tiene acceso - mover al inicio del feed
                             ViewBag.SharedPostId = post.Value;
 
-                            // Verificar si ya está en el feed
-                            var postExiste = contenidoOrdenado.Any(c => c.Id == post.Value);
-                            if (!postExiste)
-                            {
-                                contenidoOrdenado.Insert(0, postCompartido);
-                            }
+                            // Remover si ya existe en otra posición
+                            contenidoOrdenado.RemoveAll(c => c.Id == post.Value);
+                            // Insertar al inicio
+                            contenidoOrdenado.Insert(0, postCompartido);
                         }
                         else
                         {
