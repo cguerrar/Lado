@@ -364,7 +364,7 @@ namespace Lado.Controllers
         // INDEX - FEED PRINCIPAL CON CREADORES FAVORITOS
         // ========================================
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int? post = null)
         {
             try
             {
@@ -724,6 +724,33 @@ namespace Lado.Controllers
                 foreach (var anuncio in anuncios)
                 {
                     await _adService.RegistrarImpresion(anuncio.Id, usuarioId, ipAddress);
+                }
+
+                // Si viene de un link compartido, cargar ese post e insertarlo al inicio
+                if (post.HasValue)
+                {
+                    ViewBag.SharedPostId = post.Value;
+
+                    // Verificar si el post ya está en el feed
+                    var postExiste = contenidoOrdenado.Any(c => c.Id == post.Value);
+
+                    if (!postExiste)
+                    {
+                        // Cargar el post compartido
+                        var postCompartido = await _context.Contenidos
+                            .Include(c => c.Usuario)
+                            .Include(c => c.PistaMusical)
+                            .Include(c => c.Archivos.OrderBy(a => a.Orden))
+                            .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
+                                .ThenInclude(com => com.Usuario)
+                            .FirstOrDefaultAsync(c => c.Id == post.Value && c.EstaActivo && !c.EsBorrador);
+
+                        if (postCompartido != null)
+                        {
+                            // Insertar al inicio del feed
+                            contenidoOrdenado.Insert(0, postCompartido);
+                        }
+                    }
                 }
 
                 return View(contenidoOrdenado);
@@ -1437,10 +1464,13 @@ namespace Lado.Controllers
                 contenido.NumeroCompartidos++;
                 await _context.SaveChangesAsync();
 
+                // Generar URL que abre el post dentro del feed normal
+                var feedUrl = Url.Action("Index", "Feed", null, Request.Scheme) + "?post=" + id;
+
                 return Json(new
                 {
                     success = true,
-                    url = Url.Action("Detalle", "Feed", new { id }, Request.Scheme),
+                    url = feedUrl,
                     totalCompartidos = contenido.NumeroCompartidos
                 });
             }

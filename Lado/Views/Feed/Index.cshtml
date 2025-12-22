@@ -4834,6 +4834,28 @@
     document.addEventListener('DOMContentLoaded', function() {
         initPullToRefresh();
         initInfiniteScroll();
+
+        // Detectar si viene de un link compartido (SharedPostId del servidor)
+        @if (ViewBag.SharedPostId != null) {
+            <text>
+            setTimeout(() => {
+                const postId = @ViewBag.SharedPostId;
+                const postElement = document.querySelector(`.post-card[data-post-id="${postId}"]`);
+                if (postElement) {
+                    // El post está en el feed, abrirlo en fullscreen
+                    const mediaElement = postElement.querySelector('.post-media');
+                    if (mediaElement) {
+                        const fakeEvent = { preventDefault: () => {}, stopPropagation: () => {}, target: mediaElement };
+                        if (typeof openFullscreenViewer === 'function') {
+                            openFullscreenViewer(fakeEvent, postId);
+                        }
+                    }
+                    // Limpiar el parámetro de la URL sin recargar
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            }, 500);
+            </text>
+        }
     });
 
     // ========================================
