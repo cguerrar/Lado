@@ -7,6 +7,7 @@
     var estaSuscrito = ViewBag.EstaSuscrito ?? false;
     var esFavorito = ViewBag.EsFavorito ?? false;
     var estaAutenticado = ViewBag.EstaAutenticado ?? User.Identity?.IsAuthenticated ?? false;
+    var currentUserId = ViewBag.CurrentUserId as string ?? "";
 
     // Soporte para carrusel (múltiples archivos)
     var archivosCarrusel = Model.TodosLosArchivos;
@@ -713,18 +714,80 @@
         cursor: not-allowed;
     }
 
-    /* LISTA DE COMENTARIOS */
+    /* ========================================
+       COMENTARIOS ESTILO INSTAGRAM
+       ======================================== */
+
     .comment-item {
         display: flex;
         gap: 12px;
-        padding: 16px 0;
+        padding: 12px 0;
+    }
+
+    .comment-item:not(:last-child) {
         border-bottom: 1px solid var(--border);
     }
 
-    .comment-item:last-child {
-        border-bottom: none;
+    /* Avatar con boton follow */
+    .comment-avatar-wrapper {
+        position: relative;
+        flex-shrink: 0;
     }
 
+    .comment-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: var(--hover);
+    }
+
+    .comment-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .comment-avatar-initial {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 16px;
+        color: var(--fg);
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+        color: white;
+    }
+
+    .comment-follow-btn {
+        position: absolute;
+        bottom: -4px;
+        right: -4px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #0095f6;
+        border: 2px solid var(--bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+    .comment-follow-btn:hover {
+        transform: scale(1.1);
+    }
+
+    .comment-follow-btn svg {
+        width: 10px;
+        height: 10px;
+        fill: white;
+    }
+
+    /* Contenido del comentario */
     .comment-content {
         flex: 1;
         min-width: 0;
@@ -735,24 +798,172 @@
         align-items: center;
         gap: 8px;
         margin-bottom: 4px;
-        flex-wrap: wrap;
     }
 
-    .comment-header strong {
+    .comment-username {
         font-size: 14px;
         font-weight: 600;
         color: var(--fg);
+        text-decoration: none;
     }
 
-    .comment-header span {
+    .comment-username:hover {
+        text-decoration: underline;
+    }
+
+    .comment-time {
         font-size: 13px;
         color: var(--muted);
     }
 
+    .comment-menu-btn {
+        margin-left: auto;
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        padding: 4px 8px;
+        font-size: 16px;
+        letter-spacing: 2px;
+    }
+
+    .comment-menu-btn:hover {
+        color: var(--fg);
+    }
+
     .comment-text {
-        font-size: 14px;
+        font-size: 15px;
         line-height: 1.5;
         color: var(--fg);
+        margin-bottom: 8px;
+        word-wrap: break-word;
+    }
+
+    /* Acciones del comentario - Estilo Instagram */
+    .comment-actions {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 8px;
+    }
+
+    .comment-action-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 14px;
+        padding: 0;
+        transition: all 0.2s;
+    }
+
+    .comment-action-btn:hover {
+        color: var(--fg);
+    }
+
+    .comment-action-btn svg {
+        width: 20px;
+        height: 20px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+    }
+
+    .comment-action-btn.like-btn svg.liked {
+        fill: #ed4956;
+        stroke: #ed4956;
+    }
+
+    .comment-action-btn.like-btn:hover svg:not(.liked) {
+        color: #ed4956;
+    }
+
+    .comment-action-btn .count {
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    /* Animacion de like */
+    @@keyframes heartPop {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.3); }
+        100% { transform: scale(1); }
+    }
+
+    .comment-action-btn svg.liked {
+        animation: heartPop 0.3s ease-out;
+    }
+
+    /* Mostrar respuestas con avatares */
+    .show-replies-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        padding: 4px 0;
+    }
+
+    .show-replies-row:hover .show-replies-text {
+        text-decoration: underline;
+    }
+
+    .reply-mini-avatars {
+        display: flex;
+        align-items: center;
+    }
+
+    .reply-mini-avatars img,
+    .reply-mini-avatars .mini-avatar-initial {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 2px solid var(--bg);
+        margin-left: -8px;
+        object-fit: cover;
+    }
+
+    .reply-mini-avatars img:first-child,
+    .reply-mini-avatars .mini-avatar-initial:first-child {
+        margin-left: 0;
+    }
+
+    .reply-mini-avatars .mini-avatar-initial {
+        background: var(--accent);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 600;
+    }
+
+    .show-replies-text {
+        font-size: 13px;
+        color: var(--muted);
+        font-weight: 500;
+    }
+
+    /* Respuestas anidadas */
+    .comment-respuesta {
+        padding-left: 56px;
+    }
+
+    .comment-respuesta .comment-avatar {
+        width: 36px;
+        height: 36px;
+    }
+
+    .comment-respuesta .comment-follow-btn {
+        width: 16px;
+        height: 16px;
+    }
+
+    .comment-respuesta .comment-follow-btn svg {
+        width: 8px;
+        height: 8px;
     }
 
     /* MODAL REACCIONES */
@@ -2309,88 +2520,139 @@
 
                     foreach (var comentario in comentariosPrincipales)
                     {
+                        var tiempoComent = DateTime.Now - comentario.FechaCreacion;
+                        var tiempoTextoComent = tiempoComent.TotalDays >= 1 ? $"{(int)tiempoComent.TotalDays} h" :
+                            tiempoComent.TotalHours >= 1 ? $"{(int)tiempoComent.TotalHours} h" : $"{(int)tiempoComent.TotalMinutes} m";
+                        var numRespuestas = Model.Comentarios?.Count(c => c.ComentarioPadreId == comentario.Id) ?? 0;
+                        var respuestasDelComentario = respuestasPorPadre.ContainsKey(comentario.Id) ? respuestasPorPadre[comentario.Id] : new List<Lado.Models.Comentario>();
+
                         <div class="comment-item comment-principal" data-comment-id="@comentario.Id">
-                            <div class="creator-avatar" style="width: 40px; height: 40px; font-size: 14px;">
-                                @if (!string.IsNullOrEmpty(comentario.Usuario?.FotoPerfil))
+                            <!-- Avatar con boton follow -->
+                            <div class="comment-avatar-wrapper">
+                                <div class="comment-avatar">
+                                    @if (!string.IsNullOrEmpty(comentario.Usuario?.FotoPerfil))
+                                    {
+                                        <img src="@comentario.Usuario.FotoPerfil" alt="@comentario.Usuario.UserName">
+                                    }
+                                    else
+                                    {
+                                        <div class="comment-avatar-initial">@(comentario.Usuario?.UserName?.Substring(0, 1).ToUpper() ?? "U")</div>
+                                    }
+                                </div>
+                                @if (estaAutenticado && comentario.UsuarioId != currentUserId)
                                 {
-                                    <img src="@comentario.Usuario.FotoPerfil" alt="@comentario.Usuario.NombreCompleto">
-                                }
-                                else
-                                {
-                                    @(comentario.Usuario?.NombreCompleto?.Substring(0, 1) ?? "U")
+                                    <button class="comment-follow-btn" onclick="event.stopPropagation();" title="Seguir">
+                                        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="3" fill="none"/></svg>
+                                    </button>
                                 }
                             </div>
+
+                            <!-- Contenido -->
                             <div class="comment-content">
                                 <div class="comment-header">
-                                    <strong>@(comentario.Usuario?.NombreCompleto ?? "Usuario")</strong>
-                                    <span>@@@(comentario.Usuario?.UserName ?? "usuario")</span>
-                                    <span>·</span>
-                                    <span>
-                                        @{
-                                            var tiempoComent = DateTime.Now - comentario.FechaCreacion;
-                                            var tiempoTextoComent = tiempoComent.TotalDays >= 1 ? $"{(int)tiempoComent.TotalDays}d" :
-                                            tiempoComent.TotalHours >= 1 ? $"{(int)tiempoComent.TotalHours}h" : $"{(int)tiempoComent.TotalMinutes}m";
-                                        }
-                                        Hace @tiempoTextoComent
-                                    </span>
+                                    <a href="/Feed/Perfil/@comentario.Usuario?.UserName" class="comment-username">@(comentario.Usuario?.UserName ?? "usuario")</a>
+                                    <span class="comment-time">@tiempoTextoComent</span>
+                                    <button class="comment-menu-btn" onclick="event.stopPropagation();">...</button>
                                 </div>
+
                                 <p class="comment-text">@comentario.Texto</p>
-                                @if (estaAutenticado)
-                                {
-                                    <button class="btn-responder" onclick="mostrarFormularioRespuesta(@comentario.Id, '@comentario.Usuario?.UserName')">
-                                        Responder
+
+                                <!-- Acciones estilo Instagram -->
+                                <div class="comment-actions">
+                                    <button class="comment-action-btn like-btn" onclick="toggleLikeComentario(@comentario.Id, this)" data-comment-id="@comentario.Id">
+                                        <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                                        <span class="count">@(comentario.NumeroLikes > 0 ? comentario.NumeroLikes.ToString() : "")</span>
                                     </button>
+                                    <button class="comment-action-btn reply-btn" onclick="mostrarFormularioRespuesta(@comentario.Id, '@comentario.Usuario?.UserName')">
+                                        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                        <span class="count">@(numRespuestas > 0 ? numRespuestas.ToString() : "")</span>
+                                    </button>
+                                    <button class="comment-action-btn repost-btn" onclick="event.stopPropagation();">
+                                        <svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                                    </button>
+                                    <button class="comment-action-btn share-btn" onclick="event.stopPropagation();">
+                                        <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                                    </button>
+                                </div>
+
+                                <!-- Mostrar respuestas con mini avatares -->
+                                @if (numRespuestas > 0)
+                                {
+                                    <div class="show-replies-row" onclick="toggleRespuestas(@comentario.Id, this)">
+                                        <div class="reply-mini-avatars">
+                                            @foreach (var resp in respuestasDelComentario.Take(3))
+                                            {
+                                                if (!string.IsNullOrEmpty(resp.Usuario?.FotoPerfil))
+                                                {
+                                                    <img src="@resp.Usuario.FotoPerfil" alt="">
+                                                }
+                                                else
+                                                {
+                                                    <div class="mini-avatar-initial">@(resp.Usuario?.UserName?.Substring(0, 1).ToUpper() ?? "U")</div>
+                                                }
+                                            }
+                                        </div>
+                                        <span class="show-replies-text">Mostrar respuestas</span>
+                                    </div>
                                 }
                             </div>
                         </div>
 
-                        @* Mostrar respuestas anidadas *@
+                        @* Respuestas anidadas *@
                         @if (respuestasPorPadre.ContainsKey(comentario.Id))
                         {
-                            <div class="respuestas-container" id="respuestas-@comentario.Id">
-                                @{
-                                    var respuestas = respuestasPorPadre[comentario.Id];
-                                    var mostrarTodas = respuestas.Count <= 3;
-                                }
-                                @if (!mostrarTodas)
+                            var respuestas = respuestasPorPadre[comentario.Id];
+                            <div class="respuestas-container ocultas" id="respuestas-@comentario.Id">
+                                @foreach (var respuesta in respuestas)
                                 {
-                                    <button class="btn-ver-respuestas" onclick="toggleRespuestas(@comentario.Id, this)">
-                                        Ver @respuestas.Count respuestas
-                                    </button>
-                                }
-                                <div class="respuestas-lista @(mostrarTodas ? "" : "ocultas")">
-                                    @foreach (var respuesta in respuestas)
-                                    {
-                                        <div class="comment-item comment-respuesta" data-comment-id="@respuesta.Id">
-                                            <div class="creator-avatar" style="width: 32px; height: 32px; font-size: 12px;">
+                                    var tiempoResp = DateTime.Now - respuesta.FechaCreacion;
+                                    var tiempoTextoResp = tiempoResp.TotalDays >= 1 ? $"{(int)tiempoResp.TotalDays} h" :
+                                        tiempoResp.TotalHours >= 1 ? $"{(int)tiempoResp.TotalHours} h" : $"{(int)tiempoResp.TotalMinutes} m";
+
+                                    <div class="comment-item comment-respuesta" data-comment-id="@respuesta.Id">
+                                        <div class="comment-avatar-wrapper">
+                                            <div class="comment-avatar">
                                                 @if (!string.IsNullOrEmpty(respuesta.Usuario?.FotoPerfil))
                                                 {
-                                                    <img src="@respuesta.Usuario.FotoPerfil" alt="@respuesta.Usuario.NombreCompleto">
+                                                    <img src="@respuesta.Usuario.FotoPerfil" alt="@respuesta.Usuario.UserName">
                                                 }
                                                 else
                                                 {
-                                                    @(respuesta.Usuario?.NombreCompleto?.Substring(0, 1) ?? "U")
+                                                    <div class="comment-avatar-initial">@(respuesta.Usuario?.UserName?.Substring(0, 1).ToUpper() ?? "U")</div>
                                                 }
                                             </div>
-                                            <div class="comment-content">
-                                                <div class="comment-header">
-                                                    <strong>@(respuesta.Usuario?.NombreCompleto ?? "Usuario")</strong>
-                                                    <span>@@@(respuesta.Usuario?.UserName ?? "usuario")</span>
-                                                    <span>·</span>
-                                                    <span>
-                                                        @{
-                                                            var tiempoRespuesta = DateTime.Now - respuesta.FechaCreacion;
-                                                            var tiempoTextoRespuesta = tiempoRespuesta.TotalDays >= 1 ? $"{(int)tiempoRespuesta.TotalDays}d" :
-                                                            tiempoRespuesta.TotalHours >= 1 ? $"{(int)tiempoRespuesta.TotalHours}h" : $"{(int)tiempoRespuesta.TotalMinutes}m";
-                                                        }
-                                                        Hace @tiempoTextoRespuesta
-                                                    </span>
-                                                </div>
-                                                <p class="comment-text">@respuesta.Texto</p>
+                                            @if (estaAutenticado && respuesta.UsuarioId != currentUserId)
+                                            {
+                                                <button class="comment-follow-btn" onclick="event.stopPropagation();" title="Seguir">
+                                                    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="3" fill="none"/></svg>
+                                                </button>
+                                            }
+                                        </div>
+                                        <div class="comment-content">
+                                            <div class="comment-header">
+                                                <a href="/Feed/Perfil/@respuesta.Usuario?.UserName" class="comment-username">@(respuesta.Usuario?.UserName ?? "usuario")</a>
+                                                <span class="comment-time">@tiempoTextoResp</span>
+                                                <button class="comment-menu-btn" onclick="event.stopPropagation();">...</button>
+                                            </div>
+                                            <p class="comment-text">@respuesta.Texto</p>
+                                            <div class="comment-actions">
+                                                <button class="comment-action-btn like-btn" onclick="toggleLikeComentario(@respuesta.Id, this)" data-comment-id="@respuesta.Id">
+                                                    <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                                                    <span class="count">@(respuesta.NumeroLikes > 0 ? respuesta.NumeroLikes.ToString() : "")</span>
+                                                </button>
+                                                <button class="comment-action-btn reply-btn" onclick="mostrarFormularioRespuesta(@comentario.Id, '@respuesta.Usuario?.UserName')">
+                                                    <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                                </button>
+                                                <button class="comment-action-btn repost-btn" onclick="event.stopPropagation();">
+                                                    <svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                                                </button>
+                                                <button class="comment-action-btn share-btn" onclick="event.stopPropagation();">
+                                                    <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                                                </button>
                                             </div>
                                         </div>
-                                    }
-                                </div>
+                                    </div>
+                                }
                             </div>
                         }
 
@@ -2983,27 +3245,43 @@
                 }
 
                 const newComment = document.createElement('div');
-                newComment.className = 'comment-item';
+                newComment.className = 'comment-item comment-principal';
+                newComment.setAttribute('data-comment-id', data.comentario.id);
 
                 let avatarHtml = '';
                 if (data.comentario.avatar) {
-                    avatarHtml = `<img src="${escapeHtml(data.comentario.avatar)}" alt="${escapeHtml(data.comentario.nombreUsuario)}">`;
+                    avatarHtml = `<img src="${escapeHtml(data.comentario.avatar)}" alt="${escapeHtml(data.comentario.username)}">`;
                 } else {
-                    avatarHtml = escapeHtml(data.comentario.nombreUsuario?.substring(0, 1) || '');
+                    avatarHtml = `<div class="comment-avatar-initial">${escapeHtml(data.comentario.username?.substring(0, 1).toUpperCase() || 'U')}</div>`;
                 }
 
                 newComment.innerHTML = `
-                    <div class="creator-avatar" style="width: 40px; height: 40px; font-size: 14px;">
-                        ${avatarHtml}
+                    <div class="comment-avatar-wrapper">
+                        <div class="comment-avatar">${avatarHtml}</div>
                     </div>
                     <div class="comment-content">
                         <div class="comment-header">
-                            <strong>${escapeHtml(data.comentario.nombreUsuario)}</strong>
-                            <span>@@${escapeHtml(data.comentario.username)}</span>
-                            <span>·</span>
-                            <span>Justo ahora</span>
+                            <a href="/Feed/Perfil/${escapeHtml(data.comentario.username)}" class="comment-username">${escapeHtml(data.comentario.username)}</a>
+                            <span class="comment-time">Ahora</span>
+                            <button class="comment-menu-btn" onclick="event.stopPropagation();">...</button>
                         </div>
                         <p class="comment-text">${escapeHtml(texto)}</p>
+                        <div class="comment-actions">
+                            <button class="comment-action-btn like-btn" onclick="toggleLikeComentario(${data.comentario.id}, this)" data-comment-id="${data.comentario.id}">
+                                <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                                <span class="count"></span>
+                            </button>
+                            <button class="comment-action-btn reply-btn" onclick="mostrarFormularioRespuesta(${data.comentario.id}, '${escapeHtml(data.comentario.username)}')">
+                                <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                <span class="count"></span>
+                            </button>
+                            <button class="comment-action-btn repost-btn" onclick="event.stopPropagation();">
+                                <svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                            </button>
+                            <button class="comment-action-btn share-btn" onclick="event.stopPropagation();">
+                                <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                            </button>
+                        </div>
                     </div>
                 `;
 
@@ -3019,6 +3297,61 @@
             mostrarNotificacion('Error al publicar comentario', 'error');
         } finally {
             btnSubmit.textContent = 'Publicar';
+        }
+    }
+
+    // ========================================
+    // LIKES EN COMENTARIOS
+    // ========================================
+
+    async function toggleLikeComentario(comentarioId, btn) {
+        try {
+            const svg = btn.querySelector('svg');
+            const countSpan = btn.querySelector('.count');
+            const isLiked = svg.classList.contains('liked');
+
+            // Actualización optimista
+            if (isLiked) {
+                svg.classList.remove('liked');
+                const currentCount = parseInt(countSpan.textContent) || 0;
+                countSpan.textContent = currentCount > 1 ? currentCount - 1 : '';
+            } else {
+                svg.classList.add('liked');
+                const currentCount = parseInt(countSpan.textContent) || 0;
+                countSpan.textContent = currentCount + 1;
+            }
+
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+
+            const response = await fetch('/Feed/ToggleLikeComentario', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `comentarioId=${comentarioId}&__RequestVerificationToken=${encodeURIComponent(token || '')}`
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Sincronizar con el servidor
+                countSpan.textContent = data.likes > 0 ? data.likes : '';
+                if (data.meDioLike) {
+                    svg.classList.add('liked');
+                } else {
+                    svg.classList.remove('liked');
+                }
+            } else {
+                // Revertir cambio optimista
+                if (isLiked) {
+                    svg.classList.add('liked');
+                } else {
+                    svg.classList.remove('liked');
+                }
+                console.error('Error al dar like:', data.message);
+            }
+        } catch (error) {
+            console.error('Error al procesar like:', error);
         }
     }
 
@@ -3117,23 +3450,37 @@
 
                 let avatarHtml = '';
                 if (data.comentario.avatar) {
-                    avatarHtml = `<img src="${escapeHtml(data.comentario.avatar)}" alt="${escapeHtml(data.comentario.nombreUsuario)}">`;
+                    avatarHtml = `<img src="${escapeHtml(data.comentario.avatar)}" alt="${escapeHtml(data.comentario.username)}">`;
                 } else {
-                    avatarHtml = escapeHtml(data.comentario.nombreUsuario?.substring(0, 1) || '');
+                    avatarHtml = `<div class="comment-avatar-initial">${escapeHtml(data.comentario.username?.substring(0, 1).toUpperCase() || 'U')}</div>`;
                 }
 
                 newReply.innerHTML = `
-                    <div class="creator-avatar" style="width: 32px; height: 32px; font-size: 12px;">
-                        ${avatarHtml}
+                    <div class="comment-avatar-wrapper">
+                        <div class="comment-avatar">${avatarHtml}</div>
                     </div>
                     <div class="comment-content">
                         <div class="comment-header">
-                            <strong>${escapeHtml(data.comentario.nombreUsuario)}</strong>
-                            <span>@@${escapeHtml(data.comentario.username)}</span>
-                            <span>·</span>
-                            <span>Justo ahora</span>
+                            <a href="/Feed/Perfil/${escapeHtml(data.comentario.username)}" class="comment-username">${escapeHtml(data.comentario.username)}</a>
+                            <span class="comment-time">Ahora</span>
+                            <button class="comment-menu-btn" onclick="event.stopPropagation();">...</button>
                         </div>
                         <p class="comment-text">${escapeHtml(texto)}</p>
+                        <div class="comment-actions">
+                            <button class="comment-action-btn like-btn" onclick="toggleLikeComentario(${data.comentario.id}, this)" data-comment-id="${data.comentario.id}">
+                                <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                                <span class="count"></span>
+                            </button>
+                            <button class="comment-action-btn reply-btn" onclick="mostrarFormularioRespuesta(${comentarioPadreId}, '${escapeHtml(data.comentario.username)}')">
+                                <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            </button>
+                            <button class="comment-action-btn repost-btn" onclick="event.stopPropagation();">
+                                <svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                            </button>
+                            <button class="comment-action-btn share-btn" onclick="event.stopPropagation();">
+                                <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                            </button>
+                        </div>
                     </div>
                 `;
 

@@ -903,27 +903,170 @@
         font-size: 14px;
         color: var(--muted);
         cursor: pointer;
-        margin-bottom: 4px;
+        margin-bottom: 8px;
     }
 
     .view-all-comments:hover {
         text-decoration: underline;
     }
 
-    .comment-preview {
-        font-size: 14px;
-        line-height: 1.4;
-        margin-bottom: 4px;
+    /* ========================================
+       COMENTARIOS ESTILO INSTAGRAM - FEED
+       ======================================== */
+
+    .feed-comment-item {
+        display: flex;
+        gap: 10px;
+        padding: 8px 0;
     }
 
-    .comment-preview-username {
+    .feed-comment-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        overflow: hidden;
+        flex-shrink: 0;
+        background: var(--hover);
+    }
+
+    .feed-comment-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .feed-comment-avatar-initial {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 12px;
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+        color: white;
+    }
+
+    .feed-comment-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .feed-comment-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 2px;
+    }
+
+    .feed-comment-username {
+        font-size: 13px;
         font-weight: 600;
         color: var(--fg);
-        margin-right: 6px;
+        text-decoration: none;
     }
 
-    .comment-preview-text {
+    .feed-comment-username:hover {
+        text-decoration: underline;
+    }
+
+    .feed-comment-time {
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .feed-comment-text {
+        font-size: 14px;
+        line-height: 1.4;
         color: var(--fg);
+        margin-bottom: 4px;
+        word-wrap: break-word;
+    }
+
+    .feed-comment-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .feed-comment-action-btn {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 12px;
+        padding: 0;
+        transition: all 0.2s;
+    }
+
+    .feed-comment-action-btn:hover {
+        color: var(--fg);
+    }
+
+    .feed-comment-action-btn svg {
+        width: 16px;
+        height: 16px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+    }
+
+    .feed-comment-action-btn.like-btn svg.liked {
+        fill: #ed4956;
+        stroke: #ed4956;
+    }
+
+    .feed-comment-action-btn .count {
+        font-weight: 500;
+    }
+
+    @@keyframes feedHeartPop {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.3); }
+        100% { transform: scale(1); }
+    }
+
+    .feed-comment-action-btn svg.liked {
+        animation: feedHeartPop 0.3s ease-out;
+    }
+
+    /* Respuestas mini */
+    .feed-show-replies {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 0 4px 42px;
+        cursor: pointer;
+    }
+
+    .feed-show-replies:hover span {
+        text-decoration: underline;
+    }
+
+    .feed-reply-avatars {
+        display: flex;
+    }
+
+    .feed-reply-avatars img {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 2px solid var(--bg);
+        margin-left: -6px;
+        object-fit: cover;
+    }
+
+    .feed-reply-avatars img:first-child {
+        margin-left: 0;
+    }
+
+    .feed-show-replies span {
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 500;
     }
 
     /* ADD COMMENT */
@@ -3979,22 +4122,67 @@
                     </div>
                 }
 
-                <!-- Comments Preview -->
+                <!-- Comments Preview - Estilo Instagram -->
                 @if (post.Comentarios != null && post.Comentarios.Any())
                 {
                     <div class="post-comments-preview">
-                        @if (post.NumeroComentarios > 3)
+                        @if (post.NumeroComentarios > 2)
                         {
                             <div class="view-all-comments" onclick="window.location.href='/Feed/Detalle/@post.Id'">
                                 Ver los @post.NumeroComentarios comentarios
                             </div>
                         }
-                        @foreach (var comment in post.Comentarios.Take(2))
+                        @foreach (var comment in post.Comentarios.Where(c => c.ComentarioPadreId == null).Take(2))
                         {
-                            <div class="comment-preview">
-                                <span class="comment-preview-username">@(comment.Usuario?.UserName ?? "usuario")</span>
-                                <span class="comment-preview-text">@comment.Texto</span>
+                            var tcDiff = DateTime.Now - comment.FechaCreacion;
+                            var tcTexto = tcDiff.TotalDays >= 1 ? $"{(int)tcDiff.TotalDays}d" :
+                                tcDiff.TotalHours >= 1 ? $"{(int)tcDiff.TotalHours}h" : $"{(int)tcDiff.TotalMinutes}m";
+                            var numRespuestas = post.Comentarios.Count(c => c.ComentarioPadreId == comment.Id);
+
+                            <div class="feed-comment-item" data-comment-id="@comment.Id">
+                                <div class="feed-comment-avatar">
+                                    @if (!string.IsNullOrEmpty(comment.Usuario?.FotoPerfil))
+                                    {
+                                        <img src="@comment.Usuario.FotoPerfil" alt="">
+                                    }
+                                    else
+                                    {
+                                        <div class="feed-comment-avatar-initial">@(comment.Usuario?.UserName?.Substring(0, 1).ToUpper() ?? "U")</div>
+                                    }
+                                </div>
+                                <div class="feed-comment-content">
+                                    <div class="feed-comment-header">
+                                        <a href="/Feed/Perfil/@comment.Usuario?.UserName" class="feed-comment-username">@(comment.Usuario?.UserName ?? "usuario")</a>
+                                        <span class="feed-comment-time">@tcTexto</span>
+                                    </div>
+                                    <p class="feed-comment-text">@comment.Texto</p>
+                                    <div class="feed-comment-actions">
+                                        <button class="feed-comment-action-btn like-btn" onclick="toggleFeedCommentLike(@comment.Id, this)" data-comment-id="@comment.Id">
+                                            <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                                            <span class="count">@(comment.NumeroLikes > 0 ? comment.NumeroLikes.ToString() : "")</span>
+                                        </button>
+                                        <button class="feed-comment-action-btn" onclick="window.location.href='/Feed/Detalle/@post.Id'">
+                                            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                            <span class="count">@(numRespuestas > 0 ? numRespuestas.ToString() : "")</span>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
+                            @if (numRespuestas > 0)
+                            {
+                                <div class="feed-show-replies" onclick="window.location.href='/Feed/Detalle/@post.Id'">
+                                    <div class="feed-reply-avatars">
+                                        @foreach (var resp in post.Comentarios.Where(c => c.ComentarioPadreId == comment.Id).Take(2))
+                                        {
+                                            if (!string.IsNullOrEmpty(resp.Usuario?.FotoPerfil))
+                                            {
+                                                <img src="@resp.Usuario.FotoPerfil" alt="">
+                                            }
+                                        }
+                                    </div>
+                                    <span>Mostrar respuestas</span>
+                                </div>
+                            }
                         }
                     </div>
                 }
@@ -4289,6 +4477,59 @@
             };
         }, 100);
     });
+
+    // ========================================
+    // LIKES EN COMENTARIOS DEL FEED
+    // ========================================
+
+    async function toggleFeedCommentLike(comentarioId, btn) {
+        try {
+            const svg = btn.querySelector('svg');
+            const countSpan = btn.querySelector('.count');
+            const isLiked = svg.classList.contains('liked');
+
+            // Actualización optimista
+            if (isLiked) {
+                svg.classList.remove('liked');
+                const currentCount = parseInt(countSpan.textContent) || 0;
+                countSpan.textContent = currentCount > 1 ? currentCount - 1 : '';
+            } else {
+                svg.classList.add('liked');
+                const currentCount = parseInt(countSpan.textContent) || 0;
+                countSpan.textContent = currentCount + 1;
+            }
+
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+
+            const response = await fetch('/Feed/ToggleLikeComentario', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `comentarioId=${comentarioId}&__RequestVerificationToken=${encodeURIComponent(token || '')}`
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                countSpan.textContent = data.likes > 0 ? data.likes : '';
+                if (data.meDioLike) {
+                    svg.classList.add('liked');
+                } else {
+                    svg.classList.remove('liked');
+                }
+            } else {
+                // Revertir
+                if (isLiked) {
+                    svg.classList.add('liked');
+                } else {
+                    svg.classList.remove('liked');
+                }
+            }
+        } catch (error) {
+            console.error('Error al procesar like:', error);
+        }
+    }
 
     // ========================================
     // PULL TO REFRESH & INFINITE SCROLL

@@ -123,6 +123,11 @@ namespace Lado.Data
         // ========================================
         public DbSet<ConfiguracionConfianza> ConfiguracionesConfianza { get; set; }
 
+        // ========================================
+        // ⭐ DbSets NUEVOS - LIKES EN COMENTARIOS
+        // ========================================
+        public DbSet<LikeComentario> LikesComentarios { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -756,6 +761,36 @@ namespace Lado.Data
                 entity.HasIndex(e => e.FechaCreacion);
                 entity.HasIndex(e => e.ComentarioPadreId)
                     .HasDatabaseName("IX_Comentarios_ComentarioPadreId");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE LIKES EN COMENTARIOS
+            // ========================================
+            modelBuilder.Entity<LikeComentario>(entity =>
+            {
+                entity.HasKey(l => l.Id);
+
+                entity.HasOne(l => l.Comentario)
+                    .WithMany(c => c.Likes)
+                    .HasForeignKey(l => l.ComentarioId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(l => l.Usuario)
+                    .WithMany()
+                    .HasForeignKey(l => l.UsuarioId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // Índices
+                entity.HasIndex(l => l.ComentarioId)
+                    .HasDatabaseName("IX_LikesComentarios_ComentarioId");
+
+                entity.HasIndex(l => l.UsuarioId)
+                    .HasDatabaseName("IX_LikesComentarios_UsuarioId");
+
+                // Un usuario solo puede dar like una vez a un comentario
+                entity.HasIndex(l => new { l.UsuarioId, l.ComentarioId })
+                    .IsUnique()
+                    .HasDatabaseName("IX_LikesComentarios_Usuario_Comentario_Unique");
             });
 
             // ========================================

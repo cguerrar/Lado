@@ -36,5 +36,9 @@ namespace Lado.Models
         public virtual Comentario? ComentarioPadre { get; set; }
 
         public virtual ICollection<Comentario> Respuestas { get; set; } = new List<Comentario>();
+
+        // Likes del comentario
+        public int NumeroLikes { get; set; } = 0;
+        public virtual ICollection<LikeComentario> Likes { get; set; } = new List<LikeComentario>();
     }
 }

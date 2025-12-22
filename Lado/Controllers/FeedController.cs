@@ -1435,6 +1435,18 @@ namespace Lado.Controllers
                 var totalComentarios = await _context.Comentarios
                     .CountAsync(c => c.ContenidoId == contenidoId && c.EstaActivo && c.ComentarioPadreId == null);
 
+                // Obtener IDs de comentarios que el usuario actual ha dado like
+                var comentarioIds = comentariosPrincipales.Select(c => c.Id)
+                    .Concat(comentariosPrincipales.SelectMany(c => c.Respuestas.Select(r => r.Id)))
+                    .ToList();
+
+                var misLikes = !string.IsNullOrEmpty(usuarioId)
+                    ? await _context.LikesComentarios
+                        .Where(l => comentarioIds.Contains(l.ComentarioId) && l.UsuarioId == usuarioId)
+                        .Select(l => l.ComentarioId)
+                        .ToListAsync()
+                    : new List<int>();
+
                 return Json(new
                 {
                     success = true,
@@ -1443,6 +1455,8 @@ namespace Lado.Controllers
                         id = c.Id,
                         texto = c.Texto,
                         fechaCreacion = c.FechaCreacion,
+                        numeroLikes = c.NumeroLikes,
+                        meDioLike = misLikes.Contains(c.Id),
                         usuario = new
                         {
                             id = c.Usuario?.Id,
@@ -1458,6 +1472,8 @@ namespace Lado.Controllers
                                 id = r.Id,
                                 texto = r.Texto,
                                 fechaCreacion = r.FechaCreacion,
+                                numeroLikes = r.NumeroLikes,
+                                meDioLike = misLikes.Contains(r.Id),
                                 usuario = new
                                 {
                                     id = r.Usuario?.Id,
@@ -1477,6 +1493,169 @@ namespace Lado.Controllers
             {
                 _logger.LogError(ex, "Error al obtener comentarios del contenido {Id}", contenidoId);
                 return Json(new { success = false, message = "Error al cargar comentarios" });
+            }
+        }
+
+        // ========================================
+        // LIKES EN COMENTARIOS
+        // ========================================
+
+        [HttpPost]
+        [Authorize]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> LikeComentario(int comentarioId)
+        {
+            try
+            {
+                var usuarioId = _userManager.GetUserId(User);
+                if (string.IsNullOrEmpty(usuarioId))
+                {
+                    return Json(new { success = false, message = "No autenticado" });
+                }
+
+                var comentario = await _context.Comentarios
+                    .Include(c => c.Contenido)
+                    .FirstOrDefaultAsync(c => c.Id == comentarioId && c.EstaActivo);
+
+                if (comentario == null)
+                {
+                    return Json(new { success = false, message = "Comentario no encontrado" });
+                }
+
+                // Verificar si ya dio like
+                var likeExistente = await _context.LikesComentarios
+                    .FirstOrDefaultAsync(l => l.ComentarioId == comentarioId && l.UsuarioId == usuarioId);
+
+                if (likeExistente != null)
+                {
+                    return Json(new { success = true, likes = comentario.NumeroLikes, meDioLike = true });
+                }
+
+                // Agregar like
+                var nuevoLike = new LikeComentario
+                {
+                    ComentarioId = comentarioId,
+                    UsuarioId = usuarioId,
+                    FechaLike = DateTime.Now
+                };
+
+                _context.LikesComentarios.Add(nuevoLike);
+                comentario.NumeroLikes++;
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Like en comentario: Usuario {UserId} en Comentario {ComentarioId}",
+                    usuarioId, comentarioId);
+
+                return Json(new { success = true, likes = comentario.NumeroLikes, meDioLike = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al dar like al comentario {ComentarioId}", comentarioId);
+                return Json(new { success = false, message = "Error al procesar like" });
+            }
+        }
+
+        [HttpPost]
+        [Authorize]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UnlikeComentario(int comentarioId)
+        {
+            try
+            {
+                var usuarioId = _userManager.GetUserId(User);
+                if (string.IsNullOrEmpty(usuarioId))
+                {
+                    return Json(new { success = false, message = "No autenticado" });
+                }
+
+                var comentario = await _context.Comentarios
+                    .FirstOrDefaultAsync(c => c.Id == comentarioId && c.EstaActivo);
+
+                if (comentario == null)
+                {
+                    return Json(new { success = false, message = "Comentario no encontrado" });
+                }
+
+                var likeExistente = await _context.LikesComentarios
+                    .FirstOrDefaultAsync(l => l.ComentarioId == comentarioId && l.UsuarioId == usuarioId);
+
+                if (likeExistente == null)
+                {
+                    return Json(new { success = true, likes = comentario.NumeroLikes, meDioLike = false });
+                }
+
+                // Remover like
+                _context.LikesComentarios.Remove(likeExistente);
+                comentario.NumeroLikes = Math.Max(0, comentario.NumeroLikes - 1);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Unlike en comentario: Usuario {UserId} en Comentario {ComentarioId}",
+                    usuarioId, comentarioId);
+
+                return Json(new { success = true, likes = comentario.NumeroLikes, meDioLike = false });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al quitar like del comentario {ComentarioId}", comentarioId);
+                return Json(new { success = false, message = "Error al procesar unlike" });
+            }
+        }
+
+        [HttpPost]
+        [Authorize]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleLikeComentario(int comentarioId)
+        {
+            try
+            {
+                var usuarioId = _userManager.GetUserId(User);
+                if (string.IsNullOrEmpty(usuarioId))
+                {
+                    return Json(new { success = false, message = "No autenticado" });
+                }
+
+                var comentario = await _context.Comentarios
+                    .FirstOrDefaultAsync(c => c.Id == comentarioId && c.EstaActivo);
+
+                if (comentario == null)
+                {
+                    return Json(new { success = false, message = "Comentario no encontrado" });
+                }
+
+                var likeExistente = await _context.LikesComentarios
+                    .FirstOrDefaultAsync(l => l.ComentarioId == comentarioId && l.UsuarioId == usuarioId);
+
+                bool meDioLike;
+
+                if (likeExistente != null)
+                {
+                    // Quitar like
+                    _context.LikesComentarios.Remove(likeExistente);
+                    comentario.NumeroLikes = Math.Max(0, comentario.NumeroLikes - 1);
+                    meDioLike = false;
+                }
+                else
+                {
+                    // Agregar like
+                    var nuevoLike = new LikeComentario
+                    {
+                        ComentarioId = comentarioId,
+                        UsuarioId = usuarioId,
+                        FechaLike = DateTime.Now
+                    };
+                    _context.LikesComentarios.Add(nuevoLike);
+                    comentario.NumeroLikes++;
+                    meDioLike = true;
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, likes = comentario.NumeroLikes, meDioLike });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al toggle like del comentario {ComentarioId}", comentarioId);
+                return Json(new { success = false, message = "Error al procesar like" });
             }
         }
 
@@ -2357,6 +2536,7 @@ namespace Lado.Controllers
                     ViewBag.EsPropio = false;
                     ViewBag.EsFavorito = false;
                     ViewBag.EstaAutenticado = false;
+                    ViewBag.CurrentUserId = "";
 
                     _logger.LogInformation("Detalle público visto: Contenido {Id} por usuario anónimo", id);
 
@@ -2365,6 +2545,7 @@ namespace Lado.Controllers
 
                 // Usuario autenticado
                 ViewBag.EstaAutenticado = true;
+                ViewBag.CurrentUserId = usuarioActual.Id;
 
                 var esPropio = contenido.UsuarioId == usuarioActual.Id;
                 var tieneAcceso = esPropio || await VerificarAccesoContenido(usuarioActual.Id, contenido);
