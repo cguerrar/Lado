@@ -71,7 +71,7 @@ namespace Lado.Models
         // ========================================
         // CONFIGURACIÓN DE EMAIL
         // ========================================
-        public const string EMAIL_PROVEEDOR_ACTIVO = "Email_ProveedorActivo";   // "Mailjet" o "AmazonSES"
+        public const string EMAIL_PROVEEDOR_ACTIVO = "Email_ProveedorActivo";   // "Mailjet", "AmazonSES" o "Brevo"
         public const string EMAIL_FROM_EMAIL = "Email_FromEmail";               // Email del remitente
         public const string EMAIL_FROM_NAME = "Email_FromName";                 // Nombre del remitente
 
@@ -83,5 +83,8 @@ namespace Lado.Models
         public const string AMAZONSES_ACCESS_KEY = "AmazonSES_AccessKey";
         public const string AMAZONSES_SECRET_KEY = "AmazonSES_SecretKey";
         public const string AMAZONSES_REGION = "AmazonSES_Region";              // Default: us-east-1
+
+        // Brevo (antes Sendinblue)
+        public const string BREVO_API_KEY = "Brevo_ApiKey";
     }
 }

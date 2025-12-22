@@ -4,6 +4,7 @@
     ViewData["Title"] = "Feed";
     var likesUsuario = ViewBag.LikesUsuario as List<int> ?? new List<int>();
     var favoritosIds = ViewBag.FavoritosIds as List<int> ?? new List<int>();
+    var usuariosSeguidosIds = ViewBag.UsuariosSeguidosIds as List<string> ?? new List<string>();
     var stories = ViewBag.Stories as IEnumerable<dynamic>;
     var usuarioActual = ViewBag.UsuarioActual as ApplicationUser;
     var creadoresSugeridos = ViewBag.CreadoresSugeridos as List<ApplicationUser> ?? new List<ApplicationUser>();
@@ -443,6 +444,137 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+
+    /* ========================================
+       PREVIEW BLUR DE LADOB
+       ======================================== */
+    .post-media.preview-blur-wrapper {
+        position: relative;
+    }
+
+    /* Efecto Blur */
+    .post-media.blur-effect img,
+    .post-media.blur-effect video {
+        filter: blur(20px);
+        transform: scale(1.1);
+    }
+
+    /* Efecto Pixelado (simulado con blur pequeño + contrast) */
+    .post-media.pixelado-effect img,
+    .post-media.pixelado-effect video {
+        filter: blur(8px) contrast(1.2);
+        image-rendering: pixelated;
+    }
+
+    /* Efecto Silueta */
+    .post-media.silueta-effect img,
+    .post-media.silueta-effect video {
+        filter: brightness(0) blur(3px);
+    }
+
+    /* Efecto Parcial (solo borde visible) */
+    .post-media.parcial-effect img,
+    .post-media.parcial-effect video {
+        filter: blur(15px);
+        mask-image: radial-gradient(ellipse 80% 80% at center, transparent 30%, black 70%);
+        -webkit-mask-image: radial-gradient(ellipse 80% 80% at center, transparent 30%, black 70%);
+    }
+
+    /* Overlay del preview blur */
+    .preview-blur-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.3);
+        z-index: 15;
+        gap: 12px;
+        text-align: center;
+        padding: 20px;
+    }
+
+    .preview-blur-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .preview-blur-icon svg {
+        width: 24px;
+        height: 24px;
+        color: white;
+    }
+
+    .preview-blur-text {
+        color: white;
+        font-size: 14px;
+        font-weight: 500;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    }
+
+    .preview-blur-subtext {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 12px;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .preview-blur-btn {
+        background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .preview-blur-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 15px rgba(238, 90, 36, 0.4);
+    }
+
+    .preview-blur-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Badge LadoB en preview */
+    .ladob-preview-badge {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+        color: white;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        z-index: 16;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .ladob-preview-badge svg {
+        width: 12px;
+        height: 12px;
     }
 
     /* ========================================
@@ -1378,6 +1510,17 @@
         color: var(--primary);
     }
 
+    .suggestion-badge-b {
+        background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+        color: white;
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 600;
+        margin-left: 4px;
+        vertical-align: middle;
+    }
+
     .suggestion-reason {
         font-size: 12px;
         color: var(--muted);
@@ -2303,32 +2446,36 @@
         50% { transform: translateY(-4px); }
     }
 
-    /* Fullscreen Mute Button */
-    .fullscreen-mute-btn {
-        position: absolute;
-        bottom: 80px;
-        right: 20px;
+    /* Fullscreen Mute Button Global - Arriba Izquierda */
+    .fullscreen-mute-btn-global {
+        position: fixed;
+        top: 20px;
+        left: 20px;
         width: 44px;
         height: 44px;
-        background: rgba(0, 0, 0, 0.6);
+        background: rgba(255, 255, 255, 0.1);
         border: none;
+        z-index: 10001;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        z-index: 10;
-        transition: background 0.2s ease, transform 0.2s ease;
+        transition: background 0.2s ease;
     }
 
-    .fullscreen-mute-btn:hover {
-        background: rgba(0, 0, 0, 0.8);
-        transform: scale(1.1);
+    .fullscreen-mute-btn-global:hover {
+        background: rgba(255, 255, 255, 0.2);
     }
 
-    .fullscreen-mute-btn svg {
+    .fullscreen-mute-btn-global svg {
         width: 24px;
         height: 24px;
+    }
+
+    /* Ocultar el botón de mute dentro de los slides */
+    .fullscreen-mute-btn {
+        display: none !important;
     }
 
     /* ========================================
@@ -3368,12 +3515,15 @@
             var yaLeDioLike = likesUsuario.Contains(post.Id);
             var esFavorito = favoritosIds.Contains(post.Id);
             var estaBloqueado = contenidoBloqueadoIds.Contains(post.Id);
+            var esPreviewBlur = post.EsPreviewBlurDeLadoB;
+            var tipoCensura = post.TipoCensuraPreview ?? TipoCensuraPreview.Blur;
 
             // Determinar la foto de perfil según el tipo de contenido
             var fotoPerfilMostrar = post.TipoLado == TipoLado.LadoB
                 ? (post.Usuario?.FotoPerfilLadoB ?? post.Usuario?.FotoPerfil)
                 : post.Usuario?.FotoPerfil;
-            <article class="post @(estaBloqueado ? "post-locked" : "")" data-post-id="@post.Id" data-locked="@estaBloqueado.ToString().ToLower()" data-creator-id="@post.UsuarioId" data-creator-name="@(post.Usuario?.Seudonimo ?? post.Usuario?.NombreCompleto ?? "Creador")" data-creator-photo="@(post.Usuario?.FotoPerfilLadoB ?? post.Usuario?.FotoPerfil)" data-creator-price="@(post.Usuario?.PrecioSuscripcion.ToString("0.00") ?? "0.00")" data-likes="@post.NumeroLikes" data-comments="@post.NumeroComentarios">
+            var sigueAlCreador = usuariosSeguidosIds.Contains(post.UsuarioId);
+            <article class="post @(estaBloqueado ? "post-locked" : "")" data-post-id="@post.Id" data-locked="@estaBloqueado.ToString().ToLower()" data-creator-id="@post.UsuarioId" data-creator-name="@(post.Usuario?.Seudonimo ?? post.Usuario?.NombreCompleto ?? "Creador")" data-creator-photo="@(post.Usuario?.FotoPerfilLadoB ?? post.Usuario?.FotoPerfil)" data-creator-price="@(post.Usuario?.PrecioSuscripcion.ToString("0.00") ?? "0.00")" data-likes="@post.NumeroLikes" data-comments="@post.NumeroComentarios" data-is-following="@sigueAlCreador.ToString().ToLower()">
                 <!-- Header -->
                 <header class="post-header">
                     <a href="@urlPerfil" class="post-header-left">
@@ -3590,10 +3740,21 @@
                 }
                 else if (tieneArchivo)
                 {
-                    <div class="post-media"
+                    // Determinar clase de efecto blur
+                    var blurEffectClass = esPreviewBlur ? tipoCensura switch
+                    {
+                        TipoCensuraPreview.Blur => "blur-effect",
+                        TipoCensuraPreview.Pixelado => "pixelado-effect",
+                        TipoCensuraPreview.Silueta => "silueta-effect",
+                        TipoCensuraPreview.Parcial => "parcial-effect",
+                        _ => "blur-effect"
+                    } : "";
+
+                    <div class="post-media @(esPreviewBlur ? "preview-blur-wrapper " + blurEffectClass : "")"
                          data-post-id="@post.Id"
                          data-media-type="@(esVideo ? "video" : (esAudio ? "audio" : "image"))"
                          data-media-src="@post.RutaArchivo"
+                         data-is-preview-blur="@esPreviewBlur.ToString().ToLower()"
                          @if (post.PistaMusical != null)
                          {
                              <text>data-audio-src="@post.PistaMusical.RutaArchivo"</text>
@@ -3602,8 +3763,38 @@
                              <text>data-audio-start="@(post.AudioTrimInicio ?? 0)"</text>
                              <text>data-audio-volume="@(((double)(post.MusicaVolumen ?? 0.7m)).ToString(System.Globalization.CultureInfo.InvariantCulture))"</text>
                          }
-                         onclick="openFullscreenViewer(event, @post.Id)"
+                         @if (!esPreviewBlur)
+                         {
+                            <text>onclick="openFullscreenViewer(event, @post.Id)"</text>
+                         }
                          style="cursor: pointer;">
+                        @if (esPreviewBlur)
+                        {
+                            <!-- Badge LadoB -->
+                            <div class="ladob-preview-badge">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                </svg>
+                                LadoB
+                            </div>
+                            <!-- Overlay con botón -->
+                            <div class="preview-blur-overlay">
+                                <div class="preview-blur-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                    </svg>
+                                </div>
+                                <div class="preview-blur-text">Contenido Exclusivo</div>
+                                <div class="preview-blur-subtext">Disponible en LadoB de @nombreUsuario</div>
+                                <a href="/Feed/Creador/@(post.Usuario?.Seudonimo)" class="preview-blur-btn" onclick="event.stopPropagation();">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <polygon points="10,8 16,12 10,16"/>
+                                    </svg>
+                                    Ver en LadoB
+                                </a>
+                            </div>
+                        }
                         @if (esImagen)
                         {
                             <img src="@post.RutaArchivo" alt="" loading="lazy">
@@ -3918,19 +4109,33 @@
                 </div>
                 @foreach (var creador in creadoresSugeridos.Take(5))
                 {
+                    // Mostrar según LadoPreferido del creador (solo si tiene LadoB configurado)
+                    var tieneLadoB = creador.EsCreador && !string.IsNullOrEmpty(creador.Seudonimo);
+                    var mostrarComoLadoB = tieneLadoB && creador.LadoPreferido == TipoLado.LadoB;
+                    var nombreMostrar = mostrarComoLadoB ? creador.Seudonimo : creador.NombreCompleto;
+                    var fotoMostrar = mostrarComoLadoB ? (creador.FotoPerfilLadoB ?? creador.FotoPerfil) : creador.FotoPerfil;
+                    var urlPerfil = mostrarComoLadoB ? $"/Feed/Creador/{creador.Seudonimo}" : $"/Feed/Perfil/{creador.Id}";
+                    var inicialMostrar = !string.IsNullOrEmpty(nombreMostrar) ? nombreMostrar.Substring(0, 1).ToUpper() : "?";
+
                     <div class="suggestion-item">
-                        @if (!string.IsNullOrEmpty(creador.FotoPerfil))
+                        @if (!string.IsNullOrEmpty(fotoMostrar))
                         {
-                            <img src="@creador.FotoPerfil" alt="" class="suggestion-avatar">
+                            <img src="@fotoMostrar" alt="" class="suggestion-avatar">
                         }
                         else
                         {
                             <div class="suggestion-avatar-placeholder">
-                                @creador.NombreCompleto.Substring(0, 1).ToUpper()
+                                @inicialMostrar
                             </div>
                         }
                         <div class="suggestion-info">
-                            <a href="/Feed/Perfil/@creador.Id" class="suggestion-name">@creador.UserName</a>
+                            <a href="@urlPerfil" class="suggestion-name">
+                                @nombreMostrar
+                                @if (mostrarComoLadoB)
+                                {
+                                    <span class="suggestion-badge-b">B</span>
+                                }
+                            </a>
                             <div class="suggestion-reason">
                                 @if (creador.CreadorVerificado)
                                 {
@@ -6106,6 +6311,16 @@
      FULLSCREEN MEDIA VIEWER (TikTok-style)
      ======================================== -->
 <div class="fullscreen-viewer" id="fullscreenViewer">
+    <!-- Botón Mute Global - Arriba Izquierda -->
+    <button class="fullscreen-mute-btn-global" id="globalMuteBtn" onclick="toggleGlobalMute()" title="Activar/Desactivar sonido" style="display:none;">
+        <svg class="icon-muted" viewBox="0 0 24 24" fill="white">
+            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+        </svg>
+        <svg class="icon-unmuted" viewBox="0 0 24 24" fill="white" style="display:none;">
+            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>
+    </button>
+    <!-- Botón Cerrar - Arriba Derecha -->
     <button class="fullscreen-viewer-close" onclick="closeFullscreenViewer()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -6324,23 +6539,64 @@
         currentPlayingAudioId = null;
     }
 
-    // Toggle Fullscreen Video Mute
+    // Toggle Fullscreen Video Mute (legacy - para botones dentro de slides)
     function toggleFullscreenMute(btn) {
         const slide = btn.closest('.fullscreen-slide');
         const video = slide ? slide.querySelector('video') : null;
         if (!video) return;
 
         video.muted = !video.muted;
+        updateGlobalMuteIcon(video.muted);
+    }
 
-        // Actualizar todos los botones de mute (por si hay varios slides)
-        document.querySelectorAll('.fullscreen-mute-btn').forEach(muteBtn => {
-            const iconMuted = muteBtn.querySelector('.icon-muted');
-            const iconUnmuted = muteBtn.querySelector('.icon-unmuted');
-            if (iconMuted && iconUnmuted) {
-                iconMuted.style.display = video.muted ? 'block' : 'none';
-                iconUnmuted.style.display = video.muted ? 'none' : 'block';
+    // Toggle Global Mute - Botón fijo arriba izquierda
+    function toggleGlobalMute() {
+        const container = document.getElementById('fullscreenSlidesContainer');
+        const currentSlide = container.querySelector(`.fullscreen-slide[data-index="${currentFullscreenIndex}"]`);
+        if (!currentSlide) return;
+
+        const video = currentSlide.querySelector('video');
+        if (video) {
+            video.muted = !video.muted;
+            updateGlobalMuteIcon(video.muted);
+        }
+    }
+
+    // Actualizar icono del botón global de mute
+    function updateGlobalMuteIcon(isMuted) {
+        const muteBtn = document.getElementById('globalMuteBtn');
+        if (!muteBtn) return;
+
+        const iconMuted = muteBtn.querySelector('.icon-muted');
+        const iconUnmuted = muteBtn.querySelector('.icon-unmuted');
+        if (iconMuted && iconUnmuted) {
+            iconMuted.style.display = isMuted ? 'block' : 'none';
+            iconUnmuted.style.display = isMuted ? 'none' : 'block';
+        }
+    }
+
+    // Mostrar/ocultar botón de mute según el tipo de contenido actual
+    function updateGlobalMuteVisibility() {
+        const muteBtn = document.getElementById('globalMuteBtn');
+        if (!muteBtn || currentFullscreenIndex < 0 || currentFullscreenIndex >= fullscreenPosts.length) {
+            if (muteBtn) muteBtn.style.display = 'none';
+            return;
+        }
+
+        const currentPost = fullscreenPosts[currentFullscreenIndex];
+        // Mostrar solo si es video
+        if (currentPost && currentPost.type === 'video') {
+            muteBtn.style.display = 'flex';
+            // Obtener estado actual de mute del video
+            const container = document.getElementById('fullscreenSlidesContainer');
+            const currentSlide = container.querySelector(`.fullscreen-slide[data-index="${currentFullscreenIndex}"]`);
+            const video = currentSlide?.querySelector('video');
+            if (video) {
+                updateGlobalMuteIcon(video.muted);
             }
-        });
+        } else {
+            muteBtn.style.display = 'none';
+        }
     }
 
     // Recolectar todos los posts con media al cargar
@@ -6366,6 +6622,7 @@
                     creatorUsername: postElement?.querySelector('.post-username')?.textContent?.trim() || '',
                     creatorVerified: postElement?.querySelector('.post-username .fas.fa-check-circle') !== null,
                     isLadoB: postElement?.querySelector('.badge-ladob') !== null,
+                    isFollowing: postElement?.dataset.isFollowing === 'true',
                     description: postElement?.querySelector('.post-caption-text')?.textContent?.trim() || postElement?.querySelector('.post-text-content')?.textContent?.trim() || '',
                     // Usar data attributes para likes y comments
                     likes: parseInt(postElement?.dataset.likes) || 0,
@@ -6563,8 +6820,10 @@
                                 </div>
                                 <div class="credits-username">@@${escapeHtml(post.creatorUsername || post.creatorName)}</div>
                             </div>
-                            <button class="credits-follow-btn" onclick="event.stopPropagation(); followFromFullscreen('${post.creatorId}', this)">
-                                Seguir
+                            <button class="credits-follow-btn ${post.isFollowing ? 'following' : ''}"
+                                    data-creator-id="${post.creatorId}"
+                                    onclick="event.stopPropagation(); followFromFullscreen('${post.creatorId}', this)">
+                                ${post.isFollowing ? 'Siguiendo' : 'Seguir'}
                             </button>
                         </div>
                         ${descHtml}
@@ -6635,10 +6894,57 @@
         window.location.href = '/Feed/Perfil/' + creatorId + (isLadoB ? '?verSeudonimo=true' : '');
     }
 
-    // Seguir desde fullscreen (placeholder - implementar según tu lógica)
-    function followFromFullscreen(creatorId, btn) {
-        // Redirigir al perfil para seguir
-        window.location.href = '/Feed/Perfil/' + creatorId;
+    // Seguir/Dejar de seguir desde fullscreen
+    async function followFromFullscreen(creatorId, btn) {
+        const isFollowing = btn.classList.contains('following');
+        const endpoint = isFollowing ? '/Feed/DejarDeSeguir' : '/Feed/Seguir';
+
+        try {
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                },
+                body: JSON.stringify({ creadorId: creatorId, tipoLado: 0 })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                // Actualizar el botón
+                if (data.siguiendo) {
+                    btn.classList.add('following');
+                    btn.textContent = 'Siguiendo';
+                } else {
+                    btn.classList.remove('following');
+                    btn.textContent = 'Seguir';
+                }
+
+                // Actualizar en fullscreenPosts para mantener sincronizado
+                const postIndex = fullscreenPosts.findIndex(p => p.creatorId === creatorId);
+                if (postIndex >= 0) {
+                    fullscreenPosts[postIndex].isFollowing = data.siguiendo;
+                }
+
+                // Actualizar todos los botones de follow del mismo creador en el fullscreen
+                document.querySelectorAll(`.credits-follow-btn[data-creator-id="${creatorId}"]`).forEach(otherBtn => {
+                    if (data.siguiendo) {
+                        otherBtn.classList.add('following');
+                        otherBtn.textContent = 'Siguiendo';
+                    } else {
+                        otherBtn.classList.remove('following');
+                        otherBtn.textContent = 'Seguir';
+                    }
+                });
+
+                showFullscreenToast(data.siguiendo ? 'Siguiendo' : 'Dejaste de seguir');
+            } else {
+                showFullscreenToast(data.message || 'Error al procesar');
+            }
+        } catch (error) {
+            console.error('Error al seguir:', error);
+            showFullscreenToast('Error de conexión');
+        }
     }
 
     // Toggle menu de compartir
@@ -7174,10 +7480,12 @@
         });
     }
 
-    // Actualizar contador
+    // Actualizar contador y visibilidad del botón de mute
     function updateCounter() {
         const counter = document.getElementById('fullscreenCounter');
         counter.textContent = `${currentFullscreenIndex + 1} / ${fullscreenPosts.length}`;
+        // Actualizar visibilidad del botón de mute según el tipo de contenido
+        updateGlobalMuteVisibility();
     }
 
     // Reproducir video o audio del slide actual
@@ -7213,20 +7521,16 @@
                 try {
                     video.muted = false;
                     await video.play();
+                    // Actualizar icono del botón global (sin mute)
+                    updateGlobalMuteIcon(false);
                 } catch (e) {
                     // Si falla, intentar con mute
                     console.log('Reproduciendo video con mute debido a politica de autoplay');
                     video.muted = true;
                     try {
                         await video.play();
-                        // Mostrar indicador de que esta muteado
-                        const muteBtn = slide.querySelector('.fullscreen-mute-btn');
-                        if (muteBtn) {
-                            const iconMuted = muteBtn.querySelector('.icon-muted');
-                            const iconUnmuted = muteBtn.querySelector('.icon-unmuted');
-                            if (iconMuted) iconMuted.style.display = 'block';
-                            if (iconUnmuted) iconUnmuted.style.display = 'none';
-                        }
+                        // Actualizar icono del botón global (con mute)
+                        updateGlobalMuteIcon(true);
                     } catch (e2) {
                         console.log('No se pudo reproducir el video:', e2);
                     }
@@ -7330,6 +7634,10 @@
 
         // Pausar todo primero
         pauseAllFullscreenMedia();
+
+        // Ocultar botón de mute global
+        const muteBtn = document.getElementById('globalMuteBtn');
+        if (muteBtn) muteBtn.style.display = 'none';
 
         const viewer = document.getElementById('fullscreenViewer');
         viewer.classList.remove('active');

@@ -272,5 +272,40 @@ namespace Lado.Controllers
                 totalLadoB
             });
         }
+
+        // ========================================
+        // GENERADOR DE IMAGENES PROMOCIONALES
+        // ========================================
+
+        [HttpGet]
+        public async Task<IActionResult> GeneradorImagenes()
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            // Verificar que el usuario tiene Lado B configurado
+            if (string.IsNullOrEmpty(usuario.Seudonimo))
+            {
+                TempData["Error"] = "Debes configurar tu seudonimo de Lado B para usar el generador de imagenes promocionales.";
+                return RedirectToAction("Index");
+            }
+
+            // Preparar datos para el generador
+            var baseUrl = HttpContext.Request.Scheme + "://" + HttpContext.Request.Host;
+
+            ViewBag.Seudonimo = usuario.Seudonimo;
+            ViewBag.FotoPerfil = !string.IsNullOrEmpty(usuario.FotoPerfilLadoB)
+                ? usuario.FotoPerfilLadoB
+                : usuario.FotoPerfil ?? "/images/default-avatar.png";
+            ViewBag.LinkPerfil = $"{baseUrl}/Feed/Creador/{usuario.Seudonimo}";
+            ViewBag.Precio = usuario.PrecioSuscripcionLadoB;
+            ViewBag.Categoria = usuario.Categoria ?? "Creador";
+            ViewBag.BaseUrl = baseUrl;
+
+            return View();
+        }
     }
 }

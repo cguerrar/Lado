@@ -708,6 +708,13 @@ namespace Lado.Controllers
                     .ToListAsync();
                 ViewBag.FavoritosIds = favoritosUsuario;
 
+                // Obtener los usuarios que el usuario actual sigue (para mostrar "Siguiendo" en fullscreen)
+                var usuariosSeguidos = await _context.Suscripciones
+                    .Where(s => s.FanId == usuarioId && s.EstaActiva)
+                    .Select(s => s.CreadorId)
+                    .ToListAsync();
+                ViewBag.UsuariosSeguidosIds = usuariosSeguidos;
+
                 // Cargar anuncios para el feed
                 var anuncios = await _adService.ObtenerAnunciosActivos(3, usuarioId);
                 ViewBag.Anuncios = anuncios;

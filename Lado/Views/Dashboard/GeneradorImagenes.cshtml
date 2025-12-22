@@ -1,0 +1,883 @@
+@{
+    ViewData["Title"] = "Generador de Imagenes";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<style>
+    .promo-generator-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .generator-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .generator-header h1 {
+        font-size: 1.8rem;
+        color: var(--fg);
+        margin-bottom: 8px;
+    }
+
+    .generator-header p {
+        color: var(--muted);
+        font-size: 0.95rem;
+    }
+
+    /* Tabs de formato */
+    .format-tabs {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+        padding: 0 10px;
+    }
+
+    .format-tab {
+        padding: 10px 18px;
+        border: 2px solid var(--border);
+        background: var(--surface);
+        border-radius: var(--radius-lg);
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: var(--fg-secondary);
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .format-tab:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .format-tab.active {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: white;
+    }
+
+    .format-tab i {
+        font-size: 1.1rem;
+    }
+
+    /* Layout principal */
+    .generator-layout {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 24px;
+    }
+
+    @@media (max-width: 768px) {
+        .generator-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Panel de plantillas */
+    .templates-panel {
+        background: var(--surface);
+        border-radius: var(--radius-xl);
+        padding: 20px;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .templates-panel h3 {
+        font-size: 1rem;
+        color: var(--fg);
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .templates-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+
+    .template-item {
+        aspect-ratio: 1;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        border: 3px solid transparent;
+        transition: all 0.2s ease;
+    }
+
+    .template-item:hover {
+        transform: scale(1.05);
+    }
+
+    .template-item.active {
+        border-color: var(--primary);
+    }
+
+    .template-item .template-preview {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: white;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .template-item .template-name {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        font-size: 0.7rem;
+        padding: 4px;
+        text-align: center;
+    }
+
+    /* Colores de plantillas */
+    .template-minimal { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .template-neon { background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); }
+    .template-polaroid { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); }
+    .template-glass { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); }
+    .template-bold { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+
+    /* Opciones */
+    .options-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .options-panel label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        color: var(--fg-secondary);
+    }
+
+    .options-panel input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--primary);
+    }
+
+    .options-panel input[type="text"] {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--bg);
+        color: var(--fg);
+        font-size: 0.9rem;
+    }
+
+    .options-panel input[type="text"]:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+
+    /* Panel de preview */
+    .preview-panel {
+        background: var(--surface);
+        border-radius: var(--radius-xl);
+        padding: 20px;
+        box-shadow: var(--shadow-sm);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .canvas-container {
+        background: var(--bg-secondary);
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        min-height: 400px;
+        margin-bottom: 20px;
+        overflow: hidden;
+    }
+
+    #promoCanvas {
+        max-width: 100%;
+        max-height: 500px;
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .btn-download {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+        color: white;
+        border: none;
+        padding: 14px 32px;
+        border-radius: var(--radius-lg);
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .btn-download:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .btn-download i {
+        font-size: 1.1rem;
+    }
+
+    /* Dimensiones info */
+    .dimensions-info {
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin-top: 12px;
+    }
+
+    /* Back button */
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--fg-secondary);
+        text-decoration: none;
+        font-size: 0.9rem;
+        margin-bottom: 20px;
+        transition: color 0.2s;
+    }
+
+    .back-link:hover {
+        color: var(--primary);
+    }
+</style>
+
+<div class="promo-generator-container">
+    <a href="@Url.Action("Index", "Dashboard")" class="back-link">
+        <i class="fas fa-arrow-left"></i> Volver al Dashboard
+    </a>
+
+    <div class="generator-header">
+        <h1><i class="fas fa-image"></i> Generador de Imagenes Promocionales</h1>
+        <p>Crea imagenes profesionales para promocionar tu perfil en redes sociales</p>
+    </div>
+
+    <!-- Tabs de formato -->
+    <div class="format-tabs">
+        <button class="format-tab active" data-format="instagram-feed">
+            <i class="fab fa-instagram"></i> Feed
+        </button>
+        <button class="format-tab" data-format="instagram-story">
+            <i class="fab fa-instagram"></i> Story
+        </button>
+        <button class="format-tab" data-format="tiktok">
+            <i class="fab fa-tiktok"></i> TikTok
+        </button>
+        <button class="format-tab" data-format="facebook-post">
+            <i class="fab fa-facebook"></i> Post
+        </button>
+        <button class="format-tab" data-format="facebook-link">
+            <i class="fab fa-facebook"></i> Link
+        </button>
+    </div>
+
+    <div class="generator-layout">
+        <!-- Panel izquierdo: plantillas y opciones -->
+        <div class="templates-panel">
+            <h3><i class="fas fa-palette"></i> Plantillas</h3>
+            <div class="templates-grid" id="templatesGrid">
+                <div class="template-item active template-minimal" data-template="minimal">
+                    <div class="template-preview"></div>
+                    <span class="template-name">Minimalista</span>
+                </div>
+                <div class="template-item template-neon" data-template="neon">
+                    <div class="template-preview"></div>
+                    <span class="template-name">Neon</span>
+                </div>
+                <div class="template-item template-polaroid" data-template="polaroid">
+                    <div class="template-preview"></div>
+                    <span class="template-name">Polaroid</span>
+                </div>
+                <div class="template-item template-glass" data-template="glass">
+                    <div class="template-preview"></div>
+                    <span class="template-name">Glass</span>
+                </div>
+                <div class="template-item template-bold" data-template="bold">
+                    <div class="template-preview"></div>
+                    <span class="template-name">Bold</span>
+                </div>
+            </div>
+
+            <h3><i class="fas fa-sliders-h"></i> Personalizar</h3>
+            <div class="options-panel">
+                <label>
+                    <input type="checkbox" id="showQR" checked>
+                    Mostrar codigo QR
+                </label>
+                <label>
+                    <input type="checkbox" id="showPrice">
+                    Mostrar precio
+                </label>
+                <input type="text" id="customText" placeholder="Texto personalizado (opcional)" maxlength="50">
+            </div>
+        </div>
+
+        <!-- Panel derecho: preview -->
+        <div class="preview-panel">
+            <div class="canvas-container">
+                <canvas id="promoCanvas"></canvas>
+            </div>
+            <button class="btn-download" id="btnDownload">
+                <i class="fas fa-download"></i> Descargar PNG
+            </button>
+            <div class="dimensions-info" id="dimensionsInfo">1080 x 1080 px</div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <!-- QR Code Library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+
+    <script>
+        // Configuracion del creador
+        const CREATOR_CONFIG = {
+            seudonimo: '@Html.Raw(ViewBag.Seudonimo)',
+            fotoPerfil: '@Html.Raw(ViewBag.FotoPerfil)',
+            linkPerfil: '@Html.Raw(ViewBag.LinkPerfil)',
+            precio: @(ViewBag.Precio ?? 0),
+            categoria: '@Html.Raw(ViewBag.Categoria)',
+            baseUrl: '@Html.Raw(ViewBag.BaseUrl)'
+        };
+
+        // Formatos disponibles
+        const FORMATS = {
+            'instagram-feed': { width: 1080, height: 1080, label: 'Instagram Feed' },
+            'instagram-story': { width: 1080, height: 1920, label: 'Instagram Story' },
+            'tiktok': { width: 1080, height: 1920, label: 'TikTok' },
+            'facebook-post': { width: 1080, height: 1080, label: 'Facebook Post' },
+            'facebook-link': { width: 1200, height: 630, label: 'Facebook Link' }
+        };
+
+        class PromoGenerator {
+            constructor(config) {
+                this.config = config;
+                this.canvas = document.getElementById('promoCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.currentFormat = 'instagram-feed';
+                this.currentTemplate = 'minimal';
+                this.options = {
+                    showQR: true,
+                    showPrice: false,
+                    customText: ''
+                };
+                this.profileImage = null;
+                this.qrDataUrl = null;
+            }
+
+            async init() {
+                await this.loadProfileImage();
+                await this.generateQRCode();
+                this.bindEvents();
+                this.render();
+            }
+
+            async loadProfileImage() {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = () => {
+                        this.profileImage = img;
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        // Usar placeholder si falla
+                        this.profileImage = null;
+                        resolve();
+                    };
+                    img.src = this.config.fotoPerfil;
+                });
+            }
+
+            async generateQRCode() {
+                try {
+                    this.qrDataUrl = await QRCode.toDataURL(this.config.linkPerfil, {
+                        width: 200,
+                        margin: 1,
+                        color: { dark: '#000000', light: '#ffffff' }
+                    });
+                } catch (err) {
+                    console.error('Error generando QR:', err);
+                }
+            }
+
+            bindEvents() {
+                // Format tabs
+                document.querySelectorAll('.format-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        document.querySelectorAll('.format-tab').forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        this.currentFormat = tab.dataset.format;
+                        this.updateDimensionsInfo();
+                        this.render();
+                    });
+                });
+
+                // Template selection
+                document.querySelectorAll('.template-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        document.querySelectorAll('.template-item').forEach(i => i.classList.remove('active'));
+                        item.classList.add('active');
+                        this.currentTemplate = item.dataset.template;
+                        this.render();
+                    });
+                });
+
+                // Options
+                document.getElementById('showQR').addEventListener('change', (e) => {
+                    this.options.showQR = e.target.checked;
+                    this.render();
+                });
+
+                document.getElementById('showPrice').addEventListener('change', (e) => {
+                    this.options.showPrice = e.target.checked;
+                    this.render();
+                });
+
+                document.getElementById('customText').addEventListener('input', (e) => {
+                    this.options.customText = e.target.value;
+                    this.render();
+                });
+
+                // Download
+                document.getElementById('btnDownload').addEventListener('click', () => {
+                    this.download();
+                });
+            }
+
+            updateDimensionsInfo() {
+                const format = FORMATS[this.currentFormat];
+                document.getElementById('dimensionsInfo').textContent = `${format.width} x ${format.height} px`;
+            }
+
+            render() {
+                const format = FORMATS[this.currentFormat];
+                this.canvas.width = format.width;
+                this.canvas.height = format.height;
+
+                // Renderizar segun plantilla
+                switch (this.currentTemplate) {
+                    case 'minimal':
+                        this.renderMinimal();
+                        break;
+                    case 'neon':
+                        this.renderNeon();
+                        break;
+                    case 'polaroid':
+                        this.renderPolaroid();
+                        break;
+                    case 'glass':
+                        this.renderGlass();
+                        break;
+                    case 'bold':
+                        this.renderBold();
+                        break;
+                }
+            }
+
+            // ========================================
+            // PLANTILLA: MINIMALISTA
+            // ========================================
+            renderMinimal() {
+                const { width, height } = this.canvas;
+                const ctx = this.ctx;
+
+                // Fondo degradado
+                const gradient = ctx.createLinearGradient(0, 0, width, height);
+                gradient.addColorStop(0, '#667eea');
+                gradient.addColorStop(1, '#764ba2');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, width, height);
+
+                // Foto de perfil circular
+                const photoSize = Math.min(width, height) * 0.35;
+                const photoX = width / 2;
+                const photoY = height * 0.35;
+
+                this.drawCircularImage(photoX, photoY, photoSize / 2);
+
+                // Seudonimo
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `bold ${Math.floor(width * 0.07)}px Arial, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.fillText('@@' + this.config.seudonimo, width / 2, photoY + photoSize / 2 + width * 0.1);
+
+                // Texto personalizado o categoria
+                const displayText = this.options.customText || this.config.categoria;
+                ctx.font = `${Math.floor(width * 0.04)}px Arial, sans-serif`;
+                ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                ctx.fillText(displayText, width / 2, photoY + photoSize / 2 + width * 0.16);
+
+                // Precio (opcional)
+                if (this.options.showPrice && this.config.precio > 0) {
+                    ctx.font = `bold ${Math.floor(width * 0.05)}px Arial, sans-serif`;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText('$' + this.config.precio.toLocaleString() + '/mes', width / 2, height * 0.78);
+                }
+
+                // Link
+                ctx.font = `${Math.floor(width * 0.035)}px Arial, sans-serif`;
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.fillText('ladoapp.com', width / 2, height * 0.9);
+
+                // QR Code (opcional)
+                if (this.options.showQR && this.qrDataUrl) {
+                    this.drawQRCode(width * 0.88, height * 0.88, width * 0.15);
+                }
+            }
+
+            // ========================================
+            // PLANTILLA: NEON
+            // ========================================
+            renderNeon() {
+                const { width, height } = this.canvas;
+                const ctx = this.ctx;
+
+                // Fondo oscuro
+                const gradient = ctx.createLinearGradient(0, 0, width, height);
+                gradient.addColorStop(0, '#0f0c29');
+                gradient.addColorStop(0.5, '#302b63');
+                gradient.addColorStop(1, '#24243e');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, width, height);
+
+                // Foto de perfil con borde neon
+                const photoSize = Math.min(width, height) * 0.35;
+                const photoX = width / 2;
+                const photoY = height * 0.35;
+
+                // Glow effect
+                ctx.shadowColor = '#ff00ff';
+                ctx.shadowBlur = 30;
+                ctx.beginPath();
+                ctx.arc(photoX, photoY, photoSize / 2 + 8, 0, Math.PI * 2);
+                ctx.strokeStyle = '#ff00ff';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                this.drawCircularImage(photoX, photoY, photoSize / 2);
+
+                // Seudonimo con glow
+                ctx.shadowColor = '#00ffff';
+                ctx.shadowBlur = 20;
+                ctx.fillStyle = '#00ffff';
+                ctx.font = `bold ${Math.floor(width * 0.07)}px Arial, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.fillText('@@' + this.config.seudonimo, width / 2, photoY + photoSize / 2 + width * 0.1);
+                ctx.shadowBlur = 0;
+
+                // Texto personalizado
+                const displayText = this.options.customText || 'Contenido Exclusivo';
+                ctx.font = `${Math.floor(width * 0.04)}px Arial, sans-serif`;
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.fillText(displayText, width / 2, photoY + photoSize / 2 + width * 0.16);
+
+                // Precio (opcional)
+                if (this.options.showPrice && this.config.precio > 0) {
+                    ctx.shadowColor = '#ff00ff';
+                    ctx.shadowBlur = 15;
+                    ctx.font = `bold ${Math.floor(width * 0.05)}px Arial, sans-serif`;
+                    ctx.fillStyle = '#ff00ff';
+                    ctx.fillText('$' + this.config.precio.toLocaleString() + '/mes', width / 2, height * 0.78);
+                    ctx.shadowBlur = 0;
+                }
+
+                // Link
+                ctx.font = `${Math.floor(width * 0.035)}px Arial, sans-serif`;
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.fillText('ladoapp.com', width / 2, height * 0.9);
+
+                // QR Code
+                if (this.options.showQR && this.qrDataUrl) {
+                    this.drawQRCode(width * 0.88, height * 0.88, width * 0.15);
+                }
+            }
+
+            // ========================================
+            // PLANTILLA: POLAROID
+            // ========================================
+            renderPolaroid() {
+                const { width, height } = this.canvas;
+                const ctx = this.ctx;
+
+                // Fondo calido
+                const gradient = ctx.createLinearGradient(0, 0, width, height);
+                gradient.addColorStop(0, '#ffecd2');
+                gradient.addColorStop(1, '#fcb69f');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, width, height);
+
+                // Marco polaroid
+                const polaroidWidth = Math.min(width, height) * 0.7;
+                const polaroidHeight = polaroidWidth * 1.2;
+                const polaroidX = (width - polaroidWidth) / 2;
+                const polaroidY = (height - polaroidHeight) / 2 - height * 0.05;
+
+                // Sombra
+                ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                ctx.shadowBlur = 20;
+                ctx.shadowOffsetX = 5;
+                ctx.shadowOffsetY = 5;
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(polaroidX, polaroidY, polaroidWidth, polaroidHeight);
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+
+                // Foto dentro del polaroid
+                const photoMargin = polaroidWidth * 0.08;
+                const photoWidth = polaroidWidth - photoMargin * 2;
+                const photoHeight = photoWidth;
+
+                if (this.profileImage) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.rect(polaroidX + photoMargin, polaroidY + photoMargin, photoWidth, photoHeight);
+                    ctx.clip();
+                    ctx.drawImage(this.profileImage, polaroidX + photoMargin, polaroidY + photoMargin, photoWidth, photoHeight);
+                    ctx.restore();
+                } else {
+                    ctx.fillStyle = '#ddd';
+                    ctx.fillRect(polaroidX + photoMargin, polaroidY + photoMargin, photoWidth, photoHeight);
+                }
+
+                // Texto en la parte blanca del polaroid
+                ctx.fillStyle = '#333';
+                ctx.font = `bold ${Math.floor(width * 0.05)}px 'Courier New', monospace`;
+                ctx.textAlign = 'center';
+                const textY = polaroidY + photoMargin + photoHeight + (polaroidHeight - photoHeight - photoMargin * 2) / 2 + width * 0.02;
+                ctx.fillText('@@' + this.config.seudonimo, width / 2, textY);
+
+                // Texto personalizado debajo del polaroid
+                const displayText = this.options.customText || 'Sigueme';
+                ctx.font = `${Math.floor(width * 0.04)}px Arial, sans-serif`;
+                ctx.fillStyle = '#555';
+                ctx.fillText(displayText, width / 2, polaroidY + polaroidHeight + width * 0.08);
+
+                // Link
+                ctx.font = `${Math.floor(width * 0.03)}px Arial, sans-serif`;
+                ctx.fillStyle = '#888';
+                ctx.fillText('ladoapp.com', width / 2, height * 0.92);
+
+                // QR Code
+                if (this.options.showQR && this.qrDataUrl) {
+                    this.drawQRCode(width * 0.88, height * 0.1, width * 0.12);
+                }
+            }
+
+            // ========================================
+            // PLANTILLA: GLASSMORPHISM
+            // ========================================
+            renderGlass() {
+                const { width, height } = this.canvas;
+                const ctx = this.ctx;
+
+                // Fondo vibrante
+                const gradient = ctx.createLinearGradient(0, 0, width, height);
+                gradient.addColorStop(0, '#a8edea');
+                gradient.addColorStop(1, '#fed6e3');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, width, height);
+
+                // Panel de vidrio
+                const panelWidth = width * 0.75;
+                const panelHeight = height * 0.6;
+                const panelX = (width - panelWidth) / 2;
+                const panelY = (height - panelHeight) / 2;
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+                ctx.beginPath();
+                ctx.roundRect(panelX, panelY, panelWidth, panelHeight, 30);
+                ctx.fill();
+
+                // Borde del panel
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Foto de perfil
+                const photoSize = Math.min(width, height) * 0.28;
+                const photoX = width / 2;
+                const photoY = panelY + panelHeight * 0.35;
+
+                this.drawCircularImage(photoX, photoY, photoSize / 2);
+
+                // Seudonimo
+                ctx.fillStyle = '#333';
+                ctx.font = `bold ${Math.floor(width * 0.06)}px Arial, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.fillText('@@' + this.config.seudonimo, width / 2, photoY + photoSize / 2 + width * 0.08);
+
+                // Texto
+                const displayText = this.options.customText || this.config.categoria;
+                ctx.font = `${Math.floor(width * 0.035)}px Arial, sans-serif`;
+                ctx.fillStyle = '#555';
+                ctx.fillText(displayText, width / 2, photoY + photoSize / 2 + width * 0.13);
+
+                // Precio (opcional)
+                if (this.options.showPrice && this.config.precio > 0) {
+                    ctx.font = `bold ${Math.floor(width * 0.045)}px Arial, sans-serif`;
+                    ctx.fillStyle = '#333';
+                    ctx.fillText('$' + this.config.precio.toLocaleString() + '/mes', width / 2, panelY + panelHeight - width * 0.06);
+                }
+
+                // Link
+                ctx.font = `${Math.floor(width * 0.03)}px Arial, sans-serif`;
+                ctx.fillStyle = '#666';
+                ctx.fillText('ladoapp.com', width / 2, height * 0.92);
+
+                // QR Code
+                if (this.options.showQR && this.qrDataUrl) {
+                    this.drawQRCode(width * 0.88, height * 0.88, width * 0.13);
+                }
+            }
+
+            // ========================================
+            // PLANTILLA: BOLD
+            // ========================================
+            renderBold() {
+                const { width, height } = this.canvas;
+                const ctx = this.ctx;
+
+                // Fondo vibrante
+                const gradient = ctx.createLinearGradient(0, 0, width, height);
+                gradient.addColorStop(0, '#f093fb');
+                gradient.addColorStop(1, '#f5576c');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, width, height);
+
+                // Texto grande arriba
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `bold ${Math.floor(width * 0.12)}px Arial, sans-serif`;
+                ctx.textAlign = 'center';
+                const mainText = this.options.customText || 'SIGUEME';
+                ctx.fillText(mainText.toUpperCase(), width / 2, height * 0.2);
+
+                // Foto de perfil grande
+                const photoSize = Math.min(width, height) * 0.4;
+                const photoX = width / 2;
+                const photoY = height * 0.48;
+
+                // Borde blanco
+                ctx.beginPath();
+                ctx.arc(photoX, photoY, photoSize / 2 + 8, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+
+                this.drawCircularImage(photoX, photoY, photoSize / 2);
+
+                // Seudonimo grande
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `bold ${Math.floor(width * 0.08)}px Arial, sans-serif`;
+                ctx.fillText('@@' + this.config.seudonimo, width / 2, height * 0.78);
+
+                // Precio (opcional)
+                if (this.options.showPrice && this.config.precio > 0) {
+                    ctx.font = `bold ${Math.floor(width * 0.055)}px Arial, sans-serif`;
+                    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+                    ctx.fillText('$' + this.config.precio.toLocaleString() + '/mes', width / 2, height * 0.86);
+                }
+
+                // Link
+                ctx.font = `${Math.floor(width * 0.035)}px Arial, sans-serif`;
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.fillText('ladoapp.com', width / 2, height * 0.94);
+
+                // QR Code
+                if (this.options.showQR && this.qrDataUrl) {
+                    this.drawQRCode(width * 0.12, height * 0.12, width * 0.12);
+                }
+            }
+
+            // ========================================
+            // UTILIDADES
+            // ========================================
+            drawCircularImage(x, y, radius) {
+                const ctx = this.ctx;
+
+                if (this.profileImage) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.clip();
+
+                    const size = radius * 2;
+                    ctx.drawImage(this.profileImage, x - radius, y - radius, size, size);
+
+                    ctx.restore();
+                } else {
+                    // Placeholder
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ccc';
+                    ctx.fill();
+
+                    ctx.fillStyle = '#999';
+                    ctx.font = `${radius * 0.8}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('?', x, y);
+                }
+            }
+
+            drawQRCode(x, y, size) {
+                if (!this.qrDataUrl) return;
+
+                const ctx = this.ctx;
+                const img = new Image();
+                img.src = this.qrDataUrl;
+
+                // Fondo blanco para el QR
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.roundRect(x - size / 2 - 5, y - size / 2 - 5, size + 10, size + 10, 8);
+                ctx.fill();
+
+                // Dibujar QR
+                ctx.drawImage(img, x - size / 2, y - size / 2, size, size);
+            }
+
+            download() {
+                const format = FORMATS[this.currentFormat];
+                const link = document.createElement('a');
+                link.download = `${this.config.seudonimo}_${this.currentFormat}_${this.currentTemplate}.png`;
+                link.href = this.canvas.toDataURL('image/png');
+                link.click();
+            }
+        }
+
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', () => {
+            const generator = new PromoGenerator(CREATOR_CONFIG);
+            generator.init();
+        });
+    </script>
+}

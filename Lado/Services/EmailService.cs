@@ -303,6 +303,149 @@ namespace Lado.Services
         }
     }
 
+    /// <summary>
+    /// Proveedor de email usando Brevo (antes Sendinblue)
+    /// </summary>
+    public class BrevoEmailProvider : IEmailProvider
+    {
+        private readonly string _apiKey;
+        private readonly ILogger? _logger;
+        private readonly HttpClient _httpClient;
+
+        public string ProviderName => "Brevo";
+
+        public BrevoEmailProvider(string apiKey, ILogger? logger = null)
+        {
+            _apiKey = apiKey?.Trim() ?? "";
+            _logger = logger;
+            _httpClient = new HttpClient();
+            _httpClient.DefaultRequestHeaders.Add("api-key", _apiKey);
+            _httpClient.DefaultRequestHeaders.Add("accept", "application/json");
+        }
+
+        public async Task<EmailResult> SendEmailAsync(string toEmail, string subject, string htmlBody, string fromEmail, string fromName)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(_apiKey))
+                {
+                    return EmailResult.Fail("API Key de Brevo no configurada.", 0);
+                }
+
+                var payload = new
+                {
+                    sender = new { email = fromEmail, name = fromName },
+                    to = new[] { new { email = toEmail, name = toEmail.Split('@')[0] } },
+                    subject = subject,
+                    htmlContent = htmlBody,
+                    textContent = StripHtml(htmlBody)
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(payload);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                _logger?.LogInformation("Brevo: Enviando email a {Email} desde {From}", toEmail, fromEmail);
+
+                var response = await _httpClient.PostAsync("https://api.brevo.com/v3/smtp/email", content);
+                var responseBody = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger?.LogInformation("Email enviado exitosamente via Brevo a {Email}. Response: {Response}",
+                        toEmail, responseBody);
+
+                    // Extraer messageId si existe
+                    string? messageId = null;
+                    try
+                    {
+                        var responseJson = System.Text.Json.JsonDocument.Parse(responseBody);
+                        if (responseJson.RootElement.TryGetProperty("messageId", out var msgId))
+                        {
+                            messageId = msgId.GetString();
+                        }
+                    }
+                    catch { }
+
+                    return EmailResult.Ok(messageId);
+                }
+                else
+                {
+                    var statusCode = (int)response.StatusCode;
+                    string errorMessage = $"Error HTTP {statusCode}";
+
+                    try
+                    {
+                        var errorJson = System.Text.Json.JsonDocument.Parse(responseBody);
+                        if (errorJson.RootElement.TryGetProperty("message", out var msg))
+                        {
+                            errorMessage = msg.GetString() ?? errorMessage;
+                        }
+                    }
+                    catch { }
+
+                    _logger?.LogError("Error Brevo: {Error}", errorMessage);
+                    return EmailResult.Fail(errorMessage, statusCode, responseBody);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Excepcion Brevo al enviar email a {Email}", toEmail);
+                return EmailResult.Fail($"Excepción: {ex.Message}", 0, ex.ToString());
+            }
+        }
+
+        public async Task<EmailResult> TestConnectionAsync(string testEmail)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(_apiKey))
+                {
+                    return EmailResult.Fail("API Key de Brevo no configurada.", 0);
+                }
+
+                // Verificar la cuenta obteniendo información
+                var request = new HttpRequestMessage(HttpMethod.Get, "https://api.brevo.com/v3/account");
+                var response = await _httpClient.SendAsync(request);
+                var responseBody = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger?.LogInformation("Brevo: Cuenta verificada correctamente");
+                    return EmailResult.Ok();
+                }
+                else
+                {
+                    var statusCode = (int)response.StatusCode;
+                    string errorMessage = $"Error HTTP {statusCode}";
+
+                    try
+                    {
+                        var errorJson = System.Text.Json.JsonDocument.Parse(responseBody);
+                        if (errorJson.RootElement.TryGetProperty("message", out var msg))
+                        {
+                            errorMessage = msg.GetString() ?? errorMessage;
+                        }
+                    }
+                    catch { }
+
+                    return EmailResult.Fail(errorMessage, statusCode);
+                }
+            }
+            catch (Exception ex)
+            {
+                return EmailResult.Fail($"Excepción: {ex.Message}", 0, ex.ToString());
+            }
+        }
+
+        private static string StripHtml(string html)
+        {
+            if (string.IsNullOrEmpty(html)) return string.Empty;
+            return System.Text.RegularExpressions.Regex.Replace(html, "<[^>]*>", " ")
+                .Replace("  ", " ")
+                .Trim();
+        }
+    }
+
     #endregion
 
     /// <summary>
@@ -368,18 +511,25 @@ namespace Lado.Services
 
             IEmailProvider provider;
 
-            if (proveedorActivo == "AmazonSES")
+            switch (proveedorActivo)
             {
-                var accessKey = configs.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_ACCESS_KEY, "");
-                var secretKey = configs.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_SECRET_KEY, "");
-                var region = configs.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_REGION, "us-east-1");
-                provider = new AmazonSesEmailProvider(accessKey, secretKey, region, _logger);
-            }
-            else
-            {
-                var apiKey = configs.GetValueOrDefault(ConfiguracionPlataforma.MAILJET_API_KEY, "");
-                var secretKey = configs.GetValueOrDefault(ConfiguracionPlataforma.MAILJET_SECRET_KEY, "");
-                provider = new MailjetEmailProvider(apiKey, secretKey, _logger);
+                case "AmazonSES":
+                    var accessKey = configs.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_ACCESS_KEY, "");
+                    var secretKey = configs.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_SECRET_KEY, "");
+                    var region = configs.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_REGION, "us-east-1");
+                    provider = new AmazonSesEmailProvider(accessKey, secretKey, region, _logger);
+                    break;
+
+                case "Brevo":
+                    var brevoApiKey = configs.GetValueOrDefault(ConfiguracionPlataforma.BREVO_API_KEY, "");
+                    provider = new BrevoEmailProvider(brevoApiKey, _logger);
+                    break;
+
+                default: // Mailjet
+                    var mailjetApiKey = configs.GetValueOrDefault(ConfiguracionPlataforma.MAILJET_API_KEY, "");
+                    var mailjetSecretKey = configs.GetValueOrDefault(ConfiguracionPlataforma.MAILJET_SECRET_KEY, "");
+                    provider = new MailjetEmailProvider(mailjetApiKey, mailjetSecretKey, _logger);
+                    break;
             }
 
             _logger.LogInformation("Proveedor de email activo: {Provider}, From: {From}",

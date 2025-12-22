@@ -4560,12 +4560,16 @@ namespace Lado.Controllers
                 // Amazon SES
                 AmazonSesAccessKey = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_ACCESS_KEY, ""),
                 AmazonSesSecretKey = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_SECRET_KEY, ""),
-                AmazonSesRegion = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_REGION, "us-east-1")
+                AmazonSesRegion = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.AMAZONSES_REGION, "us-east-1"),
+
+                // Brevo
+                BrevoApiKey = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.BREVO_API_KEY, "")
             };
 
             // Enmascarar claves secretas para mostrar (solo ultimos 4 caracteres)
             ViewBag.MailjetSecretKeyMasked = EnmascararClave(modelo.MailjetSecretKey);
             ViewBag.AmazonSesSecretKeyMasked = EnmascararClave(modelo.AmazonSesSecretKey);
+            ViewBag.BrevoApiKeyMasked = EnmascararClave(modelo.BrevoApiKey);
 
             return View(modelo);
         }
@@ -4607,6 +4611,12 @@ namespace Lado.Controllers
                 if (!string.IsNullOrEmpty(modelo.AmazonSesSecretKey) && !modelo.AmazonSesSecretKey.StartsWith("*"))
                 {
                     await ActualizarConfiguracionEmailAsync(ConfiguracionPlataforma.AMAZONSES_SECRET_KEY, modelo.AmazonSesSecretKey, ahora);
+                }
+
+                // Guardar configuracion de Brevo
+                if (!string.IsNullOrEmpty(modelo.BrevoApiKey) && !modelo.BrevoApiKey.StartsWith("*"))
+                {
+                    await ActualizarConfiguracionEmailAsync(ConfiguracionPlataforma.BREVO_API_KEY, modelo.BrevoApiKey, ahora);
                 }
 
                 await _context.SaveChangesAsync();
@@ -4701,6 +4711,17 @@ namespace Lado.Controllers
                     }
 
                     emailProvider = new AmazonSesEmailProvider(accessKey, secretKey, region);
+                }
+                else if (proveedor == "Brevo")
+                {
+                    var apiKey = configuraciones.GetValueOrDefault(ConfiguracionPlataforma.BREVO_API_KEY, "");
+
+                    if (string.IsNullOrEmpty(apiKey))
+                    {
+                        return Json(new { success = false, message = "API Key de Brevo no configurada" });
+                    }
+
+                    emailProvider = new BrevoEmailProvider(apiKey);
                 }
                 else
                 {
@@ -5114,6 +5135,9 @@ namespace Lado.Controllers
         public string AmazonSesAccessKey { get; set; } = "";
         public string AmazonSesSecretKey { get; set; } = "";
         public string AmazonSesRegion { get; set; } = "us-east-1";
+
+        // Brevo (antes Sendinblue)
+        public string BrevoApiKey { get; set; } = "";
     }
 
     public class ConfiguracionAlgoritmosViewModel

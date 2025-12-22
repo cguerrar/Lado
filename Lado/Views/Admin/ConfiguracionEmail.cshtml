@@ -52,7 +52,7 @@
                         <div class="row">
                             <div class="col-md-4">
                                 <label class="form-label fw-bold">Proveedor Activo</label>
-                                <div class="d-flex gap-3">
+                                <div class="d-flex gap-3 flex-wrap">
                                     <div class="form-check form-check-inline">
                                         <input class="form-check-input" type="radio" name="ProveedorActivo"
                                                id="provMailjet" value="Mailjet"
@@ -67,6 +67,14 @@
                                                @(Model.ProveedorActivo == "AmazonSES" ? "checked" : "")>
                                         <label class="form-check-label" for="provAmazonSES">
                                             <i class="fab fa-aws text-warning"></i> Amazon SES
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="ProveedorActivo"
+                                               id="provBrevo" value="Brevo"
+                                               @(Model.ProveedorActivo == "Brevo" ? "checked" : "")>
+                                        <label class="form-check-label" for="provBrevo">
+                                            <i class="fas fa-bolt text-success"></i> Brevo
                                         </label>
                                     </div>
                                 </div>
@@ -195,6 +203,43 @@
                 </div>
             </div>
 
+            <!-- Brevo -->
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100" id="cardBrevo">
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-bolt"></i> Brevo
+                        </h5>
+                        <span class="badge bg-light text-dark" id="badgeBrevo">
+                            @(Model.ProveedorActivo == "Brevo" ? "ACTIVO" : "INACTIVO")
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">API Key</label>
+                            <div class="input-group">
+                                <input type="password" name="BrevoApiKey" id="brevoApiKey" class="form-control"
+                                       value="@ViewBag.BrevoApiKeyMasked" placeholder="Tu API Key de Brevo">
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('brevoApiKey')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <small class="text-muted">
+                                Obtener en <a href="https://app.brevo.com/settings/keys/api" target="_blank">Brevo API Keys</a>
+                            </small>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-success flex-grow-1" onclick="probarProveedor('Brevo')">
+                                <i class="fas fa-vial"></i> Probar Conexion
+                            </button>
+                        </div>
+
+                        <div id="resultadoBrevo" class="mt-3" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Boton Guardar -->
             <div class="col-12">
                 <div class="card border-0 shadow-sm">
@@ -220,7 +265,7 @@
                     </div>
                     <div class="card-body">
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <h6><i class="fas fa-paper-plane text-info"></i> Mailjet</h6>
                                 <ul class="text-muted small">
                                     <li>Servicio de email transaccional con buena reputacion</li>
@@ -229,13 +274,22 @@
                                     <li><a href="https://dev.mailjet.com/" target="_blank">Documentacion de Mailjet</a></li>
                                 </ul>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <h6><i class="fab fa-aws text-warning"></i> Amazon SES</h6>
                                 <ul class="text-muted small">
                                     <li>Servicio de email de Amazon Web Services</li>
                                     <li>Costo: $0.10 por cada 1,000 emails</li>
                                     <li>Requiere verificar email/dominio y salir del modo sandbox</li>
                                     <li><a href="https://docs.aws.amazon.com/ses/" target="_blank">Documentacion de Amazon SES</a></li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <h6><i class="fas fa-bolt text-success"></i> Brevo</h6>
+                                <ul class="text-muted small">
+                                    <li>Antes conocido como Sendinblue</li>
+                                    <li>Plan gratuito: 300 emails/dia</li>
+                                    <li>Solo requiere una API Key</li>
+                                    <li><a href="https://developers.brevo.com/" target="_blank">Documentacion de Brevo</a></li>
                                 </ul>
                             </div>
                         </div>
@@ -283,10 +337,12 @@
         radio.addEventListener('change', function() {
             document.getElementById('badgeMailjet').textContent = this.value === 'Mailjet' ? 'ACTIVO' : 'INACTIVO';
             document.getElementById('badgeAmazonSES').textContent = this.value === 'AmazonSES' ? 'ACTIVO' : 'INACTIVO';
+            document.getElementById('badgeBrevo').textContent = this.value === 'Brevo' ? 'ACTIVO' : 'INACTIVO';
 
             // Actualizar estilos de cards
             document.getElementById('cardMailjet').classList.toggle('border-info', this.value === 'Mailjet');
             document.getElementById('cardAmazonSES').classList.toggle('border-warning', this.value === 'AmazonSES');
+            document.getElementById('cardBrevo').classList.toggle('border-success', this.value === 'Brevo');
         });
     });
 
@@ -383,6 +439,7 @@
         const proveedorActivo = document.querySelector('input[name="ProveedorActivo"]:checked').value;
         document.getElementById('cardMailjet').classList.toggle('border-info', proveedorActivo === 'Mailjet');
         document.getElementById('cardAmazonSES').classList.toggle('border-warning', proveedorActivo === 'AmazonSES');
+        document.getElementById('cardBrevo').classList.toggle('border-success', proveedorActivo === 'Brevo');
 
         // Establecer la region seleccionada
         const regionGuardada = '@Model.AmazonSesRegion';
