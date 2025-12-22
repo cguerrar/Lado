@@ -8127,41 +8127,82 @@
         const sharedPostId = @ViewBag.SharedPostId;
         console.log('[SharedPost] Abriendo post compartido:', sharedPostId);
 
-        // Esperar a que todo esté cargado
-        if (document.readyState === 'complete') {
-            abrirPostCompartido(sharedPostId);
-        } else {
-            window.addEventListener('load', function() {
-                abrirPostCompartido(sharedPostId);
-            });
-        }
-
-        function abrirPostCompartido(postId) {
+        window.addEventListener('load', function() {
             setTimeout(() => {
-                const postElement = document.querySelector(`.post[data-post-id="${postId}"]`);
+                const postElement = document.querySelector(`.post[data-post-id="${sharedPostId}"]`);
                 console.log('[SharedPost] Post element:', postElement);
 
                 if (postElement) {
-                    // Scroll al post primero
-                    postElement.scrollIntoView({ behavior: 'instant', block: 'center' });
+                    // Scroll al post
+                    postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-                    // Abrir en fullscreen después de un momento
+                    // Highlight temporal
+                    postElement.style.transition = 'box-shadow 0.3s';
+                    postElement.style.boxShadow = '0 0 0 3px #6366f1';
                     setTimeout(() => {
-                        const mediaElement = postElement.querySelector('.post-media');
-                        if (mediaElement && typeof openFullscreenViewer === 'function') {
-                            const fakeEvent = { preventDefault: () => {}, stopPropagation: () => {}, target: mediaElement };
-                            openFullscreenViewer(fakeEvent, postId);
-                            console.log('[SharedPost] Fullscreen abierto');
-                        }
-                        // Limpiar URL
-                        window.history.replaceState({}, document.title, window.location.pathname);
-                    }, 300);
-                } else {
-                    console.log('[SharedPost] Post no encontrado en DOM');
+                        postElement.style.boxShadow = '';
+                    }, 2000);
+
+                    // Limpiar URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
                 }
-            }, 800);
-        }
+            }, 500);
+        });
+    })();
+        </text>
+    }
+
+    @if (ViewBag.SharedPostNoAccess != null) {
+        <text>
+    (function() {
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                document.getElementById('sharedPostNoAccessModal').classList.add('active');
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }, 300);
+        });
     })();
         </text>
     }
 </script>
+
+<!-- Modal: No tienes acceso al post compartido -->
+@if (ViewBag.SharedPostNoAccess != null) {
+    var noAccess = ViewBag.SharedPostNoAccess;
+    <div class="modal-overlay" id="sharedPostNoAccessModal">
+        <div class="share-modal" style="max-width: 380px; text-align: center;">
+            <div class="share-modal-header">
+                Contenido exclusivo
+                <button class="share-modal-close" onclick="document.getElementById('sharedPostNoAccessModal').classList.remove('active')">&times;</button>
+            </div>
+            <div style="padding: 24px;">
+                <div style="margin-bottom: 16px;">
+                    @if (!string.IsNullOrEmpty((string)noAccess.CreadorFoto)) {
+                        <img src="@noAccess.CreadorFoto" alt="" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary);">
+                    } else {
+                        <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--primary); display: inline-flex; align-items: center; justify-content: center; font-size: 2rem; color: white;">
+                            @(((string)noAccess.CreadorNombre)?.Substring(0, 1).ToUpper() ?? "?")
+                        </div>
+                    }
+                </div>
+                <h3 style="margin-bottom: 8px; font-size: 1.1rem;">@noAccess.CreadorNombre</h3>
+                <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 20px;">
+                    @if ((string)noAccess.TipoLado == "LadoB") {
+                        <text>Este contenido es exclusivo para suscriptores de Lado B</text>
+                    } else {
+                        <text>Sigue a este creador para ver su contenido</text>
+                    }
+                </p>
+                <a href="/Feed/Perfil/@noAccess.CreadorUsername" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; text-decoration: none;">
+                    <i class="fas fa-user-plus"></i>
+                    Ver perfil
+                </a>
+                @if (noAccess.Precio != null && (decimal)noAccess.Precio > 0) {
+                    <p style="margin-top: 12px; font-size: 0.8rem; color: var(--muted);">
+                        Desde $@(((decimal)noAccess.Precio).ToString("N0"))/mes
+                    </p>
+                }
+            </div>
+        </div>
+    </div>
+}

@@ -726,29 +726,68 @@ namespace Lado.Controllers
                     await _adService.RegistrarImpresion(anuncio.Id, usuarioId, ipAddress);
                 }
 
-                // Si viene de un link compartido, cargar ese post e insertarlo al inicio
+                // Si viene de un link compartido
                 if (post.HasValue)
                 {
-                    ViewBag.SharedPostId = post.Value;
+                    // Cargar el post compartido
+                    var postCompartido = await _context.Contenidos
+                        .Include(c => c.Usuario)
+                        .Include(c => c.PistaMusical)
+                        .Include(c => c.Archivos.OrderBy(a => a.Orden))
+                        .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
+                            .ThenInclude(com => com.Usuario)
+                        .FirstOrDefaultAsync(c => c.Id == post.Value && c.EstaActivo && !c.EsBorrador);
 
-                    // Verificar si el post ya está en el feed
-                    var postExiste = contenidoOrdenado.Any(c => c.Id == post.Value);
-
-                    if (!postExiste)
+                    if (postCompartido != null)
                     {
-                        // Cargar el post compartido
-                        var postCompartido = await _context.Contenidos
-                            .Include(c => c.Usuario)
-                            .Include(c => c.PistaMusical)
-                            .Include(c => c.Archivos.OrderBy(a => a.Orden))
-                            .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
-                                .ThenInclude(com => com.Usuario)
-                            .FirstOrDefaultAsync(c => c.Id == post.Value && c.EstaActivo && !c.EsBorrador);
+                        // Verificar si el usuario tiene acceso al post
+                        var creadorId = postCompartido.UsuarioId;
+                        var tieneAcceso = false;
 
-                        if (postCompartido != null)
+                        // Tiene acceso si: es su propio post, o sigue al creador en el lado correcto, o es contenido público
+                        if (creadorId == usuarioId)
                         {
-                            // Insertar al inicio del feed
-                            contenidoOrdenado.Insert(0, postCompartido);
+                            tieneAcceso = true;
+                        }
+                        else if (postCompartido.TipoLado == TipoLado.LadoA)
+                        {
+                            // LadoA: necesita suscripción a LadoA
+                            tieneAcceso = creadoresLadoAIds.Contains(creadorId);
+                        }
+                        else if (postCompartido.TipoLado == TipoLado.LadoB)
+                        {
+                            // LadoB: necesita suscripción a LadoB o haber comprado el contenido
+                            tieneAcceso = creadoresLadoBIds.Contains(creadorId) || contenidosCompradosIds.Contains(postCompartido.Id);
+                        }
+
+                        if (tieneAcceso)
+                        {
+                            // Usuario tiene acceso - insertar al inicio del feed
+                            ViewBag.SharedPostId = post.Value;
+
+                            // Verificar si ya está en el feed
+                            var postExiste = contenidoOrdenado.Any(c => c.Id == post.Value);
+                            if (!postExiste)
+                            {
+                                contenidoOrdenado.Insert(0, postCompartido);
+                            }
+                        }
+                        else
+                        {
+                            // Usuario NO tiene acceso - mostrar sugerencia de seguir
+                            ViewBag.SharedPostNoAccess = new {
+                                PostId = postCompartido.Id,
+                                CreadorId = creadorId,
+                                CreadorNombre = postCompartido.Usuario?.Seudonimo ?? postCompartido.Usuario?.NombreCompleto ?? "Creador",
+                                CreadorUsername = postCompartido.Usuario?.UserName,
+                                CreadorFoto = postCompartido.TipoLado == TipoLado.LadoB
+                                    ? (postCompartido.Usuario?.FotoPerfilLadoB ?? postCompartido.Usuario?.FotoPerfil)
+                                    : postCompartido.Usuario?.FotoPerfil,
+                                TipoLado = postCompartido.TipoLado.ToString(),
+                                Precio = postCompartido.TipoLado == TipoLado.LadoB
+                                    ? postCompartido.Usuario?.PrecioSuscripcionLadoB
+                                    : postCompartido.Usuario?.PrecioSuscripcion
+                            };
                         }
                     }
                 }
