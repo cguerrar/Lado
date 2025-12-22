@@ -4835,27 +4835,7 @@
         initPullToRefresh();
         initInfiniteScroll();
 
-        // Detectar si viene de un link compartido (SharedPostId del servidor)
-        @if (ViewBag.SharedPostId != null) {
-            <text>
-            setTimeout(() => {
-                const postId = @ViewBag.SharedPostId;
-                const postElement = document.querySelector(`.post-card[data-post-id="${postId}"]`);
-                if (postElement) {
-                    // El post está en el feed, abrirlo en fullscreen
-                    const mediaElement = postElement.querySelector('.post-media');
-                    if (mediaElement) {
-                        const fakeEvent = { preventDefault: () => {}, stopPropagation: () => {}, target: mediaElement };
-                        if (typeof openFullscreenViewer === 'function') {
-                            openFullscreenViewer(fakeEvent, postId);
-                        }
-                    }
-                    // Limpiar el parámetro de la URL sin recargar
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                }
-            }, 500);
-            </text>
-        }
+        // SharedPostId se maneja al final del script donde openFullscreenViewer ya está definido
     });
 
     // ========================================
@@ -8137,4 +8117,51 @@
             if (select) select.disabled = false;
         }
     };
+
+    // ========================================
+    // ABRIR POST COMPARTIDO AUTOMATICAMENTE
+    // ========================================
+    @if (ViewBag.SharedPostId != null) {
+        <text>
+    (function() {
+        const sharedPostId = @ViewBag.SharedPostId;
+        console.log('[SharedPost] Abriendo post compartido:', sharedPostId);
+
+        // Esperar a que todo esté cargado
+        if (document.readyState === 'complete') {
+            abrirPostCompartido(sharedPostId);
+        } else {
+            window.addEventListener('load', function() {
+                abrirPostCompartido(sharedPostId);
+            });
+        }
+
+        function abrirPostCompartido(postId) {
+            setTimeout(() => {
+                const postElement = document.querySelector(`.post-card[data-post-id="${postId}"]`);
+                console.log('[SharedPost] Post element:', postElement);
+
+                if (postElement) {
+                    // Scroll al post primero
+                    postElement.scrollIntoView({ behavior: 'instant', block: 'center' });
+
+                    // Abrir en fullscreen después de un momento
+                    setTimeout(() => {
+                        const mediaElement = postElement.querySelector('.post-media');
+                        if (mediaElement && typeof openFullscreenViewer === 'function') {
+                            const fakeEvent = { preventDefault: () => {}, stopPropagation: () => {}, target: mediaElement };
+                            openFullscreenViewer(fakeEvent, postId);
+                            console.log('[SharedPost] Fullscreen abierto');
+                        }
+                        // Limpiar URL
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }, 300);
+                } else {
+                    console.log('[SharedPost] Post no encontrado en DOM');
+                }
+            }, 800);
+        }
+    })();
+        </text>
+    }
 </script>
