@@ -5156,12 +5156,16 @@
     document.querySelectorAll('.share-btn').forEach(btn => {
         btn.addEventListener('click', async function() {
             const postId = this.dataset.id;
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
 
             try {
                 const res = await fetch('/Feed/Compartir', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `id=${postId}`
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'RequestVerificationToken': token
+                    },
+                    body: `id=${postId}&__RequestVerificationToken=${encodeURIComponent(token)}`
                 });
                 const data = await res.json();
 
@@ -5179,6 +5183,35 @@
             }
         });
     });
+
+    // Función global para compartir desde posts dinámicos
+    window.compartirContenido = async function(postId) {
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+
+        try {
+            const res = await fetch('/Feed/Compartir', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': token
+                },
+                body: `id=${postId}&__RequestVerificationToken=${encodeURIComponent(token)}`
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                currentShareUrl = data.url;
+                currentSharePostId = postId;
+                document.getElementById('shareUrlInput').value = data.url;
+                document.getElementById('shareWhatsApp').href = `https://wa.me/?text=${encodeURIComponent('Mira esto: ' + data.url)}`;
+                document.getElementById('shareTelegram').href = `https://t.me/share/url?url=${encodeURIComponent(data.url)}`;
+                document.getElementById('shareTwitter').href = `https://twitter.com/intent/tweet?url=${encodeURIComponent(data.url)}`;
+                document.getElementById('shareModal').classList.add('active');
+            }
+        } catch (err) {
+            console.error('Error:', err);
+        }
+    };
 
     function closeShareModal() {
         document.getElementById('shareModal').classList.remove('active');

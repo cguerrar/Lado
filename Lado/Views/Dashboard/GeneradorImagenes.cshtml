@@ -1,883 +1,2015 @@
 @{
-    ViewData["Title"] = "Generador de Imagenes";
-    Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Editor de Imagenes";
+    Layout = null;
 }
-
-<style>
-    .promo-generator-container {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 20px;
-    }
-
-    .generator-header {
-        text-align: center;
-        margin-bottom: 30px;
-    }
-
-    .generator-header h1 {
-        font-size: 1.8rem;
-        color: var(--fg);
-        margin-bottom: 8px;
-    }
-
-    .generator-header p {
-        color: var(--muted);
-        font-size: 0.95rem;
-    }
-
-    /* Tabs de formato */
-    .format-tabs {
-        display: flex;
-        gap: 8px;
-        justify-content: center;
-        flex-wrap: wrap;
-        margin-bottom: 24px;
-        padding: 0 10px;
-    }
-
-    .format-tab {
-        padding: 10px 18px;
-        border: 2px solid var(--border);
-        background: var(--surface);
-        border-radius: var(--radius-lg);
-        cursor: pointer;
-        font-size: 0.9rem;
-        font-weight: 500;
-        color: var(--fg-secondary);
-        transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .format-tab:hover {
-        border-color: var(--primary);
-        color: var(--primary);
-    }
-
-    .format-tab.active {
-        background: var(--primary);
-        border-color: var(--primary);
-        color: white;
-    }
-
-    .format-tab i {
-        font-size: 1.1rem;
-    }
-
-    /* Layout principal */
-    .generator-layout {
-        display: grid;
-        grid-template-columns: 280px 1fr;
-        gap: 24px;
-    }
-
-    @@media (max-width: 768px) {
-        .generator-layout {
-            grid-template-columns: 1fr;
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Lado</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Montserrat:wght@700;900&family=Bebas+Neue&family=Pacifico&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --accent: #ec4899;
+            --bg: #0f0f23;
+            --bg-secondary: #1a1a2e;
+            --surface: #16213e;
+            --surface-hover: #1f2937;
+            --border: #374151;
+            --fg: #f9fafb;
+            --fg-secondary: #9ca3af;
+            --muted: #6b7280;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-xl: 20px;
+            --shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
-    }
 
-    /* Panel de plantillas */
-    .templates-panel {
-        background: var(--surface);
-        border-radius: var(--radius-xl);
-        padding: 20px;
-        box-shadow: var(--shadow-sm);
-    }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
-    .templates-panel h3 {
-        font-size: 1rem;
-        color: var(--fg);
-        margin-bottom: 16px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            height: 100vh;
+            overflow: hidden;
+        }
 
-    .templates-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
-        margin-bottom: 24px;
-    }
+        /* ========== LAYOUT PRINCIPAL ========== */
+        .editor-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
 
-    .template-item {
-        aspect-ratio: 1;
-        border-radius: var(--radius-md);
-        cursor: pointer;
-        position: relative;
-        overflow: hidden;
-        border: 3px solid transparent;
-        transition: all 0.2s ease;
-    }
+        /* Header */
+        .editor-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+        }
 
-    .template-item:hover {
-        transform: scale(1.05);
-    }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
 
-    .template-item.active {
-        border-color: var(--primary);
-    }
+        .btn-back {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            color: var(--fg);
+            text-decoration: none;
+            transition: all 0.2s;
+        }
 
-    .template-item .template-preview {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: white;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-    }
+        .btn-back:hover {
+            background: var(--surface-hover);
+            border-color: var(--primary);
+        }
 
-    .template-item .template-name {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: rgba(0,0,0,0.7);
-        color: white;
-        font-size: 0.7rem;
-        padding: 4px;
-        text-align: center;
-    }
+        .editor-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
 
-    /* Colores de plantillas */
-    .template-minimal { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    .template-neon { background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); }
-    .template-polaroid { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); }
-    .template-glass { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); }
-    .template-bold { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
-    /* Opciones */
-    .options-panel {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
+        .btn {
+            padding: 10px 16px;
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: none;
+            transition: all 0.2s;
+        }
 
-    .options-panel label {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        cursor: pointer;
-        font-size: 0.9rem;
-        color: var(--fg-secondary);
-    }
+        .btn-icon {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            justify-content: center;
+        }
 
-    .options-panel input[type="checkbox"] {
-        width: 18px;
-        height: 18px;
-        accent-color: var(--primary);
-    }
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--fg);
+            border: 1px solid var(--border);
+        }
 
-    .options-panel input[type="text"] {
-        width: 100%;
-        padding: 10px 12px;
-        border: 1px solid var(--border);
-        border-radius: var(--radius-md);
-        background: var(--bg);
-        color: var(--fg);
-        font-size: 0.9rem;
-    }
+        .btn-secondary:hover {
+            background: var(--surface-hover);
+        }
 
-    .options-panel input[type="text"]:focus {
-        outline: none;
-        border-color: var(--primary);
-    }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+        }
 
-    /* Panel de preview */
-    .preview-panel {
-        background: var(--surface);
-        border-radius: var(--radius-xl);
-        padding: 20px;
-        box-shadow: var(--shadow-sm);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
 
-    .canvas-container {
-        background: var(--bg-secondary);
-        border-radius: var(--radius-lg);
-        padding: 20px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        width: 100%;
-        min-height: 400px;
-        margin-bottom: 20px;
-        overflow: hidden;
-    }
+        /* Body */
+        .editor-body {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
 
-    #promoCanvas {
-        max-width: 100%;
-        max-height: 500px;
-        border-radius: var(--radius-md);
-        box-shadow: var(--shadow-lg);
-    }
+        /* ========== SIDEBAR ========== */
+        .editor-sidebar {
+            width: 72px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 12px 0;
+        }
 
-    .btn-download {
-        background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
-        color: white;
-        border: none;
-        padding: 14px 32px;
-        border-radius: var(--radius-lg);
-        font-size: 1rem;
-        font-weight: 600;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
+        .tool-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 14px 8px;
+            cursor: pointer;
+            color: var(--muted);
+            transition: all 0.2s;
+            border: none;
+            background: none;
+            gap: 6px;
+        }
 
-    .btn-download:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-lg);
-    }
+        .tool-btn:hover {
+            color: var(--fg);
+            background: var(--bg-secondary);
+        }
 
-    .btn-download i {
-        font-size: 1.1rem;
-    }
+        .tool-btn.active {
+            color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+            border-right: 3px solid var(--primary);
+        }
 
-    /* Dimensiones info */
-    .dimensions-info {
-        text-align: center;
-        color: var(--muted);
-        font-size: 0.85rem;
-        margin-top: 12px;
-    }
+        .tool-btn i {
+            font-size: 1.25rem;
+        }
 
-    /* Back button */
-    .back-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        color: var(--fg-secondary);
-        text-decoration: none;
-        font-size: 0.9rem;
-        margin-bottom: 20px;
-        transition: color 0.2s;
-    }
+        .tool-btn span {
+            font-size: 0.65rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
 
-    .back-link:hover {
-        color: var(--primary);
-    }
-</style>
+        /* ========== PANEL DE OPCIONES ========== */
+        .options-panel {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            display: none;
+        }
 
-<div class="promo-generator-container">
-    <a href="@Url.Action("Index", "Dashboard")" class="back-link">
-        <i class="fas fa-arrow-left"></i> Volver al Dashboard
-    </a>
+        .options-panel.active {
+            display: block;
+        }
 
-    <div class="generator-header">
-        <h1><i class="fas fa-image"></i> Generador de Imagenes Promocionales</h1>
-        <p>Crea imagenes profesionales para promocionar tu perfil en redes sociales</p>
-    </div>
+        .options-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
 
-    <!-- Tabs de formato -->
-    <div class="format-tabs">
-        <button class="format-tab active" data-format="instagram-feed">
-            <i class="fab fa-instagram"></i> Feed
-        </button>
-        <button class="format-tab" data-format="instagram-story">
-            <i class="fab fa-instagram"></i> Story
-        </button>
-        <button class="format-tab" data-format="tiktok">
-            <i class="fab fa-tiktok"></i> TikTok
-        </button>
-        <button class="format-tab" data-format="facebook-post">
-            <i class="fab fa-facebook"></i> Post
-        </button>
-        <button class="format-tab" data-format="facebook-link">
-            <i class="fab fa-facebook"></i> Link
-        </button>
-    </div>
+        .options-header h3 {
+            font-size: 1rem;
+            font-weight: 600;
+        }
 
-    <div class="generator-layout">
-        <!-- Panel izquierdo: plantillas y opciones -->
-        <div class="templates-panel">
-            <h3><i class="fas fa-palette"></i> Plantillas</h3>
-            <div class="templates-grid" id="templatesGrid">
-                <div class="template-item active template-minimal" data-template="minimal">
-                    <div class="template-preview"></div>
-                    <span class="template-name">Minimalista</span>
-                </div>
-                <div class="template-item template-neon" data-template="neon">
-                    <div class="template-preview"></div>
-                    <span class="template-name">Neon</span>
-                </div>
-                <div class="template-item template-polaroid" data-template="polaroid">
-                    <div class="template-preview"></div>
-                    <span class="template-name">Polaroid</span>
-                </div>
-                <div class="template-item template-glass" data-template="glass">
-                    <div class="template-preview"></div>
-                    <span class="template-name">Glass</span>
-                </div>
-                <div class="template-item template-bold" data-template="bold">
-                    <div class="template-preview"></div>
-                    <span class="template-name">Bold</span>
-                </div>
+        .options-close {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: none;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+        }
+
+        .options-close:hover {
+            background: var(--surface);
+            color: var(--fg);
+        }
+
+        .options-content {
+            padding: 16px;
+        }
+
+        .options-section {
+            margin-bottom: 24px;
+        }
+
+        .options-section-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        /* Grid de items */
+        .items-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .items-grid-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .grid-item {
+            aspect-ratio: 1;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            border: 2px solid transparent;
+            overflow: hidden;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .grid-item:hover {
+            transform: scale(1.05);
+            border-color: var(--primary);
+        }
+
+        .grid-item.active {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+        }
+
+        .grid-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Colores */
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+        }
+
+        .color-item {
+            aspect-ratio: 1;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .color-item:hover {
+            transform: scale(1.15);
+        }
+
+        .color-item.active {
+            border-color: white;
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+
+        /* Degradados */
+        .gradient-item {
+            height: 60px;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .gradient-item:hover {
+            transform: scale(1.02);
+        }
+
+        .gradient-item.active {
+            border-color: var(--primary);
+        }
+
+        /* Boton subir */
+        .upload-btn {
+            width: 100%;
+            padding: 40px 20px;
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-lg);
+            background: var(--surface);
+            color: var(--muted);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+        }
+
+        .upload-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .upload-btn i {
+            font-size: 2rem;
+        }
+
+        /* Texto presets */
+        .text-preset {
+            padding: 12px 16px;
+            background: var(--surface);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            margin-bottom: 8px;
+            transition: all 0.2s;
+            border: 1px solid var(--border);
+        }
+
+        .text-preset:hover {
+            background: var(--surface-hover);
+            border-color: var(--primary);
+        }
+
+        .text-preset-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .text-preset-sub {
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        /* ========== CANVAS AREA ========== */
+        .canvas-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg);
+            overflow: hidden;
+        }
+
+        /* Format tabs */
+        .format-tabs {
+            display: flex;
+            gap: 6px;
+            padding: 12px 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
+        }
+
+        .format-tab {
+            padding: 8px 16px;
+            border-radius: var(--radius-md);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--fg-secondary);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .format-tab:hover {
+            border-color: var(--primary);
+            color: var(--fg);
+        }
+
+        .format-tab.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        /* Canvas container */
+        .canvas-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            overflow: auto;
+        }
+
+        .canvas-frame {
+            background: white;
+            box-shadow: var(--shadow);
+            border-radius: 4px;
+        }
+
+        #fabricCanvas {
+            display: block;
+        }
+
+        /* Canvas controls */
+        .canvas-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 12px 20px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+        }
+
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--surface);
+            padding: 6px 12px;
+            border-radius: var(--radius-md);
+        }
+
+        .zoom-btn {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: none;
+            border: none;
+            color: var(--fg);
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+        }
+
+        .zoom-btn:hover {
+            background: var(--bg-secondary);
+        }
+
+        .zoom-level {
+            font-size: 0.85rem;
+            color: var(--fg-secondary);
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .control-divider {
+            width: 1px;
+            height: 24px;
+            background: var(--border);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        /* ========== PROPERTIES BAR ========== */
+        .properties-bar {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 8px 16px;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            z-index: 1000;
+            box-shadow: var(--shadow);
+        }
+
+        .properties-bar.active {
+            display: flex;
+        }
+
+        .prop-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .prop-btn {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--fg);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .prop-btn:hover {
+            background: var(--surface-hover);
+            border-color: var(--primary);
+        }
+
+        .prop-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .prop-select {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--fg);
+            padding: 6px 10px;
+            font-size: 0.85rem;
+        }
+
+        .prop-color {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            border: 2px solid var(--border);
+            cursor: pointer;
+        }
+
+        /* ========== STICKERS GRID ========== */
+        .sticker-item {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            background: var(--surface);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sticker-item:hover {
+            transform: scale(1.1);
+            background: var(--surface-hover);
+        }
+
+        /* ========== EFFECTS PANEL ========== */
+        .filter-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: var(--radius-md);
+            transition: all 0.2s;
+        }
+
+        .filter-item:hover {
+            background: var(--surface-hover);
+        }
+
+        .filter-item.active {
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        .filter-preview {
+            width: 50px;
+            height: 50px;
+            border-radius: var(--radius-md);
+            border: 2px solid var(--border);
+        }
+
+        .filter-item span {
+            font-size: 0.7rem;
+            color: var(--fg-secondary);
+        }
+
+        .effect-hint {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-bottom: 12px;
+            font-style: italic;
+        }
+
+        .effect-slider {
+            margin-bottom: 16px;
+        }
+
+        .effect-slider label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--fg-secondary);
+            margin-bottom: 6px;
+        }
+
+        .effect-slider input[type="range"] {
+            width: calc(100% - 40px);
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .effect-slider input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .effect-slider span {
+            display: inline-block;
+            width: 35px;
+            text-align: right;
+            font-size: 0.75rem;
+            color: var(--muted);
+            vertical-align: middle;
+            margin-left: 5px;
+        }
+
+        /* ========== RESPONSIVE ========== */
+        @@media (max-width: 768px) {
+            .editor-sidebar {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                width: 100%;
+                height: auto;
+                flex-direction: row;
+                justify-content: space-around;
+                border-right: none;
+                border-top: 1px solid var(--border);
+                z-index: 100;
+            }
+
+            .tool-btn {
+                padding: 10px 6px;
+            }
+
+            .tool-btn span {
+                display: none;
+            }
+
+            .options-panel {
+                position: fixed;
+                bottom: 60px;
+                left: 0;
+                right: 0;
+                width: 100%;
+                max-height: 50vh;
+                border-right: none;
+                border-top: 1px solid var(--border);
+                border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+            }
+
+            .canvas-wrapper {
+                padding: 20px;
+                padding-bottom: 80px;
+            }
+
+            .format-tabs {
+                padding: 10px 15px;
+            }
+        }
+
+        /* Hidden file input */
+        .hidden-input {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="editor-container">
+        <!-- Header -->
+        <div class="editor-header">
+            <div class="header-left">
+                <a href="/Dashboard" class="btn-back">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <span class="editor-title">Editor de Imagenes Promocionales</span>
             </div>
-
-            <h3><i class="fas fa-sliders-h"></i> Personalizar</h3>
-            <div class="options-panel">
-                <label>
-                    <input type="checkbox" id="showQR" checked>
-                    Mostrar codigo QR
-                </label>
-                <label>
-                    <input type="checkbox" id="showPrice">
-                    Mostrar precio
-                </label>
-                <input type="text" id="customText" placeholder="Texto personalizado (opcional)" maxlength="50">
+            <div class="header-right">
+                <button class="btn btn-icon btn-secondary" id="btnUndo" title="Deshacer">
+                    <i class="fas fa-undo"></i>
+                </button>
+                <button class="btn btn-icon btn-secondary" id="btnRedo" title="Rehacer">
+                    <i class="fas fa-redo"></i>
+                </button>
+                <button class="btn btn-primary" id="btnDownload">
+                    <i class="fas fa-download"></i>
+                    <span>Descargar</span>
+                </button>
             </div>
         </div>
 
-        <!-- Panel derecho: preview -->
-        <div class="preview-panel">
-            <div class="canvas-container">
-                <canvas id="promoCanvas"></canvas>
+        <div class="editor-body">
+            <!-- Sidebar -->
+            <div class="editor-sidebar">
+                <button class="tool-btn active" data-tool="templates">
+                    <i class="fas fa-th-large"></i>
+                    <span>Plantillas</span>
+                </button>
+                <button class="tool-btn" data-tool="backgrounds">
+                    <i class="fas fa-palette"></i>
+                    <span>Fondos</span>
+                </button>
+                <button class="tool-btn" data-tool="photos">
+                    <i class="fas fa-image"></i>
+                    <span>Fotos</span>
+                </button>
+                <button class="tool-btn" data-tool="text">
+                    <i class="fas fa-font"></i>
+                    <span>Texto</span>
+                </button>
+                <button class="tool-btn" data-tool="stickers">
+                    <i class="fas fa-smile"></i>
+                    <span>Stickers</span>
+                </button>
+                <button class="tool-btn" data-tool="elements">
+                    <i class="fas fa-shapes"></i>
+                    <span>Formas</span>
+                </button>
+                <button class="tool-btn" data-tool="effects">
+                    <i class="fas fa-magic"></i>
+                    <span>Efectos</span>
+                </button>
             </div>
-            <button class="btn-download" id="btnDownload">
-                <i class="fas fa-download"></i> Descargar PNG
-            </button>
-            <div class="dimensions-info" id="dimensionsInfo">1080 x 1080 px</div>
+
+            <!-- Panel de opciones -->
+            <div class="options-panel active" id="optionsPanel">
+                <!-- Contenido dinamico -->
+            </div>
+
+            <!-- Canvas Area -->
+            <div class="canvas-area">
+                <div class="format-tabs">
+                    <button class="format-tab active" data-format="instagram-feed">
+                        <i class="fab fa-instagram"></i> Feed 1:1
+                    </button>
+                    <button class="format-tab" data-format="instagram-story">
+                        <i class="fab fa-instagram"></i> Story 9:16
+                    </button>
+                    <button class="format-tab" data-format="tiktok">
+                        <i class="fab fa-tiktok"></i> TikTok
+                    </button>
+                    <button class="format-tab" data-format="facebook">
+                        <i class="fab fa-facebook"></i> Facebook
+                    </button>
+                    <button class="format-tab" data-format="twitter">
+                        <i class="fab fa-twitter"></i> Twitter
+                    </button>
+                </div>
+
+                <div class="canvas-wrapper">
+                    <div class="canvas-frame">
+                        <canvas id="fabricCanvas"></canvas>
+                    </div>
+                </div>
+
+                <div class="canvas-controls">
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" id="zoomOut"><i class="fas fa-minus"></i></button>
+                        <span class="zoom-level" id="zoomLevel">100%</span>
+                        <button class="zoom-btn" id="zoomIn"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div class="control-divider"></div>
+                    <button class="btn btn-icon btn-secondary" id="btnBringFront" title="Traer al frente">
+                        <i class="fas fa-layer-group"></i>
+                    </button>
+                    <button class="btn btn-icon btn-secondary" id="btnSendBack" title="Enviar atras">
+                        <i class="fas fa-layer-group fa-flip-vertical"></i>
+                    </button>
+                    <div class="control-divider"></div>
+                    <button class="btn btn-icon btn-danger" id="btnDelete" title="Eliminar">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Properties bar -->
+        <div class="properties-bar" id="propertiesBar">
+            <div class="prop-group" id="textProps" style="display:none;">
+                <select class="prop-select" id="fontFamily">
+                    <option value="Inter">Inter</option>
+                    <option value="Montserrat">Montserrat</option>
+                    <option value="Playfair Display">Playfair</option>
+                    <option value="Bebas Neue">Bebas Neue</option>
+                    <option value="Pacifico">Pacifico</option>
+                </select>
+                <select class="prop-select" id="fontSize">
+                    <option value="24">24</option>
+                    <option value="32">32</option>
+                    <option value="48" selected>48</option>
+                    <option value="64">64</option>
+                    <option value="72">72</option>
+                    <option value="96">96</option>
+                </select>
+                <button class="prop-btn" id="btnBold" title="Negrita"><i class="fas fa-bold"></i></button>
+                <button class="prop-btn" id="btnItalic" title="Cursiva"><i class="fas fa-italic"></i></button>
+                <input type="color" class="prop-color" id="textColor" value="#ffffff" title="Color de texto">
+            </div>
+            <div class="prop-group" id="imageProps" style="display:none;">
+                <button class="prop-btn" id="btnFlipH" title="Voltear horizontal"><i class="fas fa-arrows-alt-h"></i></button>
+                <button class="prop-btn" id="btnFlipV" title="Voltear vertical"><i class="fas fa-arrows-alt-v"></i></button>
+            </div>
         </div>
     </div>
-</div>
 
-@section Scripts {
-    <!-- QR Code Library -->
+    <!-- Hidden inputs -->
+    <input type="file" id="imageUpload" class="hidden-input" accept="image/*">
+
+    <!-- Fabric.js -->
+    <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+    <!-- QR Code -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 
     <script>
-        // Configuracion del creador
+        // ========== CONFIGURACION ==========
         const CREATOR_CONFIG = {
             seudonimo: '@Html.Raw(ViewBag.Seudonimo)',
             fotoPerfil: '@Html.Raw(ViewBag.FotoPerfil)',
             linkPerfil: '@Html.Raw(ViewBag.LinkPerfil)',
             precio: @(ViewBag.Precio ?? 0),
-            categoria: '@Html.Raw(ViewBag.Categoria)',
             baseUrl: '@Html.Raw(ViewBag.BaseUrl)'
         };
 
-        // Formatos disponibles
         const FORMATS = {
-            'instagram-feed': { width: 1080, height: 1080, label: 'Instagram Feed' },
-            'instagram-story': { width: 1080, height: 1920, label: 'Instagram Story' },
-            'tiktok': { width: 1080, height: 1920, label: 'TikTok' },
-            'facebook-post': { width: 1080, height: 1080, label: 'Facebook Post' },
-            'facebook-link': { width: 1200, height: 630, label: 'Facebook Link' }
+            'instagram-feed': { width: 1080, height: 1080, scale: 0.45 },
+            'instagram-story': { width: 1080, height: 1920, scale: 0.3 },
+            'tiktok': { width: 1080, height: 1920, scale: 0.3 },
+            'facebook': { width: 1200, height: 630, scale: 0.5 },
+            'twitter': { width: 1200, height: 675, scale: 0.48 }
         };
 
-        class PromoGenerator {
-            constructor(config) {
-                this.config = config;
-                this.canvas = document.getElementById('promoCanvas');
-                this.ctx = this.canvas.getContext('2d');
+        const GRADIENTS = [
+            { name: 'Sunset', colors: ['#ff512f', '#f09819'] },
+            { name: 'Ocean', colors: ['#2193b0', '#6dd5ed'] },
+            { name: 'Purple', colors: ['#667eea', '#764ba2'] },
+            { name: 'Fire', colors: ['#f83600', '#f9d423'] },
+            { name: 'Mint', colors: ['#11998e', '#38ef7d'] },
+            { name: 'Pink', colors: ['#ee9ca7', '#ffdde1'] },
+            { name: 'Dark', colors: ['#0f0c29', '#302b63', '#24243e'] },
+            { name: 'Gold', colors: ['#f7971e', '#ffd200'] }
+        ];
+
+        const SOLID_COLORS = [
+            '#ffffff', '#000000', '#ef4444', '#f97316', '#eab308', '#22c55e',
+            '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'
+        ];
+
+        const STICKERS = [
+            '🔥', '💜', '✨', '💫', '⭐', '❤️', '💖', '🌟', '💎', '👑',
+            '🦋', '🌸', '💕', '🎀', '💝', '🌈', '☀️', '🌙', '💋', '🍑'
+        ];
+
+        const SOCIAL_ICONS = [
+            { icon: 'fab fa-instagram', color: '#E4405F' },
+            { icon: 'fab fa-tiktok', color: '#000000' },
+            { icon: 'fab fa-twitter', color: '#1DA1F2' },
+            { icon: 'fab fa-youtube', color: '#FF0000' },
+            { icon: 'fab fa-facebook', color: '#1877F2' }
+        ];
+
+        // ========== CLASE PRINCIPAL ==========
+        class PromoEditor {
+            constructor() {
+                this.canvas = null;
                 this.currentFormat = 'instagram-feed';
-                this.currentTemplate = 'minimal';
-                this.options = {
-                    showQR: true,
-                    showPrice: false,
-                    customText: ''
-                };
-                this.profileImage = null;
-                this.qrDataUrl = null;
+                this.currentTool = 'templates';
+                this.zoom = 1;
+                this.history = [];
+                this.historyIndex = -1;
             }
 
-            async init() {
-                await this.loadProfileImage();
-                await this.generateQRCode();
+            init() {
+                this.initCanvas();
                 this.bindEvents();
-                this.render();
+                this.renderToolPanel('templates');
+                this.setFormat('instagram-feed');
+                this.loadDefaultTemplate();
             }
 
-            async loadProfileImage() {
-                return new Promise((resolve) => {
-                    const img = new Image();
-                    img.crossOrigin = 'anonymous';
-                    img.onload = () => {
-                        this.profileImage = img;
-                        resolve();
-                    };
-                    img.onerror = () => {
-                        // Usar placeholder si falla
-                        this.profileImage = null;
-                        resolve();
-                    };
-                    img.src = this.config.fotoPerfil;
+            initCanvas() {
+                const format = FORMATS[this.currentFormat];
+                this.canvas = new fabric.Canvas('fabricCanvas', {
+                    width: format.width * format.scale,
+                    height: format.height * format.scale,
+                    backgroundColor: '#667eea',
+                    preserveObjectStacking: true
+                });
+
+                // Eventos de seleccion
+                this.canvas.on('selection:created', () => this.showProperties());
+                this.canvas.on('selection:updated', () => this.showProperties());
+                this.canvas.on('selection:cleared', () => this.hideProperties());
+                this.canvas.on('object:modified', () => this.saveHistory());
+            }
+
+            bindEvents() {
+                // Tool buttons
+                document.querySelectorAll('.tool-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        this.currentTool = btn.dataset.tool;
+                        this.renderToolPanel(this.currentTool);
+                    });
+                });
+
+                // Format tabs
+                document.querySelectorAll('.format-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        document.querySelectorAll('.format-tab').forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        this.setFormat(tab.dataset.format);
+                    });
+                });
+
+                // Zoom
+                document.getElementById('zoomIn').addEventListener('click', () => this.zoomIn());
+                document.getElementById('zoomOut').addEventListener('click', () => this.zoomOut());
+
+                // Delete
+                document.getElementById('btnDelete').addEventListener('click', () => this.deleteSelected());
+
+                // Layers
+                document.getElementById('btnBringFront').addEventListener('click', () => {
+                    const obj = this.canvas.getActiveObject();
+                    if (obj) { this.canvas.bringToFront(obj); this.canvas.renderAll(); }
+                });
+                document.getElementById('btnSendBack').addEventListener('click', () => {
+                    const obj = this.canvas.getActiveObject();
+                    if (obj) { this.canvas.sendToBack(obj); this.canvas.renderAll(); }
+                });
+
+                // Undo/Redo
+                document.getElementById('btnUndo').addEventListener('click', () => this.undo());
+                document.getElementById('btnRedo').addEventListener('click', () => this.redo());
+
+                // Download
+                document.getElementById('btnDownload').addEventListener('click', () => this.download());
+
+                // Image upload
+                document.getElementById('imageUpload').addEventListener('change', (e) => this.handleImageUpload(e));
+
+                // Text properties
+                document.getElementById('fontFamily').addEventListener('change', (e) => this.updateTextProperty('fontFamily', e.target.value));
+                document.getElementById('fontSize').addEventListener('change', (e) => this.updateTextProperty('fontSize', parseInt(e.target.value)));
+                document.getElementById('textColor').addEventListener('input', (e) => this.updateTextProperty('fill', e.target.value));
+                document.getElementById('btnBold').addEventListener('click', () => this.toggleTextBold());
+                document.getElementById('btnItalic').addEventListener('click', () => this.toggleTextItalic());
+
+                // Image properties
+                document.getElementById('btnFlipH').addEventListener('click', () => this.flipImage('x'));
+                document.getElementById('btnFlipV').addEventListener('click', () => this.flipImage('y'));
+
+                // Keyboard
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Delete' || e.key === 'Backspace') {
+                        if (document.activeElement.tagName !== 'INPUT') {
+                            this.deleteSelected();
+                        }
+                    }
                 });
             }
 
-            async generateQRCode() {
+            // ========== FORMATOS ==========
+            setFormat(format) {
+                this.currentFormat = format;
+                const f = FORMATS[format];
+
+                // Guardar objetos actuales
+                const objects = this.canvas.getObjects();
+                const json = this.canvas.toJSON();
+
+                // Redimensionar canvas
+                this.canvas.setWidth(f.width * f.scale);
+                this.canvas.setHeight(f.height * f.scale);
+                this.canvas.setZoom(f.scale);
+
+                // Re-escalar objetos
+                objects.forEach(obj => {
+                    obj.scaleX = obj.scaleX || 1;
+                    obj.scaleY = obj.scaleY || 1;
+                });
+
+                this.canvas.renderAll();
+                document.getElementById('zoomLevel').textContent = Math.round(f.scale * 100) + '%';
+            }
+
+            // ========== ZOOM ==========
+            zoomIn() {
+                const f = FORMATS[this.currentFormat];
+                f.scale = Math.min(f.scale + 0.1, 1);
+                this.setFormat(this.currentFormat);
+            }
+
+            zoomOut() {
+                const f = FORMATS[this.currentFormat];
+                f.scale = Math.max(f.scale - 0.1, 0.2);
+                this.setFormat(this.currentFormat);
+            }
+
+            // ========== HERRAMIENTAS ==========
+            renderToolPanel(tool) {
+                const panel = document.getElementById('optionsPanel');
+                panel.classList.add('active');
+
+                switch(tool) {
+                    case 'templates':
+                        panel.innerHTML = this.getTemplatesPanel();
+                        break;
+                    case 'backgrounds':
+                        panel.innerHTML = this.getBackgroundsPanel();
+                        break;
+                    case 'photos':
+                        panel.innerHTML = this.getPhotosPanel();
+                        break;
+                    case 'text':
+                        panel.innerHTML = this.getTextPanel();
+                        break;
+                    case 'stickers':
+                        panel.innerHTML = this.getStickersPanel();
+                        break;
+                    case 'elements':
+                        panel.innerHTML = this.getElementsPanel();
+                        break;
+                    case 'effects':
+                        panel.innerHTML = this.getEffectsPanel();
+                        break;
+                }
+
+                this.bindPanelEvents(tool);
+            }
+
+            getTemplatesPanel() {
+                return `
+                    <div class="options-header">
+                        <h3>Plantillas</h3>
+                    </div>
+                    <div class="options-content">
+                        <div class="options-section">
+                            <div class="options-section-title">Promocionales</div>
+                            <div class="items-grid">
+                                <div class="grid-item" data-template="minimal" style="background: linear-gradient(135deg, #667eea, #764ba2)"></div>
+                                <div class="grid-item" data-template="neon" style="background: linear-gradient(135deg, #0f0c29, #302b63)"></div>
+                                <div class="grid-item" data-template="sunset" style="background: linear-gradient(135deg, #ff512f, #f09819)"></div>
+                                <div class="grid-item" data-template="ocean" style="background: linear-gradient(135deg, #2193b0, #6dd5ed)"></div>
+                                <div class="grid-item" data-template="pink" style="background: linear-gradient(135deg, #ee9ca7, #ffdde1)"></div>
+                                <div class="grid-item" data-template="dark" style="background: linear-gradient(135deg, #232526, #414345)"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            getBackgroundsPanel() {
+                let gradientItems = GRADIENTS.map((g, i) =>
+                    `<div class="gradient-item" data-gradient="${i}" style="background: linear-gradient(135deg, ${g.colors.join(', ')})"></div>`
+                ).join('');
+
+                let colorItems = SOLID_COLORS.map(c =>
+                    `<div class="color-item" data-color="${c}" style="background: ${c}"></div>`
+                ).join('');
+
+                return `
+                    <div class="options-header">
+                        <h3>Fondos</h3>
+                    </div>
+                    <div class="options-content">
+                        <div class="options-section">
+                            <div class="options-section-title">Colores</div>
+                            <div class="color-grid">${colorItems}</div>
+                        </div>
+                        <div class="options-section">
+                            <div class="options-section-title">Degradados</div>
+                            ${gradientItems}
+                        </div>
+                    </div>
+                `;
+            }
+
+            getPhotosPanel() {
+                return `
+                    <div class="options-header">
+                        <h3>Fotos</h3>
+                    </div>
+                    <div class="options-content">
+                        <div class="options-section">
+                            <label class="upload-btn" id="uploadPhotoBtn">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <span>Subir imagen</span>
+                            </label>
+                        </div>
+                        <div class="options-section">
+                            <div class="options-section-title">Tu perfil</div>
+                            <div class="items-grid">
+                                <div class="grid-item" id="useProfilePhoto" style="background-image: url('${CREATOR_CONFIG.fotoPerfil}'); background-size: cover; background-position: center;"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            getTextPanel() {
+                return `
+                    <div class="options-header">
+                        <h3>Texto</h3>
+                    </div>
+                    <div class="options-content">
+                        <div class="options-section">
+                            <div class="text-preset" data-text="heading">
+                                <div class="text-preset-title">Agregar titulo</div>
+                                <div class="text-preset-sub">Texto grande y destacado</div>
+                            </div>
+                            <div class="text-preset" data-text="subheading">
+                                <div class="text-preset-title" style="font-size: 0.95rem;">Agregar subtitulo</div>
+                                <div class="text-preset-sub">Texto mediano</div>
+                            </div>
+                            <div class="text-preset" data-text="body">
+                                <div class="text-preset-title" style="font-size: 0.85rem; font-weight: 400;">Agregar texto</div>
+                                <div class="text-preset-sub">Parrafo normal</div>
+                            </div>
+                        </div>
+                        <div class="options-section">
+                            <div class="options-section-title">Textos rapidos</div>
+                            <div class="text-preset" data-quicktext="@@${CREATOR_CONFIG.seudonimo}">
+                                <div class="text-preset-title">@@${CREATOR_CONFIG.seudonimo}</div>
+                            </div>
+                            <div class="text-preset" data-quicktext="Sigueme">
+                                <div class="text-preset-title">Sigueme</div>
+                            </div>
+                            <div class="text-preset" data-quicktext="Link en bio">
+                                <div class="text-preset-title">Link en bio</div>
+                            </div>
+                            <div class="text-preset" data-quicktext="Contenido Exclusivo">
+                                <div class="text-preset-title">Contenido Exclusivo</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            getStickersPanel() {
+                let stickerItems = STICKERS.map(s =>
+                    `<div class="sticker-item" data-sticker="${s}">${s}</div>`
+                ).join('');
+
+                let socialItems = SOCIAL_ICONS.map((s, i) =>
+                    `<div class="sticker-item" data-social="${i}"><i class="${s.icon}" style="color: ${s.color}"></i></div>`
+                ).join('');
+
+                return `
+                    <div class="options-header">
+                        <h3>Stickers</h3>
+                    </div>
+                    <div class="options-content">
+                        <div class="options-section">
+                            <div class="options-section-title">Emojis</div>
+                            <div class="items-grid items-grid-3">${stickerItems}</div>
+                        </div>
+                        <div class="options-section">
+                            <div class="options-section-title">Redes Sociales</div>
+                            <div class="items-grid items-grid-3">${socialItems}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            getElementsPanel() {
+                return `
+                    <div class="options-header">
+                        <h3>Formas</h3>
+                    </div>
+                    <div class="options-content">
+                        <div class="options-section">
+                            <div class="items-grid">
+                                <div class="grid-item" data-shape="rect" style="background: var(--primary); display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-square" style="color: white; font-size: 1.5rem;"></i>
+                                </div>
+                                <div class="grid-item" data-shape="circle" style="background: var(--accent); display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-circle" style="color: white; font-size: 1.5rem;"></i>
+                                </div>
+                                <div class="grid-item" data-shape="line" style="background: var(--success); display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-minus" style="color: white; font-size: 1.5rem;"></i>
+                                </div>
+                                <div class="grid-item" data-shape="qr" style="background: white; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-qrcode" style="color: #333; font-size: 1.5rem;"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            getEffectsPanel() {
+                return `
+                    <div class="options-header">
+                        <h3>Efectos</h3>
+                    </div>
+                    <div class="options-content">
+                        <div class="options-section">
+                            <div class="options-section-title">Filtros rapidos</div>
+                            <div class="items-grid">
+                                <div class="filter-item" data-filter="none">
+                                    <div class="filter-preview" style="background: linear-gradient(45deg, #667eea, #764ba2)"></div>
+                                    <span>Normal</span>
+                                </div>
+                                <div class="filter-item" data-filter="grayscale">
+                                    <div class="filter-preview" style="background: linear-gradient(45deg, #555, #888)"></div>
+                                    <span>B/N</span>
+                                </div>
+                                <div class="filter-item" data-filter="sepia">
+                                    <div class="filter-preview" style="background: linear-gradient(45deg, #704214, #c4a35a)"></div>
+                                    <span>Sepia</span>
+                                </div>
+                                <div class="filter-item" data-filter="vintage">
+                                    <div class="filter-preview" style="background: linear-gradient(45deg, #d4a574, #8b7355)"></div>
+                                    <span>Vintage</span>
+                                </div>
+                                <div class="filter-item" data-filter="vibrant">
+                                    <div class="filter-preview" style="background: linear-gradient(45deg, #ff0080, #00ff80)"></div>
+                                    <span>Vibrante</span>
+                                </div>
+                                <div class="filter-item" data-filter="cool">
+                                    <div class="filter-preview" style="background: linear-gradient(45deg, #00c9ff, #92fe9d)"></div>
+                                    <span>Frio</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="options-section">
+                            <div class="options-section-title">Ajustes de imagen</div>
+                            <p class="effect-hint">Selecciona una imagen primero</p>
+                            <div class="effect-slider">
+                                <label>Brillo</label>
+                                <input type="range" id="brightnessSlider" min="-1" max="1" step="0.1" value="0">
+                                <span id="brightnessValue">0</span>
+                            </div>
+                            <div class="effect-slider">
+                                <label>Contraste</label>
+                                <input type="range" id="contrastSlider" min="-1" max="1" step="0.1" value="0">
+                                <span id="contrastValue">0</span>
+                            </div>
+                            <div class="effect-slider">
+                                <label>Saturacion</label>
+                                <input type="range" id="saturationSlider" min="-1" max="1" step="0.1" value="0">
+                                <span id="saturationValue">0</span>
+                            </div>
+                        </div>
+                        <div class="options-section">
+                            <div class="options-section-title">Sombras</div>
+                            <div class="text-preset" data-shadow="soft">
+                                <div class="text-preset-title">Sombra suave</div>
+                                <div class="text-preset-sub">Efecto de profundidad sutil</div>
+                            </div>
+                            <div class="text-preset" data-shadow="hard">
+                                <div class="text-preset-title">Sombra dura</div>
+                                <div class="text-preset-sub">Borde marcado</div>
+                            </div>
+                            <div class="text-preset" data-shadow="glow">
+                                <div class="text-preset-title">Resplandor</div>
+                                <div class="text-preset-sub">Efecto neon brillante</div>
+                            </div>
+                            <div class="text-preset" data-shadow="none">
+                                <div class="text-preset-title">Sin sombra</div>
+                                <div class="text-preset-sub">Quitar efecto</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            bindPanelEvents(tool) {
+                // Templates
+                document.querySelectorAll('[data-template]').forEach(el => {
+                    el.addEventListener('click', () => this.applyTemplate(el.dataset.template));
+                });
+
+                // Colors
+                document.querySelectorAll('[data-color]').forEach(el => {
+                    el.addEventListener('click', () => this.setBackgroundColor(el.dataset.color));
+                });
+
+                // Gradients
+                document.querySelectorAll('[data-gradient]').forEach(el => {
+                    el.addEventListener('click', () => this.setBackgroundGradient(parseInt(el.dataset.gradient)));
+                });
+
+                // Upload photo
+                const uploadBtn = document.getElementById('uploadPhotoBtn');
+                if (uploadBtn) {
+                    uploadBtn.addEventListener('click', () => document.getElementById('imageUpload').click());
+                }
+
+                // Profile photo
+                const profileBtn = document.getElementById('useProfilePhoto');
+                if (profileBtn) {
+                    profileBtn.addEventListener('click', () => this.addImage(CREATOR_CONFIG.fotoPerfil));
+                }
+
+                // Text presets
+                document.querySelectorAll('[data-text]').forEach(el => {
+                    el.addEventListener('click', () => this.addTextPreset(el.dataset.text));
+                });
+
+                document.querySelectorAll('[data-quicktext]').forEach(el => {
+                    el.addEventListener('click', () => this.addQuickText(el.dataset.quicktext));
+                });
+
+                // Stickers
+                document.querySelectorAll('[data-sticker]').forEach(el => {
+                    el.addEventListener('click', () => this.addSticker(el.dataset.sticker));
+                });
+
+                document.querySelectorAll('[data-social]').forEach(el => {
+                    el.addEventListener('click', () => this.addSocialIcon(parseInt(el.dataset.social)));
+                });
+
+                // Shapes
+                document.querySelectorAll('[data-shape]').forEach(el => {
+                    el.addEventListener('click', () => this.addShape(el.dataset.shape));
+                });
+
+                // Filters
+                document.querySelectorAll('[data-filter]').forEach(el => {
+                    el.addEventListener('click', () => this.applyFilter(el.dataset.filter));
+                });
+
+                // Shadows
+                document.querySelectorAll('[data-shadow]').forEach(el => {
+                    el.addEventListener('click', () => this.applyShadow(el.dataset.shadow));
+                });
+
+                // Effect sliders
+                const brightnessSlider = document.getElementById('brightnessSlider');
+                const contrastSlider = document.getElementById('contrastSlider');
+                const saturationSlider = document.getElementById('saturationSlider');
+
+                if (brightnessSlider) {
+                    brightnessSlider.addEventListener('input', (e) => {
+                        document.getElementById('brightnessValue').textContent = e.target.value;
+                        this.applyImageAdjustment('brightness', parseFloat(e.target.value));
+                    });
+                }
+                if (contrastSlider) {
+                    contrastSlider.addEventListener('input', (e) => {
+                        document.getElementById('contrastValue').textContent = e.target.value;
+                        this.applyImageAdjustment('contrast', parseFloat(e.target.value));
+                    });
+                }
+                if (saturationSlider) {
+                    saturationSlider.addEventListener('input', (e) => {
+                        document.getElementById('saturationValue').textContent = e.target.value;
+                        this.applyImageAdjustment('saturation', parseFloat(e.target.value));
+                    });
+                }
+            }
+
+            // ========== ACCIONES ==========
+            loadDefaultTemplate() {
+                this.applyTemplate('minimal');
+            }
+
+            applyTemplate(template) {
+                this.canvas.clear();
+                const f = FORMATS[this.currentFormat];
+                const w = f.width;
+                const h = f.height;
+
+                let bgColor;
+                switch(template) {
+                    case 'minimal':
+                        bgColor = new fabric.Gradient({
+                            type: 'linear',
+                            coords: { x1: 0, y1: 0, x2: w, y2: h },
+                            colorStops: [
+                                { offset: 0, color: '#667eea' },
+                                { offset: 1, color: '#764ba2' }
+                            ]
+                        });
+                        break;
+                    case 'neon':
+                        bgColor = new fabric.Gradient({
+                            type: 'linear',
+                            coords: { x1: 0, y1: 0, x2: w, y2: h },
+                            colorStops: [
+                                { offset: 0, color: '#0f0c29' },
+                                { offset: 0.5, color: '#302b63' },
+                                { offset: 1, color: '#24243e' }
+                            ]
+                        });
+                        break;
+                    case 'sunset':
+                        bgColor = new fabric.Gradient({
+                            type: 'linear',
+                            coords: { x1: 0, y1: 0, x2: w, y2: h },
+                            colorStops: [
+                                { offset: 0, color: '#ff512f' },
+                                { offset: 1, color: '#f09819' }
+                            ]
+                        });
+                        break;
+                    case 'ocean':
+                        bgColor = new fabric.Gradient({
+                            type: 'linear',
+                            coords: { x1: 0, y1: 0, x2: w, y2: h },
+                            colorStops: [
+                                { offset: 0, color: '#2193b0' },
+                                { offset: 1, color: '#6dd5ed' }
+                            ]
+                        });
+                        break;
+                    case 'pink':
+                        bgColor = new fabric.Gradient({
+                            type: 'linear',
+                            coords: { x1: 0, y1: 0, x2: w, y2: h },
+                            colorStops: [
+                                { offset: 0, color: '#ee9ca7' },
+                                { offset: 1, color: '#ffdde1' }
+                            ]
+                        });
+                        break;
+                    case 'dark':
+                        bgColor = new fabric.Gradient({
+                            type: 'linear',
+                            coords: { x1: 0, y1: 0, x2: w, y2: h },
+                            colorStops: [
+                                { offset: 0, color: '#232526' },
+                                { offset: 1, color: '#414345' }
+                            ]
+                        });
+                        break;
+                }
+
+                this.canvas.setBackgroundColor(bgColor, this.canvas.renderAll.bind(this.canvas));
+
+                // Agregar texto por defecto
+                const text = new fabric.IText('@@' + CREATOR_CONFIG.seudonimo, {
+                    left: w / 2,
+                    top: h / 2,
+                    fontSize: 72,
+                    fontFamily: 'Montserrat',
+                    fontWeight: 'bold',
+                    fill: '#ffffff',
+                    originX: 'center',
+                    originY: 'center',
+                    shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.3)', blur: 10, offsetX: 2, offsetY: 2 })
+                });
+
+                this.canvas.add(text);
+                this.canvas.renderAll();
+                this.saveHistory();
+            }
+
+            setBackgroundColor(color) {
+                this.canvas.setBackgroundColor(color, this.canvas.renderAll.bind(this.canvas));
+                this.saveHistory();
+            }
+
+            setBackgroundGradient(index) {
+                const g = GRADIENTS[index];
+                const f = FORMATS[this.currentFormat];
+                const gradient = new fabric.Gradient({
+                    type: 'linear',
+                    coords: { x1: 0, y1: 0, x2: f.width, y2: f.height },
+                    colorStops: g.colors.map((c, i) => ({ offset: i / (g.colors.length - 1), color: c }))
+                });
+                this.canvas.setBackgroundColor(gradient, this.canvas.renderAll.bind(this.canvas));
+                this.saveHistory();
+            }
+
+            addImage(url) {
+                fabric.Image.fromURL(url, (img) => {
+                    const f = FORMATS[this.currentFormat];
+                    const maxSize = Math.min(f.width, f.height) * 0.4;
+                    const scale = maxSize / Math.max(img.width, img.height);
+
+                    img.set({
+                        left: f.width / 2,
+                        top: f.height / 2,
+                        scaleX: scale,
+                        scaleY: scale,
+                        originX: 'center',
+                        originY: 'center'
+                    });
+
+                    this.canvas.add(img);
+                    this.canvas.setActiveObject(img);
+                    this.canvas.renderAll();
+                    this.saveHistory();
+                }, { crossOrigin: 'anonymous' });
+            }
+
+            handleImageUpload(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    this.addImage(event.target.result);
+                };
+                reader.readAsDataURL(file);
+                e.target.value = '';
+            }
+
+            addTextPreset(type) {
+                const f = FORMATS[this.currentFormat];
+                let config = {
+                    left: f.width / 2,
+                    top: f.height / 2,
+                    originX: 'center',
+                    originY: 'center',
+                    fill: '#ffffff',
+                    fontFamily: 'Montserrat'
+                };
+
+                switch(type) {
+                    case 'heading':
+                        config.text = 'Titulo';
+                        config.fontSize = 72;
+                        config.fontWeight = 'bold';
+                        break;
+                    case 'subheading':
+                        config.text = 'Subtitulo';
+                        config.fontSize = 48;
+                        config.fontWeight = 'bold';
+                        break;
+                    case 'body':
+                        config.text = 'Escribe aqui...';
+                        config.fontSize = 32;
+                        config.fontWeight = 'normal';
+                        break;
+                }
+
+                const text = new fabric.IText(config.text, config);
+                this.canvas.add(text);
+                this.canvas.setActiveObject(text);
+                this.canvas.renderAll();
+                this.saveHistory();
+            }
+
+            addQuickText(content) {
+                const f = FORMATS[this.currentFormat];
+                const text = new fabric.IText(content, {
+                    left: f.width / 2,
+                    top: f.height / 2,
+                    fontSize: 56,
+                    fontFamily: 'Montserrat',
+                    fontWeight: 'bold',
+                    fill: '#ffffff',
+                    originX: 'center',
+                    originY: 'center',
+                    shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.3)', blur: 8, offsetX: 2, offsetY: 2 })
+                });
+
+                this.canvas.add(text);
+                this.canvas.setActiveObject(text);
+                this.canvas.renderAll();
+                this.saveHistory();
+            }
+
+            addSticker(emoji) {
+                const f = FORMATS[this.currentFormat];
+                const text = new fabric.IText(emoji, {
+                    left: f.width / 2,
+                    top: f.height / 2,
+                    fontSize: 80,
+                    originX: 'center',
+                    originY: 'center'
+                });
+
+                this.canvas.add(text);
+                this.canvas.setActiveObject(text);
+                this.canvas.renderAll();
+                this.saveHistory();
+            }
+
+            addSocialIcon(index) {
+                const icon = SOCIAL_ICONS[index];
+                const f = FORMATS[this.currentFormat];
+
+                // Crear circulo con icono
+                const circle = new fabric.Circle({
+                    radius: 40,
+                    fill: icon.color,
+                    originX: 'center',
+                    originY: 'center'
+                });
+
+                const text = new fabric.Text(icon.icon.split(' ')[1].replace('fa-', '').charAt(0).toUpperCase(), {
+                    fontSize: 40,
+                    fill: 'white',
+                    originX: 'center',
+                    originY: 'center',
+                    fontFamily: 'Arial'
+                });
+
+                const group = new fabric.Group([circle, text], {
+                    left: f.width / 2,
+                    top: f.height / 2,
+                    originX: 'center',
+                    originY: 'center'
+                });
+
+                this.canvas.add(group);
+                this.canvas.setActiveObject(group);
+                this.canvas.renderAll();
+                this.saveHistory();
+            }
+
+            addShape(shape) {
+                const f = FORMATS[this.currentFormat];
+                let obj;
+
+                switch(shape) {
+                    case 'rect':
+                        obj = new fabric.Rect({
+                            left: f.width / 2,
+                            top: f.height / 2,
+                            width: 200,
+                            height: 200,
+                            fill: '#6366f1',
+                            originX: 'center',
+                            originY: 'center',
+                            rx: 10,
+                            ry: 10
+                        });
+                        break;
+                    case 'circle':
+                        obj = new fabric.Circle({
+                            left: f.width / 2,
+                            top: f.height / 2,
+                            radius: 100,
+                            fill: '#ec4899',
+                            originX: 'center',
+                            originY: 'center'
+                        });
+                        break;
+                    case 'line':
+                        obj = new fabric.Line([f.width / 2 - 100, f.height / 2, f.width / 2 + 100, f.height / 2], {
+                            stroke: '#ffffff',
+                            strokeWidth: 4,
+                            originX: 'center',
+                            originY: 'center'
+                        });
+                        break;
+                    case 'qr':
+                        this.addQRCode();
+                        return;
+                }
+
+                if (obj) {
+                    this.canvas.add(obj);
+                    this.canvas.setActiveObject(obj);
+                    this.canvas.renderAll();
+                    this.saveHistory();
+                }
+            }
+
+            async addQRCode() {
                 try {
-                    this.qrDataUrl = await QRCode.toDataURL(this.config.linkPerfil, {
+                    const qrDataUrl = await QRCode.toDataURL(CREATOR_CONFIG.linkPerfil, {
                         width: 200,
                         margin: 1,
                         color: { dark: '#000000', light: '#ffffff' }
+                    });
+
+                    fabric.Image.fromURL(qrDataUrl, (img) => {
+                        const f = FORMATS[this.currentFormat];
+                        img.set({
+                            left: f.width - 120,
+                            top: f.height - 120,
+                            originX: 'center',
+                            originY: 'center'
+                        });
+
+                        this.canvas.add(img);
+                        this.canvas.setActiveObject(img);
+                        this.canvas.renderAll();
+                        this.saveHistory();
                     });
                 } catch (err) {
                     console.error('Error generando QR:', err);
                 }
             }
 
-            bindEvents() {
-                // Format tabs
-                document.querySelectorAll('.format-tab').forEach(tab => {
-                    tab.addEventListener('click', () => {
-                        document.querySelectorAll('.format-tab').forEach(t => t.classList.remove('active'));
-                        tab.classList.add('active');
-                        this.currentFormat = tab.dataset.format;
-                        this.updateDimensionsInfo();
-                        this.render();
-                    });
-                });
+            // ========== PROPIEDADES ==========
+            showProperties() {
+                const obj = this.canvas.getActiveObject();
+                if (!obj) return;
 
-                // Template selection
-                document.querySelectorAll('.template-item').forEach(item => {
-                    item.addEventListener('click', () => {
-                        document.querySelectorAll('.template-item').forEach(i => i.classList.remove('active'));
-                        item.classList.add('active');
-                        this.currentTemplate = item.dataset.template;
-                        this.render();
-                    });
-                });
+                const bar = document.getElementById('propertiesBar');
+                const textProps = document.getElementById('textProps');
+                const imageProps = document.getElementById('imageProps');
 
-                // Options
-                document.getElementById('showQR').addEventListener('change', (e) => {
-                    this.options.showQR = e.target.checked;
-                    this.render();
-                });
+                bar.classList.add('active');
 
-                document.getElementById('showPrice').addEventListener('change', (e) => {
-                    this.options.showPrice = e.target.checked;
-                    this.render();
-                });
-
-                document.getElementById('customText').addEventListener('input', (e) => {
-                    this.options.customText = e.target.value;
-                    this.render();
-                });
-
-                // Download
-                document.getElementById('btnDownload').addEventListener('click', () => {
-                    this.download();
-                });
-            }
-
-            updateDimensionsInfo() {
-                const format = FORMATS[this.currentFormat];
-                document.getElementById('dimensionsInfo').textContent = `${format.width} x ${format.height} px`;
-            }
-
-            render() {
-                const format = FORMATS[this.currentFormat];
-                this.canvas.width = format.width;
-                this.canvas.height = format.height;
-
-                // Renderizar segun plantilla
-                switch (this.currentTemplate) {
-                    case 'minimal':
-                        this.renderMinimal();
-                        break;
-                    case 'neon':
-                        this.renderNeon();
-                        break;
-                    case 'polaroid':
-                        this.renderPolaroid();
-                        break;
-                    case 'glass':
-                        this.renderGlass();
-                        break;
-                    case 'bold':
-                        this.renderBold();
-                        break;
-                }
-            }
-
-            // ========================================
-            // PLANTILLA: MINIMALISTA
-            // ========================================
-            renderMinimal() {
-                const { width, height } = this.canvas;
-                const ctx = this.ctx;
-
-                // Fondo degradado
-                const gradient = ctx.createLinearGradient(0, 0, width, height);
-                gradient.addColorStop(0, '#667eea');
-                gradient.addColorStop(1, '#764ba2');
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, width, height);
-
-                // Foto de perfil circular
-                const photoSize = Math.min(width, height) * 0.35;
-                const photoX = width / 2;
-                const photoY = height * 0.35;
-
-                this.drawCircularImage(photoX, photoY, photoSize / 2);
-
-                // Seudonimo
-                ctx.fillStyle = '#ffffff';
-                ctx.font = `bold ${Math.floor(width * 0.07)}px Arial, sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.fillText('@@' + this.config.seudonimo, width / 2, photoY + photoSize / 2 + width * 0.1);
-
-                // Texto personalizado o categoria
-                const displayText = this.options.customText || this.config.categoria;
-                ctx.font = `${Math.floor(width * 0.04)}px Arial, sans-serif`;
-                ctx.fillStyle = 'rgba(255,255,255,0.8)';
-                ctx.fillText(displayText, width / 2, photoY + photoSize / 2 + width * 0.16);
-
-                // Precio (opcional)
-                if (this.options.showPrice && this.config.precio > 0) {
-                    ctx.font = `bold ${Math.floor(width * 0.05)}px Arial, sans-serif`;
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillText('$' + this.config.precio.toLocaleString() + '/mes', width / 2, height * 0.78);
-                }
-
-                // Link
-                ctx.font = `${Math.floor(width * 0.035)}px Arial, sans-serif`;
-                ctx.fillStyle = 'rgba(255,255,255,0.7)';
-                ctx.fillText('ladoapp.com', width / 2, height * 0.9);
-
-                // QR Code (opcional)
-                if (this.options.showQR && this.qrDataUrl) {
-                    this.drawQRCode(width * 0.88, height * 0.88, width * 0.15);
-                }
-            }
-
-            // ========================================
-            // PLANTILLA: NEON
-            // ========================================
-            renderNeon() {
-                const { width, height } = this.canvas;
-                const ctx = this.ctx;
-
-                // Fondo oscuro
-                const gradient = ctx.createLinearGradient(0, 0, width, height);
-                gradient.addColorStop(0, '#0f0c29');
-                gradient.addColorStop(0.5, '#302b63');
-                gradient.addColorStop(1, '#24243e');
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, width, height);
-
-                // Foto de perfil con borde neon
-                const photoSize = Math.min(width, height) * 0.35;
-                const photoX = width / 2;
-                const photoY = height * 0.35;
-
-                // Glow effect
-                ctx.shadowColor = '#ff00ff';
-                ctx.shadowBlur = 30;
-                ctx.beginPath();
-                ctx.arc(photoX, photoY, photoSize / 2 + 8, 0, Math.PI * 2);
-                ctx.strokeStyle = '#ff00ff';
-                ctx.lineWidth = 4;
-                ctx.stroke();
-                ctx.shadowBlur = 0;
-
-                this.drawCircularImage(photoX, photoY, photoSize / 2);
-
-                // Seudonimo con glow
-                ctx.shadowColor = '#00ffff';
-                ctx.shadowBlur = 20;
-                ctx.fillStyle = '#00ffff';
-                ctx.font = `bold ${Math.floor(width * 0.07)}px Arial, sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.fillText('@@' + this.config.seudonimo, width / 2, photoY + photoSize / 2 + width * 0.1);
-                ctx.shadowBlur = 0;
-
-                // Texto personalizado
-                const displayText = this.options.customText || 'Contenido Exclusivo';
-                ctx.font = `${Math.floor(width * 0.04)}px Arial, sans-serif`;
-                ctx.fillStyle = 'rgba(255,255,255,0.7)';
-                ctx.fillText(displayText, width / 2, photoY + photoSize / 2 + width * 0.16);
-
-                // Precio (opcional)
-                if (this.options.showPrice && this.config.precio > 0) {
-                    ctx.shadowColor = '#ff00ff';
-                    ctx.shadowBlur = 15;
-                    ctx.font = `bold ${Math.floor(width * 0.05)}px Arial, sans-serif`;
-                    ctx.fillStyle = '#ff00ff';
-                    ctx.fillText('$' + this.config.precio.toLocaleString() + '/mes', width / 2, height * 0.78);
-                    ctx.shadowBlur = 0;
-                }
-
-                // Link
-                ctx.font = `${Math.floor(width * 0.035)}px Arial, sans-serif`;
-                ctx.fillStyle = 'rgba(255,255,255,0.5)';
-                ctx.fillText('ladoapp.com', width / 2, height * 0.9);
-
-                // QR Code
-                if (this.options.showQR && this.qrDataUrl) {
-                    this.drawQRCode(width * 0.88, height * 0.88, width * 0.15);
-                }
-            }
-
-            // ========================================
-            // PLANTILLA: POLAROID
-            // ========================================
-            renderPolaroid() {
-                const { width, height } = this.canvas;
-                const ctx = this.ctx;
-
-                // Fondo calido
-                const gradient = ctx.createLinearGradient(0, 0, width, height);
-                gradient.addColorStop(0, '#ffecd2');
-                gradient.addColorStop(1, '#fcb69f');
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, width, height);
-
-                // Marco polaroid
-                const polaroidWidth = Math.min(width, height) * 0.7;
-                const polaroidHeight = polaroidWidth * 1.2;
-                const polaroidX = (width - polaroidWidth) / 2;
-                const polaroidY = (height - polaroidHeight) / 2 - height * 0.05;
-
-                // Sombra
-                ctx.shadowColor = 'rgba(0,0,0,0.3)';
-                ctx.shadowBlur = 20;
-                ctx.shadowOffsetX = 5;
-                ctx.shadowOffsetY = 5;
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(polaroidX, polaroidY, polaroidWidth, polaroidHeight);
-                ctx.shadowBlur = 0;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 0;
-
-                // Foto dentro del polaroid
-                const photoMargin = polaroidWidth * 0.08;
-                const photoWidth = polaroidWidth - photoMargin * 2;
-                const photoHeight = photoWidth;
-
-                if (this.profileImage) {
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.rect(polaroidX + photoMargin, polaroidY + photoMargin, photoWidth, photoHeight);
-                    ctx.clip();
-                    ctx.drawImage(this.profileImage, polaroidX + photoMargin, polaroidY + photoMargin, photoWidth, photoHeight);
-                    ctx.restore();
+                if (obj.type === 'i-text' || obj.type === 'text') {
+                    textProps.style.display = 'flex';
+                    imageProps.style.display = 'none';
+                    document.getElementById('fontFamily').value = obj.fontFamily || 'Inter';
+                    document.getElementById('fontSize').value = obj.fontSize || 48;
+                    document.getElementById('textColor').value = obj.fill || '#ffffff';
+                } else if (obj.type === 'image') {
+                    textProps.style.display = 'none';
+                    imageProps.style.display = 'flex';
                 } else {
-                    ctx.fillStyle = '#ddd';
-                    ctx.fillRect(polaroidX + photoMargin, polaroidY + photoMargin, photoWidth, photoHeight);
-                }
-
-                // Texto en la parte blanca del polaroid
-                ctx.fillStyle = '#333';
-                ctx.font = `bold ${Math.floor(width * 0.05)}px 'Courier New', monospace`;
-                ctx.textAlign = 'center';
-                const textY = polaroidY + photoMargin + photoHeight + (polaroidHeight - photoHeight - photoMargin * 2) / 2 + width * 0.02;
-                ctx.fillText('@@' + this.config.seudonimo, width / 2, textY);
-
-                // Texto personalizado debajo del polaroid
-                const displayText = this.options.customText || 'Sigueme';
-                ctx.font = `${Math.floor(width * 0.04)}px Arial, sans-serif`;
-                ctx.fillStyle = '#555';
-                ctx.fillText(displayText, width / 2, polaroidY + polaroidHeight + width * 0.08);
-
-                // Link
-                ctx.font = `${Math.floor(width * 0.03)}px Arial, sans-serif`;
-                ctx.fillStyle = '#888';
-                ctx.fillText('ladoapp.com', width / 2, height * 0.92);
-
-                // QR Code
-                if (this.options.showQR && this.qrDataUrl) {
-                    this.drawQRCode(width * 0.88, height * 0.1, width * 0.12);
+                    textProps.style.display = 'none';
+                    imageProps.style.display = 'none';
                 }
             }
 
-            // ========================================
-            // PLANTILLA: GLASSMORPHISM
-            // ========================================
-            renderGlass() {
-                const { width, height } = this.canvas;
-                const ctx = this.ctx;
+            hideProperties() {
+                document.getElementById('propertiesBar').classList.remove('active');
+            }
 
-                // Fondo vibrante
-                const gradient = ctx.createLinearGradient(0, 0, width, height);
-                gradient.addColorStop(0, '#a8edea');
-                gradient.addColorStop(1, '#fed6e3');
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, width, height);
-
-                // Panel de vidrio
-                const panelWidth = width * 0.75;
-                const panelHeight = height * 0.6;
-                const panelX = (width - panelWidth) / 2;
-                const panelY = (height - panelHeight) / 2;
-
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-                ctx.beginPath();
-                ctx.roundRect(panelX, panelY, panelWidth, panelHeight, 30);
-                ctx.fill();
-
-                // Borde del panel
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                // Foto de perfil
-                const photoSize = Math.min(width, height) * 0.28;
-                const photoX = width / 2;
-                const photoY = panelY + panelHeight * 0.35;
-
-                this.drawCircularImage(photoX, photoY, photoSize / 2);
-
-                // Seudonimo
-                ctx.fillStyle = '#333';
-                ctx.font = `bold ${Math.floor(width * 0.06)}px Arial, sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.fillText('@@' + this.config.seudonimo, width / 2, photoY + photoSize / 2 + width * 0.08);
-
-                // Texto
-                const displayText = this.options.customText || this.config.categoria;
-                ctx.font = `${Math.floor(width * 0.035)}px Arial, sans-serif`;
-                ctx.fillStyle = '#555';
-                ctx.fillText(displayText, width / 2, photoY + photoSize / 2 + width * 0.13);
-
-                // Precio (opcional)
-                if (this.options.showPrice && this.config.precio > 0) {
-                    ctx.font = `bold ${Math.floor(width * 0.045)}px Arial, sans-serif`;
-                    ctx.fillStyle = '#333';
-                    ctx.fillText('$' + this.config.precio.toLocaleString() + '/mes', width / 2, panelY + panelHeight - width * 0.06);
-                }
-
-                // Link
-                ctx.font = `${Math.floor(width * 0.03)}px Arial, sans-serif`;
-                ctx.fillStyle = '#666';
-                ctx.fillText('ladoapp.com', width / 2, height * 0.92);
-
-                // QR Code
-                if (this.options.showQR && this.qrDataUrl) {
-                    this.drawQRCode(width * 0.88, height * 0.88, width * 0.13);
+            updateTextProperty(prop, value) {
+                const obj = this.canvas.getActiveObject();
+                if (obj && (obj.type === 'i-text' || obj.type === 'text')) {
+                    obj.set(prop, value);
+                    this.canvas.renderAll();
+                    this.saveHistory();
                 }
             }
 
-            // ========================================
-            // PLANTILLA: BOLD
-            // ========================================
-            renderBold() {
-                const { width, height } = this.canvas;
-                const ctx = this.ctx;
-
-                // Fondo vibrante
-                const gradient = ctx.createLinearGradient(0, 0, width, height);
-                gradient.addColorStop(0, '#f093fb');
-                gradient.addColorStop(1, '#f5576c');
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, width, height);
-
-                // Texto grande arriba
-                ctx.fillStyle = '#ffffff';
-                ctx.font = `bold ${Math.floor(width * 0.12)}px Arial, sans-serif`;
-                ctx.textAlign = 'center';
-                const mainText = this.options.customText || 'SIGUEME';
-                ctx.fillText(mainText.toUpperCase(), width / 2, height * 0.2);
-
-                // Foto de perfil grande
-                const photoSize = Math.min(width, height) * 0.4;
-                const photoX = width / 2;
-                const photoY = height * 0.48;
-
-                // Borde blanco
-                ctx.beginPath();
-                ctx.arc(photoX, photoY, photoSize / 2 + 8, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
-                ctx.fill();
-
-                this.drawCircularImage(photoX, photoY, photoSize / 2);
-
-                // Seudonimo grande
-                ctx.fillStyle = '#ffffff';
-                ctx.font = `bold ${Math.floor(width * 0.08)}px Arial, sans-serif`;
-                ctx.fillText('@@' + this.config.seudonimo, width / 2, height * 0.78);
-
-                // Precio (opcional)
-                if (this.options.showPrice && this.config.precio > 0) {
-                    ctx.font = `bold ${Math.floor(width * 0.055)}px Arial, sans-serif`;
-                    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-                    ctx.fillText('$' + this.config.precio.toLocaleString() + '/mes', width / 2, height * 0.86);
-                }
-
-                // Link
-                ctx.font = `${Math.floor(width * 0.035)}px Arial, sans-serif`;
-                ctx.fillStyle = 'rgba(255,255,255,0.7)';
-                ctx.fillText('ladoapp.com', width / 2, height * 0.94);
-
-                // QR Code
-                if (this.options.showQR && this.qrDataUrl) {
-                    this.drawQRCode(width * 0.12, height * 0.12, width * 0.12);
+            toggleTextBold() {
+                const obj = this.canvas.getActiveObject();
+                if (obj && (obj.type === 'i-text' || obj.type === 'text')) {
+                    obj.set('fontWeight', obj.fontWeight === 'bold' ? 'normal' : 'bold');
+                    this.canvas.renderAll();
+                    this.saveHistory();
                 }
             }
 
-            // ========================================
-            // UTILIDADES
-            // ========================================
-            drawCircularImage(x, y, radius) {
-                const ctx = this.ctx;
+            toggleTextItalic() {
+                const obj = this.canvas.getActiveObject();
+                if (obj && (obj.type === 'i-text' || obj.type === 'text')) {
+                    obj.set('fontStyle', obj.fontStyle === 'italic' ? 'normal' : 'italic');
+                    this.canvas.renderAll();
+                    this.saveHistory();
+                }
+            }
 
-                if (this.profileImage) {
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.arc(x, y, radius, 0, Math.PI * 2);
-                    ctx.clip();
+            flipImage(axis) {
+                const obj = this.canvas.getActiveObject();
+                if (obj && obj.type === 'image') {
+                    if (axis === 'x') obj.set('flipX', !obj.flipX);
+                    if (axis === 'y') obj.set('flipY', !obj.flipY);
+                    this.canvas.renderAll();
+                    this.saveHistory();
+                }
+            }
 
-                    const size = radius * 2;
-                    ctx.drawImage(this.profileImage, x - radius, y - radius, size, size);
-
-                    ctx.restore();
+            // ========== EFECTOS Y FILTROS ==========
+            applyFilter(filterName) {
+                const obj = this.canvas.getActiveObject();
+                if (!obj || obj.type !== 'image') {
+                    // Si no hay imagen seleccionada, aplicar a todas las imagenes
+                    this.canvas.getObjects('image').forEach(img => {
+                        this._setImageFilter(img, filterName);
+                    });
                 } else {
-                    // Placeholder
-                    ctx.beginPath();
-                    ctx.arc(x, y, radius, 0, Math.PI * 2);
-                    ctx.fillStyle = '#ccc';
-                    ctx.fill();
+                    this._setImageFilter(obj, filterName);
+                }
+                this.canvas.renderAll();
+                this.saveHistory();
 
-                    ctx.fillStyle = '#999';
-                    ctx.font = `${radius * 0.8}px Arial`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('?', x, y);
+                // Marcar filtro activo
+                document.querySelectorAll('[data-filter]').forEach(el => el.classList.remove('active'));
+                document.querySelector('[data-filter="' + filterName + '"]')?.classList.add('active');
+            }
+
+            _setImageFilter(img, filterName) {
+                img.filters = [];
+                switch(filterName) {
+                    case 'grayscale':
+                        img.filters.push(new fabric.Image.filters.Grayscale());
+                        break;
+                    case 'sepia':
+                        img.filters.push(new fabric.Image.filters.Sepia());
+                        break;
+                    case 'vintage':
+                        img.filters.push(new fabric.Image.filters.Sepia());
+                        img.filters.push(new fabric.Image.filters.Contrast({ contrast: 0.1 }));
+                        img.filters.push(new fabric.Image.filters.Brightness({ brightness: -0.1 }));
+                        break;
+                    case 'vibrant':
+                        img.filters.push(new fabric.Image.filters.Saturation({ saturation: 0.5 }));
+                        img.filters.push(new fabric.Image.filters.Contrast({ contrast: 0.2 }));
+                        break;
+                    case 'cool':
+                        img.filters.push(new fabric.Image.filters.Saturation({ saturation: -0.2 }));
+                        img.filters.push(new fabric.Image.filters.Brightness({ brightness: 0.1 }));
+                        break;
+                    case 'none':
+                    default:
+                        break;
+                }
+                img.applyFilters();
+            }
+
+            applyImageAdjustment(type, value) {
+                const obj = this.canvas.getActiveObject();
+                if (!obj || obj.type !== 'image') return;
+
+                // Remover filtro del mismo tipo si existe
+                obj.filters = obj.filters.filter(f => {
+                    if (type === 'brightness') return !(f instanceof fabric.Image.filters.Brightness);
+                    if (type === 'contrast') return !(f instanceof fabric.Image.filters.Contrast);
+                    if (type === 'saturation') return !(f instanceof fabric.Image.filters.Saturation);
+                    return true;
+                });
+
+                // Agregar nuevo filtro si valor != 0
+                if (value !== 0) {
+                    switch(type) {
+                        case 'brightness':
+                            obj.filters.push(new fabric.Image.filters.Brightness({ brightness: value }));
+                            break;
+                        case 'contrast':
+                            obj.filters.push(new fabric.Image.filters.Contrast({ contrast: value }));
+                            break;
+                        case 'saturation':
+                            obj.filters.push(new fabric.Image.filters.Saturation({ saturation: value }));
+                            break;
+                    }
+                }
+
+                obj.applyFilters();
+                this.canvas.renderAll();
+            }
+
+            applyShadow(shadowType) {
+                const obj = this.canvas.getActiveObject();
+                if (!obj) return;
+
+                let shadow = null;
+                switch(shadowType) {
+                    case 'soft':
+                        shadow = new fabric.Shadow({
+                            color: 'rgba(0,0,0,0.4)',
+                            blur: 20,
+                            offsetX: 5,
+                            offsetY: 5
+                        });
+                        break;
+                    case 'hard':
+                        shadow = new fabric.Shadow({
+                            color: 'rgba(0,0,0,0.8)',
+                            blur: 2,
+                            offsetX: 8,
+                            offsetY: 8
+                        });
+                        break;
+                    case 'glow':
+                        shadow = new fabric.Shadow({
+                            color: 'rgba(99, 102, 241, 0.8)',
+                            blur: 25,
+                            offsetX: 0,
+                            offsetY: 0
+                        });
+                        break;
+                    case 'none':
+                    default:
+                        shadow = null;
+                        break;
+                }
+
+                obj.set('shadow', shadow);
+                this.canvas.renderAll();
+                this.saveHistory();
+            }
+
+            deleteSelected() {
+                const obj = this.canvas.getActiveObject();
+                if (obj) {
+                    this.canvas.remove(obj);
+                    this.canvas.renderAll();
+                    this.saveHistory();
                 }
             }
 
-            drawQRCode(x, y, size) {
-                if (!this.qrDataUrl) return;
-
-                const ctx = this.ctx;
-                const img = new Image();
-                img.src = this.qrDataUrl;
-
-                // Fondo blanco para el QR
-                ctx.fillStyle = '#ffffff';
-                ctx.beginPath();
-                ctx.roundRect(x - size / 2 - 5, y - size / 2 - 5, size + 10, size + 10, 8);
-                ctx.fill();
-
-                // Dibujar QR
-                ctx.drawImage(img, x - size / 2, y - size / 2, size, size);
+            // ========== HISTORIAL ==========
+            saveHistory() {
+                const json = JSON.stringify(this.canvas.toJSON());
+                this.history = this.history.slice(0, this.historyIndex + 1);
+                this.history.push(json);
+                this.historyIndex++;
+                if (this.history.length > 30) {
+                    this.history.shift();
+                    this.historyIndex--;
+                }
             }
 
+            undo() {
+                if (this.historyIndex > 0) {
+                    this.historyIndex--;
+                    this.canvas.loadFromJSON(this.history[this.historyIndex], () => {
+                        this.canvas.renderAll();
+                    });
+                }
+            }
+
+            redo() {
+                if (this.historyIndex < this.history.length - 1) {
+                    this.historyIndex++;
+                    this.canvas.loadFromJSON(this.history[this.historyIndex], () => {
+                        this.canvas.renderAll();
+                    });
+                }
+            }
+
+            // ========== EXPORTAR ==========
             download() {
-                const format = FORMATS[this.currentFormat];
+                const f = FORMATS[this.currentFormat];
+
+                // Crear canvas temporal a resolucion completa
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = f.width;
+                tempCanvas.height = f.height;
+                const tempCtx = tempCanvas.getContext('2d');
+
+                // Dibujar fondo
+                const bgColor = this.canvas.backgroundColor;
+                if (bgColor) {
+                    if (typeof bgColor === 'string') {
+                        tempCtx.fillStyle = bgColor;
+                        tempCtx.fillRect(0, 0, f.width, f.height);
+                    } else {
+                        // Es un gradiente
+                        const gradient = tempCtx.createLinearGradient(0, 0, f.width, f.height);
+                        bgColor.colorStops.forEach(stop => {
+                            gradient.addColorStop(stop.offset, stop.color);
+                        });
+                        tempCtx.fillStyle = gradient;
+                        tempCtx.fillRect(0, 0, f.width, f.height);
+                    }
+                }
+
+                // Escalar para exportar a resolucion completa
+                const multiplier = f.width / this.canvas.getWidth();
+
+                const dataURL = this.canvas.toDataURL({
+                    format: 'png',
+                    quality: 1,
+                    multiplier: multiplier
+                });
+
                 const link = document.createElement('a');
-                link.download = `${this.config.seudonimo}_${this.currentFormat}_${this.currentTemplate}.png`;
-                link.href = this.canvas.toDataURL('image/png');
+                link.download = CREATOR_CONFIG.seudonimo + '_' + this.currentFormat + '.png';
+                link.href = dataURL;
                 link.click();
             }
         }
 
-        // Inicializar
+        // ========== INICIALIZAR ==========
         document.addEventListener('DOMContentLoaded', () => {
-            const generator = new PromoGenerator(CREATOR_CONFIG);
-            generator.init();
+            window.editor = new PromoEditor();
+            window.editor.init();
         });
     </script>
-}
+</body>
+</html>
