@@ -5620,13 +5620,15 @@
             if (playPromise !== undefined) {
                 await playPromise;
             }
-            updateVideoState(video, true);
+            // Forzar estado visual inmediatamente
+            postMedia.classList.remove('video-paused', 'ios-needs-tap');
+            postMedia.classList.add('video-playing');
+            console.log('[Video] Play exitoso, clases:', postMedia.className);
             return true;
         } catch (err) {
             console.log('[Video] Autoplay bloqueado:', err.name);
-            // En iOS, mostrar indicador de tap
-            postMedia.classList.add('ios-needs-tap');
-            updateVideoState(video, false);
+            postMedia.classList.remove('video-playing');
+            postMedia.classList.add('video-paused', 'ios-needs-tap');
             return false;
         }
     }
@@ -5722,14 +5724,27 @@
             video.autoplay = false; // Controlamos nosotros el autoplay
 
             // Eventos de estado
-            video.addEventListener('play', () => updateVideoState(video, true));
-            video.addEventListener('pause', () => updateVideoState(video, false));
+            video.addEventListener('playing', () => {
+                console.log('[Video] playing event');
+                updateVideoState(video, true);
+                video.closest('.post-media')?.classList.remove('video-loading');
+            });
+            video.addEventListener('pause', () => {
+                console.log('[Video] pause event');
+                updateVideoState(video, false);
+            });
             video.addEventListener('waiting', () => {
-                // Video buffering
                 video.closest('.post-media')?.classList.add('video-loading');
             });
-            video.addEventListener('playing', () => {
-                video.closest('.post-media')?.classList.remove('video-loading');
+            // timeupdate: se dispara constantemente mientras el video reproduce
+            // Esto asegura que el estado visual se mantenga correcto en iOS
+            video.addEventListener('timeupdate', () => {
+                if (!video.paused && !video.ended) {
+                    const postMedia = video.closest('.post-media');
+                    if (postMedia && !postMedia.classList.contains('video-playing')) {
+                        updateVideoState(video, true);
+                    }
+                }
             });
 
             // Observers
