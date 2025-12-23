@@ -288,6 +288,23 @@
         color: var(--text-muted);
     }
 
+    /* Nombre del remitente */
+    .mensaje-sender {
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-bottom: 4px;
+        padding: 0 2px;
+    }
+
+    .mensaje-recibido .mensaje-sender {
+        color: var(--primary);
+    }
+
+    .mensaje-enviado .mensaje-sender {
+        color: #10b981;
+        text-align: right;
+    }
+
     /* Check marks */
     .check-icon {
         width: 16px;
@@ -1063,6 +1080,7 @@
                         : DateTime.SpecifyKind(mensaje.FechaEnvio, DateTimeKind.Local).ToUniversalTime();
                     var timestamp = new DateTimeOffset(fechaUtc).ToUnixTimeMilliseconds();
                     <div class="mensaje @(esMio ? "mensaje-enviado" : "mensaje-recibido")" data-id="@mensaje.Id" data-timestamp="@timestamp">
+                        <div class="mensaje-sender">@(esMio ? "Tú" : (otroUsuario?.NombreCompleto ?? otroUsuario?.UserName ?? "Usuario"))</div>
                         <div class="mensaje-burbuja">
                             @if (mensaje.MensajeRespondido != null)
                             {
@@ -1244,6 +1262,7 @@
     <script>
         const usuarioActualId = '@Model.Id';
         const otroUsuarioId = '@otroUsuario?.Id';
+        const otroUsuarioNombre = '@(otroUsuario?.NombreCompleto ?? otroUsuario?.UserName ?? "Usuario")';
         let mensajeRespondidoId = null;
         let archivoSeleccionado = null;
         let connection = null;
@@ -1328,8 +1347,10 @@
             // Formatear hora usando timestamp (hora local del dispositivo)
             const horaFormateada = mensaje.fechaEnvioTimestamp ? formatLocalTime(mensaje.fechaEnvioTimestamp) : (mensaje.fechaEnvio || '');
 
+            const senderName = esMio ? 'Tú' : otroUsuarioNombre;
             const html = `
                 <div class="mensaje ${esMio ? 'mensaje-enviado' : 'mensaje-recibido'} ${mensajeEmojiClass}" data-id="${mensaje.id}" data-timestamp="${mensaje.fechaEnvioTimestamp || ''}">
+                    <div class="mensaje-sender">${senderName}</div>
                     <div class="mensaje-burbuja">${respuestaHtml}${mediaHtml}${textoHtml}<div class="mensaje-info"><span class="mensaje-hora">${horaFormateada}</span>${checkHtml}</div></div>
                     <div class="mensaje-actions"><button class="btn-reply" onclick="iniciarRespuesta(${mensaje.id}, '${escapeHtml(mensaje.remitenteNombre || 'Usuario')}', '${escapeHtml(mensaje.contenido || '')}', ${mensaje.tipoMensaje})"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg></button></div>
                 </div>`;
