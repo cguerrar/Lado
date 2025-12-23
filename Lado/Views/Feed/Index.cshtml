@@ -5581,15 +5581,15 @@
 
     console.log('[Video] iOS:', isIOSDevice, 'Safari:', isSafari);
 
+    // Videos pausados manualmente por el usuario (no autoplay)
+    const manuallyPausedVideos = new Set();
+
     // Actualizar estado visual del video
     function updateVideoState(video, isPlaying) {
         const postMedia = video?.closest('.post-media');
         if (!postMedia) return;
 
-        // Forzar el estado correcto basado en el video real
-        const actuallyPlaying = isPlaying || (!video.paused && !video.ended);
-
-        if (actuallyPlaying) {
+        if (isPlaying) {
             postMedia.classList.remove('video-paused', 'ios-needs-tap');
             postMedia.classList.add('video-playing');
         } else {
@@ -5597,25 +5597,6 @@
             postMedia.classList.add('video-paused');
         }
     }
-
-    // Sincronizar estado visual con estado real del video
-    function syncVideoStates() {
-        document.querySelectorAll('.feed-video').forEach(video => {
-            const postMedia = video.closest('.post-media');
-            if (!postMedia) return;
-
-            if (!video.paused && !video.ended) {
-                postMedia.classList.remove('video-paused', 'ios-needs-tap');
-                postMedia.classList.add('video-playing');
-            } else {
-                postMedia.classList.remove('video-playing');
-                postMedia.classList.add('video-paused');
-            }
-        });
-    }
-
-    // Sincronizar cada 500ms para iOS
-    setInterval(syncVideoStates, 500);
 
     // Pausar todos los videos excepto uno
     function pauseAllVideosExcept(exceptVideo) {
@@ -5675,7 +5656,11 @@
         const video = postMedia?.querySelector('video.feed-video');
         if (!video) return;
 
+        const videoId = video.getAttribute('data-post-id') || video.src;
+
         if (video.paused) {
+            // Usuario quiere reproducir
+            manuallyPausedVideos.delete(videoId);
             pauseAllVideosExcept(video);
             video.muted = isGlobalMuted;
             video.play().then(() => {
@@ -5685,6 +5670,8 @@
                 updateVideoState(video, false);
             });
         } else {
+            // Usuario quiere pausar - marcar como pausa manual
+            manuallyPausedVideos.add(videoId);
             video.pause();
             updateVideoState(video, false);
         }
@@ -5706,11 +5693,18 @@
     const videoObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             const video = entry.target;
+            const videoId = video.getAttribute('data-post-id') || video.src;
 
             if (entry.isIntersecting) {
+                // No reproducir si el usuario lo pauso manualmente
+                if (manuallyPausedVideos.has(videoId)) {
+                    return;
+                }
                 pauseAllVideosExcept(video);
                 playVideo(video);
             } else {
+                // Al salir del viewport, limpiar pausa manual y pausar
+                manuallyPausedVideos.delete(videoId);
                 video.pause();
                 updateVideoState(video, false);
             }
