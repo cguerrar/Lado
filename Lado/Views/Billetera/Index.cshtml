@@ -414,34 +414,58 @@
                                     Al momento del retiro, <strong>LadoApp.com</strong> aplicara la comision acordada en tu contrato
                                     y la retencion de impuestos segun tu pais de residencia (@nombrePaisVal).
                                 </p>
+                                @{
+                                    var comisionBilletera = ViewBag.ComisionBilleteraElectronica ?? "2.5";
+                                    decimal comisionBilleteraVal;
+                                    if (!decimal.TryParse(comisionBilletera.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out comisionBilleteraVal))
+                                    {
+                                        comisionBilleteraVal = 2.5m;
+                                    }
+                                }
                                 <div class="row g-2 mb-3">
-                                    <div class="col-md-3">
+                                    <div class="col-6 col-md-4 col-xl-2">
                                         <div class="p-3" style="background: white; border-radius: 12px; border: 2px solid rgba(245, 158, 11, 0.3);">
                                             <small class="text-muted d-block mb-1">Comision LadoApp</small>
-                                            <strong style="font-size: 1.4rem; color: #dc2626;">@Model.ComisionRetiro%</strong>
+                                            <strong style="font-size: 1.3rem; color: #dc2626;">@Model.ComisionRetiro%</strong>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-6 col-md-4 col-xl-2">
+                                        <div class="p-3" style="background: white; border-radius: 12px; border: 2px solid rgba(139, 92, 246, 0.3);">
+                                            <small class="text-muted d-block mb-1">Billetera Electronica</small>
+                                            <strong style="font-size: 1.3rem; color: #8b5cf6;">@comisionBilleteraVal.ToString("N2")%</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4 col-xl-2">
                                         <div class="p-3" style="background: white; border-radius: 12px; border: 2px solid rgba(245, 158, 11, 0.3);">
                                             <small class="text-muted d-block mb-1">Retencion Impuestos</small>
-                                            <strong style="font-size: 1.4rem; color: #d97706;">@retencionImpuestosVal%</strong>
+                                            <strong style="font-size: 1.3rem; color: #d97706;">@retencionImpuestosVal%</strong>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-6 col-md-4 col-xl-2">
                                         <div class="p-3" style="background: white; border-radius: 12px; border: 2px solid rgba(245, 158, 11, 0.3);">
                                             <small class="text-muted d-block mb-1">Minimo para retirar</small>
-                                            <strong style="font-size: 1.4rem; color: #92400e;">$@Model.MontoMinimoRetiro.ToString("N0")</strong>
+                                            <strong style="font-size: 1.3rem; color: #92400e;">$@Model.MontoMinimoRetiro.ToString("N0")</strong>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-6 col-md-4 col-xl-2">
                                         <div class="p-3" style="background: white; border-radius: 12px; border: 2px solid rgba(16, 185, 129, 0.3);">
                                             <small class="text-muted d-block mb-1">Retiro de $100</small>
-                                            <strong style="font-size: 1.4rem; color: #10b981;">Recibes $@netoEjemplo.ToString("N2")</strong>
+                                            <strong style="font-size: 1.3rem; color: #10b981;">$@netoEjemplo.ToString("N2")</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4 col-xl-2">
+                                        <div class="p-3" style="background: white; border-radius: 12px; border: 2px solid rgba(6, 182, 212, 0.3);">
+                                            <small class="text-muted d-block mb-1">Tiempo Proceso</small>
+                                            <strong style="font-size: 1rem; color: #0891b2;">@(ViewBag.TiempoProcesoRetiro ?? "3-5 dias")</strong>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="p-2" style="background: rgba(255,255,255,0.7); border-radius: 8px; font-size: 0.85rem; color: #78350f;">
-                                    <strong>Desglose:</strong> $100 - $@comisionEjemplo.ToString("N2") (comision) - $@impuestoEjemplo.ToString("N2") (impuestos) = <strong class="text-success">$@netoEjemplo.ToString("N2") neto</strong>
+                                <div class="p-2 mb-2" style="background: rgba(255,255,255,0.7); border-radius: 8px; font-size: 0.85rem; color: #78350f;">
+                                    <strong>Desglose retiro $100:</strong> $100 - $@comisionEjemplo.ToString("N2") (comision LadoApp) - $@impuestoEjemplo.ToString("N2") (impuestos) = <strong class="text-success">$@netoEjemplo.ToString("N2") neto</strong>
+                                </div>
+                                <div class="p-2" style="background: rgba(139, 92, 246, 0.1); border-radius: 8px; font-size: 0.8rem; color: #6d28d9;">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    <strong>Billetera Electronica (@comisionBilleteraVal.ToString("N2")%):</strong> Esta comision aplica cuando retiras a billeteras digitales como PayPal, Payoneer, Skrill o similares. Si retiras por transferencia bancaria directa, esta comision no aplica.
                                 </div>
                             </div>
                         </div>
@@ -688,7 +712,21 @@
                                             <p class="mb-1" style="font-weight: 800; font-size: 1.1rem; color: @colorMonto;">
                                                 @signoMonto$@transaccion.Monto.ToString("N2")
                                             </p>
-                                            <span class="badge badge-custom" style="background: @bgIcon; color: @colorMonto;">@transaccion.Tipo</span>
+                                            <div class="d-flex align-items-center justify-content-end gap-2">
+                                                <span class="badge badge-custom" style="background: @bgIcon; color: @colorMonto;">@transaccion.Tipo</span>
+                                                @if (!string.IsNullOrEmpty(transaccion.RutaLiquidacion))
+                                                {
+                                                    <a href="@transaccion.RutaLiquidacion" target="_blank" title="Ver Liquidacion PDF" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: #dbeafe; border-radius: 8px; transition: all 0.2s ease;">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                            <polyline points="14 2 14 8 20 8"></polyline>
+                                                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                                                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                                                            <polyline points="10 9 9 9 8 9"></polyline>
+                                                        </svg>
+                                                    </a>
+                                                }
+                                            </div>
                                         </td>
                                     </tr>
                                 }

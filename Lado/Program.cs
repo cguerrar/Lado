@@ -240,6 +240,7 @@ builder.Services.AddScoped<Lado.Services.IDateTimeService, Lado.Services.DateTim
 builder.Services.AddScoped<Lado.Services.IInteresesService, Lado.Services.InteresesService>();
 builder.Services.AddScoped<Lado.Services.ILogEventoService, Lado.Services.LogEventoService>();
 builder.Services.AddScoped<Lado.Services.ITrustService, Lado.Services.TrustService>();
+builder.Services.AddScoped<Lado.Services.ILiquidacionService, Lado.Services.LiquidacionService>();
 builder.Services.AddHostedService<Lado.Services.LogCleanupService>();
 builder.Services.AddHostedService<Lado.Services.TokenCleanupService>();
 builder.Services.AddHostedService<Lado.Services.SuscripcionExpirationService>();
@@ -356,6 +357,9 @@ app.UseSession();
 
 // Contador de visitas
 app.UseVisitasMiddleware();
+
+// Actualizar última actividad del usuario (para estado "en línea")
+app.UseUserActivity();
 
 // ========================================
 // CACHE-CONTROL HEADERS

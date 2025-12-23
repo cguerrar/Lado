@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Lado.Data;
 using Lado.Models;
+using Lado.Services;
 
 namespace Lado.Controllers
 {
@@ -12,13 +13,22 @@ namespace Lado.Controllers
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ApplicationDbContext _context;
+        private readonly ILiquidacionService _liquidacionService;
+        private readonly IEmailService _emailService;
+        private readonly ILogger<BilleteraController> _logger;
 
         public BilleteraController(
             UserManager<ApplicationUser> userManager,
-            ApplicationDbContext context)
+            ApplicationDbContext context,
+            ILiquidacionService liquidacionService,
+            IEmailService emailService,
+            ILogger<BilleteraController> logger)
         {
             _userManager = userManager;
             _context = context;
+            _liquidacionService = liquidacionService;
+            _emailService = emailService;
+            _logger = logger;
         }
 
         // GET: /Billetera
@@ -86,7 +96,8 @@ namespace Lado.Controllers
                     Descripcion = t.Descripcion,
                     Monto = t.Monto,
                     Estado = t.EstadoPago ?? "Completado",
-                    TipoTransaccion = t.TipoTransaccion
+                    TipoTransaccion = t.TipoTransaccion,
+                    RutaLiquidacion = t.RutaLiquidacion
                 })
                 .ToListAsync();
 
@@ -233,7 +244,46 @@ namespace Lado.Controllers
 
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = $"Retiro solicitado: ${monto:N2} bruto → Comisión ${comision:N2} ({usuario.ComisionRetiro}%) + Impuestos ${montoRetencion:N2} ({retencionImpuestos}%) = Neto ${montoNeto:N2}. Se procesará en 3-5 días hábiles.";
+            // Generar PDF de liquidación
+            try
+            {
+                // Generar y guardar PDF
+                var rutaPdf = await _liquidacionService.GenerarLiquidacionPdfAsync(transaccion, usuario);
+                transaccion.RutaLiquidacion = rutaPdf;
+                await _context.SaveChangesAsync();
+
+                // Generar bytes del PDF para enviar por email
+                var pdfBytes = await _liquidacionService.GenerarLiquidacionBytesAsync(transaccion, usuario);
+
+                // Enviar email con PDF adjunto
+                var emailEnviado = await _emailService.SendLiquidacionRetiroAsync(
+                    usuario.Email!,
+                    usuario.NombreCompleto ?? usuario.UserName ?? "Creador",
+                    monto,
+                    comision,
+                    montoRetencion,
+                    montoNeto,
+                    metodoPago,
+                    transaccion.Id,
+                    pdfBytes
+                );
+
+                if (emailEnviado)
+                {
+                    _logger.LogInformation("Liquidación enviada por email para transacción {TransaccionId}", transaccion.Id);
+                }
+                else
+                {
+                    _logger.LogWarning("No se pudo enviar email de liquidación para transacción {TransaccionId}", transaccion.Id);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al generar/enviar liquidación para transacción {TransaccionId}", transaccion.Id);
+                // No fallar la solicitud de retiro si falla la generación del PDF
+            }
+
+            TempData["Success"] = $"Retiro solicitado: ${monto:N2} bruto → Comisión ${comision:N2} ({usuario.ComisionRetiro}%) + Impuestos ${montoRetencion:N2} ({retencionImpuestos}%) = Neto ${montoNeto:N2}. Se procesará en 3-5 días hábiles. Recibirás la liquidación por email.";
             return RedirectToAction(nameof(Index));
         }
 

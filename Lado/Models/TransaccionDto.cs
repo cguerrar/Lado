@@ -9,5 +9,6 @@
         public decimal Monto { get; set; }
         public string Estado { get; set; } = string.Empty;
         public TipoTransaccion TipoTransaccion { get; set; }
+        public string? RutaLiquidacion { get; set; }
     }
 }

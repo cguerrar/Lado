@@ -38,6 +38,11 @@
 
         public string? Notas { get; set; }
 
+        /// <summary>
+        /// Ruta al archivo PDF de liquidación (solo para retiros)
+        /// </summary>
+        public string? RutaLiquidacion { get; set; }
+
         // ========================================
         // RELACIONES
         // ========================================

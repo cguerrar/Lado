@@ -49,6 +49,7 @@ namespace Lado.Services
         Task<bool> SendWelcomeEmailAsync(string toEmail, string nombre, string username, string temporaryPassword);
         Task<bool> SendNewSubscriberNotificationAsync(string creatorEmail, string creatorName, string subscriberName);
         Task<bool> SendPaymentReceivedNotificationAsync(string email, string nombre, decimal monto, string concepto);
+        Task<bool> SendLiquidacionRetiroAsync(string email, string nombre, decimal montoBruto, decimal comision, decimal impuestos, decimal montoNeto, string metodoPago, int transaccionId, byte[] pdfBytes);
         Task<EmailResult> TestProviderAsync(string testEmail);
         Task<string> GetActiveProviderNameAsync();
     }
@@ -649,6 +650,85 @@ namespace Lado.Services
             return await SendEmailAsync(email, subject, html);
         }
 
+        public async Task<bool> SendLiquidacionRetiroAsync(string email, string nombre, decimal montoBruto, decimal comision, decimal impuestos, decimal montoNeto, string metodoPago, int transaccionId, byte[] pdfBytes)
+        {
+            try
+            {
+                var configs = await GetEmailConfigAsync();
+                var apiKey = configs.GetValueOrDefault(ConfiguracionPlataforma.MAILJET_API_KEY, "");
+                var secretKey = configs.GetValueOrDefault(ConfiguracionPlataforma.MAILJET_SECRET_KEY, "");
+                var fromEmail = configs.GetValueOrDefault(ConfiguracionPlataforma.EMAIL_FROM_EMAIL, "noreply@ladoapp.com");
+                var fromName = configs.GetValueOrDefault(ConfiguracionPlataforma.EMAIL_FROM_NAME, "Lado");
+
+                if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(secretKey))
+                {
+                    _logger.LogWarning("No hay credenciales de Mailjet configuradas para enviar liquidación");
+                    return false;
+                }
+
+                var client = new MailjetClient(apiKey, secretKey);
+
+                var subject = $"Liquidación de Retiro #{transaccionId:D8} - Lado";
+                var html = GetEmailTemplate("liquidacion_retiro", new Dictionary<string, string>
+                {
+                    { "nombre", nombre },
+                    { "montoBruto", montoBruto.ToString("N2") },
+                    { "comision", comision.ToString("N2") },
+                    { "impuestos", impuestos.ToString("N2") },
+                    { "montoNeto", montoNeto.ToString("N2") },
+                    { "metodoPago", metodoPago },
+                    { "transaccionId", transaccionId.ToString("D8") },
+                    { "fecha", DateTime.Now.ToString("dd/MM/yyyy HH:mm") }
+                });
+
+                // Convertir PDF a Base64
+                var pdfBase64 = Convert.ToBase64String(pdfBytes);
+
+                var request = new MailjetRequest { Resource = SendV31.Resource }
+                    .Property("Messages", new JArray
+                    {
+                        new JObject
+                        {
+                            { "From", new JObject { { "Email", fromEmail }, { "Name", fromName } } },
+                            { "To", new JArray { new JObject { { "Email", email }, { "Name", nombre } } } },
+                            { "Subject", subject },
+                            { "HTMLPart", html },
+                            { "TextPart", $"Hola {nombre}, adjuntamos la liquidación de tu retiro #{transaccionId:D8}. Monto bruto: ${montoBruto:N2}, Comisión: ${comision:N2}, Impuestos: ${impuestos:N2}, Neto a recibir: ${montoNeto:N2}" },
+                            { "Attachments", new JArray
+                                {
+                                    new JObject
+                                    {
+                                        { "ContentType", "application/pdf" },
+                                        { "Filename", $"liquidacion_{transaccionId}.pdf" },
+                                        { "Base64Content", pdfBase64 }
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                _logger.LogInformation("Enviando liquidación de retiro a {Email}", email);
+
+                var response = await client.PostAsync(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("Liquidación enviada exitosamente a {Email}", email);
+                    return true;
+                }
+                else
+                {
+                    _logger.LogError("Error al enviar liquidación: {StatusCode}", response.StatusCode);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al enviar liquidación de retiro a {Email}", email);
+                return false;
+            }
+        }
+
         #endregion
 
         #region Templates
@@ -829,6 +909,67 @@ namespace Lado.Services
             <hr style='border:none;border-top:1px solid #eee;margin:30px 0;'>
             <p style='color:#999;font-size:12px;text-align:center;'>
                 &copy; {year} Lado. Todos los derechos reservados.
+            </p>
+        </div>
+    </div>
+</body>
+</html>",
+
+                "liquidacion_retiro" => $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+</head>
+<body style='margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,sans-serif;'>
+    <div style='max-width:600px;margin:0 auto;padding:40px 20px;'>
+        <div style='background:#ffffff;border-radius:16px;padding:40px;box-shadow:0 2px 8px rgba(0,0,0,0.1);'>
+            <div style='text-align:center;margin-bottom:30px;'>
+                <h1 style='color:#4682B4;margin:0;font-size:28px;'>Lado</h1>
+                <p style='color:#666;margin:8px 0 0;font-size:14px;'>Liquidacion de Retiro</p>
+            </div>
+            <h2 style='color:#333;margin-bottom:20px;'>Hola {{{{nombre}}}},</h2>
+            <p style='color:#666;font-size:16px;line-height:1.6;'>
+                Tu solicitud de retiro <strong>#{{{{transaccionId}}}}</strong> ha sido registrada exitosamente.
+                Adjuntamos el documento de liquidacion en formato PDF para tus registros.
+            </p>
+            <div style='background:#f8f9fa;border:1px solid #e9ecef;border-radius:12px;padding:24px;margin:24px 0;'>
+                <h3 style='color:#4682B4;margin:0 0 16px 0;font-size:16px;border-bottom:2px solid #4682B4;padding-bottom:8px;'>Resumen del Retiro</h3>
+                <table style='width:100%;border-collapse:collapse;'>
+                    <tr>
+                        <td style='padding:8px 0;color:#666;'>Monto Bruto:</td>
+                        <td style='padding:8px 0;text-align:right;font-weight:600;color:#333;'>${{{{montoBruto}}}}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding:8px 0;color:#dc3545;'>Comision LadoApp:</td>
+                        <td style='padding:8px 0;text-align:right;font-weight:600;color:#dc3545;'>-${{{{comision}}}}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding:8px 0;color:#fd7e14;'>Retencion Impuestos:</td>
+                        <td style='padding:8px 0;text-align:right;font-weight:600;color:#fd7e14;'>-${{{{impuestos}}}}</td>
+                    </tr>
+                    <tr style='border-top:2px solid #dee2e6;'>
+                        <td style='padding:12px 0 0;color:#333;font-weight:700;font-size:18px;'>Neto a Recibir:</td>
+                        <td style='padding:12px 0 0;text-align:right;font-weight:700;color:#28a745;font-size:20px;'>${{{{montoNeto}}}}</td>
+                    </tr>
+                </table>
+            </div>
+            <div style='background:#e7f5ff;border:1px solid #74c0fc;border-radius:8px;padding:16px;margin:20px 0;'>
+                <p style='margin:0;color:#1971c2;font-size:14px;'>
+                    <strong>Metodo de pago:</strong> {{{{metodoPago}}}}<br>
+                    <strong>Fecha:</strong> {{{{fecha}}}}<br>
+                    <strong>Tiempo estimado:</strong> 3-5 dias habiles
+                </p>
+            </div>
+            <p style='color:#666;font-size:14px;'>
+                Recibiras una notificacion cuando el pago haya sido procesado.
+                Si tienes alguna pregunta, no dudes en contactarnos.
+            </p>
+            <hr style='border:none;border-top:1px solid #eee;margin:30px 0;'>
+            <p style='color:#999;font-size:12px;text-align:center;'>
+                &copy; {year} Lado. Todos los derechos reservados.<br>
+                <a href='https://ladoapp.com' style='color:#4682B4;'>www.ladoapp.com</a>
             </p>
         </div>
     </div>
