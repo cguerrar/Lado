@@ -768,27 +768,46 @@
         }
     }
 
-    /* 🍎 iOS: Indicador de que se requiere tap */
+    /* Video loading spinner */
+    .video-loading::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 40px;
+        height: 40px;
+        margin: -20px 0 0 -20px;
+        border: 3px solid rgba(255,255,255,0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: videoSpin 0.8s linear infinite;
+        z-index: 20;
+    }
+
+    @@keyframes videoSpin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* iOS: Indicador de tap para reproducir */
+    .ios-needs-tap .video-play-icon {
+        opacity: 1 !important;
+    }
+
     .ios-needs-tap::after {
         content: 'Toca para reproducir';
         position: absolute;
-        bottom: 50%;
+        top: 60%;
         left: 50%;
-        transform: translate(-50%, 50%);
-        background: rgba(0, 0, 0, 0.7);
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.8);
         color: white;
-        padding: 12px 20px;
-        border-radius: 25px;
-        font-size: 14px;
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-size: 13px;
         font-weight: 500;
         z-index: 15;
         pointer-events: none;
-        animation: iosTapPulse 2s ease-in-out infinite;
-    }
-
-    @@keyframes iosTapPulse {
-        0%, 100% { opacity: 0.9; transform: translate(-50%, 50%) scale(1); }
-        50% { opacity: 1; transform: translate(-50%, 50%) scale(1.05); }
+        white-space: nowrap;
     }
 
     .video-mute-btn {
@@ -4149,7 +4168,7 @@
                                 }
                                 else if (esVideo)
                                 {
-                                    <video src="@post.RutaArchivo" class="feed-video" muted loop playsinline="true" webkit-playsinline="true" preload="none" poster=""></video>
+                                    <video src="@post.RutaArchivo" class="feed-video" muted loop playsinline webkit-playsinline x-webkit-airplay="allow" preload="metadata"></video>
                                 }
                                 else if (esAudio)
                                 {
@@ -4206,7 +4225,7 @@
                                     <div class="carousel-slide" data-index="@i" style="width: @(100.0 / archivosCarrusel.Count)%;">
                                         @if (esArchivoVideo)
                                         {
-                                            <video src="@archivo.RutaArchivo" class="carousel-media feed-video" muted loop playsinline="true" webkit-playsinline="true" preload="none"></video>
+                                            <video src="@archivo.RutaArchivo" class="carousel-media feed-video" muted loop playsinline webkit-playsinline x-webkit-airplay="allow" preload="metadata"></video>
                                             <div class="video-play-icon carousel-play-icon">
                                                 <svg class="icon-play" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
                                                 <svg class="icon-pause" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
@@ -4357,9 +4376,10 @@
                                    class="feed-video"
                                    muted
                                    loop
-                                   playsinline="true"
-                                   webkit-playsinline="true"
-                                   preload="none"
+                                   playsinline
+                                   webkit-playsinline
+                                   x-webkit-airplay="allow"
+                                   preload="metadata"
                                    data-post-id="@post.Id">
                             </video>
                             <div class="video-controls-overlay" onclick="handleVideoClick(event, this)">
@@ -5395,7 +5415,7 @@
                          data-media-src="${post.rutaArchivo}"
                          onclick="openFullscreenViewer(event, ${post.id})"
                          style="cursor: pointer;">
-                        <video src="${post.rutaArchivo}" class="feed-video" muted loop playsinline="true" webkit-playsinline="true" preload="none" data-post-id="${post.id}"></video>
+                        <video src="${post.rutaArchivo}" class="feed-video" muted loop playsinline webkit-playsinline x-webkit-airplay="allow" preload="metadata" data-post-id="${post.id}"></video>
                         <div class="video-controls-overlay" onclick="handleVideoClick(event, this)">
                             <div class="video-play-icon">
                                 <svg class="icon-play" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
@@ -5525,35 +5545,35 @@
     }
 
     // ========================================
-    // SISTEMA DE VIDEO REFACTORIZADO
+    // SISTEMA DE VIDEO - OPTIMIZADO PARA iOS
     // ========================================
 
-    // Contador de observers activos
     let activeVideoObservers = 0;
     const MAX_VIDEO_OBSERVERS = 30;
+    let isGlobalMuted = true;
 
-    // Estado global de mute
-    let isGlobalMuted = true; // Empezar siempre muted para autoplay
-
-    // Deteccion mejorada de iOS/iPadOS (incluye iPadOS 13+ que se identifica como Mac)
+    // Deteccion de iOS/iPadOS (incluye iPadOS 13+)
     const isIOSDevice = (() => {
         const ua = navigator.userAgent;
         const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
-        const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+        const isIPadOS = (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+                         (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
         return isIOS || isIPadOS;
     })();
 
-    let userHasInteracted = false;
+    // Safari detection
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-    // Funcion para actualizar el estado visual del video
+    console.log('[Video] iOS:', isIOSDevice, 'Safari:', isSafari);
+
+    // Actualizar estado visual del video
     function updateVideoState(video, isPlaying) {
         const postMedia = video?.closest('.post-media');
         if (!postMedia) return;
 
         if (isPlaying) {
-            postMedia.classList.remove('video-paused');
+            postMedia.classList.remove('video-paused', 'ios-needs-tap');
             postMedia.classList.add('video-playing');
-            postMedia.classList.remove('ios-needs-tap');
         } else {
             postMedia.classList.add('video-paused');
             postMedia.classList.remove('video-playing');
@@ -5570,83 +5590,70 @@
         });
     }
 
-    // Reproducir video con manejo de errores
+    // Reproducir video - estrategia para iOS
     async function playVideo(video) {
         const postMedia = video?.closest('.post-media');
         if (!video || !postMedia) return false;
 
-        // En iOS sin interaccion, mostrar indicador de tap
-        if (isIOSDevice && !userHasInteracted) {
-            postMedia.classList.add('video-paused', 'ios-needs-tap');
-            video.muted = true;
-            return false;
+        // Asegurar muted para autoplay
+        video.muted = true;
+
+        // Esperar a que el video tenga datos
+        if (video.readyState < 2) {
+            // Forzar carga
+            video.load();
+            await new Promise(resolve => {
+                const onCanPlay = () => {
+                    video.removeEventListener('canplay', onCanPlay);
+                    resolve();
+                };
+                video.addEventListener('canplay', onCanPlay);
+                // Timeout de seguridad
+                setTimeout(resolve, 3000);
+            });
         }
 
-        // Asegurar que este muted para autoplay
-        video.muted = isGlobalMuted;
-
         try {
-            await video.play();
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+                await playPromise;
+            }
             updateVideoState(video, true);
             return true;
         } catch (err) {
-            // Si falla, intentar con muted
-            if (!video.muted) {
-                video.muted = true;
-                isGlobalMuted = true;
-                updateAllMuteIcons();
-                try {
-                    await video.play();
-                    updateVideoState(video, true);
-                    return true;
-                } catch (e) {
-                    // Requiere interaccion del usuario
-                    if (isIOSDevice) {
-                        postMedia.classList.add('ios-needs-tap');
-                    }
-                    updateVideoState(video, false);
-                    return false;
-                }
-            } else {
-                if (isIOSDevice) {
-                    postMedia.classList.add('ios-needs-tap');
-                }
-                updateVideoState(video, false);
-                return false;
-            }
+            console.log('[Video] Autoplay bloqueado:', err.name);
+            // En iOS, mostrar indicador de tap
+            postMedia.classList.add('ios-needs-tap');
+            updateVideoState(video, false);
+            return false;
         }
     }
 
-    // Handler para click en el overlay del video
+    // Handler para click en overlay
     function handleVideoClick(event, overlay) {
         event.stopPropagation();
         event.preventDefault();
-
-        // Marcar que el usuario interactuo
-        userHasInteracted = true;
 
         const postMedia = overlay.closest('.post-media');
         const video = postMedia?.querySelector('video.feed-video');
         if (!video) return;
 
         if (video.paused) {
-            // Pausar otros videos
             pauseAllVideosExcept(video);
-            // Reproducir este
             video.muted = isGlobalMuted;
             video.play().then(() => {
                 updateVideoState(video, true);
-            }).catch(() => {
+            }).catch((err) => {
+                console.log('[Video] Play error:', err);
                 updateVideoState(video, false);
             });
         } else {
-            // Pausar
             video.pause();
             updateVideoState(video, false);
         }
     }
 
-    // Funcion para actualizar iconos de mute
+    // Actualizar iconos de mute
     function updateAllMuteIcons() {
         document.querySelectorAll('.video-mute-btn').forEach(btn => {
             const mi = btn.querySelector('.muted-icon');
@@ -5658,41 +5665,15 @@
         });
     }
 
-    // Desbloquear videos en iOS al interactuar
-    function handleUserInteraction() {
-        if (userHasInteracted) return;
-        userHasInteracted = true;
-
-        // Intentar reproducir el video visible
-        const visibleVideo = document.querySelector('.feed-video[data-observed="true"]');
-        if (visibleVideo && visibleVideo.paused) {
-            const postMedia = visibleVideo.closest('.post-media');
-            if (postMedia?.classList.contains('ios-needs-tap')) {
-                visibleVideo.muted = true;
-                visibleVideo.play().then(() => {
-                    updateVideoState(visibleVideo, true);
-                }).catch(() => {});
-            }
-        }
-    }
-
-    // Registrar interaccion del usuario
-    ['touchstart', 'click'].forEach(evt => {
-        document.addEventListener(evt, handleUserInteraction, { passive: true, once: true });
-    });
-
-    // Intersection Observer para autoplay de videos
+    // Intersection Observer para autoplay
     const videoObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             const video = entry.target;
-            const postMedia = video.closest('.post-media');
 
             if (entry.isIntersecting) {
-                // Video visible - pausar otros y reproducir este
                 pauseAllVideosExcept(video);
                 playVideo(video);
             } else {
-                // Video no visible - pausar
                 video.pause();
                 updateVideoState(video, false);
             }
@@ -5700,44 +5681,43 @@
     }, {
         root: null,
         rootMargin: '0px',
-        threshold: 0.6
+        threshold: 0.5
     });
 
-    // Preload observer - carga videos antes de ser visibles
+    // Preload observer
     const videoPreloadObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const video = entry.target;
-                if (video.preload === 'none') {
-                    video.preload = 'metadata';
+                if (video.readyState < 1) {
                     video.load();
                 }
                 videoPreloadObserver.unobserve(video);
             }
         });
-    }, { rootMargin: '500px' });
+    }, { rootMargin: '800px' });
 
     function initVideoObserversForNewPosts() {
         document.querySelectorAll('.post-media video.feed-video:not([data-observed])').forEach(video => {
             video.setAttribute('data-observed', 'true');
 
-            // Asegurar atributos para iOS
-            video.setAttribute('playsinline', 'true');
-            video.setAttribute('webkit-playsinline', 'true');
+            // Forzar atributos para iOS
+            video.playsInline = true;
             video.muted = true;
+            video.autoplay = false; // Controlamos nosotros el autoplay
 
-            // Escuchar eventos del video para actualizar estado
+            // Eventos de estado
             video.addEventListener('play', () => updateVideoState(video, true));
             video.addEventListener('pause', () => updateVideoState(video, false));
-            video.addEventListener('ended', () => {
-                // Loop manual si es necesario
-                if (video.loop) {
-                    video.currentTime = 0;
-                    video.play().catch(() => {});
-                }
+            video.addEventListener('waiting', () => {
+                // Video buffering
+                video.closest('.post-media')?.classList.add('video-loading');
+            });
+            video.addEventListener('playing', () => {
+                video.closest('.post-media')?.classList.remove('video-loading');
             });
 
-            // Agregar observers
+            // Observers
             videoPreloadObserver.observe(video);
 
             if (activeVideoObservers < MAX_VIDEO_OBSERVERS) {
