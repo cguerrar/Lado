@@ -217,8 +217,19 @@ namespace Lado.Controllers
             var retencionImpuestos = await ObtenerRetencionUsuarioAsync(usuario);
             var montoRetencion = monto * (retencionImpuestos / 100);
 
-            // Calcular monto neto (bruto - comisión - impuestos)
-            var montoNeto = monto - comision - montoRetencion;
+            // Calcular comisión de billetera electrónica
+            var configuraciones = await _context.ConfiguracionesPlataforma
+                .Where(c => c.Categoria == "Billetera")
+                .ToDictionaryAsync(c => c.Clave, c => c.Valor);
+            var porcentajeBilletera = decimal.TryParse(
+                configuraciones.GetValueOrDefault(ConfiguracionPlataforma.COMISION_BILLETERA_ELECTRONICA, "2.5"),
+                System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var pct) ? pct : 2.5m;
+            var comisionBilletera = monto * (porcentajeBilletera / 100);
+
+            // Calcular monto neto (bruto - comisión - impuestos - billetera)
+            var montoNeto = monto - comision - montoRetencion - comisionBilletera;
 
             // Crear transacción de retiro
             var transaccion = new Transaccion
@@ -228,8 +239,9 @@ namespace Lado.Controllers
                 MontoNeto = montoNeto,
                 Comision = comision,
                 RetencionImpuestos = montoRetencion,
+                ComisionBilleteraElectronica = comisionBilletera,
                 TipoTransaccion = TipoTransaccion.Retiro,
-                Descripcion = $"Retiro vía {metodoPago} (Comisión: {usuario.ComisionRetiro}%, Impuestos: {retencionImpuestos}%)",
+                Descripcion = $"Retiro vía {metodoPago} (Comisión: {usuario.ComisionRetiro}%, Impuestos: {retencionImpuestos}%, Billetera: {porcentajeBilletera}%)",
                 EstadoPago = "Pendiente",
                 MetodoPago = metodoPago,
                 FechaTransaccion = DateTime.Now,
@@ -262,6 +274,7 @@ namespace Lado.Controllers
                     monto,
                     comision,
                     montoRetencion,
+                    comisionBilletera,
                     montoNeto,
                     metodoPago,
                     transaccion.Id,
@@ -283,7 +296,7 @@ namespace Lado.Controllers
                 // No fallar la solicitud de retiro si falla la generación del PDF
             }
 
-            TempData["Success"] = $"Retiro solicitado: ${monto:N2} bruto → Comisión ${comision:N2} ({usuario.ComisionRetiro}%) + Impuestos ${montoRetencion:N2} ({retencionImpuestos}%) = Neto ${montoNeto:N2}. Se procesará en 3-5 días hábiles. Recibirás la liquidación por email.";
+            TempData["Success"] = $"Retiro solicitado: ${monto:N2} bruto → Comisión ${comision:N2} + Impuestos ${montoRetencion:N2} + Billetera ${comisionBilletera:N2} = Neto ${montoNeto:N2}. Se procesará en 3-5 días hábiles. Recibirás la liquidación por email.";
             return RedirectToAction(nameof(Index));
         }
 

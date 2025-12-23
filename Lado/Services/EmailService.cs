@@ -49,7 +49,7 @@ namespace Lado.Services
         Task<bool> SendWelcomeEmailAsync(string toEmail, string nombre, string username, string temporaryPassword);
         Task<bool> SendNewSubscriberNotificationAsync(string creatorEmail, string creatorName, string subscriberName);
         Task<bool> SendPaymentReceivedNotificationAsync(string email, string nombre, decimal monto, string concepto);
-        Task<bool> SendLiquidacionRetiroAsync(string email, string nombre, decimal montoBruto, decimal comision, decimal impuestos, decimal montoNeto, string metodoPago, int transaccionId, byte[] pdfBytes);
+        Task<bool> SendLiquidacionRetiroAsync(string email, string nombre, decimal montoBruto, decimal comision, decimal impuestos, decimal comisionBilletera, decimal montoNeto, string metodoPago, int transaccionId, byte[] pdfBytes);
         Task<EmailResult> TestProviderAsync(string testEmail);
         Task<string> GetActiveProviderNameAsync();
     }
@@ -650,7 +650,7 @@ namespace Lado.Services
             return await SendEmailAsync(email, subject, html);
         }
 
-        public async Task<bool> SendLiquidacionRetiroAsync(string email, string nombre, decimal montoBruto, decimal comision, decimal impuestos, decimal montoNeto, string metodoPago, int transaccionId, byte[] pdfBytes)
+        public async Task<bool> SendLiquidacionRetiroAsync(string email, string nombre, decimal montoBruto, decimal comision, decimal impuestos, decimal comisionBilletera, decimal montoNeto, string metodoPago, int transaccionId, byte[] pdfBytes)
         {
             try
             {
@@ -675,6 +675,7 @@ namespace Lado.Services
                     { "montoBruto", montoBruto.ToString("N2") },
                     { "comision", comision.ToString("N2") },
                     { "impuestos", impuestos.ToString("N2") },
+                    { "comisionBilletera", comisionBilletera.ToString("N2") },
                     { "montoNeto", montoNeto.ToString("N2") },
                     { "metodoPago", metodoPago },
                     { "transaccionId", transaccionId.ToString("D8") },
@@ -948,6 +949,10 @@ namespace Lado.Services
                     <tr>
                         <td style='padding:8px 0;color:#fd7e14;'>Retencion Impuestos:</td>
                         <td style='padding:8px 0;text-align:right;font-weight:600;color:#fd7e14;'>-${{{{impuestos}}}}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding:8px 0;color:#9333ea;'>Comision Billetera Electronica:</td>
+                        <td style='padding:8px 0;text-align:right;font-weight:600;color:#9333ea;'>-${{{{comisionBilletera}}}}</td>
                     </tr>
                     <tr style='border-top:2px solid #dee2e6;'>
                         <td style='padding:12px 0 0;color:#333;font-weight:700;font-size:18px;'>Neto a Recibir:</td>

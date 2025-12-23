@@ -265,6 +265,18 @@ namespace Lado.Services
                             .FontColor(Colors.Red.Darken1);
                     });
 
+                    // Comisión Billetera Electrónica
+                    if (transaccion.ComisionBilleteraElectronica > 0)
+                    {
+                        inner.Item().PaddingTop(5).Row(row =>
+                        {
+                            row.RelativeItem().Text("(-) Comisión Billetera Electrónica:").FontSize(10).FontColor(Colors.Purple.Darken1);
+                            row.ConstantItem(100).AlignRight().Text($"-${transaccion.ComisionBilleteraElectronica ?? 0:N2}")
+                                .FontSize(10)
+                                .FontColor(Colors.Purple.Darken1);
+                        });
+                    }
+
                     // Retención de impuestos
                     if (transaccion.RetencionImpuestos > 0)
                     {

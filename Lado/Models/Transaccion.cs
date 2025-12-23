@@ -16,6 +16,11 @@
 
         public decimal? RetencionImpuestos { get; set; }
 
+        /// <summary>
+        /// Comisión de billetera electrónica (porcentaje aplicado al retiro)
+        /// </summary>
+        public decimal? ComisionBilleteraElectronica { get; set; }
+
         public string? Descripcion { get; set; }
 
         public DateTime FechaTransaccion { get; set; } = DateTime.Now;
