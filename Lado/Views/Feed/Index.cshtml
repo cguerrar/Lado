@@ -408,11 +408,7 @@
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        pointer-events: none;
-    }
-
-    .video-controls-overlay > * {
-        pointer-events: auto;
+        z-index: 5;
     }
 
     /* Location Badge */
@@ -730,17 +726,46 @@
         justify-content: center;
         opacity: 0;
         transition: opacity 0.2s ease;
+        pointer-events: none;
     }
 
     .video-play-icon svg {
         width: 32px;
         height: 32px;
+    }
+
+    /* Icono de play (triangulo) - centrado con margin-left */
+    .video-play-icon .icon-play {
         margin-left: 4px;
     }
 
+    /* Icono de pausa - oculto por defecto */
+    .video-play-icon .icon-pause {
+        display: none;
+    }
+
+    /* Cuando el video esta reproduciendose: mostrar pausa, ocultar play */
+    .post-media.video-playing .video-play-icon .icon-play {
+        display: none;
+    }
+    .post-media.video-playing .video-play-icon .icon-pause {
+        display: block;
+    }
+
+    /* Mostrar icono en hover o cuando esta pausado */
     .post-media:hover .video-play-icon,
     .video-paused .video-play-icon {
         opacity: 1;
+    }
+
+    /* En mobile: siempre mostrar cuando esta pausado, no en hover */
+    @@media (hover: none) {
+        .post-media:hover .video-play-icon {
+            opacity: 0;
+        }
+        .video-paused .video-play-icon {
+            opacity: 1;
+        }
     }
 
     /* 🍎 iOS: Indicador de que se requiere tap */
@@ -773,12 +798,14 @@
         width: 36px;
         height: 36px;
         background: rgba(0, 0, 0, 0.6);
+        border: none;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
         transition: background 0.2s ease;
+        z-index: 10;
     }
 
     .video-mute-btn:hover {
@@ -3554,6 +3581,352 @@
         }
     }
 
+    /* ========================================
+       MODAL DE REPORTES ESTILO INSTAGRAM
+       ======================================== */
+    .report-modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.65);
+        z-index: 10000;
+        justify-content: center;
+        align-items: center;
+        backdrop-filter: blur(4px);
+        animation: fadeInOverlay 0.2s ease;
+    }
+
+    .report-modal-overlay.show {
+        display: flex;
+    }
+
+    @@keyframes fadeInOverlay {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .report-modal {
+        background: var(--surface);
+        border-radius: 16px;
+        width: 100%;
+        max-width: 400px;
+        max-height: 85vh;
+        overflow: hidden;
+        animation: slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    @@keyframes slideUpModal {
+        from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    .report-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .report-modal-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--fg);
+        flex: 1;
+        text-align: center;
+    }
+
+    .report-modal-close {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: transparent;
+        color: var(--fg);
+        cursor: pointer;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+    }
+
+    .report-modal-close:hover {
+        background: var(--hover);
+    }
+
+    .report-modal-close svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .report-modal-subtitle {
+        padding: 16px 20px 12px;
+        font-size: 14px;
+        color: var(--muted);
+        line-height: 1.4;
+    }
+
+    .report-options {
+        max-height: calc(85vh - 180px);
+        overflow-y: auto;
+    }
+
+    .report-option {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        cursor: pointer;
+        transition: background 0.15s;
+        border: none;
+        background: transparent;
+        width: 100%;
+        text-align: left;
+    }
+
+    .report-option:hover {
+        background: var(--hover);
+    }
+
+    .report-option:active {
+        background: var(--line);
+    }
+
+    .report-option-content {
+        flex: 1;
+    }
+
+    .report-option-title {
+        font-size: 15px;
+        color: var(--fg);
+        font-weight: 400;
+        margin-bottom: 2px;
+    }
+
+    .report-option-desc {
+        font-size: 12px;
+        color: var(--muted);
+        display: none;
+    }
+
+    .report-option-arrow {
+        color: var(--muted);
+        flex-shrink: 0;
+        margin-left: 12px;
+    }
+
+    .report-option-arrow svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    /* Subopciones */
+    .report-suboptions {
+        display: none;
+        animation: fadeInOptions 0.2s ease;
+    }
+
+    .report-suboptions.show {
+        display: block;
+    }
+
+    @@keyframes fadeInOptions {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .report-back-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 16px 20px;
+        font-size: 15px;
+        color: var(--primary);
+        cursor: pointer;
+        border: none;
+        background: transparent;
+        width: 100%;
+        text-align: left;
+        border-bottom: 1px solid var(--line);
+        font-weight: 500;
+    }
+
+    .report-back-btn:hover {
+        background: var(--hover);
+    }
+
+    .report-back-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .report-category-title {
+        padding: 12px 20px 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Campo de texto adicional */
+    .report-textarea-container {
+        padding: 0 20px 16px;
+        display: none;
+    }
+
+    .report-textarea-container.show {
+        display: block;
+    }
+
+    .report-textarea {
+        width: 100%;
+        min-height: 100px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--fg);
+        font-size: 14px;
+        resize: none;
+        font-family: inherit;
+    }
+
+    .report-textarea:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+
+    .report-textarea::placeholder {
+        color: var(--muted);
+    }
+
+    /* Boton de enviar */
+    .report-submit-container {
+        padding: 12px 20px 20px;
+        display: none;
+    }
+
+    .report-submit-container.show {
+        display: block;
+    }
+
+    .report-submit-btn {
+        width: 100%;
+        padding: 14px;
+        background: #ed4956;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .report-submit-btn:hover {
+        background: #dc3545;
+        transform: translateY(-1px);
+    }
+
+    .report-submit-btn:active {
+        transform: translateY(0);
+    }
+
+    .report-submit-btn:disabled {
+        background: var(--muted);
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    /* Confirmacion de envio */
+    .report-confirmation {
+        display: none;
+        text-align: center;
+        padding: 40px 20px;
+    }
+
+    .report-confirmation.show {
+        display: block;
+    }
+
+    .report-confirmation-icon {
+        width: 64px;
+        height: 64px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+    }
+
+    .report-confirmation-icon svg {
+        width: 32px;
+        height: 32px;
+        color: white;
+    }
+
+    .report-confirmation-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--fg);
+        margin-bottom: 8px;
+    }
+
+    .report-confirmation-text {
+        font-size: 14px;
+        color: var(--muted);
+        line-height: 1.5;
+        margin-bottom: 24px;
+    }
+
+    .report-confirmation-btn {
+        padding: 12px 24px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .report-confirmation-btn:hover {
+        opacity: 0.9;
+    }
+
+    /* Responsive */
+    @@media (max-width: 480px) {
+        .report-modal {
+            max-width: 100%;
+            max-height: 100vh;
+            border-radius: 0;
+            height: 100%;
+        }
+
+        .report-modal-overlay {
+            align-items: flex-end;
+        }
+
+        @@supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .report-submit-container {
+                padding-bottom: calc(20px + env(safe-area-inset-bottom));
+            }
+        }
+    }
+
 </style>
 
 <div class="feed-page-layout">
@@ -3776,7 +4149,7 @@
                                 }
                                 else if (esVideo)
                                 {
-                                    <video src="@post.RutaArchivo" class="feed-video" muted loop playsinline webkit-playsinline preload="none" poster=""></video>
+                                    <video src="@post.RutaArchivo" class="feed-video" muted loop playsinline="true" webkit-playsinline="true" preload="none" poster=""></video>
                                 }
                                 else if (esAudio)
                                 {
@@ -3833,9 +4206,10 @@
                                     <div class="carousel-slide" data-index="@i" style="width: @(100.0 / archivosCarrusel.Count)%;">
                                         @if (esArchivoVideo)
                                         {
-                                            <video src="@archivo.RutaArchivo" class="carousel-media feed-video" muted loop playsinline preload="none"></video>
+                                            <video src="@archivo.RutaArchivo" class="carousel-media feed-video" muted loop playsinline="true" webkit-playsinline="true" preload="none"></video>
                                             <div class="video-play-icon carousel-play-icon">
-                                                <svg viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                                                <svg class="icon-play" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                                                <svg class="icon-pause" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                                             </div>
                                         }
                                         else
@@ -3983,14 +4357,15 @@
                                    class="feed-video"
                                    muted
                                    loop
-                                   playsinline
-                                   webkit-playsinline
+                                   playsinline="true"
+                                   webkit-playsinline="true"
                                    preload="none"
                                    data-post-id="@post.Id">
                             </video>
-                            <div class="video-controls-overlay">
+                            <div class="video-controls-overlay" onclick="handleVideoClick(event, this)">
                                 <div class="video-play-icon">
-                                    <svg viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                                    <svg class="icon-play" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                                    <svg class="icon-pause" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                                 </div>
                                 <button class="video-mute-btn" onclick="toggleVideoMute(event, this)" title="Activar/Desactivar sonido">
                                     <svg class="muted-icon" viewBox="0 0 24 24" fill="white">
@@ -4437,6 +4812,281 @@
     </div>
 </div>
 
+<!-- MODAL DE REPORTES ESTILO INSTAGRAM -->
+<div class="report-modal-overlay" id="reportModal">
+    <div class="report-modal">
+        <!-- Header -->
+        <div class="report-modal-header">
+            <div style="width: 32px;"></div>
+            <span class="report-modal-title">Reportar</span>
+            <button class="report-modal-close" onclick="closeReportModal()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Contenido principal -->
+        <div id="reportMainContent">
+            <div class="report-modal-subtitle">
+                ¿Por qué quieres reportar esta publicación?
+            </div>
+
+            <div class="report-options">
+                <!-- Opcion 1: No me gusta -->
+                <button class="report-option" onclick="selectReportReason('No me gusta', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Simplemente no me gusta</div>
+                    </div>
+                    <div class="report-option-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+                </button>
+
+                <!-- Opcion 2: Bullying -->
+                <button class="report-option" onclick="selectReportReason('Bullying o acoso', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Bullying o contacto no deseado</div>
+                    </div>
+                    <div class="report-option-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+                </button>
+
+                <!-- Opcion 3: Autolesion -->
+                <button class="report-option" onclick="selectReportReason('Autolesión o suicidio', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Suicidio, autolesión o trastornos alimentarios</div>
+                    </div>
+                    <div class="report-option-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+                </button>
+
+                <!-- Opcion 4: Violencia -->
+                <button class="report-option" onclick="showReportSuboptions('violencia')">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Violencia, odio o explotación</div>
+                    </div>
+                    <div class="report-option-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+                </button>
+
+                <!-- Opcion 5: Venta restringida -->
+                <button class="report-option" onclick="selectReportReason('Venta de artículos restringidos', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Venta o promoción de artículos restringidos</div>
+                    </div>
+                    <div class="report-option-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+                </button>
+
+                <!-- Opcion 6: Contenido sexual -->
+                <button class="report-option" onclick="showReportSuboptions('sexual')">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Desnudos o actividad sexual</div>
+                    </div>
+                    <div class="report-option-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+                </button>
+
+                <!-- Opcion 7: Spam -->
+                <button class="report-option" onclick="selectReportReason('Estafa, fraude o spam', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Estafa, fraude o spam</div>
+                    </div>
+                    <div class="report-option-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+                </button>
+
+                <!-- Opcion 8: Info falsa -->
+                <button class="report-option" onclick="selectReportReason('Información falsa', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Información falsa</div>
+                    </div>
+                    <div class="report-option-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+                </button>
+
+                <!-- Opcion 9: Suplantación -->
+                <button class="report-option" onclick="selectReportReason('Suplantación de identidad', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Suplantación de identidad</div>
+                    </div>
+                    <div class="report-option-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+                </button>
+
+                <!-- Opcion 10: Propiedad intelectual -->
+                <button class="report-option" onclick="selectReportReason('Infracción de propiedad intelectual', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Infracción de propiedad intelectual</div>
+                    </div>
+                    <div class="report-option-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+                </button>
+
+                <!-- Opcion 11: Otro -->
+                <button class="report-option" onclick="selectReportReason('Otro motivo', true)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Otro motivo</div>
+                    </div>
+                    <div class="report-option-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Subopciones: Violencia -->
+        <div class="report-suboptions" id="reportSubViolencia">
+            <button class="report-back-btn" onclick="showMainReportOptions()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                Volver
+            </button>
+            <div class="report-category-title">Violencia, odio o explotación</div>
+            <div class="report-options">
+                <button class="report-option" onclick="selectReportReason('Violencia gráfica', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Violencia gráfica</div>
+                    </div>
+                </button>
+                <button class="report-option" onclick="selectReportReason('Amenazas de violencia', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Amenazas de violencia</div>
+                    </div>
+                </button>
+                <button class="report-option" onclick="selectReportReason('Discurso de odio', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Discurso de odio o símbolos</div>
+                    </div>
+                </button>
+                <button class="report-option" onclick="selectReportReason('Crueldad animal', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Crueldad o maltrato animal</div>
+                    </div>
+                </button>
+                <button class="report-option" onclick="selectReportReason('Explotación de menores', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Explotación de menores</div>
+                    </div>
+                </button>
+                <button class="report-option" onclick="selectReportReason('Terrorismo o extremismo', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Terrorismo o extremismo</div>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Subopciones: Sexual -->
+        <div class="report-suboptions" id="reportSubSexual">
+            <button class="report-back-btn" onclick="showMainReportOptions()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                Volver
+            </button>
+            <div class="report-category-title">Desnudos o actividad sexual</div>
+            <div class="report-options">
+                <button class="report-option" onclick="selectReportReason('Desnudos no solicitados', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Desnudos sin consentimiento</div>
+                    </div>
+                </button>
+                <button class="report-option" onclick="selectReportReason('Contenido sexual explícito', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Actividad sexual explícita</div>
+                    </div>
+                </button>
+                <button class="report-option" onclick="selectReportReason('Solicitud sexual', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Solicitud o explotación sexual</div>
+                    </div>
+                </button>
+                <button class="report-option" onclick="selectReportReason('Contenido sexual de menores', false)">
+                    <div class="report-option-content">
+                        <div class="report-option-title">Involucramiento de menores</div>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Paso 2: Detalles adicionales -->
+        <div class="report-suboptions" id="reportDetailsStep">
+            <button class="report-back-btn" onclick="showMainReportOptions()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                Volver
+            </button>
+            <div class="report-category-title" id="selectedReasonTitle">Motivo seleccionado</div>
+
+            <div class="report-textarea-container show">
+                <textarea
+                    class="report-textarea"
+                    id="reportDetails"
+                    placeholder="Describe con más detalle el problema (opcional)..."
+                    maxlength="500"></textarea>
+            </div>
+
+            <div class="report-submit-container show">
+                <button class="report-submit-btn" id="submitReportBtn" onclick="submitReport()">
+                    Enviar reporte
+                </button>
+            </div>
+        </div>
+
+        <!-- Confirmación -->
+        <div class="report-confirmation" id="reportConfirmation">
+            <div class="report-confirmation-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </div>
+            <div class="report-confirmation-title">Gracias por informarnos</div>
+            <div class="report-confirmation-text">
+                Tu reporte nos ayuda a mantener la comunidad segura.
+                Revisaremos este contenido y tomaremos las medidas necesarias.
+            </div>
+            <button class="report-confirmation-btn" onclick="closeReportModal()">
+                Listo
+            </button>
+        </div>
+    </div>
+</div>
 
 @functions {
     string GetTimeAgo(DateTime fecha)
@@ -4739,16 +5389,17 @@
                     </div>`;
             } else if (post.esVideo) {
                 mediaHtml = `
-                    <div class="post-media"
+                    <div class="post-media video-paused"
                          data-post-id="${post.id}"
                          data-media-type="video"
                          data-media-src="${post.rutaArchivo}"
                          onclick="openFullscreenViewer(event, ${post.id})"
                          style="cursor: pointer;">
-                        <video src="${post.rutaArchivo}" class="feed-video" ${isGlobalMuted ? 'muted' : ''} loop playsinline preload="none" data-post-id="${post.id}"></video>
-                        <div class="video-controls-overlay">
+                        <video src="${post.rutaArchivo}" class="feed-video" muted loop playsinline="true" webkit-playsinline="true" preload="none" data-post-id="${post.id}"></video>
+                        <div class="video-controls-overlay" onclick="handleVideoClick(event, this)">
                             <div class="video-play-icon">
-                                <svg viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                                <svg class="icon-play" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                                <svg class="icon-pause" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                             </div>
                             <button class="video-mute-btn" onclick="toggleVideoMute(event, this)" title="Activar/Desactivar sonido">
                                 <svg class="muted-icon" viewBox="0 0 24 24" fill="white" style="display:${isGlobalMuted ? 'block' : 'none'};">
@@ -4873,66 +5524,129 @@
         return `${Math.floor(diffDays / 7)}sem`;
     }
 
+    // ========================================
+    // SISTEMA DE VIDEO REFACTORIZADO
+    // ========================================
+
     // Contador de observers activos
     let activeVideoObservers = 0;
     const MAX_VIDEO_OBSERVERS = 30;
 
-    // Estado global de mute (false = con sonido, true = silenciado)
-    let isGlobalMuted = false;
+    // Estado global de mute
+    let isGlobalMuted = true; // Empezar siempre muted para autoplay
 
-    // 🍎 iOS Detection y Video Unlock
-    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    let iosVideoUnlocked = false;
+    // Deteccion mejorada de iOS/iPadOS (incluye iPadOS 13+ que se identifica como Mac)
+    const isIOSDevice = (() => {
+        const ua = navigator.userAgent;
+        const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+        const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+        return isIOS || isIPadOS;
+    })();
 
-    // En iOS, los videos deben empezar muted
-    if (isIOSDevice) {
-        isGlobalMuted = true;
-        console.log('[iOS] Detectado - videos iniciarán silenciados');
-    }
+    let userHasInteracted = false;
 
-    // Función para desbloquear videos en iOS después de primera interacción
-    function unlockIOSVideos() {
-        if (iosVideoUnlocked) return;
-        iosVideoUnlocked = true;
-        console.log('[iOS] Videos desbloqueados por interacción del usuario');
+    // Funcion para actualizar el estado visual del video
+    function updateVideoState(video, isPlaying) {
+        const postMedia = video?.closest('.post-media');
+        if (!postMedia) return;
 
-        // Intentar reproducir el video visible actualmente
-        const visibleVideo = document.querySelector('.feed-video:not([data-observed="false"])');
-        if (visibleVideo && visibleVideo.paused) {
-            visibleVideo.muted = true; // Siempre muted en iOS para autoplay
-            visibleVideo.play().catch(() => {});
+        if (isPlaying) {
+            postMedia.classList.remove('video-paused');
+            postMedia.classList.add('video-playing');
+            postMedia.classList.remove('ios-needs-tap');
+        } else {
+            postMedia.classList.add('video-paused');
+            postMedia.classList.remove('video-playing');
         }
-
-        // Remover listeners después del primer desbloqueo
-        document.removeEventListener('touchstart', unlockIOSVideos);
-        document.removeEventListener('click', unlockIOSVideos);
     }
 
-    // En iOS, esperar primera interacción
-    if (isIOSDevice) {
-        document.addEventListener('touchstart', unlockIOSVideos, { passive: true, once: true });
-        document.addEventListener('click', unlockIOSVideos, { passive: true, once: true });
-
-        // Handler para reproducir video al tocar en iOS
-        document.addEventListener('click', function(e) {
-            const postMedia = e.target.closest('.post-media.ios-needs-tap');
-            if (postMedia) {
-                const video = postMedia.querySelector('video.feed-video');
-                if (video) {
-                    iosVideoUnlocked = true;
-                    video.muted = true;
-                    video.play().then(() => {
-                        postMedia.classList.remove('video-paused', 'ios-needs-tap');
-                        console.log('[iOS] Video reproducido por tap');
-                    }).catch(err => {
-                        console.warn('[iOS] Error al reproducir video:', err);
-                    });
-                }
+    // Pausar todos los videos excepto uno
+    function pauseAllVideosExcept(exceptVideo) {
+        document.querySelectorAll('.feed-video').forEach(v => {
+            if (v !== exceptVideo && !v.paused) {
+                v.pause();
+                updateVideoState(v, false);
             }
         });
     }
 
-    // Función para actualizar iconos de mute en todos los botones
+    // Reproducir video con manejo de errores
+    async function playVideo(video) {
+        const postMedia = video?.closest('.post-media');
+        if (!video || !postMedia) return false;
+
+        // En iOS sin interaccion, mostrar indicador de tap
+        if (isIOSDevice && !userHasInteracted) {
+            postMedia.classList.add('video-paused', 'ios-needs-tap');
+            video.muted = true;
+            return false;
+        }
+
+        // Asegurar que este muted para autoplay
+        video.muted = isGlobalMuted;
+
+        try {
+            await video.play();
+            updateVideoState(video, true);
+            return true;
+        } catch (err) {
+            // Si falla, intentar con muted
+            if (!video.muted) {
+                video.muted = true;
+                isGlobalMuted = true;
+                updateAllMuteIcons();
+                try {
+                    await video.play();
+                    updateVideoState(video, true);
+                    return true;
+                } catch (e) {
+                    // Requiere interaccion del usuario
+                    if (isIOSDevice) {
+                        postMedia.classList.add('ios-needs-tap');
+                    }
+                    updateVideoState(video, false);
+                    return false;
+                }
+            } else {
+                if (isIOSDevice) {
+                    postMedia.classList.add('ios-needs-tap');
+                }
+                updateVideoState(video, false);
+                return false;
+            }
+        }
+    }
+
+    // Handler para click en el overlay del video
+    function handleVideoClick(event, overlay) {
+        event.stopPropagation();
+        event.preventDefault();
+
+        // Marcar que el usuario interactuo
+        userHasInteracted = true;
+
+        const postMedia = overlay.closest('.post-media');
+        const video = postMedia?.querySelector('video.feed-video');
+        if (!video) return;
+
+        if (video.paused) {
+            // Pausar otros videos
+            pauseAllVideosExcept(video);
+            // Reproducir este
+            video.muted = isGlobalMuted;
+            video.play().then(() => {
+                updateVideoState(video, true);
+            }).catch(() => {
+                updateVideoState(video, false);
+            });
+        } else {
+            // Pausar
+            video.pause();
+            updateVideoState(video, false);
+        }
+    }
+
+    // Funcion para actualizar iconos de mute
     function updateAllMuteIcons() {
         document.querySelectorAll('.video-mute-btn').forEach(btn => {
             const mi = btn.querySelector('.muted-icon');
@@ -4944,104 +5658,96 @@
         });
     }
 
-    // Intersection Observer para autoplay de videos (GLOBAL)
+    // Desbloquear videos en iOS al interactuar
+    function handleUserInteraction() {
+        if (userHasInteracted) return;
+        userHasInteracted = true;
+
+        // Intentar reproducir el video visible
+        const visibleVideo = document.querySelector('.feed-video[data-observed="true"]');
+        if (visibleVideo && visibleVideo.paused) {
+            const postMedia = visibleVideo.closest('.post-media');
+            if (postMedia?.classList.contains('ios-needs-tap')) {
+                visibleVideo.muted = true;
+                visibleVideo.play().then(() => {
+                    updateVideoState(visibleVideo, true);
+                }).catch(() => {});
+            }
+        }
+    }
+
+    // Registrar interaccion del usuario
+    ['touchstart', 'click'].forEach(evt => {
+        document.addEventListener(evt, handleUserInteraction, { passive: true, once: true });
+    });
+
+    // Intersection Observer para autoplay de videos
     const videoObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             const video = entry.target;
             const postMedia = video.closest('.post-media');
 
             if (entry.isIntersecting) {
-                // El video es visible - reproducir
-                // Primero pausar todos los demás
-                document.querySelectorAll('.feed-video').forEach(v => {
-                    if (v !== video && !v.paused) {
-                        v.pause();
-                        v.closest('.post-media')?.classList.add('video-paused');
-                    }
-                });
-
-                // 🍎 iOS: Si no está desbloqueado, mostrar indicador y esperar
-                if (isIOSDevice && !iosVideoUnlocked) {
-                    postMedia?.classList.add('video-paused', 'ios-needs-tap');
-                    video.muted = true;
-                    // No intentar play() - esperar a que el usuario toque
-                    return;
-                }
-
-                // Aplicar estado global de mute (en iOS siempre muted para autoplay)
-                video.muted = isIOSDevice ? true : isGlobalMuted;
-
-                // Reproducir este video
-                video.play().then(() => {
-                    postMedia?.classList.remove('video-paused', 'ios-needs-tap');
-                    updateAllMuteIcons();
-                }).catch(err => {
-                    console.log('Autoplay bloqueado:', err);
-                    // Si falla el autoplay, intentar con mute
-                    if (!video.muted) {
-                        video.muted = true;
-                        isGlobalMuted = true;
-                        video.play().then(() => {
-                            postMedia?.classList.remove('video-paused', 'ios-needs-tap');
-                            updateAllMuteIcons();
-                        }).catch(() => {
-                            postMedia?.classList.add('video-paused');
-                            // En iOS mostrar indicador de tap
-                            if (isIOSDevice) {
-                                postMedia?.classList.add('ios-needs-tap');
-                            }
-                        });
-                    } else {
-                        postMedia?.classList.add('video-paused');
-                        if (isIOSDevice) {
-                            postMedia?.classList.add('ios-needs-tap');
-                        }
-                    }
-                });
+                // Video visible - pausar otros y reproducir este
+                pauseAllVideosExcept(video);
+                playVideo(video);
             } else {
-                // El video ya no es visible - pausar
+                // Video no visible - pausar
                 video.pause();
-                postMedia?.classList.add('video-paused');
-                postMedia?.classList.remove('ios-needs-tap');
+                updateVideoState(video, false);
             }
         });
     }, {
         root: null,
         rootMargin: '0px',
-        threshold: 0.6 // 60% visible para activar
+        threshold: 0.6
     });
 
-    // Preload observer - carga videos cuando están cerca del viewport
+    // Preload observer - carga videos antes de ser visibles
     const videoPreloadObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const video = entry.target;
                 if (video.preload === 'none') {
-                    video.preload = 'auto'; // Cargar video completo para autoplay
+                    video.preload = 'metadata';
                     video.load();
                 }
                 videoPreloadObserver.unobserve(video);
             }
         });
-    }, { rootMargin: '300px' }); // Precargar 300px antes de ser visible
+    }, { rootMargin: '500px' });
 
     function initVideoObserversForNewPosts() {
-        // Observar nuevos videos para autoplay
         document.querySelectorAll('.post-media video.feed-video:not([data-observed])').forEach(video => {
             video.setAttribute('data-observed', 'true');
 
-            // Agregar al preload observer para cargar el video
+            // Asegurar atributos para iOS
+            video.setAttribute('playsinline', 'true');
+            video.setAttribute('webkit-playsinline', 'true');
+            video.muted = true;
+
+            // Escuchar eventos del video para actualizar estado
+            video.addEventListener('play', () => updateVideoState(video, true));
+            video.addEventListener('pause', () => updateVideoState(video, false));
+            video.addEventListener('ended', () => {
+                // Loop manual si es necesario
+                if (video.loop) {
+                    video.currentTime = 0;
+                    video.play().catch(() => {});
+                }
+            });
+
+            // Agregar observers
             videoPreloadObserver.observe(video);
 
-            // Agregar al autoplay observer
             if (activeVideoObservers < MAX_VIDEO_OBSERVERS) {
                 videoObserver.observe(video);
-                video.closest('.post-media')?.classList.add('video-paused');
+                updateVideoState(video, false);
                 activeVideoObservers++;
             }
         });
 
-        // Observar nuevos posts con música para autoplay de audio
+        // Observar posts con musica
         document.querySelectorAll('.post-media:not([data-music-observed])').forEach(media => {
             if (media.querySelector('.photo-audio-player')) {
                 media.setAttribute('data-music-observed', 'true');
@@ -5896,33 +6602,142 @@
         cerrarMenus();
     }
 
-    // Reportar contenido
-    async function reportarContenido(postId) {
-        const motivo = prompt('Describe el motivo del reporte:');
-        if (!motivo) {
-            cerrarMenus();
-            return;
+    // ========================================
+    // SISTEMA DE REPORTES ESTILO INSTAGRAM
+    // ========================================
+    let currentReportPostId = null;
+    let currentReportReason = '';
+    let requiresDetails = false;
+
+    // Abrir modal de reportes
+    function reportarContenido(postId) {
+        currentReportPostId = postId;
+        currentReportReason = '';
+        requiresDetails = false;
+
+        // Resetear estado del modal
+        document.getElementById('reportMainContent').style.display = 'block';
+        document.getElementById('reportSubViolencia').classList.remove('show');
+        document.getElementById('reportSubSexual').classList.remove('show');
+        document.getElementById('reportDetailsStep').classList.remove('show');
+        document.getElementById('reportConfirmation').classList.remove('show');
+        document.getElementById('reportDetails').value = '';
+
+        // Mostrar modal
+        document.getElementById('reportModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+
+        cerrarMenus();
+    }
+
+    // Cerrar modal de reportes
+    function closeReportModal() {
+        document.getElementById('reportModal').classList.remove('show');
+        document.body.style.overflow = '';
+        currentReportPostId = null;
+        currentReportReason = '';
+    }
+
+    // Mostrar opciones principales
+    function showMainReportOptions() {
+        document.getElementById('reportMainContent').style.display = 'block';
+        document.getElementById('reportSubViolencia').classList.remove('show');
+        document.getElementById('reportSubSexual').classList.remove('show');
+        document.getElementById('reportDetailsStep').classList.remove('show');
+    }
+
+    // Mostrar subopciones
+    function showReportSuboptions(category) {
+        document.getElementById('reportMainContent').style.display = 'none';
+
+        if (category === 'violencia') {
+            document.getElementById('reportSubViolencia').classList.add('show');
+        } else if (category === 'sexual') {
+            document.getElementById('reportSubSexual').classList.add('show');
+        }
+    }
+
+    // Seleccionar motivo de reporte
+    function selectReportReason(reason, needsDetails) {
+        currentReportReason = reason;
+        requiresDetails = needsDetails;
+
+        // Ocultar todas las secciones
+        document.getElementById('reportMainContent').style.display = 'none';
+        document.getElementById('reportSubViolencia').classList.remove('show');
+        document.getElementById('reportSubSexual').classList.remove('show');
+
+        // Mostrar paso de detalles o enviar directamente
+        if (needsDetails) {
+            document.getElementById('selectedReasonTitle').textContent = reason;
+            document.getElementById('reportDetailsStep').classList.add('show');
+            document.getElementById('reportDetails').focus();
+        } else {
+            // Enviar reporte directamente con el motivo seleccionado
+            submitReportWithReason(reason);
+        }
+    }
+
+    // Enviar reporte con motivo
+    async function submitReportWithReason(reason) {
+        const submitBtn = document.getElementById('submitReportBtn');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Enviando...';
         }
 
         try {
             const res = await fetch('/Feed/Reportar', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `id=${postId}&motivo=${encodeURIComponent(motivo)}`
+                body: `id=${currentReportPostId}&motivo=${encodeURIComponent(reason)}`
             });
             const data = await res.json();
 
-            if (data.success) {
-                showToast(data.message || 'Reporte enviado correctamente');
-            } else {
-                showToast(data.message || 'Error al enviar reporte');
-            }
+            // Mostrar confirmación
+            document.getElementById('reportMainContent').style.display = 'none';
+            document.getElementById('reportSubViolencia').classList.remove('show');
+            document.getElementById('reportSubSexual').classList.remove('show');
+            document.getElementById('reportDetailsStep').classList.remove('show');
+            document.getElementById('reportConfirmation').classList.add('show');
+
         } catch (err) {
             console.error('Error:', err);
             showToast('Error al enviar reporte');
+            closeReportModal();
         }
-        cerrarMenus();
+
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Enviar reporte';
+        }
     }
+
+    // Enviar reporte desde el formulario de detalles
+    async function submitReport() {
+        const details = document.getElementById('reportDetails').value.trim();
+        let fullReason = currentReportReason;
+
+        if (details) {
+            fullReason += ': ' + details;
+        }
+
+        await submitReportWithReason(fullReason);
+    }
+
+    // Cerrar modal al hacer clic fuera
+    document.getElementById('reportModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeReportModal();
+        }
+    });
+
+    // Cerrar con tecla Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('reportModal').classList.contains('show')) {
+            closeReportModal();
+        }
+    });
 
     // Bloquear usuario
     async function bloquearUsuario(userId, nombreUsuario) {
@@ -5969,38 +6784,35 @@
     }
 
     // ========================================
-    // VIDEO AUTOPLAY TIKTOK-STYLE
+    // VIDEO CONTROLS - SIMPLIFICADO
     // ========================================
 
-    // Toggle play/pause on click
+    // Toggle play/pause (legacy - usar handleVideoClick preferentemente)
     function toggleVideoPlay(event, video) {
         event.stopPropagation();
         event.preventDefault();
-
-        const overlay = video.nextElementSibling;
+        userHasInteracted = true;
 
         if (video.paused) {
-            // Pausar todos los demas videos
-            document.querySelectorAll('.feed-video').forEach(v => {
-                if (v !== video && !v.paused) {
-                    v.pause();
-                    v.closest('.post-media').classList.add('video-paused');
-                }
+            pauseAllVideosExcept(video);
+            video.muted = isGlobalMuted;
+            video.play().then(() => {
+                updateVideoState(video, true);
+            }).catch(() => {
+                updateVideoState(video, false);
             });
-            video.play();
-            video.closest('.post-media').classList.remove('video-paused');
         } else {
             video.pause();
-            video.closest('.post-media').classList.add('video-paused');
+            updateVideoState(video, false);
         }
     }
 
-    // Toggle mute - usa estado global
+    // Toggle mute global
     function toggleVideoMute(event, btn) {
         event.stopPropagation();
         event.preventDefault();
+        userHasInteracted = true;
 
-        // Cambiar estado global
         isGlobalMuted = !isGlobalMuted;
 
         // Aplicar a todos los videos
@@ -6008,22 +6820,14 @@
             v.muted = isGlobalMuted;
         });
 
-        // Actualizar todos los iconos
         updateAllMuteIcons();
     }
 
     // Inicializar observers para videos existentes al cargar la página
     document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.feed-video').forEach(video => {
-            video.setAttribute('data-observed', 'true');
-            // Aplicar estado global de mute
-            video.muted = isGlobalMuted;
-            videoObserver.observe(video);
-            videoPreloadObserver.observe(video);
-            video.closest('.post-media')?.classList.add('video-paused');
-            activeVideoObservers++;
-        });
-        // Actualizar iconos de mute para reflejar el estado inicial
+        // Usar la funcion unificada de inicializacion
+        initVideoObserversForNewPosts();
+        // Actualizar iconos de mute
         updateAllMuteIcons();
     });
 </script>
