@@ -926,6 +926,7 @@ namespace Lado.Controllers
         {
             var reportes = await _context.Reportes
                 .Include(r => r.UsuarioReportador)
+                .Include(r => r.UsuarioReportado)
                 .Include(r => r.ContenidoReportado)
                 .ThenInclude(c => c.Usuario)
                 .OrderByDescending(r => r.FechaReporte)
@@ -935,26 +936,98 @@ namespace Lado.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> ResolverReporte(int id, string accion)
+        public async Task<IActionResult> ResolverReporte(int id, string accion, string? detalles)
         {
             var reporte = await _context.Reportes
                 .Include(r => r.ContenidoReportado)
+                .ThenInclude(c => c.Usuario)
+                .Include(r => r.UsuarioReportado)
                 .FirstOrDefaultAsync(r => r.Id == id);
 
-            if (reporte != null)
+            if (reporte == null)
             {
-                reporte.Estado = "Resuelto";
-                reporte.FechaResolucion = DateTime.Now;
-
-                if (accion == "censurar" && reporte.ContenidoReportado != null)
-                {
-                    reporte.ContenidoReportado.Censurado = true;
-                    reporte.ContenidoReportado.RazonCensura = $"Reporte: {reporte.Motivo}";
-                }
-
-                await _context.SaveChangesAsync();
-                TempData["Success"] = "Reporte resuelto exitosamente.";
+                TempData["Error"] = "Reporte no encontrado.";
+                return RedirectToAction(nameof(Reportes));
             }
+
+            reporte.Estado = "Resuelto";
+            reporte.FechaResolucion = DateTime.Now;
+            reporte.Accion = accion;
+
+            var mensajeAccion = "";
+
+            // Ejecutar acción según la selección
+            switch (accion)
+            {
+                case "Usuario bloqueado":
+                    // Bloquear al usuario reportado
+                    var usuarioABloquear = reporte.TipoReporte == "Usuario"
+                        ? reporte.UsuarioReportado
+                        : reporte.ContenidoReportado?.Usuario;
+
+                    if (usuarioABloquear != null)
+                    {
+                        usuarioABloquear.EstaActivo = false;
+                        mensajeAccion = $"Usuario @{usuarioABloquear.UserName} bloqueado.";
+                    }
+                    break;
+
+                case "Contenido eliminado":
+                    if (reporte.ContenidoReportado != null)
+                    {
+                        reporte.ContenidoReportado.EstaActivo = false;
+                        mensajeAccion = $"Contenido #{reporte.ContenidoReportado.Id} eliminado.";
+                    }
+                    break;
+
+                case "Contenido censurado":
+                    if (reporte.ContenidoReportado != null)
+                    {
+                        reporte.ContenidoReportado.Censurado = true;
+                        reporte.ContenidoReportado.RazonCensura = $"Reporte #{reporte.Id}: {reporte.Motivo}";
+                        mensajeAccion = $"Contenido #{reporte.ContenidoReportado.Id} censurado.";
+                    }
+                    break;
+
+                case "Advertencia enviada":
+                    // Crear notificación de advertencia al usuario
+                    var usuarioAdvertido = reporte.TipoReporte == "Usuario"
+                        ? reporte.UsuarioReportado
+                        : reporte.ContenidoReportado?.Usuario;
+
+                    if (usuarioAdvertido != null)
+                    {
+                        var notificacion = new Notificacion
+                        {
+                            UsuarioId = usuarioAdvertido.Id,
+                            Tipo = TipoNotificacion.Sistema,
+                            Titulo = "Advertencia",
+                            Mensaje = $"Has recibido una advertencia por: {reporte.Motivo}. Por favor revisa nuestros términos de servicio.",
+                            FechaCreacion = DateTime.Now,
+                            Leida = false
+                        };
+                        _context.Notificaciones.Add(notificacion);
+                        mensajeAccion = $"Advertencia enviada a @{usuarioAdvertido.UserName}.";
+                    }
+                    break;
+
+                case "Reporte infundado":
+                    mensajeAccion = "Reporte marcado como infundado. No se tomó ninguna acción.";
+                    break;
+
+                default:
+                    mensajeAccion = $"Acción: {accion}";
+                    break;
+            }
+
+            // Agregar detalles si los hay
+            if (!string.IsNullOrEmpty(detalles))
+            {
+                reporte.Accion = $"{accion} - {detalles}";
+            }
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = $"Reporte resuelto. {mensajeAccion}";
 
             return RedirectToAction(nameof(Reportes));
         }

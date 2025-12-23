@@ -1,264 +1,587 @@
-﻿@model List<Lado.Models.Reporte>
+@model List<Lado.Models.Reporte>
 @{
-    ViewData["Title"] = "Gestión de Reportes";
+    ViewData["Title"] = "Gestion de Reportes";
     var pendientes = Model.Count(r => r.Estado == "Pendiente");
     var resueltos = Model.Count(r => r.Estado == "Resuelto");
 }
 
+<style>
+    .report-card {
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .report-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+    .report-header {
+        padding: 16px;
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+        color: white;
+    }
+    .report-header.resolved {
+        background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+    }
+    .report-body {
+        padding: 20px;
+    }
+    .content-preview {
+        position: relative;
+        width: 100%;
+        max-width: 300px;
+        aspect-ratio: 1;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #f0f0f0;
+        margin: 12px auto;
+    }
+    .content-preview img,
+    .content-preview video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .content-preview .video-badge {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+    }
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 10px;
+        margin-bottom: 12px;
+    }
+    .user-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #dee2e6;
+    }
+    .user-avatar-placeholder {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 18px;
+    }
+    .motivo-badge {
+        display: inline-block;
+        padding: 6px 12px;
+        background: #fff3cd;
+        color: #856404;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+    }
+    .action-btn {
+        padding: 10px 16px;
+        border-radius: 10px;
+        font-weight: 500;
+        font-size: 13px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .action-btn:hover {
+        transform: scale(1.02);
+    }
+    .btn-block-user {
+        background: #dc3545;
+        color: white;
+    }
+    .btn-delete-content {
+        background: #fd7e14;
+        color: white;
+    }
+    .btn-censor {
+        background: #6f42c1;
+        color: white;
+    }
+    .btn-warn {
+        background: #ffc107;
+        color: #212529;
+    }
+    .btn-dismiss {
+        background: #6c757d;
+        color: white;
+    }
+    .tabs-modern {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        background: #f1f3f5;
+        padding: 6px;
+        border-radius: 12px;
+        width: fit-content;
+    }
+    .tab-btn {
+        padding: 10px 20px;
+        border: none;
+        background: transparent;
+        border-radius: 8px;
+        font-weight: 500;
+        color: #495057;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .tab-btn.active {
+        background: white;
+        color: #dc3545;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .tab-btn .badge {
+        margin-left: 6px;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #6c757d;
+    }
+    .empty-state svg {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+    .description-text {
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 8px;
+        font-size: 14px;
+        color: #495057;
+        border-left: 3px solid #dc3545;
+        margin-top: 12px;
+    }
+    .stats-row {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    .stat-card {
+        padding: 16px 24px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .stat-card.pending {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+    }
+    .stat-card.resolved {
+        background: linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%);
+    }
+    .stat-number {
+        font-size: 28px;
+        font-weight: 700;
+    }
+    .stat-label {
+        font-size: 14px;
+        color: #495057;
+    }
+</style>
+
 <div class="container-fluid py-4">
     <!-- Header -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <h2><i class="fas fa-flag text-danger"></i> Gestión de Reportes</h2>
-            <p class="text-muted">
-                <span class="badge bg-warning">@pendientes Pendientes</span>
-                <span class="badge bg-success ms-2">@resueltos Resueltos</span>
-            </p>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-2">
+                    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>
+                    <line x1="4" y1="22" x2="4" y2="15"></line>
+                </svg>
+                Gestion de Reportes
+            </h2>
+            <p class="text-muted mb-0">Revisa y administra los reportes de contenido y usuarios</p>
         </div>
-        <div class="col-md-6 text-end">
-            <a href="@Url.Action("Index", "Admin")" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Volver al Dashboard
-            </a>
+        <a href="@Url.Action("Index", "Admin")" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Volver al Dashboard
+        </a>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+        <div class="stat-card pending">
+            <div>
+                <div class="stat-number text-warning">@pendientes</div>
+                <div class="stat-label">Pendientes</div>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#856404" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+        </div>
+        <div class="stat-card resolved">
+            <div>
+                <div class="stat-number text-success">@resueltos</div>
+                <div class="stat-label">Resueltos</div>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#198754" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
         </div>
     </div>
 
-    <!-- Tabs: Pendientes / Resueltos -->
-    <div class="card border-0 shadow-sm">
-        <div class="card-body">
-            <ul class="nav nav-tabs mb-3" role="tablist">
-                <li class="nav-item">
-                    <a class="nav-link active" data-bs-toggle="tab" href="#pendientes">
-                        <i class="fas fa-clock text-warning"></i>
-                        Pendientes (@pendientes)
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" data-bs-toggle="tab" href="#resueltos">
-                        <i class="fas fa-check-circle text-success"></i>
-                        Resueltos (@resueltos)
-                    </a>
-                </li>
-            </ul>
+    <!-- Tabs -->
+    <div class="tabs-modern">
+        <button class="tab-btn active" onclick="showTab('pendientes', this)">
+            Pendientes
+            <span class="badge bg-warning text-dark">@pendientes</span>
+        </button>
+        <button class="tab-btn" onclick="showTab('resueltos', this)">
+            Resueltos
+            <span class="badge bg-success">@resueltos</span>
+        </button>
+    </div>
 
-            <div class="tab-content">
-                <!-- Tab Pendientes -->
-                <div class="tab-pane fade show active" id="pendientes">
-                    @{
-                        var reportesPendientes = Model.Where(r => r.Estado == "Pendiente").OrderByDescending(r => r.FechaReporte).ToList();
-                    }
-                    @if (reportesPendientes.Any())
-                    {
-                        <div class="row g-3">
-                            @foreach (var reporte in reportesPendientes)
-                            {
-                                <div class="col-md-6">
-                                    <div class="card border-warning h-100">
-                                        <div class="card-header bg-warning bg-opacity-10">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <span class="badge bg-warning">
-                                                    <i class="fas fa-exclamation-triangle"></i> @reporte.TipoReporte
-                                                </span>
-                                                <small class="text-muted">@reporte.FechaReporte.ToString("dd/MM/yy HH:mm")</small>
-                                            </div>
+    <!-- Tab Content: Pendientes -->
+    <div id="tab-pendientes" class="tab-content">
+        @{
+            var reportesPendientes = Model.Where(r => r.Estado == "Pendiente").OrderByDescending(r => r.FechaReporte).ToList();
+        }
+        @if (reportesPendientes.Any())
+        {
+            <div class="row g-4">
+                @foreach (var reporte in reportesPendientes)
+                {
+                    <div class="col-lg-6 col-xl-4">
+                        <div class="report-card">
+                            <div class="report-header">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>
+                                        @if (reporte.TipoReporte == "Usuario")
+                                        {
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1">
+                                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                                <circle cx="12" cy="7" r="4"></circle>
+                                            </svg>
+                                        }
+                                        else
+                                        {
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1">
+                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                                <polyline points="21 15 16 10 5 21"></polyline>
+                                            </svg>
+                                        }
+                                        Reporte de @reporte.TipoReporte
+                                    </span>
+                                    <small>@reporte.FechaReporte.ToString("dd/MM HH:mm")</small>
+                                </div>
+                            </div>
+
+                            <div class="report-body">
+                                <!-- Reportador -->
+                                <div class="user-info" style="background: #e3f2fd;">
+                                    @if (!string.IsNullOrEmpty(reporte.UsuarioReportador?.FotoPerfil))
+                                    {
+                                        <img src="@reporte.UsuarioReportador.FotoPerfil" class="user-avatar" alt="">
+                                    }
+                                    else
+                                    {
+                                        <div class="user-avatar-placeholder">
+                                            @(reporte.UsuarioReportador?.UserName?.Substring(0, 1).ToUpper() ?? "?")
                                         </div>
-                                        <div class="card-body">
-                                            <!-- Reportador -->
-                                            <div class="mb-3">
-                                                <strong class="text-muted">Reportado por:</strong>
-                                                <div class="d-flex align-items-center mt-1">
-                                                    @if (!string.IsNullOrEmpty(reporte.UsuarioReportador.FotoPerfil))
-                                                    {
-                                                        <img src="@reporte.UsuarioReportador.FotoPerfil"
-                                                             class="rounded-circle me-2" style="width: 30px; height: 30px;">
-                                                    }
-                                                    else
-                                                    {
-                                                        <div class="rounded-circle bg-primary text-white me-2 d-flex align-items-center justify-content-center"
-                                                             style="width: 30px; height: 30px; font-size: 0.8rem;">
-                                                            @reporte.UsuarioReportador.UserName.Substring(0, 1).ToUpper()
-                                                        </div>
-                                                    }
-                                                    <strong>@reporte.UsuarioReportador.UserName</strong>
-                                                </div>
-                                            </div>
-
-                                            <!-- Reportado -->
-                                            @if (reporte.TipoReporte == "Usuario" && reporte.UsuarioReportado != null)
-                                            {
-                                                <div class="mb-3">
-                                                    <strong class="text-danger">Usuario reportado:</strong>
-                                                    <div class="d-flex align-items-center mt-1">
-                                                        @if (!string.IsNullOrEmpty(reporte.UsuarioReportado.FotoPerfil))
-                                                        {
-                                                            <img src="@reporte.UsuarioReportado.FotoPerfil"
-                                                                 class="rounded-circle me-2" style="width: 30px; height: 30px;">
-                                                        }
-                                                        else
-                                                        {
-                                                            <div class="rounded-circle bg-danger text-white me-2 d-flex align-items-center justify-content-center"
-                                                                 style="width: 30px; height: 30px; font-size: 0.8rem;">
-                                                                @reporte.UsuarioReportado.UserName.Substring(0, 1).ToUpper()
-                                                            </div>
-                                                        }
-                                                        <strong>@reporte.UsuarioReportado.UserName</strong>
-                                                        <a href="@Url.Action("DetalleUsuario", new { id = reporte.UsuarioReportado.Id })"
-                                                           class="btn btn-sm btn-outline-primary ms-auto">
-                                                            Ver Perfil
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            }
-
-                                            @if (reporte.TipoReporte == "Contenido" && reporte.ContenidoReportado != null)
-                                            {
-                                                <div class="mb-3">
-                                                    <strong class="text-danger">Contenido reportado:</strong>
-                                                    <div class="mt-1">
-                                                        <p class="mb-1">
-                                                            @(reporte.ContenidoReportado.Descripcion.Length > 50
-                                                                ? reporte.ContenidoReportado.Descripcion.Substring(0, 50) + "..."
-                                                                : reporte.ContenidoReportado.Descripcion)
-                                                        </p>
-                                                        <a href="@Url.Action("DetalleContenido", new { id = reporte.ContenidoReportado.Id })"
-                                                           class="btn btn-sm btn-outline-primary">
-                                                            Ver Contenido
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            }
-
-                                            <!-- Motivo -->
-                                            <div class="mb-3">
-                                                <strong>Motivo:</strong>
-                                                <p class="mb-0">@reporte.Motivo</p>
-                                            </div>
-
-                                            <!-- Descripción -->
-                                            @if (!string.IsNullOrEmpty(reporte.Descripcion))
-                                            {
-                                                <div class="mb-3">
-                                                    <strong>Descripción:</strong>
-                                                    <p class="mb-0 text-muted small">@reporte.Descripcion</p>
-                                                </div>
-                                            }
-
-                                            <!-- Acciones -->
-                                            <div class="d-grid gap-2">
-                                                <button class="btn btn-success" data-bs-toggle="modal"
-                                                        data-bs-target="#resolverModal" data-reportid="@reporte.Id">
-                                                    <i class="fas fa-check"></i> Resolver Reporte
-                                                </button>
-                                            </div>
-                                        </div>
+                                    }
+                                    <div>
+                                        <div class="fw-bold">@(reporte.UsuarioReportador?.UserName ?? "Usuario")</div>
+                                        <small class="text-muted">Reporto este contenido</small>
                                     </div>
                                 </div>
-                            }
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="text-center py-5">
-                            <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
-                            <h5 class="text-muted">No hay reportes pendientes</h5>
-                        </div>
-                    }
-                </div>
 
-                <!-- Tab Resueltos -->
-                <div class="tab-pane fade" id="resueltos">
-                    @{
-                        var reportesResueltos = Model.Where(r => r.Estado == "Resuelto").OrderByDescending(r => r.FechaResolucion).ToList();
-                    }
-                    @if (reportesResueltos.Any())
-                    {
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Tipo</th>
-                                        <th>Reportado por</th>
-                                        <th>Motivo</th>
-                                        <th>Fecha Reporte</th>
-                                        <th>Fecha Resolución</th>
-                                        <th>Acción</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var reporte in reportesResueltos)
+                                <!-- Contenido/Usuario Reportado -->
+                                @if (reporte.TipoReporte == "Contenido" && reporte.ContenidoReportado != null)
+                                {
+                                    <div class="text-center mb-3">
+                                        <small class="text-danger fw-bold">CONTENIDO REPORTADO</small>
+                                        <div class="content-preview">
+                                            @if (reporte.ContenidoReportado.TipoContenido == Lado.Models.TipoContenido.Video)
+                                            {
+                                                <video src="@reporte.ContenidoReportado.RutaArchivo" muted></video>
+                                                <span class="video-badge">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                                    </svg>
+                                                    Video
+                                                </span>
+                                            }
+                                            else if (!string.IsNullOrEmpty(reporte.ContenidoReportado.RutaArchivo))
+                                            {
+                                                <img src="@reporte.ContenidoReportado.RutaArchivo" alt="Contenido reportado">
+                                            }
+                                            else
+                                            {
+                                                <div class="d-flex align-items-center justify-content-center h-100">
+                                                    <span class="text-muted">Sin imagen</span>
+                                                </div>
+                                            }
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(reporte.ContenidoReportado.Descripcion))
+                                        {
+                                            <p class="small text-muted mb-0 px-2" style="max-height: 40px; overflow: hidden;">
+                                                @(reporte.ContenidoReportado.Descripcion.Length > 80
+                                                    ? reporte.ContenidoReportado.Descripcion.Substring(0, 80) + "..."
+                                                    : reporte.ContenidoReportado.Descripcion)
+                                            </p>
+                                        }
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                Por: <strong>@(reporte.ContenidoReportado.Usuario?.UserName ?? "Desconocido")</strong>
+                                            </small>
+                                        </div>
+                                    </div>
+                                }
+                                else if (reporte.TipoReporte == "Usuario" && reporte.UsuarioReportado != null)
+                                {
+                                    <div class="user-info" style="background: #ffebee;">
+                                        @if (!string.IsNullOrEmpty(reporte.UsuarioReportado.FotoPerfil))
+                                        {
+                                            <img src="@reporte.UsuarioReportado.FotoPerfil" class="user-avatar" alt="" style="border-color: #dc3545;">
+                                        }
+                                        else
+                                        {
+                                            <div class="user-avatar-placeholder" style="background: linear-gradient(135deg, #dc3545 0%, #c62828 100%);">
+                                                @reporte.UsuarioReportado.UserName.Substring(0, 1).ToUpper()
+                                            </div>
+                                        }
+                                        <div>
+                                            <div class="fw-bold text-danger">@reporte.UsuarioReportado.UserName</div>
+                                            <small class="text-muted">Usuario reportado</small>
+                                        </div>
+                                    </div>
+                                }
+
+                                <!-- Motivo -->
+                                <div class="mb-3">
+                                    <small class="text-muted">Motivo:</small>
+                                    <div class="motivo-badge">@reporte.Motivo</div>
+                                </div>
+
+                                <!-- Descripcion -->
+                                @if (!string.IsNullOrEmpty(reporte.Descripcion))
+                                {
+                                    <div class="description-text">
+                                        "@reporte.Descripcion"
+                                    </div>
+                                }
+
+                                <!-- Acciones Rapidas -->
+                                <div class="action-buttons">
+                                    <form method="post" action="@Url.Action("ResolverReporte", new { id = reporte.Id })" class="d-inline">
+                                        <input type="hidden" name="accion" value="Usuario bloqueado">
+                                        <button type="submit" class="action-btn btn-block-user" onclick="return confirm('¿Bloquear usuario?')">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                                            </svg>
+                                            Bloquear Usuario
+                                        </button>
+                                    </form>
+
+                                    @if (reporte.TipoReporte == "Contenido")
                                     {
-                                        <tr>
-                                            <td>
-                                                <span class="badge bg-success">@reporte.TipoReporte</span>
-                                            </td>
-                                            <td>@reporte.UsuarioReportador.UserName</td>
-                                            <td>@reporte.Motivo</td>
-                                            <td>@reporte.FechaReporte.ToString("dd/MM/yy")</td>
-                                            <td>@reporte.FechaResolucion?.ToString("dd/MM/yy")</td>
-                                            <td>
-                                                @if (!string.IsNullOrEmpty(reporte.Accion))
-                                                {
-                                                    <small class="text-muted">@reporte.Accion</small>
-                                                }
-                                                else
-                                                {
-                                                    <small class="text-muted">-</small>
-                                                }
-                                            </td>
-                                        </tr>
+                                        <form method="post" action="@Url.Action("ResolverReporte", new { id = reporte.Id })" class="d-inline">
+                                            <input type="hidden" name="accion" value="Contenido eliminado">
+                                            <button type="submit" class="action-btn btn-delete-content" onclick="return confirm('¿Eliminar contenido?')">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                </svg>
+                                                Eliminar
+                                            </button>
+                                        </form>
+                                        <form method="post" action="@Url.Action("ResolverReporte", new { id = reporte.Id })" class="d-inline">
+                                            <input type="hidden" name="accion" value="Contenido censurado">
+                                            <button type="submit" class="action-btn btn-censor" onclick="return confirm('¿Censurar contenido?')">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                                </svg>
+                                                Censurar
+                                            </button>
+                                        </form>
                                     }
-                                </tbody>
-                            </table>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="text-center py-5">
-                            <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
-                            <h5 class="text-muted">No hay reportes resueltos</h5>
-                        </div>
-                    }
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- Modal Resolver Reporte -->
-<div class="modal fade" id="resolverModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title">Resolver Reporte</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    <form method="post" action="@Url.Action("ResolverReporte", new { id = reporte.Id })" class="d-inline">
+                                        <input type="hidden" name="accion" value="Advertencia enviada">
+                                        <button type="submit" class="action-btn btn-warn">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                                <line x1="12" y1="9" x2="12" y2="13"></line>
+                                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                            </svg>
+                                            Advertir
+                                        </button>
+                                    </form>
+
+                                    <form method="post" action="@Url.Action("ResolverReporte", new { id = reporte.Id })" class="d-inline">
+                                        <input type="hidden" name="accion" value="Reporte infundado">
+                                        <button type="submit" class="action-btn btn-dismiss">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                                            </svg>
+                                            Descartar
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
             </div>
-            <form method="post" id="formResolver">
-                <div class="modal-body">
-                    <p>Especifica la acción tomada:</p>
-                    <select name="accion" class="form-select mb-3" required>
-                        <option value="">Selecciona una acción...</option>
-                        <option value="Usuario bloqueado">Usuario bloqueado</option>
-                        <option value="Contenido eliminado">Contenido eliminado</option>
-                        <option value="Contenido censurado">Contenido censurado</option>
-                        <option value="Advertencia enviada">Advertencia enviada</option>
-                        <option value="Reporte infundado">Reporte infundado</option>
-                        <option value="Otro">Otro</option>
-                    </select>
-                    <textarea name="detalles" class="form-control" rows="3"
-                              placeholder="Detalles adicionales (opcional)"></textarea>
+        }
+        else
+        {
+            <div class="empty-state">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <h4>No hay reportes pendientes</h4>
+                <p>Todos los reportes han sido atendidos</p>
+            </div>
+        }
+    </div>
+
+    <!-- Tab Content: Resueltos -->
+    <div id="tab-resueltos" class="tab-content" style="display: none;">
+        @{
+            var reportesResueltos = Model.Where(r => r.Estado == "Resuelto").OrderByDescending(r => r.FechaResolucion).ToList();
+        }
+        @if (reportesResueltos.Any())
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 100px;">Tipo</th>
+                                <th>Reportado por</th>
+                                <th>Afectado</th>
+                                <th>Motivo</th>
+                                <th>Fecha</th>
+                                <th>Accion Tomada</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var reporte in reportesResueltos)
+                            {
+                                <tr>
+                                    <td>
+                                        <span class="badge @(reporte.TipoReporte == "Usuario" ? "bg-primary" : "bg-info")">
+                                            @reporte.TipoReporte
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            @if (!string.IsNullOrEmpty(reporte.UsuarioReportador?.FotoPerfil))
+                                            {
+                                                <img src="@reporte.UsuarioReportador.FotoPerfil" class="rounded-circle" style="width: 28px; height: 28px; object-fit: cover;">
+                                            }
+                                            @(reporte.UsuarioReportador?.UserName ?? "Desconocido")
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @if (reporte.TipoReporte == "Usuario")
+                                        {
+                                            <span class="text-danger">@(reporte.UsuarioReportado?.UserName ?? "N/A")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Contenido #@(reporte.ContenidoReportado?.Id ?? 0)</span>
+                                        }
+                                    </td>
+                                    <td><small>@reporte.Motivo</small></td>
+                                    <td>
+                                        <small class="text-muted">@reporte.FechaResolucion?.ToString("dd/MM/yy")</small>
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(reporte.Accion))
+                                        {
+                                            @if (reporte.Accion.Contains("bloqueado"))
+                                            {
+                                                <span class="badge bg-danger">@reporte.Accion</span>
+                                            }
+                                            else if (reporte.Accion.Contains("eliminado"))
+                                            {
+                                                <span class="badge bg-warning text-dark">@reporte.Accion</span>
+                                            }
+                                            else if (reporte.Accion.Contains("censurado"))
+                                            {
+                                                <span class="badge bg-purple text-white" style="background: #6f42c1;">@reporte.Accion</span>
+                                            }
+                                            else if (reporte.Accion.Contains("infundado"))
+                                            {
+                                                <span class="badge bg-secondary">@reporte.Accion</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-info">@reporte.Accion</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <small class="text-muted">-</small>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-success">Marcar como Resuelto</button>
-                </div>
-            </form>
-        </div>
+            </div>
+        }
+        else
+        {
+            <div class="empty-state">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <h4>Sin historial</h4>
+                <p>No hay reportes resueltos aun</p>
+            </div>
+        }
     </div>
 </div>
 
 <script>
-    document.getElementById('resolverModal').addEventListener('show.bs.modal', function (event) {
-        var button = event.relatedTarget;
-        var reportId = button.getAttribute('data-reportid');
-        document.getElementById('formResolver').action = '/Admin/ResolverReporte/' + reportId;
-    });
+function showTab(tabId, button) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+    // Show selected tab
+    document.getElementById('tab-' + tabId).style.display = 'block';
+    // Update active button
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    button.classList.add('active');
+}
 </script>
