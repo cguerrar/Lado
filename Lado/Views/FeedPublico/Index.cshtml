@@ -264,34 +264,17 @@
     }
 
     /* ========================================
-       STATS EN LA PARTE INFERIOR
+       DEGRADADO INFERIOR ADICIONAL
        ======================================== */
-    .mosaic-stats {
+    .mosaic-bottom-fade {
         position: fixed;
-        bottom: 40px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 100;
-        display: flex;
-        gap: 60px;
-        text-align: center;
-    }
-
-    .mosaic-stat {
-        color: rgba(255, 255, 255, 0.7);
-    }
-
-    .mosaic-stat-number {
-        font-size: 2rem;
-        font-weight: 800;
-        color: #fff;
-        display: block;
-    }
-
-    .mosaic-stat-label {
-        font-size: 0.85rem;
-        text-transform: uppercase;
-        letter-spacing: 1px;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 120px;
+        background: linear-gradient(to top, #000 0%, transparent 100%);
+        pointer-events: none;
+        z-index: 9;
         opacity: 0.8;
     }
 
@@ -362,20 +345,6 @@
             justify-content: center;
             width: 100%;
             text-align: center;
-        }
-
-        .mosaic-stats {
-            gap: 24px;
-            bottom: 25px;
-        }
-
-        .mosaic-stat-number {
-            font-size: 1.4rem;
-        }
-
-        .mosaic-stat-label {
-            font-size: 0.7rem;
-            letter-spacing: 0.5px;
         }
 
         .mosaic-content {
@@ -454,21 +423,6 @@
             align-items: center;
         }
 
-        .mosaic-stats {
-            gap: 16px;
-            bottom: 20px;
-            flex-wrap: wrap;
-            justify-content: center;
-            padding: 0 10px;
-        }
-
-        .mosaic-stat-number {
-            font-size: 1.2rem;
-        }
-
-        .mosaic-stat-label {
-            font-size: 0.65rem;
-        }
     }
 
     /* ========================================
@@ -520,9 +474,6 @@
             padding-right: env(safe-area-inset-right);
         }
 
-        .mosaic-stats {
-            bottom: calc(20px + env(safe-area-inset-bottom));
-        }
     }
 
     /* ========================================
@@ -547,19 +498,6 @@
         .mosaic-btn {
             padding: 10px 20px;
             font-size: 12px;
-        }
-
-        .mosaic-stats {
-            bottom: 10px;
-            gap: 20px;
-        }
-
-        .mosaic-stat-number {
-            font-size: 1rem;
-        }
-
-        .mosaic-stat-label {
-            font-size: 0.6rem;
         }
     }
 
@@ -602,8 +540,9 @@
                 .OrderBy(x => random.Next())
                 .ToList();
 
-            // Repetir si hay pocas imagenes para llenar el mosaico
-            var itemsNecesarios = 120; // Grid grande
+            // Necesitamos suficientes items para llenar toda la pantalla
+            // Para pantalla 1920x1080 con items de 100px = ~20 cols x 12 rows = 240 items
+            var itemsNecesarios = 250;
             while (contenidoAleatorio.Count < itemsNecesarios && contenidoLista.Any())
             {
                 contenidoAleatorio.AddRange(contenidoLista
@@ -622,14 +561,18 @@
             <div class="mosaic-item" data-tipo="@(esVideo ? "video" : "image")" onclick="window.location.href='@Url.Action("Login", "Account")'">
                 @if (esVideo)
                 {
-                    <video src="@item.RutaArchivo" muted loop playsinline preload="metadata"></video>
+                    <video data-src="@item.RutaArchivo" muted loop playsinline preload="none" poster="@(item.Thumbnail ?? "")"></video>
                     <div class="video-badge">
                         <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                     </div>
                 }
                 else
                 {
-                    <img data-src="@imagenSrc" alt="">
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E"
+                         data-src="@imagenSrc"
+                         alt=""
+                         loading="lazy"
+                         decoding="async">
                 }
             </div>
         }
@@ -681,27 +624,14 @@
         }
     </div>
 
-    <!-- Stats -->
-    <div class="mosaic-stats">
-        <div class="mosaic-stat">
-            <span class="mosaic-stat-number" id="statCreadores">0</span>
-            <span class="mosaic-stat-label">Creadores</span>
-        </div>
-        <div class="mosaic-stat">
-            <span class="mosaic-stat-number" id="statContenido">0</span>
-            <span class="mosaic-stat-label">Contenidos</span>
-        </div>
-        <div class="mosaic-stat">
-            <span class="mosaic-stat-number" id="statComunidad">0</span>
-            <span class="mosaic-stat-label">Comunidad</span>
-        </div>
-    </div>
 </div>
 
 @section Scripts {
     <script>
         (function() {
             const grid = document.getElementById('mosaicGrid');
+            if (!grid) return;
+
             const items = grid.querySelectorAll('.mosaic-item');
 
             // Detectar si es dispositivo tactil
@@ -713,134 +643,192 @@
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
             // ========================================
-            // CARGA PROGRESIVA DE IMAGENES
+            // SISTEMA DE CARGA OPTIMIZADO CON INTERSECTION OBSERVER
             // ========================================
-            function loadImage(img, item, retryCount = 0) {
-                const src = img.getAttribute('data-src');
-                if (!src) return;
 
-                // Crear nueva imagen para precargar
-                const tempImg = new Image();
+            // Imagen de fallback en caso de error (gradiente sutil)
+            const fallbackSrc = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%231a1a2e'/%3E%3Cstop offset='100%25' style='stop-color:%232d2d44'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23g)' width='100' height='100'/%3E%3C/svg%3E";
 
-                tempImg.onload = function() {
-                    img.src = src;
-                    img.removeAttribute('data-src');
-                    // Delay aleatorio para efecto visual
-                    const delay = Math.random() * 150;
-                    setTimeout(() => {
+            // Tracking de items cargados
+            const loadedItems = new Set();
+            let observerActive = true;
+
+            // Función para cargar una imagen
+            function loadMedia(item) {
+                if (loadedItems.has(item)) return;
+
+                const img = item.querySelector('img');
+                const video = item.querySelector('video');
+
+                if (img && img.hasAttribute('data-src')) {
+                    const src = img.getAttribute('data-src');
+
+                    // Marcar como en proceso
+                    loadedItems.add(item);
+
+                    // Cargar imagen
+                    img.onload = function() {
                         img.classList.add('loaded');
                         item.classList.add('media-loaded');
-                    }, delay);
-                };
+                        img.removeAttribute('data-src');
+                    };
 
-                tempImg.onerror = function() {
-                    // Reintentar hasta 2 veces con cache-bust
-                    if (retryCount < 2) {
-                        setTimeout(() => {
-                            const bustSrc = src + (src.includes('?') ? '&' : '?') + '_t=' + Date.now();
-                            img.setAttribute('data-src', bustSrc);
-                            loadImage(img, item, retryCount + 1);
-                        }, 500 * (retryCount + 1));
-                    } else {
-                        item.style.visibility = 'hidden';
-                    }
-                };
+                    img.onerror = function() {
+                        // Usar fallback en lugar de ocultar
+                        img.src = fallbackSrc;
+                        img.classList.add('loaded');
+                        item.classList.add('media-loaded');
+                        img.removeAttribute('data-src');
+                    };
 
-                tempImg.src = src;
+                    img.src = src;
+                }
+
+                if (video && video.hasAttribute('data-src')) {
+                    const src = video.getAttribute('data-src');
+
+                    loadedItems.add(item);
+
+                    video.onloadeddata = function() {
+                        video.classList.add('loaded');
+                        item.classList.add('media-loaded');
+                    };
+
+                    video.onerror = function() {
+                        item.classList.add('media-loaded');
+                        // Ocultar el badge de video si falla
+                        const badge = item.querySelector('.video-badge');
+                        if (badge) badge.style.display = 'none';
+                    };
+
+                    video.src = src;
+                    video.removeAttribute('data-src');
+                }
             }
 
-            function setupProgressiveLoading() {
-                const imagesToLoad = [];
+            // Crear Intersection Observer con margen más amplio
+            const observerOptions = {
+                root: null,
+                rootMargin: '500px', // Pre-cargar 500px antes de entrar en viewport
+                threshold: 0
+            };
 
-                items.forEach((item, index) => {
-                    const img = item.querySelector('img[data-src]');
-                    const video = item.querySelector('video');
+            const imageObserver = new IntersectionObserver((entries) => {
+                if (!observerActive) return;
 
-                    if (img) {
-                        imagesToLoad.push({ img, item, index });
-                    }
-
-                    if (video) {
-                        video.addEventListener('loadeddata', function() {
-                            const delay = Math.random() * 150;
-                            setTimeout(() => {
-                                this.classList.add('loaded');
-                                item.classList.add('media-loaded');
-                            }, delay);
-                        });
-
-                        if (video.readyState >= 2) {
-                            video.classList.add('loaded');
-                            item.classList.add('media-loaded');
-                        }
-
-                        video.addEventListener('error', function() {
-                            item.style.visibility = 'hidden';
-                        });
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        loadMedia(entry.target);
+                        imageObserver.unobserve(entry.target);
                     }
                 });
+            }, observerOptions);
 
-                // Cargar imagenes en lotes para no saturar
-                const batchSize = 10;
-                let currentBatch = 0;
+            // Observar todos los items
+            items.forEach(item => {
+                imageObserver.observe(item);
+            });
 
-                function loadNextBatch() {
-                    const start = currentBatch * batchSize;
-                    const end = Math.min(start + batchSize, imagesToLoad.length);
+            // Cargar items visibles inmediatamente (los del centro)
+            function loadVisibleItems() {
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                const centerX = viewportWidth / 2;
+                const centerY = viewportHeight / 2;
 
-                    for (let i = start; i < end; i++) {
-                        const { img, item } = imagesToLoad[i];
-                        loadImage(img, item);
-                    }
+                // Ordenar por distancia al centro
+                const sortedItems = Array.from(items).map(item => {
+                    const rect = item.getBoundingClientRect();
+                    const itemCenterX = rect.left + rect.width / 2;
+                    const itemCenterY = rect.top + rect.height / 2;
+                    const distance = Math.sqrt(
+                        Math.pow(itemCenterX - centerX, 2) +
+                        Math.pow(itemCenterY - centerY, 2)
+                    );
+                    return { item, distance, visible: item.style.display !== 'none' };
+                })
+                .filter(i => i.visible)
+                .sort((a, b) => a.distance - b.distance);
 
-                    currentBatch++;
-                    if (end < imagesToLoad.length) {
-                        setTimeout(loadNextBatch, 50);
-                    }
-                }
+                // Cargar primero los 20 más cercanos al centro
+                const priorityItems = sortedItems.slice(0, 20);
 
-                // Iniciar carga
-                if (imagesToLoad.length > 0) {
-                    loadNextBatch();
-                }
+                priorityItems.forEach(({ item }, index) => {
+                    setTimeout(() => loadMedia(item), index * 20);
+                });
             }
 
-            // Iniciar carga progresiva cuando el DOM esté listo
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', setupProgressiveLoading);
+            // Cargar todos los items restantes después de un delay
+            function loadRemainingItems() {
+                let delay = 0;
+                items.forEach(item => {
+                    if (!loadedItems.has(item)) {
+                        // Cargar todos los items, incluso los ocultos (por si se muestran después)
+                        setTimeout(() => loadMedia(item), delay);
+                        delay += 15; // Reducido de 30 a 15ms para carga más rápida
+                    }
+                });
+            }
+
+            // Forzar carga de TODOS los items después de 3 segundos
+            function forceLoadAll() {
+                items.forEach(item => {
+                    if (!loadedItems.has(item)) {
+                        loadMedia(item);
+                    }
+                });
+            }
+
+            // Iniciar carga
+            function initLoading() {
+                requestAnimationFrame(() => {
+                    // Primero cargar items visibles/cercanos al centro
+                    loadVisibleItems();
+
+                    // Después de 500ms, cargar el resto progresivamente
+                    setTimeout(loadRemainingItems, 500);
+
+                    // Forzar carga de todos los items restantes después de 3 segundos
+                    setTimeout(forceLoadAll, 3000);
+                });
+            }
+
+            // Ejecutar cuando el DOM esté listo
+            if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                setTimeout(initLoading, 50);
             } else {
-                setupProgressiveLoading();
+                document.addEventListener('DOMContentLoaded', initLoading);
             }
 
             function setupGrid() {
                 const vw = window.innerWidth;
                 const vh = window.innerHeight;
 
-                let cols, rows, itemSize, gap;
+                let cols, itemSize, gap;
 
-                // Grid adaptativo segun tamano de pantalla
+                // Determinar tamano de items y columnas segun ancho
                 if (vw > 1600) {
-                    cols = 15; rows = 8; itemSize = 120; gap = 4;
+                    itemSize = 110; gap = 4;
                 } else if (vw > 1400) {
-                    cols = 14; rows = 8; itemSize = 110; gap = 4;
+                    itemSize = 100; gap = 4;
                 } else if (vw > 1200) {
-                    cols = 12; rows = 7; itemSize = 105; gap = 4;
+                    itemSize = 95; gap = 4;
                 } else if (vw > 1024) {
-                    cols = 11; rows = 7; itemSize = 95; gap = 3;
+                    itemSize = 90; gap = 3;
                 } else if (vw > 768) {
-                    cols = 10; rows = 7; itemSize = 85; gap = 3;
+                    itemSize = 80; gap = 3;
                 } else if (vw > 480) {
-                    cols = 8; rows = 10; itemSize = 65; gap = 2;
+                    itemSize = 65; gap = 2;
                 } else {
-                    cols = 6; rows = 12; itemSize = 55; gap = 2;
+                    itemSize = 55; gap = 2;
                 }
 
-                // Ajustar para landscape en moviles
-                if (vh < 500 && vw > vh) {
-                    cols = Math.min(cols + 4, 18);
-                    rows = Math.max(rows - 3, 4);
-                    itemSize = Math.min(itemSize, 70);
-                }
+                // Calcular columnas y filas para LLENAR toda la pantalla + extra
+                cols = Math.ceil(vw / (itemSize + gap)) + 2;
+                let rows = Math.ceil(vh / (itemSize + gap)) + 2;
+
+                // Asegurar minimo de filas para que el mosaico cubra todo
+                rows = Math.max(rows, 10);
 
                 grid.style.gridTemplateColumns = `repeat(${cols}, ${itemSize}px)`;
                 grid.style.gridTemplateRows = `repeat(${rows}, ${itemSize}px)`;
@@ -848,24 +836,39 @@
 
                 const maxItems = cols * rows;
                 items.forEach((item, index) => {
-                    item.style.display = index < maxItems ? 'block' : 'none';
+                    const shouldShow = index < maxItems;
+                    item.style.display = shouldShow ? 'block' : 'none';
+
+                    // Cargar items que ahora son visibles pero no estaban cargados
+                    if (shouldShow && !loadedItems.has(item)) {
+                        loadMedia(item);
+                    }
                 });
             }
 
             setupGrid();
-            window.addEventListener('resize', setupGrid);
+
+            // Debounce para resize
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(setupGrid, 100);
+            });
             window.addEventListener('orientationchange', () => {
                 setTimeout(setupGrid, 100);
             });
 
-            // Manejo de videos
+            // Manejo de videos - solo después de que se carguen
             if (!isTouchDevice) {
-                // Desktop: hover para reproducir
+                // Desktop: hover para reproducir (solo si el video ya cargó)
                 items.forEach(item => {
                     const video = item.querySelector('video');
                     if (video) {
                         item.addEventListener('mouseenter', () => {
-                            video.play().catch(() => {});
+                            // Solo reproducir si ya tiene src y está cargado
+                            if (video.src && video.readyState >= 2) {
+                                video.play().catch(() => {});
+                            }
                         });
                         item.addEventListener('mouseleave', () => {
                             video.pause();
@@ -874,21 +877,20 @@
                     }
                 });
             } else {
-                // Movil: reproducir algunos videos aleatoriamente como preview
-                const videos = Array.from(grid.querySelectorAll('video'));
-                const videosToPlay = videos.slice(0, Math.min(3, videos.length));
+                // Movil: reproducir algunos videos después de cargarlos
+                setTimeout(() => {
+                    const videos = Array.from(grid.querySelectorAll('video'))
+                        .filter(v => v.src && v.readyState >= 2);
+                    const videosToPlay = videos.slice(0, Math.min(2, videos.length));
 
-                videosToPlay.forEach(video => {
-                    video.muted = true;
-                    video.playsInline = true;
-                    video.setAttribute('playsinline', '');
-                    video.setAttribute('webkit-playsinline', '');
-
-                    // Intentar reproducir con delay aleatorio
-                    setTimeout(() => {
+                    videosToPlay.forEach(video => {
+                        video.muted = true;
+                        video.playsInline = true;
+                        video.setAttribute('playsinline', '');
+                        video.setAttribute('webkit-playsinline', '');
                         video.play().catch(() => {});
-                    }, Math.random() * 2000);
-                });
+                    });
+                }, 2000); // Esperar a que carguen
             }
 
             // Animar stats

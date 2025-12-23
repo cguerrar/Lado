@@ -34,7 +34,8 @@ namespace Lado.Middleware
                 "/account/forgotpassword",
                 "/account/resetpassword",
                 "/ageverification",
-                "/css", "/js", "/lib", "/images", "/uploads"
+                "/css", "/js", "/lib", "/images", "/uploads",
+                "/signalr"  // Para conexiones en tiempo real
             };
 
             // ✅ CORRECCIÓN: Verificar si es exactamente "/" o si empieza con alguna ruta pública

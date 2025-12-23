@@ -45,6 +45,12 @@ namespace Lado.Models
 
         public bool EsGratis { get; set; } = true;
 
+        /// <summary>
+        /// Indica si el contenido es un Reel (video corto vertical desde el creador de Reels)
+        /// vs un Post con video normal
+        /// </summary>
+        public bool EsReel { get; set; } = false;
+
         // ========================================
         // VISIBILIDAD PÚBLICA PARA FEED GENERAL
         // ========================================
@@ -66,6 +72,25 @@ namespace Lado.Models
         public int? DuracionPreviewSegundos { get; set; }
 
         public string? RutaPreview { get; set; }
+
+        // ========================================
+        // PREVIEW BLUR DE LADOB EN LADOA
+        // ========================================
+
+        /// <summary>
+        /// Si es true, este contenido es un preview censurado de un contenido LadoB
+        /// </summary>
+        public bool EsPreviewBlurDeLadoB { get; set; } = false;
+
+        /// <summary>
+        /// ID del contenido LadoB original (si este es un preview blur)
+        /// </summary>
+        public int? ContenidoOriginalLadoBId { get; set; }
+
+        /// <summary>
+        /// Tipo de censura aplicada al preview
+        /// </summary>
+        public TipoCensuraPreview? TipoCensuraPreview { get; set; }
 
         // ========================================
         // MÚSICA ASOCIADA (para fotos con audio)

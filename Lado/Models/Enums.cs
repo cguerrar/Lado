@@ -75,6 +75,14 @@
         LadoB = 1   // Monetizado, seudónimo
     }
 
+    public enum TipoCensuraPreview
+    {
+        Blur = 0,       // Desenfoque gaussiano
+        Pixelado = 1,   // Pixelado estilo mosaico
+        Silueta = 2,    // Solo silueta/sombra
+        Parcial = 3     // Solo 10-20% visible
+    }
+
     // ====================================
     // ENUMS PARA SISTEMA DE AGENCIAS
     // ====================================

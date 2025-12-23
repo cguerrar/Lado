@@ -115,6 +115,7 @@ namespace Lado.Controllers
 
             ViewBag.UsuarioVerificado = user.CreadorVerificado;
             ViewBag.LadoPreferido = user.LadoPreferido;
+            ViewBag.PermitirPreviewBlur = user.PermitirPreviewBlurLadoB && user.TieneLadoB();
 
             _logger.LogInformation("GET Crear - Usuario: {Username}, Verificado: {Verificado}, LadoPreferido: {LadoPreferido}",
                 user.UserName, user.CreadorVerificado, user.LadoPreferido);
@@ -135,7 +136,9 @@ namespace Lado.Controllers
             bool EsGratis,
             decimal? PrecioDesbloqueo = null,
             bool EsBorrador = false,
-            bool EsPublicoGeneral = false)
+            bool EsPublicoGeneral = false,
+            bool CrearPreviewBlur = false,
+            int TipoCensuraPreview = 0)
         {
             try
             {
@@ -420,6 +423,47 @@ namespace Lado.Controllers
                 _logger.LogInformation("Contenido guardado - ID: {Id}, TipoLado: {TipoLado}, CategoriaId: {CategoriaId}",
                     contenido.Id, contenido.TipoLado, contenido.CategoriaInteresId);
 
+                // ========================================
+                // CREAR PREVIEW BLUR PARA LADOA (si se solicitó)
+                // ========================================
+                if (CrearPreviewBlur && tipoLado == TipoLado.LadoB && !EsBorrador)
+                {
+                    try
+                    {
+                        var previewBlur = new Contenido
+                        {
+                            UsuarioId = usuario.Id,
+                            TipoContenido = contenido.TipoContenido,
+                            Descripcion = "✨ Contenido exclusivo disponible en mi LadoB",
+                            RutaArchivo = contenido.RutaArchivo,
+                            Thumbnail = contenido.Thumbnail,
+                            TipoLado = TipoLado.LadoA,
+                            EsGratis = true,
+                            EsPublicoGeneral = true,
+                            NombreMostrado = usuario.NombreCompleto,
+                            EsPreviewBlurDeLadoB = true,
+                            ContenidoOriginalLadoBId = contenido.Id,
+                            TipoCensuraPreview = (Models.TipoCensuraPreview)TipoCensuraPreview,
+                            CategoriaInteresId = contenido.CategoriaInteresId,
+                            FechaPublicacion = DateTime.Now,
+                            EstaActivo = true,
+                            Latitud = contenido.Latitud,
+                            Longitud = contenido.Longitud,
+                            NombreUbicacion = contenido.NombreUbicacion
+                        };
+
+                        _context.Contenidos.Add(previewBlur);
+                        await _context.SaveChangesAsync();
+
+                        _logger.LogInformation("Preview blur creado - ID: {Id} para LadoB contenido ID: {OriginalId}",
+                            previewBlur.Id, contenido.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error al crear preview blur, el contenido original se guardó correctamente");
+                    }
+                }
+
                 // ✅ Mensajes de éxito personalizados
                 if (EsBorrador)
                 {
@@ -456,6 +500,120 @@ namespace Lado.Controllers
                 TempData["Error"] = $"Error al crear contenido: {ex.Message}";
                 ViewBag.UsuarioVerificado = false;
                 return View();
+            }
+        }
+
+        // ========================================
+        // CREAR RAPIDO (DESDE EDITOR DE IMAGENES)
+        // ========================================
+
+        [HttpPost]
+        public async Task<IActionResult> CrearRapido(IFormFile archivo, string descripcion, bool esPublico = true)
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
+                {
+                    return Json(new { success = false, error = "Usuario no autenticado" });
+                }
+
+                if (archivo == null || archivo.Length == 0)
+                {
+                    return Json(new { success = false, error = "No se recibió el archivo" });
+                }
+
+                // Rate limiting básico
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var userAgent = Request.Headers["User-Agent"].ToString();
+                var rateLimitKey = $"content_create_{usuario.Id}";
+
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKey, 10, TimeSpan.FromMinutes(5),
+                    TipoAtaque.SpamContenido, "/Contenido/CrearRapido", usuario.Id, userAgent))
+                {
+                    return Json(new { success = false, error = "Demasiadas publicaciones. Espera unos minutos." });
+                }
+
+                // Validar archivo
+                var extension = Path.GetExtension(archivo.FileName).ToLower();
+                var tiposPermitidos = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+
+                if (!tiposPermitidos.Contains(extension))
+                {
+                    return Json(new { success = false, error = "Formato no permitido. Usa JPG, PNG, GIF o WEBP." });
+                }
+
+                if (archivo.Length > 20 * 1024 * 1024) // 20MB max
+                {
+                    return Json(new { success = false, error = "El archivo es muy grande (max 20MB)" });
+                }
+
+                // Guardar archivo
+                var carpetaUsuario = usuario.UserName?.Replace("@", "_").Replace(".", "_") ?? usuario.Id;
+                var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", carpetaUsuario);
+
+                if (!Directory.Exists(uploadsFolder))
+                {
+                    Directory.CreateDirectory(uploadsFolder);
+                }
+
+                var uniqueFileName = $"promo_{Guid.NewGuid()}{extension}";
+                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                using (var fileStream = new FileStream(filePath, FileMode.Create))
+                {
+                    await archivo.CopyToAsync(fileStream);
+                }
+
+                var rutaArchivo = $"/uploads/{carpetaUsuario}/{uniqueFileName}";
+
+                // Crear contenido
+                var contenido = new Contenido
+                {
+                    UsuarioId = usuario.Id,
+                    TipoContenido = Models.TipoContenido.Foto,
+                    Descripcion = descripcion ?? "",
+                    RutaArchivo = rutaArchivo,
+                    TipoLado = TipoLado.LadoA,
+                    EsGratis = true,
+                    EsPublicoGeneral = esPublico,
+                    NombreMostrado = usuario.NombreCompleto,
+                    EsPremium = false,
+                    PrecioDesbloqueo = 0,
+                    EsBorrador = false,
+                    FechaPublicacion = DateTime.Now,
+                    EstaActivo = true,
+                    NumeroLikes = 0,
+                    NumeroComentarios = 0,
+                    NumeroVistas = 0
+                };
+
+                // Generar thumbnail
+                var thumbnail = await _imageService.GenerarThumbnailAsync(filePath, 400, 400, 75);
+                if (!string.IsNullOrEmpty(thumbnail))
+                {
+                    contenido.Thumbnail = thumbnail;
+                }
+
+                _context.Contenidos.Add(contenido);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Contenido creado desde editor - ID: {Id}, Usuario: {Usuario}",
+                    contenido.Id, usuario.UserName);
+
+                // Notificar a seguidores
+                _ = _notificationService.NotificarNuevoContenidoAsync(
+                    usuario.Id,
+                    contenido.Id,
+                    contenido.Descripcion ?? "Nueva imagen promocional",
+                    TipoLado.LadoA);
+
+                return Json(new { success = true, contenidoId = contenido.Id });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error en CrearRapido");
+                return Json(new { success = false, error = "Error al publicar: " + ex.Message });
             }
         }
 
@@ -1019,7 +1177,9 @@ namespace Lado.Controllers
                     MusicaVolumen = audioVolume,
                     AudioOriginalVolumen = originalVolume,
                     AudioTrimInicio = audioStartTime.HasValue ? (int)audioStartTime.Value : null,
-                    AudioDuracion = null // Se calculará si es necesario
+                    AudioDuracion = null, // Se calculará si es necesario
+                    // Marcar como Reel (creado desde el creador de Reels)
+                    EsReel = true
                 };
 
                 // Incrementar contador de uso de la pista musical

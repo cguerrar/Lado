@@ -1627,7 +1627,7 @@
 				</button>
 
 				<!-- Theme Toggle -->
-				<button type="button" class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" aria-label="@Localizer.Get("Settings_Theme")">
+				<button type="button" class="theme-toggle" id="themeToggleBtn" aria-label="@Localizer.Get("Settings_Theme")">
 					<svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 						<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
 					</svg>
@@ -1889,31 +1889,39 @@
 			html.style.display = '';
 		}
 
-		// Agregar event listener robusto para iOS
-		document.addEventListener('DOMContentLoaded', function() {
-			const themeBtn = document.getElementById('themeToggleBtn');
-			if (themeBtn) {
-				let lastToggle = 0;
+		// Agregar event listener robusto para el toggle de tema
+		(function() {
+			let isToggling = false;
 
-				function handleToggle(e) {
+			function setupThemeToggle() {
+				const themeBtn = document.getElementById('themeToggleBtn');
+				if (!themeBtn) return;
+
+				// Solo usar click - es el más confiable cross-browser
+				themeBtn.addEventListener('click', function(e) {
 					e.preventDefault();
-					e.stopPropagation();
 
-					// Debounce para evitar doble toggle (touchend + click)
-					const now = Date.now();
-					if (now - lastToggle < 300) return;
-					lastToggle = now;
+					// Prevenir doble ejecución
+					if (isToggling) return;
+					isToggling = true;
 
 					toggleTheme();
-				}
 
-				// Usar addEventListener (más confiable en iOS)
-				themeBtn.addEventListener('click', handleToggle, { passive: false });
+					// Reset flag después de un pequeño delay
+					setTimeout(() => { isToggling = false; }, 100);
+				});
 
-				// También agregar touchend para iOS (algunos modelos lo necesitan)
-				themeBtn.addEventListener('touchend', handleToggle, { passive: false });
+				// CSS para evitar delay en móviles
+				themeBtn.style.touchAction = 'manipulation';
 			}
-		});
+
+			// Ejecutar cuando el DOM esté listo
+			if (document.readyState === 'loading') {
+				document.addEventListener('DOMContentLoaded', setupThemeToggle);
+			} else {
+				setupThemeToggle();
+			}
+		})();
 
 		function toggleSidebar(e) {
 			if (e) {
@@ -1950,7 +1958,7 @@
 			}
 		});
 
-		const observer = new MutationObserver(function(mutations) {
+		const sidebarBodyObserver = new MutationObserver(function(mutations) {
 			mutations.forEach(function(mutation) {
 				if (mutation.attributeName === 'class') {
 					const body = mutation.target;
@@ -1963,7 +1971,7 @@
 			});
 		});
 
-		observer.observe(document.body, {
+		sidebarBodyObserver.observe(document.body, {
 			attributes: true
 		});
 

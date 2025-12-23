@@ -80,6 +80,51 @@ namespace Lado.Controllers
             return RedirectToAction("Index", "Dashboard");
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarCuenta()
+        {
+            try
+            {
+                var user = await _userManager.GetUserAsync(User);
+                if (user == null)
+                {
+                    return Json(new { success = false, message = "Usuario no encontrado" });
+                }
+
+                // Guardar el email para el log
+                var email = user.Email;
+
+                // Eliminar el usuario
+                var result = await _userManager.DeleteAsync(user);
+
+                if (result.Succeeded)
+                {
+                    // Log de eliminación
+                    _context.AgeVerificationLogs.Add(new AgeVerificationLog
+                    {
+                        UserId = "DELETED-" + email,
+                        FechaVerificacion = DateTime.UtcNow,
+                        Pais = "ACCOUNT_DELETED",
+                        EdadAlVerificar = 0,
+                        IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                    });
+                    await _context.SaveChangesAsync();
+
+                    return Json(new { success = true, message = "Cuenta eliminada exitosamente" });
+                }
+                else
+                {
+                    var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                    return Json(new { success = false, message = "Error al eliminar: " + errors });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Error: " + ex.Message });
+            }
+        }
+
         private int ObtenerEdadMinimaPorPais(string pais)
         {
             // Edad mínima por país según legislación

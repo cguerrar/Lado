@@ -55,7 +55,7 @@ namespace Lado.Controllers
                             && c.Usuario.EstaActivo)
                     .OrderByDescending(c => c.NumeroLikes + c.NumeroVistas)
                     .ThenByDescending(c => c.FechaPublicacion)
-                    .Take(150)  // Obtener mas contenido para el mosaico
+                    .Take(300)  // Obtener suficiente contenido para llenar toda la pantalla
                     .ToListAsync();
 
                 // 2. CONTENIDO PREMIUM (LadoB) para mostrar difuminado

@@ -587,6 +587,15 @@
         display: block;
     }
 
+    /* Video preview hover effect */
+    .post-item video.video-preview {
+        transition: transform 0.2s ease;
+    }
+
+    .post-item:hover video.video-preview {
+        transform: scale(1.02);
+    }
+
     .post-overlay {
         position: absolute;
         inset: 0;
@@ -2089,7 +2098,7 @@
                                 }
                                 else
                                 {
-                                    <video src="@contenido.RutaArchivo" muted preload="metadata"></video>
+                                    <video src="@(contenido.RutaArchivo)#t=0.1" muted preload="metadata" playsinline loop class="video-preview"></video>
                                 }
                                 <div class="video-indicator">
                                     <svg viewBox="0 0 24 24" fill="currentColor">
@@ -2194,7 +2203,7 @@
                             }
                             else
                             {
-                                <video src="@contenido.RutaArchivo" muted></video>
+                                <video src="@(contenido.RutaArchivo)#t=0.1" muted preload="metadata" playsinline loop class="video-preview"></video>
                             }
                             <div class="video-indicator">
                                 <svg viewBox="0 0 24 24">
@@ -2764,5 +2773,39 @@ document.addEventListener('DOMContentLoaded', function() {
     if (subscribeModal && subscribeModal.parentElement !== document.body) {
         document.body.appendChild(subscribeModal);
     }
+
+    // Video hover play functionality
+    initVideoHover();
 });
+
+function initVideoHover() {
+    const videoItems = document.querySelectorAll('.post-item video.video-preview');
+
+    videoItems.forEach(video => {
+        if (video.dataset.hoverInitialized) return;
+        video.dataset.hoverInitialized = 'true';
+
+        const postItem = video.closest('.post-item');
+        if (!postItem) return;
+
+        postItem.addEventListener('mouseenter', function() {
+            if (video.readyState >= 2) {
+                video.currentTime = 0;
+                video.play().catch(() => {});
+            }
+        });
+
+        postItem.addEventListener('mouseleave', function() {
+            video.pause();
+            // Reset to first frame
+            const src = video.src;
+            if (src.includes('#t=')) {
+                const baseUrl = src.split('#t=')[0];
+                video.currentTime = 0.1;
+            } else {
+                video.currentTime = 0;
+            }
+        });
+    });
+}
 </script>

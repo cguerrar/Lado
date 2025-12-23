@@ -2131,7 +2131,7 @@ namespace Lado.Controllers
                     .Select(s => s.CreadorId)
                     .ToListAsync();
 
-                // Obtener contenido para explorar (60 items iniciales)
+                // Obtener contenido para explorar (100 items iniciales)
                 // Mostrar TODO el contenido (LadoA y LadoB) - el LadoB se mostrará bloqueado si no está suscrito
                 var contenidoExplorar = await _context.Contenidos
                     .Include(c => c.Usuario)
@@ -2144,7 +2144,7 @@ namespace Lado.Controllers
                             && !usuariosBloqueadosIds.Contains(c.UsuarioId))
                     .OrderByDescending(c => c.NumeroLikes + c.NumeroComentarios * 2)
                     .ThenByDescending(c => c.FechaPublicacion)
-                    .Take(60)
+                    .Take(100)
                     .ToListAsync();
 
                 ViewBag.ContenidoExplorar = contenidoExplorar;
@@ -2232,6 +2232,13 @@ namespace Lado.Controllers
                     .Select(s => s.CreadorId)
                     .ToListAsync();
 
+                // Obtener IDs de creadores que el usuario sigue (todas las suscripciones activas)
+                var suscripcionesTodas = await _context.Suscripciones
+                    .AsNoTracking()
+                    .Where(s => s.FanId == usuarioActual.Id && s.EstaActiva)
+                    .Select(s => s.CreadorId)
+                    .ToListAsync();
+
                 var query = _context.Contenidos
                     .AsNoTracking() // ⚡ No tracking
                     .Where(c => c.EstaActivo
@@ -2242,7 +2249,12 @@ namespace Lado.Controllers
                             && !usuariosBloqueadosIds.Contains(c.UsuarioId));
 
                 // Filtrar por tipo
-                if (tipo == "fotos")
+                if (tipo == "siguiendo")
+                {
+                    // Solo contenido de creadores que el usuario sigue
+                    query = query.Where(c => suscripcionesTodas.Contains(c.UsuarioId));
+                }
+                else if (tipo == "fotos")
                 {
                     query = query.Where(c => c.TipoContenido == TipoContenido.Foto || c.TipoContenido == TipoContenido.Imagen);
                 }

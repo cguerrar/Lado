@@ -213,6 +213,59 @@ namespace Lado.Models
         [Display(Name = "Lado Preferido")]
         public TipoLado LadoPreferido { get; set; } = TipoLado.LadoA; // LadoA = Público, LadoB = Premium
 
+        // ========================================
+        // PROMOCIÓN DE LADOB DESDE LADOA
+        // ========================================
+        /// <summary>
+        /// Muestra un banner "Tengo contenido exclusivo" en el perfil LadoA
+        /// </summary>
+        [Display(Name = "Mostrar Teaser LadoB en Perfil")]
+        public bool MostrarTeaserLadoB { get; set; } = false;
+
+        /// <summary>
+        /// Permite publicar versiones censuradas del contenido LadoB en el feed LadoA
+        /// </summary>
+        [Display(Name = "Permitir Preview Blur de LadoB")]
+        public bool PermitirPreviewBlurLadoB { get; set; } = false;
+
+        // ========================================
+        // ESTADO EN LÍNEA Y PRIVACIDAD
+        // ========================================
+
+        /// <summary>
+        /// Si es true, otros usuarios pueden ver cuando está en línea
+        /// </summary>
+        [Display(Name = "Mostrar Estado En Línea")]
+        public bool MostrarEstadoEnLinea { get; set; } = true;
+
+        /// <summary>
+        /// Verifica si el usuario está en línea (actividad en los últimos 5 minutos)
+        /// </summary>
+        public bool EstaEnLinea => UltimaActividad.HasValue &&
+            (DateTime.UtcNow - UltimaActividad.Value).TotalMinutes <= 5;
+
+        /// <summary>
+        /// Obtiene texto descriptivo de última conexión
+        /// </summary>
+        public string ObtenerUltimaConexionTexto()
+        {
+            if (!UltimaActividad.HasValue)
+                return "Sin conexión reciente";
+
+            var diferencia = DateTime.UtcNow - UltimaActividad.Value;
+
+            if (diferencia.TotalMinutes <= 5)
+                return "En línea";
+            if (diferencia.TotalMinutes < 60)
+                return $"Hace {(int)diferencia.TotalMinutes} min";
+            if (diferencia.TotalHours < 24)
+                return $"Hace {(int)diferencia.TotalHours}h";
+            if (diferencia.TotalDays < 7)
+                return $"Hace {(int)diferencia.TotalDays} días";
+
+            return "Hace más de una semana";
+        }
+
         // Relacion con Agencia (si TipoUsuario == 2)
         public virtual Agencia? Agencia { get; set; }
 

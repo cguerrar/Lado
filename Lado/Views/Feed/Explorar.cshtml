@@ -327,6 +327,16 @@
         transform: scale(1.05);
     }
 
+    /* Video preview - mostrar primer frame */
+    .explore-item .video-preview {
+        pointer-events: none;
+    }
+
+    /* Asegurar que el video cargue el primer frame */
+    .explore-item video.video-preview {
+        background: var(--bg-tertiary);
+    }
+
     /* Fallback para imágenes que fallan */
     .explore-item img.error {
         object-fit: contain;
@@ -1251,6 +1261,32 @@
         line-height: 1.4;
     }
 
+    .mapa-privacy-notice strong {
+        color: var(--primary);
+    }
+
+    .mapa-notices {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .mapa-notices .mapa-privacy-notice {
+        margin-bottom: 0;
+    }
+
+    .mapa-privacy-secondary {
+        background: linear-gradient(135deg, rgba(100, 116, 139, 0.1) 0%, rgba(100, 116, 139, 0.05) 100%);
+        border-color: rgba(100, 116, 139, 0.2);
+        font-size: 12px;
+        padding: 10px 14px;
+    }
+
+    .mapa-privacy-secondary i {
+        color: var(--muted);
+    }
+
     @@media (max-width: 480px) {
         .mapa-privacy-notice {
             font-size: 12px;
@@ -1260,6 +1296,11 @@
 
         .mapa-privacy-notice i {
             font-size: 14px;
+        }
+
+        .mapa-privacy-secondary {
+            font-size: 11px;
+            padding: 8px 10px;
         }
     }
 
@@ -1498,6 +1539,9 @@
         <div class="filters-bar">
             <div class="filter-chips">
                 <button class="filter-chip active" data-tipo="todos" onclick="filterContent('todos', this)">Todos</button>
+                <button class="filter-chip" data-tipo="siguiendo" onclick="filterContent('siguiendo', this)">
+                    <i class="fas fa-user-friends"></i> Siguiendo
+                </button>
                 <button class="filter-chip" data-tipo="fotos" onclick="filterContent('fotos', this)">
                     <i class="fas fa-image"></i> Fotos
                 </button>
@@ -1524,13 +1568,24 @@
                 var itemClass = estaBloqueado ? "explore-item bloqueado" : "explore-item";
                 var clickAction = estaBloqueado ? $"window.location.href='/Feed/Perfil/{item.UsuarioId}'" : (item.EsContenidoSensible ? "" : $"window.location.href='/Feed/Detalle/{item.Id}'");
                 <div class="@itemClass" onclick="@clickAction" data-tipo="@((int)item.TipoContenido)" data-post-id="@item.Id" data-video-src="@(esVideo ? item.RutaArchivo : "")" data-bloqueado="@estaBloqueado.ToString().ToLower()">
-                    <!-- Siempre usar imagen para preview (más rápido y compatible con iOS) -->
-                    <img src="@imagenSrc" alt="" loading="lazy" decoding="async" class="explore-thumb">
-                    @if (esVideo)
+                    @if (esVideo && !tieneThumb)
                     {
+                        <!-- Video sin thumbnail: usar video element para mostrar primer frame -->
+                        <video src="@(item.RutaArchivo)#t=0.1" preload="metadata" muted playsinline class="explore-thumb video-preview"></video>
                         <div class="video-badge">
                             <i class="fas fa-play"></i>
                         </div>
+                    }
+                    else
+                    {
+                        <!-- Imagen o video con thumbnail -->
+                        <img src="@imagenSrc" alt="" loading="lazy" decoding="async" class="explore-thumb">
+                        @if (esVideo)
+                        {
+                            <div class="video-badge">
+                                <i class="fas fa-play"></i>
+                            </div>
+                        }
                     }
                     @if (esPremium)
                     {
@@ -1783,10 +1838,16 @@
 
     <!-- Tab: Mapa Interactivo (Solo Lado A) -->
     <div id="tab-mapa" class="tab-content">
-        <!-- Aviso de privacidad -->
-        <div class="mapa-privacy-notice">
-            <i class="fas fa-shield-alt"></i>
-            <span>Las ubicaciones son aproximadas para proteger la privacidad de nuestros creadores</span>
+        <!-- Aviso de contenido y privacidad -->
+        <div class="mapa-notices">
+            <div class="mapa-privacy-notice">
+                <i class="fas fa-globe-americas"></i>
+                <span>Solo se muestran publicaciones del <strong>Lado A</strong> (contenido público)</span>
+            </div>
+            <div class="mapa-privacy-notice mapa-privacy-secondary">
+                <i class="fas fa-shield-alt"></i>
+                <span>Las ubicaciones son aproximadas para proteger la privacidad</span>
+            </div>
         </div>
 
         <!-- Loading inicial del mapa -->
@@ -1859,17 +1920,22 @@
                 }
 
                 if (video) {
-                    // Para videos, marcar como cargado cuando tenga metadata
-                    video.addEventListener('loadeddata', function() {
-                        const delay = Math.random() * 200;
-                        setTimeout(() => {
-                            this.classList.add('loaded');
-                            item.classList.add('media-loaded');
-                        }, delay);
-                    });
+                    // Para videos, marcar como cargado cuando tenga metadata o datos
+                    const markVideoLoaded = function() {
+                        if (!video.classList.contains('loaded')) {
+                            const delay = Math.random() * 200;
+                            setTimeout(() => {
+                                video.classList.add('loaded');
+                                item.classList.add('media-loaded');
+                            }, delay);
+                        }
+                    };
+
+                    video.addEventListener('loadedmetadata', markVideoLoaded);
+                    video.addEventListener('loadeddata', markVideoLoaded);
 
                     // Si ya tiene datos
-                    if (video.readyState >= 2) {
+                    if (video.readyState >= 1) {
                         video.classList.add('loaded');
                         item.classList.add('media-loaded');
                     }
@@ -2043,8 +2109,13 @@
 
                         const videoBadge = isVideo ? '<div class="video-badge"><i class="fas fa-play"></i></div>' : '';
 
+                        // Para videos, usar elemento video para mostrar preview y permitir hover play
+                        const mediaElement = isVideo
+                            ? `<video src="${item.rutaArchivo}#t=0.1" preload="metadata" muted playsinline loop class="explore-thumb video-preview"></video>`
+                            : `<img src="${imageSrc}" alt="" loading="lazy" class="explore-thumb">`;
+
                         div.innerHTML = `
-                            <img src="${imageSrc}" alt="" loading="lazy" class="explore-thumb">
+                            ${mediaElement}
                             ${videoBadge}
                             ${premiumBadge}
                             ${lockedOverlay}

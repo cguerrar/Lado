@@ -639,6 +639,23 @@ namespace Lado.Controllers
             return Json(new { success = true, message = request.Habilitado ? "Detección de ubicación habilitada" : "Detección de ubicación deshabilitada" });
         }
 
+        // POST: /Usuario/ActualizarEstadoEnLinea
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ActualizarEstadoEnLinea([FromBody] ActualizarEstadoEnLineaRequest request)
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            usuario.MostrarEstadoEnLinea = request.Mostrar;
+            await _userManager.UpdateAsync(usuario);
+
+            return Json(new { success = true, message = request.Mostrar ? "Estado en línea visible" : "Estado en línea oculto" });
+        }
+
         // POST: /Usuario/ActualizarOcultarIdentidad
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -668,9 +685,9 @@ namespace Lado.Controllers
         public async Task<IActionResult> CambiarLadoPreferido([FromBody] CambiarLadoPreferidoRequest request)
         {
             // Validar lado
-            if (request.LadoPreferido < 0 || request.LadoPreferido > 1)
+            if (request == null || request.LadoPreferido < 0 || request.LadoPreferido > 1)
             {
-                return Json(new { success = false, message = "Lado no válido" });
+                return Json(new { success = false, message = "Lado no válido", debug = $"request null: {request == null}" });
             }
 
             var usuario = await _userManager.GetUserAsync(User);
@@ -681,11 +698,69 @@ namespace Lado.Controllers
 
             // Guardar el lado preferido
             usuario.LadoPreferido = (TipoLado)request.LadoPreferido;
-            await _userManager.UpdateAsync(usuario);
+            var result = await _userManager.UpdateAsync(usuario);
+
+            if (!result.Succeeded)
+            {
+                var errores = string.Join(", ", result.Errors.Select(e => e.Description));
+                return Json(new { success = false, message = $"Error al guardar: {errores}" });
+            }
 
             var nombreLado = request.LadoPreferido == 0 ? "Lado A" : "Lado B";
 
-            return Json(new { success = true, message = $"Lado preferido cambiado a {nombreLado}" });
+            return Json(new {
+                success = true,
+                message = $"Lado preferido cambiado a {nombreLado}"
+            });
+        }
+
+        // POST: /Usuario/CambiarPromocionLadoB
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CambiarPromocionLadoB([FromBody] CambiarPromocionLadoBRequest request)
+        {
+            if (request == null || string.IsNullOrEmpty(request.Tipo))
+            {
+                return Json(new { success = false, message = "Datos inválidos" });
+            }
+
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            // Solo creadores con LadoB pueden usar esta función
+            if (!usuario.EsCreador || !usuario.TieneLadoB())
+            {
+                return Json(new { success = false, message = "Solo disponible para creadores con LadoB" });
+            }
+
+            string mensaje = "";
+
+            if (request.Tipo == "teaser")
+            {
+                usuario.MostrarTeaserLadoB = request.Activo;
+                mensaje = request.Activo ? "Teaser activado en tu perfil" : "Teaser desactivado";
+            }
+            else if (request.Tipo == "blur")
+            {
+                usuario.PermitirPreviewBlurLadoB = request.Activo;
+                mensaje = request.Activo ? "Previews blur activados" : "Previews blur desactivados";
+            }
+            else
+            {
+                return Json(new { success = false, message = "Tipo no válido" });
+            }
+
+            var result = await _userManager.UpdateAsync(usuario);
+
+            if (!result.Succeeded)
+            {
+                return Json(new { success = false, message = "Error al guardar" });
+            }
+
+            return Json(new { success = true, message = mensaje });
         }
 
         // GET: /Usuario/ActividadReciente
@@ -742,59 +817,181 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-            // Verificar confirmación
-            if (confirmacion != "ELIMINAR")
+            var userId = usuario.Id;
+            var userName = usuario.UserName;
+
+            // Log inicio
+            Console.WriteLine($"[EliminarCuenta] Iniciando eliminación para usuario: {userName} ({userId})");
+            Console.WriteLine($"[EliminarCuenta] Confirmación recibida: '{confirmacion}'");
+
+            // Verificar confirmación (case insensitive)
+            if (string.IsNullOrEmpty(confirmacion) || !confirmacion.Equals("ELIMINAR", StringComparison.OrdinalIgnoreCase))
             {
-                TempData["Error"] = "Debes escribir 'ELIMINAR' para confirmar";
+                Console.WriteLine($"[EliminarCuenta] Confirmación inválida");
+                TempData["Error"] = $"Debes escribir 'ELIMINAR' para confirmar. Recibido: '{confirmacion}'";
                 return RedirectToAction(nameof(Configuracion));
             }
 
             try
             {
-                // 1. Eliminar contenidos del usuario
-                var contenidos = _context.Contenidos.Where(c => c.UsuarioId == usuario.Id);
-                _context.Contenidos.RemoveRange(contenidos);
+                Console.WriteLine($"[EliminarCuenta] Iniciando transacción...");
 
-                // 2. Eliminar likes
+                // Usar una transacción para asegurar consistencia
+                using var transaction = await _context.Database.BeginTransactionAsync();
+
+                // Batch 1: Notificaciones, Likes, Comentarios
+                Console.WriteLine("[EliminarCuenta] Batch 1: Notificaciones, Likes, Comentarios...");
+                var notificaciones = _context.Notificaciones.Where(n => n.UsuarioId == usuario.Id);
+                _context.Notificaciones.RemoveRange(notificaciones);
                 var likes = _context.Likes.Where(l => l.UsuarioId == usuario.Id);
                 _context.Likes.RemoveRange(likes);
-
-                // 3. Eliminar comentarios
+                var likesEnMiContenido = _context.Likes.Where(l => l.Contenido.UsuarioId == usuario.Id);
+                _context.Likes.RemoveRange(likesEnMiContenido);
                 var comentarios = _context.Comentarios.Where(c => c.UsuarioId == usuario.Id);
                 _context.Comentarios.RemoveRange(comentarios);
+                var comentariosEnMiContenido = _context.Comentarios.Where(c => c.Contenido.UsuarioId == usuario.Id);
+                _context.Comentarios.RemoveRange(comentariosEnMiContenido);
+                await _context.SaveChangesAsync();
+                Console.WriteLine("[EliminarCuenta] Batch 1 completado");
 
-                // 4. Eliminar suscripciones (como fan)
-                var suscripcionesFan = _context.Suscripciones
-                    .Where(s => s.FanId == usuario.Id);
+                // Batch 2: Stories y vistas
+                Console.WriteLine("[EliminarCuenta] Batch 2: Stories y vistas...");
+                var storyVistas = _context.StoryVistas.Where(sv => sv.UsuarioId == usuario.Id);
+                _context.StoryVistas.RemoveRange(storyVistas);
+                var vistasEnMisStories = _context.StoryVistas.Where(sv => sv.Story.CreadorId == usuario.Id);
+                _context.StoryVistas.RemoveRange(vistasEnMisStories);
+                var stories = _context.Stories.Where(s => s.CreadorId == usuario.Id);
+                _context.Stories.RemoveRange(stories);
+                await _context.SaveChangesAsync();
+                Console.WriteLine("[EliminarCuenta] Batch 2 completado");
+
+                // Batch 3: Reacciones y colecciones
+                Console.WriteLine("[EliminarCuenta] Batch 3: Reacciones y colecciones...");
+                var reacciones = _context.Reacciones.Where(r => r.UsuarioId == usuario.Id);
+                _context.Reacciones.RemoveRange(reacciones);
+                var reaccionesEnMiContenido = _context.Reacciones.Where(r => r.Contenido.UsuarioId == usuario.Id);
+                _context.Reacciones.RemoveRange(reaccionesEnMiContenido);
+                var contenidoColecciones = _context.ContenidoColecciones
+                    .Where(cc => cc.Coleccion.CreadorId == usuario.Id || cc.Contenido.UsuarioId == usuario.Id);
+                _context.ContenidoColecciones.RemoveRange(contenidoColecciones);
+                var colecciones = _context.Colecciones.Where(c => c.CreadorId == usuario.Id);
+                _context.Colecciones.RemoveRange(colecciones);
+                await _context.SaveChangesAsync();
+                Console.WriteLine("[EliminarCuenta] Batch 3 completado");
+
+                // Batch 4: Tips y desafios
+                Console.WriteLine("[EliminarCuenta] Batch 4: Tips y desafios...");
+                var tips = _context.Tips.Where(t => t.FanId == usuario.Id || t.CreadorId == usuario.Id);
+                _context.Tips.RemoveRange(tips);
+                var desafios = _context.Desafios.Where(d => d.FanId == usuario.Id);
+                _context.Desafios.RemoveRange(desafios);
+                var propuestasDesafios = _context.PropuestasDesafios.Where(p => p.CreadorId == usuario.Id);
+                _context.PropuestasDesafios.RemoveRange(propuestasDesafios);
+                await _context.SaveChangesAsync();
+                Console.WriteLine("[EliminarCuenta] Batch 4 completado");
+
+                // Batch 5: Suscripciones y mensajes
+                Console.WriteLine("[EliminarCuenta] Batch 5: Suscripciones y mensajes...");
+                var suscripcionesFan = _context.Suscripciones.Where(s => s.FanId == usuario.Id);
                 _context.Suscripciones.RemoveRange(suscripcionesFan);
-
-                // 5. Eliminar suscripciones (como creador)
-                var suscripcionesCreador = _context.Suscripciones
-                    .Where(s => s.CreadorId == usuario.Id);
+                var suscripcionesCreador = _context.Suscripciones.Where(s => s.CreadorId == usuario.Id);
                 _context.Suscripciones.RemoveRange(suscripcionesCreador);
-
-                // 6. Eliminar mensajes
                 var mensajes = _context.MensajesPrivados
                     .Where(m => m.RemitenteId == usuario.Id || m.DestinatarioId == usuario.Id);
                 _context.MensajesPrivados.RemoveRange(mensajes);
-
-                // 7. Eliminar chat mensajes
                 var chatMensajes = _context.ChatMensajes
                     .Where(m => m.RemitenteId == usuario.Id || m.DestinatarioId == usuario.Id);
                 _context.ChatMensajes.RemoveRange(chatMensajes);
+                await _context.SaveChangesAsync();
+                Console.WriteLine("[EliminarCuenta] Batch 5 completado");
 
-                // 8. Eliminar transacciones
-                var transacciones = _context.Transacciones
-                    .Where(t => t.UsuarioId == usuario.Id);
+                // Batch 6: Transacciones, reportes, bloqueos
+                Console.WriteLine("[EliminarCuenta] Batch 6: Transacciones, reportes, bloqueos...");
+                var transacciones = _context.Transacciones.Where(t => t.UsuarioId == usuario.Id);
                 _context.Transacciones.RemoveRange(transacciones);
-
-                // 9. Eliminar reportes
                 var reportes = _context.Reportes
-                    .Where(r => r.UsuarioReportadorId == usuario.Id ||
-                               r.UsuarioReportadoId == usuario.Id);
+                    .Where(r => r.UsuarioReportadorId == usuario.Id || r.UsuarioReportadoId == usuario.Id);
                 _context.Reportes.RemoveRange(reportes);
+                var bloqueos = _context.BloqueosUsuarios
+                    .Where(b => b.BloqueadorId == usuario.Id || b.BloqueadoId == usuario.Id);
+                _context.BloqueosUsuarios.RemoveRange(bloqueos);
+                await _context.SaveChangesAsync();
+                Console.WriteLine("[EliminarCuenta] Batch 6 completado");
 
-                // 10. Eliminar archivos físicos
+                // Batch 7: Intereses, preferencias, favoritos, interacciones
+                Console.WriteLine("[EliminarCuenta] Batch 7: Intereses, preferencias, favoritos...");
+                var intereses = _context.InteresesUsuarios.Where(i => i.UsuarioId == usuario.Id);
+                _context.InteresesUsuarios.RemoveRange(intereses);
+                var preferencias = _context.PreferenciasAlgoritmoUsuario.Where(p => p.UsuarioId == usuario.Id);
+                _context.PreferenciasAlgoritmoUsuario.RemoveRange(preferencias);
+                var favoritos = _context.Favoritos.Where(f => f.UsuarioId == usuario.Id);
+                _context.Favoritos.RemoveRange(favoritos);
+                var interacciones = _context.InteraccionesContenidos.Where(i => i.UsuarioId == usuario.Id);
+                _context.InteraccionesContenidos.RemoveRange(interacciones);
+                var interaccionesEnMiContenido = _context.InteraccionesContenidos.Where(i => i.Contenido.UsuarioId == usuario.Id);
+                _context.InteraccionesContenidos.RemoveRange(interaccionesEnMiContenido);
+                await _context.SaveChangesAsync();
+                Console.WriteLine("[EliminarCuenta] Batch 7 completado");
+
+                // Batch 8: Compras, tokens
+                Console.WriteLine("[EliminarCuenta] Batch 8: Compras, tokens...");
+                var comprasContenido = _context.ComprasContenido.Where(c => c.UsuarioId == usuario.Id);
+                _context.ComprasContenido.RemoveRange(comprasContenido);
+                var comprasColeccion = _context.ComprasColeccion.Where(c => c.CompradorId == usuario.Id);
+                _context.ComprasColeccion.RemoveRange(comprasColeccion);
+                var refreshTokens = _context.RefreshTokens.Where(r => r.UserId == usuario.Id);
+                _context.RefreshTokens.RemoveRange(refreshTokens);
+                var activeTokens = _context.ActiveTokens.Where(a => a.UserId == usuario.Id);
+                _context.ActiveTokens.RemoveRange(activeTokens);
+                await _context.SaveChangesAsync();
+                Console.WriteLine("[EliminarCuenta] Batch 8 completado");
+
+                // Batch 8.5: Impresiones y clics de anuncios
+                Console.WriteLine("[EliminarCuenta] Batch 8.5: Impresiones y clics de anuncios...");
+                var impresionesAnuncios = _context.ImpresionesAnuncios.Where(i => i.UsuarioId == usuario.Id);
+                _context.ImpresionesAnuncios.RemoveRange(impresionesAnuncios);
+                var clicsAnuncios = _context.ClicsAnuncios.Where(c => c.UsuarioId == usuario.Id);
+                _context.ClicsAnuncios.RemoveRange(clicsAnuncios);
+                await _context.SaveChangesAsync();
+                Console.WriteLine("[EliminarCuenta] Batch 8.5 completado");
+
+                // Batch 8.6: Agencia y anuncios
+                Console.WriteLine("[EliminarCuenta] Batch 8.6: Agencia y anuncios...");
+                var agencia = _context.Agencias.FirstOrDefault(a => a.UsuarioId == usuario.Id);
+                if (agencia != null)
+                {
+                    // Eliminar clics e impresiones de los anuncios de la agencia
+                    var anunciosIds = _context.Anuncios.Where(a => a.AgenciaId == agencia.Id).Select(a => a.Id).ToList();
+                    var impresionesAgencia = _context.ImpresionesAnuncios.Where(i => anunciosIds.Contains(i.AnuncioId));
+                    _context.ImpresionesAnuncios.RemoveRange(impresionesAgencia);
+                    var clicsAgencia = _context.ClicsAnuncios.Where(c => anunciosIds.Contains(c.AnuncioId));
+                    _context.ClicsAnuncios.RemoveRange(clicsAgencia);
+                    var segmentaciones = _context.SegmentacionesAnuncios.Where(s => anunciosIds.Contains(s.AnuncioId));
+                    _context.SegmentacionesAnuncios.RemoveRange(segmentaciones);
+                    var anuncios = _context.Anuncios.Where(a => a.AgenciaId == agencia.Id);
+                    _context.Anuncios.RemoveRange(anuncios);
+                    var transaccionesAgencia = _context.TransaccionesAgencias.Where(t => t.AgenciaId == agencia.Id);
+                    _context.TransaccionesAgencias.RemoveRange(transaccionesAgencia);
+                    _context.Agencias.Remove(agencia);
+                }
+                await _context.SaveChangesAsync();
+                Console.WriteLine("[EliminarCuenta] Batch 8.6 completado");
+
+                // Batch 9: Contenidos del usuario
+                Console.WriteLine("[EliminarCuenta] Batch 9: Contenidos del usuario...");
+                var contenidos = _context.Contenidos.Where(c => c.UsuarioId == usuario.Id).ToList();
+                foreach (var contenido in contenidos)
+                {
+                    if (!string.IsNullOrEmpty(contenido.RutaArchivo))
+                        EliminarArchivoFisico(contenido.RutaArchivo);
+                    if (!string.IsNullOrEmpty(contenido.Thumbnail))
+                        EliminarArchivoFisico(contenido.Thumbnail);
+                }
+                _context.Contenidos.RemoveRange(contenidos);
+                Console.WriteLine($"[EliminarCuenta] {contenidos.Count} contenidos marcados para eliminar");
+
+                // Batch 10: Archivos físicos del perfil
+                Console.WriteLine("[EliminarCuenta] Batch 10: Archivos físicos del perfil...");
                 if (!string.IsNullOrEmpty(usuario.FotoPerfil))
                 {
                     EliminarArchivoFisico(usuario.FotoPerfil);
@@ -808,30 +1005,49 @@ namespace Lado.Controllers
                     EliminarArchivoFisico(usuario.FotoPortada);
                 }
 
-                // 11. Guardar cambios en la base de datos
+                // 23. Guardar todos los cambios
+                Console.WriteLine($"[EliminarCuenta] Guardando cambios en base de datos...");
                 await _context.SaveChangesAsync();
+                Console.WriteLine($"[EliminarCuenta] Cambios guardados exitosamente");
 
-                // 12. Eliminar usuario de Identity
+                // 24. Eliminar usuario de Identity
+                Console.WriteLine($"[EliminarCuenta] Eliminando usuario de Identity...");
                 var result = await _userManager.DeleteAsync(usuario);
 
                 if (result.Succeeded)
                 {
+                    Console.WriteLine($"[EliminarCuenta] Usuario eliminado de Identity exitosamente");
+
+                    // Confirmar la transacción
+                    await transaction.CommitAsync();
+                    Console.WriteLine($"[EliminarCuenta] Transacción confirmada");
+
                     // Cerrar sesión
                     await _signInManager.SignOutAsync();
+                    Console.WriteLine($"[EliminarCuenta] Sesión cerrada. Cuenta {userName} eliminada completamente.");
 
                     TempData["Success"] = "Tu cuenta ha sido eliminada permanentemente";
                     return RedirectToAction("Index", "Home");
                 }
                 else
                 {
-                    TempData["Error"] = "Error al eliminar la cuenta: " +
-                        string.Join(", ", result.Errors.Select(e => e.Description));
+                    // Revertir la transacción si falla
+                    await transaction.RollbackAsync();
+
+                    var errores = string.Join(", ", result.Errors.Select(e => e.Description));
+                    Console.WriteLine($"[EliminarCuenta] ERROR Identity: {errores}");
+
+                    TempData["Error"] = "Error al eliminar la cuenta: " + errores;
                     return RedirectToAction(nameof(Configuracion));
                 }
             }
             catch (Exception ex)
             {
-                TempData["Error"] = "Error al eliminar la cuenta: " + ex.Message;
+                var errorMsg = ex.Message + (ex.InnerException != null ? " - " + ex.InnerException.Message : "");
+                Console.WriteLine($"[EliminarCuenta] EXCEPCIÓN: {errorMsg}");
+                Console.WriteLine($"[EliminarCuenta] StackTrace: {ex.StackTrace}");
+
+                TempData["Error"] = "Error al eliminar la cuenta: " + errorMsg;
                 return RedirectToAction(nameof(Configuracion));
             }
         }
@@ -1435,6 +1651,11 @@ namespace Lado.Controllers
         public bool Habilitado { get; set; } = false;
     }
 
+    public class ActualizarEstadoEnLineaRequest
+    {
+        public bool Mostrar { get; set; } = true;
+    }
+
     public class ActualizarOcultarIdentidadRequest
     {
         public bool Ocultar { get; set; } = false;
@@ -1442,7 +1663,17 @@ namespace Lado.Controllers
 
     public class CambiarLadoPreferidoRequest
     {
+        [System.Text.Json.Serialization.JsonPropertyName("ladoPreferido")]
         public int LadoPreferido { get; set; } = 0;
+    }
+
+    public class CambiarPromocionLadoBRequest
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("tipo")]
+        public string Tipo { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("activo")]
+        public bool Activo { get; set; } = false;
     }
 
     public class GuardarInteresesRequest

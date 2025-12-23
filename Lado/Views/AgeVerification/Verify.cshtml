@@ -565,6 +565,67 @@
             font-weight: 500;
         }
 
+        /* Exit Options */
+        .exit-options {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .exit-label {
+            font-size: 0.8125rem;
+            color: var(--text-light);
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+
+        .exit-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .btn-exit {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 16px;
+            border-radius: var(--radius-md);
+            font-size: 0.8125rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            border: none;
+            font-family: inherit;
+        }
+
+        .btn-exit svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .btn-logout {
+            background: var(--bg-light);
+            color: var(--text-gray);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-logout:hover {
+            background: var(--border-color);
+            color: var(--text-dark);
+        }
+
+        .btn-delete {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-delete:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
         /* Responsive */
         @@media (max-width: 480px) {
             .verification-wrapper {
@@ -772,6 +833,30 @@
                     </svg>
                     Tus datos estan protegidos y encriptados
                 </span>
+
+                <!-- Opciones de salida -->
+                <div class="exit-options">
+                    <p class="exit-label">¿Cambiaste de opinion?</p>
+                    <div class="exit-buttons">
+                        <a href="/Account/Logout" class="btn-exit btn-logout">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                                <polyline points="16 17 21 12 16 7"/>
+                                <line x1="21" y1="12" x2="9" y2="12"/>
+                            </svg>
+                            Cerrar sesion
+                        </a>
+                        <button type="button" class="btn-exit btn-delete" onclick="confirmarEliminarCuenta()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                <line x1="10" y1="11" x2="10" y2="17"/>
+                                <line x1="14" y1="11" x2="14" y2="17"/>
+                            </svg>
+                            Eliminar cuenta
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -853,6 +938,35 @@
 
             updateHiddenDate();
         });
+
+        // Confirmar eliminacion de cuenta
+        function confirmarEliminarCuenta() {
+            if (confirm('¿Estas seguro de que deseas eliminar tu cuenta?\n\nEsta accion es IRREVERSIBLE y se eliminaran todos tus datos.')) {
+                if (confirm('ULTIMA CONFIRMACION:\n\n¿Realmente deseas eliminar tu cuenta permanentemente?')) {
+                    // Enviar solicitud para eliminar cuenta
+                    fetch('/AgeVerification/EliminarCuenta', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Tu cuenta ha sido eliminada exitosamente.');
+                            window.location.href = '/';
+                        } else {
+                            alert('Error: ' + (data.message || 'No se pudo eliminar la cuenta'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Ocurrio un error al eliminar la cuenta. Intenta cerrar sesion.');
+                    });
+                }
+            }
+        }
     </script>
 </body>
 </html>
