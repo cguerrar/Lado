@@ -1295,9 +1295,9 @@ namespace Lado.Controllers
         // ========================================
         public async Task<IActionResult> Configuracion()
         {
-            // Cargar configuraciones de billetera y regional
+            // Cargar configuraciones de billetera, regional y archivos
             var configuraciones = await _context.ConfiguracionesPlataforma
-                .Where(c => c.Categoria == "Billetera" || c.Categoria == "General" || c.Categoria == "Regional")
+                .Where(c => c.Categoria == "Billetera" || c.Categoria == "General" || c.Categoria == "Regional" || c.Categoria == "Archivos")
                 .ToDictionaryAsync(c => c.Clave, c => c.Valor);
 
             ViewBag.ComisionBilleteraElectronica = configuraciones.TryGetValue(ConfiguracionPlataforma.COMISION_BILLETERA_ELECTRONICA, out var comision) ? comision : "2.5";
@@ -1305,6 +1305,11 @@ namespace Lado.Controllers
             ViewBag.MontoMinimoRecarga = configuraciones.TryGetValue(ConfiguracionPlataforma.MONTO_MINIMO_RECARGA, out var minRecarga) ? minRecarga : "5";
             ViewBag.MontoMaximoRecarga = configuraciones.TryGetValue(ConfiguracionPlataforma.MONTO_MAXIMO_RECARGA, out var maxRecarga) ? maxRecarga : "1000";
             ViewBag.ZonaHoraria = configuraciones.TryGetValue(ConfiguracionPlataforma.ZONA_HORARIA, out var zonaHoraria) ? zonaHoraria : "America/Bogota";
+
+            // Límites de archivos
+            ViewBag.LimiteFotoMB = configuraciones.TryGetValue(ConfiguracionPlataforma.LIMITE_TAMANO_FOTO_MB, out var fotoMb) ? fotoMb : "10";
+            ViewBag.LimiteVideoMB = configuraciones.TryGetValue(ConfiguracionPlataforma.LIMITE_TAMANO_VIDEO_MB, out var videoMb) ? videoMb : "100";
+            ViewBag.LimiteCantidadArchivos = configuraciones.TryGetValue(ConfiguracionPlataforma.LIMITE_CANTIDAD_ARCHIVOS, out var cantArchivos) ? cantArchivos : "10";
 
             return View();
         }
@@ -1359,6 +1364,32 @@ namespace Lado.Controllers
             catch (Exception)
             {
                 TempData["Error"] = "Error al actualizar la zona horaria";
+            }
+
+            return RedirectToAction(nameof(Configuracion));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ActualizarLimitesContenido(
+            int limiteFotoMB,
+            int limiteVideoMB,
+            int limiteCantidadArchivos)
+        {
+            try
+            {
+                var ahora = DateTime.Now;
+
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.LIMITE_TAMANO_FOTO_MB, limiteFotoMB.ToString(), ahora, "Archivos");
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.LIMITE_TAMANO_VIDEO_MB, limiteVideoMB.ToString(), ahora, "Archivos");
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.LIMITE_CANTIDAD_ARCHIVOS, limiteCantidadArchivos.ToString(), ahora, "Archivos");
+
+                await _context.SaveChangesAsync();
+
+                TempData["Success"] = $"Limites actualizados: Fotos {limiteFotoMB}MB, Videos {limiteVideoMB}MB, Max archivos {limiteCantidadArchivos}";
+            }
+            catch (Exception)
+            {
+                TempData["Error"] = "Error al actualizar los limites de contenido";
             }
 
             return RedirectToAction(nameof(Configuracion));
