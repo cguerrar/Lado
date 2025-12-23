@@ -5,6 +5,11 @@
     var ladoPreferido = ViewBag.LadoPreferido ?? Lado.Models.TipoLado.LadoA;
     var ladoPreferidoEsB = ladoPreferido == Lado.Models.TipoLado.LadoB && usuarioVerificado;
     var permitirPreviewBlur = ViewBag.PermitirPreviewBlur ?? false;
+
+    // Límites de archivos desde Admin
+    var limiteFotoMB = ViewBag.LimiteFotoMB ?? 10;
+    var limiteVideoMB = ViewBag.LimiteVideoMB ?? 100;
+    var limiteCantidadArchivos = ViewBag.LimiteCantidadArchivos ?? 10;
 }
 
 <div class="crear-container">
@@ -86,49 +91,15 @@
                 </div>
             </div>
 
-            <!-- Tipo de Contenido -->
-            <div class="form-section">
-                <label class="section-label">Tipo de contenido</label>
-                <div class="tipo-grid">
-                    <div class="tipo-card active" data-tipo="1">
-                        <div class="tipo-icon">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
-                            </svg>
-                        </div>
-                        <h3>Foto</h3>
-                        <p>JPG, PNG, GIF</p>
-                    </div>
-
-                    <div class="tipo-card" data-tipo="2">
-                        <div class="tipo-icon">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
-                            </svg>
-                        </div>
-                        <h3>Video</h3>
-                        <p>MP4, MOV, AVI</p>
-                    </div>
-
-                    <div class="tipo-card" data-tipo="0">
-                        <div class="tipo-icon">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
-                            </svg>
-                        </div>
-                        <h3>Post</h3>
-                        <p>Solo texto</p>
-                    </div>
-                </div>
-                <input type="hidden" name="TipoContenido" id="tipoContenidoInput" value="1" />
-            </div>
+            <!-- Tipo de Contenido (auto-detectado) -->
+            <input type="hidden" name="TipoContenido" id="tipoContenidoInput" value="1" />
 
             <!-- Subir Archivo(s) -->
             <div class="form-section" id="archivoSection">
                 <label class="section-label">
-                    Subir archivos
-                    <span class="required">*</span>
-                    <span class="upload-badge">Hasta 10 archivos</span>
+                    Subir contenido
+                    <span class="optional-hint">(opcional para posts de solo texto)</span>
+                    <span class="upload-badge">Hasta @limiteCantidadArchivos archivos</span>
                 </label>
                 <div class="upload-zone" id="uploadArea" tabindex="0">
                     <div class="upload-content">
@@ -150,7 +121,7 @@
                             <span class="btn-paste-text">Pegar desde portapapeles</span>
                             <span class="btn-paste-text-ios">Seleccionar de Fotos</span>
                         </button>
-                        <span class="upload-hint">Fotos: max 10MB · Videos: max 100MB · Hasta 10 archivos</span>
+                        <span class="upload-hint">Fotos: max @(limiteFotoMB)MB · Videos: max @(limiteVideoMB)MB · Hasta @limiteCantidadArchivos archivos</span>
                     </div>
                     <input type="file" name="archivos" id="archivoInput" class="file-input" accept="image/*,video/*,.heic,.heif,.mov" multiple>
                 </div>
@@ -449,6 +420,13 @@
     .required {
         color: #EF4444;
         margin-left: 4px;
+    }
+
+    .optional-hint {
+        font-weight: 400;
+        font-size: 13px;
+        color: #9CA3AF;
+        margin-left: 8px;
     }
 
     .lado-selector {
@@ -1675,15 +1653,17 @@
         document.addEventListener('DOMContentLoaded', function() {
             const usuarioVerificado = @(usuarioVerificado ? "true" : "false");
             const ladoPreferidoEsB = @(ladoPreferidoEsB ? "true" : "false");
-            const MAX_FILES = 10;
+
+            // Límites desde Admin
+            const MAX_FILES = @limiteCantidadArchivos;
+            const MAX_SIZE_IMAGE_MB = @limiteFotoMB;
+            const MAX_SIZE_VIDEO_MB = @limiteVideoMB;
 
             // Elementos
             const ladoOptions = document.querySelectorAll('.lado-option');
             const esGratisInput = document.getElementById('esGratisInput');
             const precioSectionWrapper = document.getElementById('precioSectionWrapper');
-            const tipoCards = document.querySelectorAll('.tipo-card');
             const tipoInput = document.getElementById('tipoContenidoInput');
-            const archivoSection = document.getElementById('archivoSection');
             const uploadArea = document.getElementById('uploadArea');
             const archivoInput = document.getElementById('archivoInput');
             const previewGrid = document.getElementById('previewGrid');
@@ -1767,20 +1747,24 @@
                 });
             });
 
-            // Tipo de contenido
-            tipoCards.forEach(card => {
-                card.addEventListener('click', function() {
-                    tipoCards.forEach(c => c.classList.remove('active'));
-                    this.classList.add('active');
-                    tipoInput.value = this.dataset.tipo;
+            // Auto-detectar tipo de contenido basado en archivos
+            function actualizarTipoContenido() {
+                if (selectedFiles.length === 0) {
+                    tipoInput.value = '0'; // Solo texto
+                    return;
+                }
 
-                    if (this.dataset.tipo === '0') {
-                        archivoSection.style.display = 'none';
-                    } else {
-                        archivoSection.style.display = 'block';
-                    }
-                });
-            });
+                const tieneVideo = selectedFiles.some(f => isVideoFileGlobal(f));
+                const tieneImagen = selectedFiles.some(f => !isVideoFileGlobal(f));
+
+                if (tieneVideo) {
+                    tipoInput.value = '2'; // Video
+                } else if (tieneImagen) {
+                    tipoInput.value = '1'; // Foto
+                } else {
+                    tipoInput.value = '0'; // Solo texto
+                }
+            }
 
             // Detectar iOS
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
@@ -1999,16 +1983,16 @@
                     const isImage = isImageMime || isImageExt;
                     const isVideo = isVideoMime || isVideoExt;
 
-                    // Limite de tamaño: 10MB para fotos, 100MB para videos
-                    const maxSizeImage = 10 * 1024 * 1024; // 10MB
-                    const maxSizeVideo = 100 * 1024 * 1024; // 100MB
+                    // Limite de tamaño desde configuración Admin
+                    const maxSizeImage = MAX_SIZE_IMAGE_MB * 1024 * 1024;
+                    const maxSizeVideo = MAX_SIZE_VIDEO_MB * 1024 * 1024;
                     const maxSize = isVideo ? maxSizeVideo : maxSizeImage;
                     const isValidSize = file.size <= maxSize;
 
                     // Mostrar error especifico si excede el tamaño
                     if (!isValidSize && (isImage || isVideo)) {
                         const sizeInMB = (file.size / (1024 * 1024)).toFixed(1);
-                        const limitMB = isVideo ? 100 : 10;
+                        const limitMB = isVideo ? MAX_SIZE_VIDEO_MB : MAX_SIZE_IMAGE_MB;
                         alert(`El archivo "${file.name}" (${sizeInMB}MB) excede el límite de ${limitMB}MB para ${isVideo ? 'videos' : 'fotos'}`);
                     }
 
@@ -2035,6 +2019,9 @@
 
             function updatePreviewGrid() {
                 previewItems.innerHTML = '';
+
+                // Auto-detectar tipo de contenido
+                actualizarTipoContenido();
 
                 if (selectedFiles.length === 0) {
                     previewGrid.style.display = 'none';
@@ -2171,10 +2158,13 @@
                 const esBorrador = esBorradorInput.value === 'true';
                 const esGratis = esGratisInput.value === 'true';
 
-                // Validar archivos requeridos
-                if (!esBorrador && tipoContenido !== '0' && selectedFiles.length === 0) {
+                // Auto-detectar tipo antes de validar
+                actualizarTipoContenido();
+
+                // Validar: si no hay archivos, debe haber descripción (post de solo texto)
+                if (!esBorrador && selectedFiles.length === 0 && !descripcionTextarea.value.trim()) {
                     e.preventDefault();
-                    alert('Por favor selecciona al menos un archivo para publicar');
+                    alert('Por favor sube contenido o escribe una descripción');
                     return false;
                 }
 

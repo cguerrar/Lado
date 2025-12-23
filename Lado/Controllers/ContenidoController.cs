@@ -117,6 +117,15 @@ namespace Lado.Controllers
             ViewBag.LadoPreferido = user.LadoPreferido;
             ViewBag.PermitirPreviewBlur = user.PermitirPreviewBlurLadoB && user.TieneLadoB();
 
+            // Cargar límites de archivos desde configuración
+            var configuraciones = await _context.ConfiguracionesPlataforma
+                .Where(c => c.Clave.StartsWith("Limite_"))
+                .ToDictionaryAsync(c => c.Clave, c => c.Valor);
+
+            ViewBag.LimiteFotoMB = int.TryParse(configuraciones.GetValueOrDefault(ConfiguracionPlataforma.LIMITE_TAMANO_FOTO_MB, "10"), out var fotoMb) ? fotoMb : 10;
+            ViewBag.LimiteVideoMB = int.TryParse(configuraciones.GetValueOrDefault(ConfiguracionPlataforma.LIMITE_TAMANO_VIDEO_MB, "100"), out var videoMb) ? videoMb : 100;
+            ViewBag.LimiteCantidadArchivos = int.TryParse(configuraciones.GetValueOrDefault(ConfiguracionPlataforma.LIMITE_CANTIDAD_ARCHIVOS, "10"), out var cantArchivos) ? cantArchivos : 10;
+
             _logger.LogInformation("GET Crear - Usuario: {Username}, Verificado: {Verificado}, LadoPreferido: {LadoPreferido}",
                 user.UserName, user.CreadorVerificado, user.LadoPreferido);
 

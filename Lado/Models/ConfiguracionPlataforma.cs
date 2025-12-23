@@ -86,5 +86,12 @@ namespace Lado.Models
 
         // Brevo (antes Sendinblue)
         public const string BREVO_API_KEY = "Brevo_ApiKey";
+
+        // ========================================
+        // LÍMITES DE ARCHIVOS
+        // ========================================
+        public const string LIMITE_TAMANO_FOTO_MB = "Limite_TamanoFoto_MB";     // Default: 10
+        public const string LIMITE_TAMANO_VIDEO_MB = "Limite_TamanoVideo_MB";   // Default: 100
+        public const string LIMITE_CANTIDAD_ARCHIVOS = "Limite_CantidadArchivos"; // Default: 10
     }
 }
