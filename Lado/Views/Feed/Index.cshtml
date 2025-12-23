@@ -745,26 +745,41 @@
     }
 
     /* Cuando el video esta reproduciendose: mostrar pausa, ocultar play */
-    .post-media.video-playing .video-play-icon .icon-play {
-        display: none;
+    .video-playing .video-play-icon .icon-play {
+        display: none !important;
     }
-    .post-media.video-playing .video-play-icon .icon-pause {
-        display: block;
+    .video-playing .video-play-icon .icon-pause {
+        display: block !important;
     }
 
-    /* Mostrar icono en hover o cuando esta pausado */
-    .post-media:hover .video-play-icon,
-    .video-paused .video-play-icon {
+    /* Mostrar icono: en hover o cuando esta pausado */
+    .post-media:hover .video-play-icon {
         opacity: 1;
     }
 
-    /* En mobile: siempre mostrar cuando esta pausado, no en hover */
-    @@media (hover: none) {
-        .post-media:hover .video-play-icon {
-            opacity: 0;
+    /* Video pausado: siempre mostrar icono de play */
+    .video-paused .video-play-icon {
+        opacity: 1 !important;
+    }
+
+    /* Video reproduciendose: ocultar icono (solo mostrar en hover en desktop) */
+    .video-playing .video-play-icon {
+        opacity: 0;
+    }
+    .video-playing:hover .video-play-icon {
+        opacity: 1;
+    }
+
+    /* Mobile: sin hover, solo mostrar cuando pausado */
+    @@media (hover: none), (pointer: coarse) {
+        .video-playing .video-play-icon {
+            opacity: 0 !important;
+        }
+        .video-playing:active .video-play-icon {
+            opacity: 1 !important;
         }
         .video-paused .video-play-icon {
-            opacity: 1;
+            opacity: 1 !important;
         }
     }
 
@@ -5571,14 +5586,36 @@
         const postMedia = video?.closest('.post-media');
         if (!postMedia) return;
 
-        if (isPlaying) {
+        // Forzar el estado correcto basado en el video real
+        const actuallyPlaying = isPlaying || (!video.paused && !video.ended);
+
+        if (actuallyPlaying) {
             postMedia.classList.remove('video-paused', 'ios-needs-tap');
             postMedia.classList.add('video-playing');
         } else {
-            postMedia.classList.add('video-paused');
             postMedia.classList.remove('video-playing');
+            postMedia.classList.add('video-paused');
         }
     }
+
+    // Sincronizar estado visual con estado real del video
+    function syncVideoStates() {
+        document.querySelectorAll('.feed-video').forEach(video => {
+            const postMedia = video.closest('.post-media');
+            if (!postMedia) return;
+
+            if (!video.paused && !video.ended) {
+                postMedia.classList.remove('video-paused', 'ios-needs-tap');
+                postMedia.classList.add('video-playing');
+            } else {
+                postMedia.classList.remove('video-playing');
+                postMedia.classList.add('video-paused');
+            }
+        });
+    }
+
+    // Sincronizar cada 500ms para iOS
+    setInterval(syncVideoStates, 500);
 
     // Pausar todos los videos excepto uno
     function pauseAllVideosExcept(exceptVideo) {
