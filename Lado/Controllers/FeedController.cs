@@ -3866,5 +3866,66 @@ namespace Lado.Controllers
                 return Json(new { success = false, message = "Error al cargar seguidores en común" });
             }
         }
+
+        // ========================================
+        // OBTENER POST (para compartir como story)
+        // ========================================
+
+        [HttpGet]
+        public async Task<IActionResult> ObtenerPost(int id)
+        {
+            try
+            {
+                var usuarioActual = await _userManager.GetUserAsync(User);
+                if (usuarioActual == null)
+                {
+                    return Json(new { success = false, message = "No autenticado" });
+                }
+
+                var post = await _context.Contenidos
+                    .Include(c => c.Usuario)
+                    .FirstOrDefaultAsync(c => c.Id == id && c.EstaActivo);
+
+                if (post == null)
+                {
+                    return Json(new { success = false, message = "Post no encontrado" });
+                }
+
+                // Verificar que el usuario tenga acceso al post
+                var tieneAcceso = post.UsuarioId == usuarioActual.Id;
+                if (!tieneAcceso)
+                {
+                    // Verificar si sigue al creador
+                    var suscripcion = await _context.Suscripciones
+                        .AnyAsync(s => s.FanId == usuarioActual.Id && s.CreadorId == post.UsuarioId && s.EstaActiva);
+                    tieneAcceso = suscripcion || post.TipoLado == TipoLado.LadoA;
+                }
+
+                if (!tieneAcceso)
+                {
+                    return Json(new { success = false, message = "No tienes acceso a este contenido" });
+                }
+
+                return Json(new
+                {
+                    success = true,
+                    post = new
+                    {
+                        id = post.Id,
+                        creadorId = post.UsuarioId,
+                        creadorNombre = post.Usuario?.NombreCompleto,
+                        descripcion = post.Descripcion,
+                        rutaArchivo = post.RutaArchivo,
+                        tipoContenido = post.TipoContenido.ToString(),
+                        tipoLado = post.TipoLado.ToString()
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener post {PostId}", id);
+                return Json(new { success = false, message = "Error al obtener el post" });
+            }
+        }
     }
 }

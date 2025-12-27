@@ -177,8 +177,8 @@
     }
 
     .story-ring {
-        width: 66px;
-        height: 66px;
+        width: 80px;
+        height: 80px;
         border-radius: 50%;
         padding: 3px;
         background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
@@ -213,17 +213,758 @@
         justify-content: center;
         color: white;
         font-weight: 700;
-        font-size: 18px;
+        font-size: 22px;
     }
 
     .story-username {
         font-size: 12px;
         color: var(--fg);
-        max-width: 66px;
+        max-width: 80px;
         text-align: center;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    /* TU STORY - Estilo especial con botón + */
+    .story-ring.your-story {
+        background: linear-gradient(135deg, var(--line) 0%, var(--muted) 100%);
+        position: relative;
+    }
+
+    .story-ring.your-story.has-story {
+        background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+    }
+
+    .story-add-btn {
+        position: absolute;
+        bottom: -2px;
+        right: -2px;
+        width: 26px;
+        height: 26px;
+        background: var(--primary);
+        border-radius: 50%;
+        border: 2px solid var(--surface);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+
+    .story-add-btn svg {
+        width: 12px;
+        height: 12px;
+    }
+
+    .story-item:hover .story-add-btn {
+        transform: scale(1.1);
+        transition: transform 0.2s;
+    }
+
+    /* ========================================
+       STORY VIEWER MODAL - Pantalla Completa
+       ======================================== */
+
+    /* Variables de tema para el visor de stories */
+    :root {
+        --story-overlay-bg: rgba(241, 245, 249, 0.97);
+        --story-container-bg: #e2e8f0;
+        --story-header-bg: linear-gradient(to bottom, rgba(255,255,255,0.8) 0%, transparent 100%);
+        --story-text-color: #1e293b;
+        --story-text-secondary: rgba(30, 41, 59, 0.7);
+        --story-close-bg: rgba(0, 0, 0, 0.1);
+        --story-close-bg-hover: rgba(0, 0, 0, 0.2);
+        --story-close-color: #334155;
+        --story-progress-bg: rgba(0, 0, 0, 0.2);
+        --story-progress-fill: var(--primary);
+    }
+
+    [data-theme="dark"] {
+        --story-overlay-bg: rgba(15, 23, 42, 0.97);
+        --story-container-bg: #1e293b;
+        --story-header-bg: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%);
+        --story-text-color: #f8fafc;
+        --story-text-secondary: rgba(248, 250, 252, 0.7);
+        --story-close-bg: rgba(255, 255, 255, 0.2);
+        --story-close-bg-hover: rgba(255, 255, 255, 0.3);
+        --story-close-color: white;
+        --story-progress-bg: rgba(255, 255, 255, 0.3);
+        --story-progress-fill: white;
+    }
+
+    .story-viewer-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: var(--story-overlay-bg);
+        z-index: 9999999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.3s ease;
+    }
+
+    .story-viewer-overlay.active {
+        display: flex;
+    }
+
+    /* Ocultar header y bottom nav cuando el visor de stories está activo */
+    body.story-viewer-open .top-navbar,
+    body.story-viewer-open .bottom-nav {
+        display: none !important;
+    }
+
+    .story-viewer-container {
+        position: relative;
+        width: 100%;
+        max-width: 420px;
+        height: 90vh;
+        max-height: 750px;
+        background: var(--story-container-bg);
+        border-radius: 16px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        transition: background 0.3s ease;
+    }
+
+    /* Móvil: pantalla completa */
+    @@media (max-width: 768px) {
+        .story-viewer-container {
+            max-width: 100%;
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+            max-height: none;
+            border-radius: 0;
+            box-shadow: none;
+        }
+    }
+
+    .story-viewer-header {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        padding: 12px 16px;
+        z-index: 10;
+        background: var(--story-header-bg);
+    }
+
+    .story-progress-container {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 12px;
+    }
+
+    .story-progress-bar {
+        flex: 1;
+        height: 3px;
+        background: var(--story-progress-bg);
+        border-radius: 2px;
+        overflow: hidden;
+    }
+
+    .story-progress-fill {
+        height: 100%;
+        background: var(--story-progress-fill);
+        width: 0%;
+        transition: width 0.1s linear;
+    }
+
+    .story-progress-bar.completed .story-progress-fill {
+        width: 100%;
+    }
+
+    .story-progress-bar.active .story-progress-fill {
+        animation: storyProgress 5s linear forwards;
+    }
+
+    @@keyframes storyProgress {
+        from { width: 0%; }
+        to { width: 100%; }
+    }
+
+    .story-viewer-user {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .story-viewer-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid var(--story-text-color);
+    }
+
+    .story-viewer-avatar-placeholder {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 14px;
+        border: 2px solid var(--story-text-color);
+    }
+
+    .story-viewer-username {
+        color: var(--story-text-color);
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .story-viewer-time {
+        color: var(--story-text-secondary);
+        font-size: 12px;
+    }
+
+    .story-viewer-close {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 32px;
+        height: 32px;
+        background: var(--story-close-bg);
+        border: none;
+        border-radius: 50%;
+        color: var(--story-close-color);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 11;
+        transition: background 0.2s ease;
+    }
+
+    .story-viewer-close:hover {
+        background: var(--story-close-bg-hover);
+    }
+
+    .story-viewer-content {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .story-viewer-media {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+    }
+
+    .story-viewer-video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+    }
+
+    /* Desktop: contain para no cortar mucho */
+    @@media (min-width: 769px) {
+        .story-viewer-media,
+        .story-viewer-video {
+            object-fit: contain;
+        }
+    }
+
+    .story-viewer-text {
+        position: absolute;
+        bottom: 60px;
+        left: 16px;
+        right: 16px;
+        color: var(--story-text-color);
+        font-size: 16px;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        text-align: center;
+    }
+
+    /* Contenedor de overlays del editor */
+    .story-overlays-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 3;
+    }
+
+    .story-overlay-item {
+        position: absolute;
+        pointer-events: none;
+    }
+
+    .story-overlay-text {
+        white-space: pre-wrap;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+        padding: 4px 8px;
+        border-radius: 4px;
+    }
+
+    .story-overlay-sticker {
+        font-size: 48px;
+    }
+
+    .story-overlay-mention {
+        color: white;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .story-overlay-drawing {
+        width: 100%;
+        height: 100%;
+    }
+
+    /* Indicador de música */
+    .story-music-indicator {
+        position: absolute;
+        bottom: 80px;
+        left: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--story-close-bg);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        padding: 8px 12px;
+        border-radius: 20px;
+        color: var(--story-text-color);
+        z-index: 10;
+    }
+
+    .story-music-indicator .music-icon {
+        animation: musicBounce 0.5s ease infinite alternate;
+    }
+
+    @@keyframes musicBounce {
+        from { transform: scale(1); }
+        to { transform: scale(1.1); }
+    }
+
+    .story-music-indicator .music-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .story-music-indicator .music-title {
+        font-size: 12px;
+        font-weight: 600;
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .story-music-indicator .music-artist {
+        font-size: 10px;
+        opacity: 0.8;
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Navegación táctil */
+    .story-nav-zone {
+        position: absolute;
+        top: 60px;
+        bottom: 80px; /* Dejar espacio para la barra de acciones */
+        width: 35%;
+        z-index: 5;
+        cursor: pointer;
+    }
+
+    .story-nav-zone.prev {
+        left: 0;
+    }
+
+    .story-nav-zone.next {
+        right: 0;
+    }
+
+    /* Navegación entre usuarios */
+    .story-user-nav {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 44px;
+        height: 44px;
+        background: rgba(255, 255, 255, 0.9);
+        border: none;
+        border-radius: 50%;
+        color: #262626;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 20;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .story-user-nav:hover {
+        background: white;
+    }
+
+    .story-user-nav.prev {
+        left: -60px;
+    }
+
+    .story-user-nav.next {
+        right: -60px;
+    }
+
+    .story-user-nav svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    /* ========================================
+       BARRA DE ACCIONES DEL STORY (Like + Mensaje)
+       ======================================== */
+    .story-actions-bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 16px 20px;
+        background: linear-gradient(transparent, rgba(0,0,0,0.6));
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        z-index: 20;
+        pointer-events: auto;
+    }
+
+    .story-action-btn {
+        background: rgba(255, 255, 255, 0.15);
+        border: none;
+        border-radius: 50%;
+        width: 44px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: white;
+        backdrop-filter: blur(8px);
+        pointer-events: auto;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .story-action-btn:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: scale(1.1);
+    }
+
+    .story-action-btn:active {
+        transform: scale(0.95);
+    }
+
+    .story-action-btn svg {
+        width: 24px;
+        height: 24px;
+    }
+
+    .story-action-btn.liked {
+        background: rgba(239, 68, 68, 0.9);
+    }
+
+    .story-action-btn.liked svg {
+        fill: white;
+    }
+
+    .story-like-btn svg {
+        transition: transform 0.2s ease;
+    }
+
+    .story-like-btn.liked svg {
+        animation: storyLikePop 0.3s ease;
+    }
+
+    @@keyframes storyLikePop {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.3); }
+        100% { transform: scale(1); }
+    }
+
+    .story-like-count {
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        margin-left: -8px;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    }
+
+    .story-message-input-container {
+        flex: 1;
+        position: relative;
+    }
+
+    .story-message-input {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 24px;
+        padding: 12px 20px;
+        color: white;
+        font-size: 14px;
+        outline: none;
+        backdrop-filter: blur(8px);
+        transition: all 0.2s ease;
+        cursor: pointer;
+        pointer-events: auto;
+    }
+
+    .story-message-input::placeholder {
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    .story-message-input:focus {
+        background: rgba(255, 255, 255, 0.25);
+        border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    /* ========================================
+       MODAL CREAR STORY
+       ======================================== */
+    .create-story-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 9998;
+        display: none;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .create-story-modal.active {
+        display: flex;
+    }
+
+    .create-story-container {
+        background: var(--surface);
+        border-radius: 12px;
+        width: 100%;
+        max-width: 450px;
+        max-height: 90vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .create-story-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .create-story-header h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--fg);
+    }
+
+    .create-story-close {
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        padding: 4px;
+    }
+
+    .create-story-close:hover {
+        color: var(--fg);
+    }
+
+    .create-story-body {
+        padding: 20px;
+        overflow-y: auto;
+    }
+
+    .create-story-upload {
+        border: 2px dashed var(--line);
+        border-radius: 12px;
+        padding: 40px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-bottom: 16px;
+    }
+
+    .create-story-upload:hover {
+        border-color: var(--primary);
+        background: rgba(70, 130, 180, 0.05);
+    }
+
+    .create-story-upload svg {
+        width: 48px;
+        height: 48px;
+        color: var(--muted);
+        margin-bottom: 12px;
+    }
+
+    .create-story-upload p {
+        color: var(--muted);
+        margin: 0;
+        font-size: 14px;
+    }
+
+    .create-story-upload span {
+        color: var(--primary);
+        font-weight: 500;
+    }
+
+    .create-story-preview {
+        position: relative;
+        width: 100%;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 16px;
+        display: none;
+    }
+
+    .create-story-preview.active {
+        display: block;
+    }
+
+    .create-story-preview img,
+    .create-story-preview video {
+        width: 100%;
+        max-height: 400px;
+        object-fit: contain;
+        background: #000;
+    }
+
+    .create-story-remove-preview {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 28px;
+        height: 28px;
+        background: rgba(0, 0, 0, 0.6);
+        border: none;
+        border-radius: 50%;
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .create-story-text {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--fg);
+        font-size: 14px;
+        resize: none;
+        margin-bottom: 16px;
+    }
+
+    .create-story-text:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+
+    .create-story-tipo {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .create-story-tipo label {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px;
+        border: 2px solid var(--line);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 14px;
+        color: var(--muted);
+    }
+
+    .create-story-tipo input[type="radio"] {
+        display: none;
+    }
+
+    .create-story-tipo input[type="radio"]:checked + label {
+        border-color: var(--primary);
+        color: var(--primary);
+        background: rgba(70, 130, 180, 0.1);
+    }
+
+    .create-story-submit {
+        width: 100%;
+        padding: 14px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .create-story-submit:hover {
+        background: var(--primary-hover);
+    }
+
+    .create-story-submit:disabled {
+        background: var(--line);
+        cursor: not-allowed;
+    }
+
+    .create-story-editor-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        padding: 12px;
+        margin-top: 12px;
+        color: var(--primary);
+        background: transparent;
+        border: 1px dashed var(--primary);
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+
+    .create-story-editor-link:hover {
+        background: rgba(var(--primary-rgb), 0.1);
     }
 
     /* ========================================
@@ -4472,13 +5213,13 @@
         }
 
         .story-ring {
-            width: 56px;
-            height: 56px;
+            width: 68px;
+            height: 68px;
         }
 
         .story-username {
             font-size: 11px;
-            max-width: 56px;
+            max-width: 68px;
         }
 
         /* Posts sin bordes laterales */
@@ -4624,13 +5365,13 @@
     @@media (max-width: 479px) {
         /* Stories aún más compactos */
         .story-ring {
-            width: 52px;
-            height: 52px;
+            width: 62px;
+            height: 62px;
         }
 
         .story-username {
             font-size: 10px;
-            max-width: 52px;
+            max-width: 62px;
         }
 
         .stories-scroll {
@@ -4739,12 +5480,12 @@
     /* Pantallas muy pequeñas (< 360px) - iPhone SE, etc */
     @@media (max-width: 359px) {
         .story-ring {
-            width: 48px;
-            height: 48px;
+            width: 58px;
+            height: 58px;
         }
 
         .story-username {
-            max-width: 48px;
+            max-width: 58px;
         }
 
         .stories-scroll {
@@ -4821,14 +5562,40 @@
 
     <div class="feed-main">
         <div class="feed-container">
-            <!-- STORIES BAR -->
-            @if (stories != null && stories.Any())
-            {
-                <div class="stories-bar">
-                    <div class="stories-scroll">
+            <!-- STORIES BAR - Estilo Instagram -->
+            <div class="stories-bar">
+                <div class="stories-scroll">
+                    <!-- TU STORY - Siempre primero con botón + -->
+                    <div class="story-item" id="tuStoryItem" onclick="manejarTuStoryClick()">
+                        <div class="story-ring your-story" id="tuStoryRing">
+                            <div class="story-ring-inner">
+                                @if (!string.IsNullOrEmpty(usuarioActual?.FotoPerfil))
+                                {
+                                    <img src="@usuarioActual.FotoPerfil" alt="" class="story-avatar">
+                                }
+                                else
+                                {
+                                    <div class="story-avatar-placeholder">
+                                        @(usuarioActual?.NombreCompleto?.Substring(0, 1).ToUpper() ?? "U")
+                                    </div>
+                                }
+                            </div>
+                            <div class="story-add-btn" onclick="event.stopPropagation(); abrirModalCrearStory();">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </div>
+                        </div>
+                        <span class="story-username">Tu story</span>
+                    </div>
+
+                    <!-- STORIES DE SEGUIDOS -->
+                    @if (stories != null && stories.Any())
+                    {
                         @foreach (var storyGroup in stories)
                         {
-                            <div class="story-item" onclick="window.location.href='/Feed/Perfil/@storyGroup.CreadorId'">
+                            <div class="story-item" onclick="abrirVisorStories('@storyGroup.CreadorId')">
                                 <div class="story-ring @(storyGroup.TieneStorysSinVer ? "" : "seen")">
                                     <div class="story-ring-inner">
                                         @if (!string.IsNullOrEmpty(storyGroup.Creador.FotoPerfil))
@@ -4846,9 +5613,9 @@
                                 <span class="story-username">@storyGroup.Creador.NombreCompleto.Split(' ')[0]</span>
                             </div>
                         }
-                    </div>
+                    }
                 </div>
-            }
+            </div>
 
             <!-- ALGORITHM SELECTOR -->
             @if (algoritmosDisponibles.Any())
@@ -5723,6 +6490,16 @@
         <!-- Vista principal de opciones -->
         <div id="shareMainView">
             <div class="share-options">
+                <div class="share-option" id="shareAsStory" onclick="compartirComoStory()">
+                    <div class="share-option-icon" style="background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="12" r="10" fill="none" stroke="white" stroke-width="2"/>
+                            <line x1="12" y1="8" x2="12" y2="16" stroke="white" stroke-width="2"/>
+                            <line x1="8" y1="12" x2="16" y2="12" stroke="white" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <span class="share-option-label">Tu historia</span>
+                </div>
                 <div class="share-option" id="shareFriends" onclick="openFriendsPanel()">
                     <div class="share-option-icon friends">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -7662,6 +8439,72 @@
         showToast('URL copiada');
     }
 
+    // Compartir post como story
+    async function compartirComoStory() {
+        if (!currentSharePostId) {
+            showToast('Error: no se encontró el post');
+            return;
+        }
+
+        closeShareModal();
+
+        try {
+            // Obtener datos del post
+            const response = await fetch(`/Feed/ObtenerPost/${currentSharePostId}`);
+            const data = await response.json();
+
+            if (!data.success || !data.post) {
+                showToast('No se pudo obtener el contenido');
+                return;
+            }
+
+            const post = data.post;
+
+            // Verificar que tenga media
+            if (!post.rutaArchivo && (!post.archivos || post.archivos.length === 0)) {
+                showToast('Este post no tiene imagen o video para compartir');
+                return;
+            }
+
+            // Tomar la primera imagen/video del post
+            const mediaUrl = post.rutaArchivo || (post.archivos && post.archivos[0]?.ruta);
+
+            if (!mediaUrl) {
+                showToast('No se encontró media para compartir');
+                return;
+            }
+
+            // Crear story desde la URL del media
+            showToast('Creando historia...');
+
+            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+            const formData = new FormData();
+            formData.append('postId', currentSharePostId);
+            formData.append('texto', post.descripcion ? `📸 ${post.descripcion.substring(0, 100)}` : '');
+
+            const storyResponse = await fetch('/Stories/CrearDesdePost', {
+                method: 'POST',
+                headers: {
+                    'RequestVerificationToken': token
+                },
+                body: formData
+            });
+
+            const storyData = await storyResponse.json();
+
+            if (storyData.success) {
+                showToast('¡Compartido en tu historia!');
+                actualizarBarraStories();
+            } else {
+                showToast(storyData.message || 'Error al compartir');
+            }
+        } catch (error) {
+            console.error('Error al compartir como story:', error);
+            showToast('Error al compartir');
+        }
+    }
+
     // ========================================
     // ENVIAR A AMIGOS
     // ========================================
@@ -9071,6 +9914,182 @@
         }
     }
 </style>
+
+<!-- ========================================
+     STORY VIEWER MODAL - Visor pantalla completa
+     ======================================== -->
+<div class="story-viewer-overlay" id="storyViewerOverlay">
+    <div class="story-viewer-container">
+        <!-- Header con progreso -->
+        <div class="story-viewer-header">
+            <div class="story-progress-container" id="storyProgressContainer">
+                <!-- Barras de progreso se generan dinámicamente -->
+            </div>
+            <div class="story-viewer-user">
+                <img src="" alt="" class="story-viewer-avatar" id="storyViewerAvatar" style="display:none;">
+                <div class="story-viewer-avatar-placeholder" id="storyViewerAvatarPlaceholder">?</div>
+                <div>
+                    <div class="story-viewer-username" id="storyViewerUsername">Usuario</div>
+                    <div class="story-viewer-time" id="storyViewerTime">Hace 2h</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botón cerrar -->
+        <button class="story-viewer-close" onclick="cerrarVisorStories()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+
+        <!-- Contenido (imagen/video) -->
+        <div class="story-viewer-content" id="storyViewerContent">
+            <img src="" alt="" class="story-viewer-media" id="storyViewerImage" style="display:none;">
+            <video class="story-viewer-video" id="storyViewerVideo" muted playsinline style="display:none;"></video>
+
+            <!-- Contenedor de overlays del editor -->
+            <div class="story-overlays-container" id="storyOverlaysContainer"></div>
+
+            <div class="story-viewer-text" id="storyViewerText"></div>
+
+            <!-- Zonas táctiles para navegar -->
+            <div class="story-nav-zone prev" onclick="storyAnterior()"></div>
+            <div class="story-nav-zone next" onclick="storySiguiente()"></div>
+        </div>
+
+        <!-- Audio para música de stories -->
+        <audio id="storyMusicPlayer" preload="auto" style="display:none;"></audio>
+
+        <!-- Indicador de música -->
+        <div class="story-music-indicator" id="storyMusicIndicator" style="display:none;">
+            <div class="music-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                </svg>
+            </div>
+            <div class="music-info">
+                <span class="music-title" id="storyMusicTitle">Cancion</span>
+                <span class="music-artist" id="storyMusicArtist">Artista</span>
+            </div>
+        </div>
+
+        <!-- Navegación entre usuarios -->
+        <button class="story-user-nav prev" id="storyUserNavPrev" onclick="usuarioStoriesAnterior()" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+        </button>
+        <button class="story-user-nav next" id="storyUserNavNext" onclick="usuarioStoriesSiguiente()" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+        </button>
+
+        <!-- Barra de acciones: Like + Mensaje -->
+        <div class="story-actions-bar" id="storyActionsBar">
+            <!-- Botón Like -->
+            <button class="story-action-btn story-like-btn" id="storyLikeBtn" onclick="toggleStoryLike()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="storyLikeIcon">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                </svg>
+            </button>
+            <span class="story-like-count" id="storyLikeCount">0</span>
+
+            <!-- Input de mensaje (lleva a /Mensajes) -->
+            <div class="story-message-input-container">
+                <input type="text" class="story-message-input" id="storyMessageInput"
+                       placeholder="Enviar mensaje..."
+                       onclick="abrirMensajesDesdeStory()"
+                       readonly>
+            </div>
+
+            <!-- Botón Mensaje directo -->
+            <button class="story-action-btn story-message-btn" id="storyMessageBtn" onclick="abrirMensajesDesdeStory()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================
+     MODAL CREAR STORY
+     ======================================== -->
+<div class="create-story-modal" id="createStoryModal">
+    <div class="create-story-container">
+        <div class="create-story-header">
+            <h3>Crear historia</h3>
+            <button class="create-story-close" onclick="cerrarModalCrearStory()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        <div class="create-story-body">
+            <!-- Zona de upload -->
+            <div class="create-story-upload" id="createStoryUpload" onclick="document.getElementById('storyFileInput').click()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <p><span>Haz clic para subir</span> una foto o video</p>
+                <p style="font-size: 12px; margin-top: 8px;">JPG, PNG, MP4 (máx. 30s)</p>
+            </div>
+            <input type="file" id="storyFileInput" accept="image/*,video/*" style="display:none;" onchange="previsualizarStory(this)">
+
+            <!-- Preview -->
+            <div class="create-story-preview" id="createStoryPreview">
+                <img src="" alt="" id="storyPreviewImage" style="display:none;">
+                <video src="" id="storyPreviewVideo" muted playsinline style="display:none;"></video>
+                <button class="create-story-remove-preview" onclick="eliminarPreviewStory()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Texto opcional -->
+            <textarea class="create-story-text" id="storyTexto" placeholder="Añade un texto a tu historia (opcional)" rows="2"></textarea>
+
+            <!-- Tipo de lado -->
+            <div class="create-story-tipo">
+                <input type="radio" name="storyTipoLado" id="storyTipoLadoA" value="LadoA" checked>
+                <label for="storyTipoLadoA">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <circle cx="12" cy="12" r="10"></circle>
+                    </svg>
+                    Lado A
+                </label>
+                <input type="radio" name="storyTipoLado" id="storyTipoLadoB" value="LadoB">
+                <label for="storyTipoLadoB">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zM2 12h20"></path>
+                    </svg>
+                    Lado B
+                </label>
+            </div>
+
+            <!-- Botón crear -->
+            <button class="create-story-submit" id="storySubmitBtn" onclick="crearStory()" disabled>
+                Compartir historia
+            </button>
+
+            <!-- Enlace al editor avanzado -->
+            <a href="/Stories/Editor" class="create-story-editor-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                </svg>
+                Usar editor avanzado
+            </a>
+        </div>
+    </div>
+</div>
 
 <!-- DM Popup HTML -->
 <div class="dm-popup-container" id="dmPopup">
@@ -11115,6 +12134,709 @@
             });
         }
     })();
+
+    // ========================================
+    // STORIES - Sistema Instagram-style
+    // ========================================
+    let storiesData = [];
+    let currentUserIndex = 0;
+    let currentStoryIndex = 0;
+    let storyTimer = null;
+    let storyDuration = 5000; // 5 segundos para imágenes
+    let storyArchivoSeleccionado = null;
+
+    // Calcular tiempo relativo
+    function tiempoRelativoStory(fecha) {
+        const ahora = new Date();
+        const publicado = new Date(fecha);
+        const diff = ahora - publicado;
+        const minutos = Math.floor(diff / 60000);
+        const horas = Math.floor(diff / 3600000);
+
+        if (minutos < 1) return 'Ahora';
+        if (minutos < 60) return `Hace ${minutos}m`;
+        if (horas < 24) return `Hace ${horas}h`;
+        return 'Hace 1d';
+    }
+
+    // Abrir visor de stories
+    async function abrirVisorStories(creadorId) {
+        try {
+            // Cargar stories desde API
+            const response = await fetch('/Stories/Obtener');
+            const data = await response.json();
+
+            if (!data.success || !data.stories || data.stories.length === 0) {
+                showToast('No hay stories disponibles');
+                return;
+            }
+
+            storiesData = data.stories;
+
+            // Encontrar índice del creador seleccionado
+            currentUserIndex = storiesData.findIndex(s => s.creadorId === creadorId);
+            if (currentUserIndex === -1) currentUserIndex = 0;
+
+            currentStoryIndex = 0;
+
+            // Mostrar overlay
+            document.getElementById('storyViewerOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            document.body.classList.add('story-viewer-open');
+
+            // Mostrar primera story del usuario
+            mostrarStory();
+
+        } catch (error) {
+            console.error('Error al abrir stories:', error);
+            showToast('Error al cargar stories');
+        }
+    }
+
+    // Mostrar story actual
+    function mostrarStory() {
+        const userStories = storiesData[currentUserIndex];
+        if (!userStories) {
+            cerrarVisorStories();
+            return;
+        }
+
+        const story = userStories.stories[currentStoryIndex];
+        if (!story) {
+            // Si no hay más stories de este usuario, pasar al siguiente
+            usuarioStoriesSiguiente();
+            return;
+        }
+
+        // Actualizar info del usuario
+        const avatar = document.getElementById('storyViewerAvatar');
+        const avatarPlaceholder = document.getElementById('storyViewerAvatarPlaceholder');
+
+        if (userStories.creador.avatar) {
+            avatar.src = userStories.creador.avatar;
+            avatar.style.display = 'block';
+            avatarPlaceholder.style.display = 'none';
+        } else {
+            avatar.style.display = 'none';
+            avatarPlaceholder.style.display = 'flex';
+            avatarPlaceholder.textContent = userStories.creador.nombre?.charAt(0)?.toUpperCase() || '?';
+        }
+
+        document.getElementById('storyViewerUsername').textContent = userStories.creador.nombre;
+        document.getElementById('storyViewerTime').textContent = tiempoRelativoStory(story.fechaPublicacion);
+
+        // Actualizar barras de progreso
+        actualizarBarrasProgreso(userStories.stories.length, currentStoryIndex);
+
+        // Mostrar media
+        const imgEl = document.getElementById('storyViewerImage');
+        const videoEl = document.getElementById('storyViewerVideo');
+        const textoEl = document.getElementById('storyViewerText');
+
+        imgEl.style.display = 'none';
+        videoEl.style.display = 'none';
+
+        if (story.tipo === 'Video') {
+            videoEl.src = story.rutaArchivo;
+            videoEl.style.display = 'block';
+            videoEl.play();
+            // Para videos, usar su duración real
+            videoEl.onloadedmetadata = function() {
+                storyDuration = Math.min(videoEl.duration * 1000, 30000); // Máximo 30s
+                iniciarTimerStory();
+            };
+        } else {
+            imgEl.src = story.rutaArchivo;
+            imgEl.style.display = 'block';
+            storyDuration = 5000;
+            iniciarTimerStory();
+        }
+
+        // Texto de la story (solo si no hay overlays)
+        if (!story.tieneOverlays) {
+            textoEl.textContent = story.texto || '';
+        } else {
+            textoEl.textContent = '';
+        }
+
+        // Renderizar overlays del editor
+        renderizarOverlays(story);
+
+        // Reproducir música si tiene
+        reproducirMusicaStory(story);
+
+        // Marcar como vista
+        marcarStoryVista(story.id);
+
+        // Actualizar navegación entre usuarios
+        actualizarNavegacionUsuarios();
+
+        // Actualizar estado de likes
+        actualizarLikeUI(story);
+    }
+
+    // Actualizar UI de like en el visor de story
+    function actualizarLikeUI(story) {
+        const likeBtn = document.getElementById('storyLikeBtn');
+        const likeCount = document.getElementById('storyLikeCount');
+        const likeIcon = document.getElementById('storyLikeIcon');
+
+        if (story.liked) {
+            likeBtn.classList.add('liked');
+            likeIcon.setAttribute('fill', 'currentColor');
+        } else {
+            likeBtn.classList.remove('liked');
+            likeIcon.setAttribute('fill', 'none');
+        }
+
+        likeCount.textContent = story.likes || 0;
+    }
+
+    // Toggle like en story actual
+    async function toggleStoryLike() {
+        const userStories = storiesData[currentUserIndex];
+        if (!userStories) return;
+
+        const story = userStories.stories[currentStoryIndex];
+        if (!story) return;
+
+        const likeBtn = document.getElementById('storyLikeBtn');
+        const likeCount = document.getElementById('storyLikeCount');
+        const likeIcon = document.getElementById('storyLikeIcon');
+
+        // Optimistic UI update
+        const wasLiked = story.liked;
+        story.liked = !wasLiked;
+        story.likes = (story.likes || 0) + (wasLiked ? -1 : 1);
+        if (story.likes < 0) story.likes = 0;
+
+        actualizarLikeUI(story);
+
+        try {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            const formData = new FormData();
+            formData.append('__RequestVerificationToken', token || '');
+
+            const response = await fetch(`/Stories/ToggleLike/${story.id}`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                // Actualizar con datos reales del servidor
+                story.liked = data.liked;
+                story.likes = data.likes;
+                actualizarLikeUI(story);
+                console.log('Like actualizado:', data);
+            } else {
+                // Revertir si hay error
+                story.liked = wasLiked;
+                story.likes = (story.likes || 0) + (wasLiked ? 1 : -1);
+                actualizarLikeUI(story);
+                console.error('Error al dar like, status:', response.status);
+            }
+        } catch (error) {
+            // Revertir en caso de error
+            story.liked = wasLiked;
+            story.likes = (story.likes || 0) + (wasLiked ? 1 : -1);
+            actualizarLikeUI(story);
+            console.error('Error de red al dar like:', error);
+        }
+    }
+
+    // Abrir mensajes directos con el creador de la story (con referencia a la historia)
+    function abrirMensajesDesdeStory() {
+        const userStories = storiesData[currentUserIndex];
+        if (!userStories || !userStories.creador) return;
+
+        const creadorId = userStories.creador.id;
+
+        // Obtener el ID de la historia actual
+        const currentStory = userStories.stories[currentStoryIndex];
+        const storyId = currentStory ? currentStory.id : null;
+
+        // Cerrar visor de stories
+        cerrarVisorStories();
+
+        // Ir al chat con el creador, incluyendo referencia a la historia
+        let chatUrl = `/Mensajes/Chat/${encodeURIComponent(creadorId)}`;
+        if (storyId) {
+            chatUrl += `?storyId=${storyId}`;
+        }
+        window.location.href = chatUrl;
+    }
+
+    // Renderizar overlays del editor visual
+    function renderizarOverlays(story) {
+        const container = document.getElementById('storyOverlaysContainer');
+        container.innerHTML = '';
+
+        if (!story.elementosJson) return;
+
+        try {
+            const elementos = JSON.parse(story.elementosJson);
+
+            // Renderizar textos
+            if (elementos.textos && elementos.textos.length > 0) {
+                elementos.textos.forEach(texto => {
+                    const el = document.createElement('div');
+                    el.className = 'story-overlay-item story-overlay-text';
+                    el.textContent = texto.texto;
+                    el.style.left = `${texto.x}%`;
+                    el.style.top = `${texto.y}%`;
+                    el.style.fontSize = `${texto.fontSize || 24}px`;
+                    el.style.color = texto.color || '#ffffff';
+                    el.style.fontFamily = texto.fontFamily || 'Arial';
+                    if (texto.backgroundColor) {
+                        el.style.backgroundColor = texto.backgroundColor;
+                    }
+                    if (texto.rotation) {
+                        el.style.transform = `rotate(${texto.rotation}deg)`;
+                    }
+                    container.appendChild(el);
+                });
+            }
+
+            // Renderizar stickers/emojis
+            if (elementos.stickers && elementos.stickers.length > 0) {
+                elementos.stickers.forEach(sticker => {
+                    const el = document.createElement('div');
+                    el.className = 'story-overlay-item story-overlay-sticker';
+                    el.textContent = sticker.valor;
+                    el.style.left = `${sticker.x}%`;
+                    el.style.top = `${sticker.y}%`;
+                    if (sticker.scale) {
+                        el.style.transform = `scale(${sticker.scale})`;
+                    }
+                    if (sticker.rotation) {
+                        el.style.transform += ` rotate(${sticker.rotation}deg)`;
+                    }
+                    container.appendChild(el);
+                });
+            }
+
+            // Renderizar menciones
+            if (elementos.menciones && elementos.menciones.length > 0) {
+                elementos.menciones.forEach(mencion => {
+                    const el = document.createElement('div');
+                    el.className = 'story-overlay-item story-overlay-mention';
+                    el.textContent = '@@' + mencion.username;
+                    el.style.left = mencion.x + '%';
+                    el.style.top = mencion.y + '%';
+                    container.appendChild(el);
+                });
+            }
+
+            // Renderizar dibujos (SVG)
+            if (elementos.dibujos && elementos.dibujos.length > 0) {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('class', 'story-overlay-drawing');
+                // Usar dimensiones originales del canvas si están disponibles
+                const viewBoxWidth = elementos.canvasWidth || 360;
+                const viewBoxHeight = elementos.canvasHeight || 640;
+                svg.setAttribute('viewBox', `0 0 ${viewBoxWidth} ${viewBoxHeight}`);
+                svg.setAttribute('preserveAspectRatio', 'none');
+
+                elementos.dibujos.forEach(dibujo => {
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.setAttribute('d', dibujo.pathData);
+                    path.setAttribute('stroke', dibujo.color || '#ffffff');
+                    path.setAttribute('stroke-width', dibujo.strokeWidth || 2);
+                    path.setAttribute('fill', 'none');
+                    path.setAttribute('stroke-linecap', 'round');
+                    path.setAttribute('stroke-linejoin', 'round');
+                    svg.appendChild(path);
+                });
+
+                container.appendChild(svg);
+            }
+
+        } catch (error) {
+            console.error('Error al renderizar overlays:', error);
+        }
+    }
+
+    // Reproducir música de la story
+    function reproducirMusicaStory(story) {
+        const audioEl = document.getElementById('storyMusicPlayer');
+        const indicator = document.getElementById('storyMusicIndicator');
+
+        // Detener música anterior
+        audioEl.pause();
+        audioEl.src = '';
+        indicator.style.display = 'none';
+
+        if (story.musica && story.musica.audioUrl) {
+            audioEl.src = story.musica.audioUrl;
+            audioEl.currentTime = story.musica.inicioSegundos || 0;
+
+            // Mostrar indicador
+            document.getElementById('storyMusicTitle').textContent = story.musica.titulo;
+            document.getElementById('storyMusicArtist').textContent = story.musica.artista;
+            indicator.style.display = 'flex';
+
+            // Reproducir
+            audioEl.play().catch(err => {
+                console.log('No se pudo reproducir la música automáticamente:', err);
+            });
+        }
+    }
+
+    // Actualizar barras de progreso
+    function actualizarBarrasProgreso(total, actual) {
+        const container = document.getElementById('storyProgressContainer');
+        container.innerHTML = '';
+
+        for (let i = 0; i < total; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'story-progress-bar';
+            if (i < actual) {
+                bar.classList.add('completed');
+            } else if (i === actual) {
+                bar.classList.add('active');
+            }
+            bar.innerHTML = '<div class="story-progress-fill"></div>';
+            container.appendChild(bar);
+        }
+    }
+
+    // Iniciar timer para avanzar
+    function iniciarTimerStory() {
+        if (storyTimer) clearTimeout(storyTimer);
+
+        storyTimer = setTimeout(() => {
+            storySiguiente();
+        }, storyDuration);
+    }
+
+    // Pausar timer
+    function pausarTimerStory() {
+        if (storyTimer) clearTimeout(storyTimer);
+    }
+
+    // Story anterior
+    function storyAnterior() {
+        pausarTimerStory();
+        if (currentStoryIndex > 0) {
+            currentStoryIndex--;
+            mostrarStory();
+        } else if (currentUserIndex > 0) {
+            // Ir al último story del usuario anterior
+            currentUserIndex--;
+            currentStoryIndex = storiesData[currentUserIndex].stories.length - 1;
+            mostrarStory();
+        }
+    }
+
+    // Story siguiente
+    function storySiguiente() {
+        pausarTimerStory();
+        const userStories = storiesData[currentUserIndex];
+
+        if (currentStoryIndex < userStories.stories.length - 1) {
+            currentStoryIndex++;
+            mostrarStory();
+        } else {
+            // Pasar al siguiente usuario
+            usuarioStoriesSiguiente();
+        }
+    }
+
+    // Usuario anterior
+    function usuarioStoriesAnterior() {
+        pausarTimerStory();
+        if (currentUserIndex > 0) {
+            currentUserIndex--;
+            currentStoryIndex = 0;
+            mostrarStory();
+        }
+    }
+
+    // Usuario siguiente
+    function usuarioStoriesSiguiente() {
+        pausarTimerStory();
+        if (currentUserIndex < storiesData.length - 1) {
+            currentUserIndex++;
+            currentStoryIndex = 0;
+            mostrarStory();
+        } else {
+            // Ya no hay más usuarios
+            cerrarVisorStories();
+        }
+    }
+
+    // Actualizar botones de navegación entre usuarios
+    function actualizarNavegacionUsuarios() {
+        const prevBtn = document.getElementById('storyUserNavPrev');
+        const nextBtn = document.getElementById('storyUserNavNext');
+
+        prevBtn.style.display = currentUserIndex > 0 ? 'flex' : 'none';
+        nextBtn.style.display = currentUserIndex < storiesData.length - 1 ? 'flex' : 'none';
+    }
+
+    // Cerrar visor
+    function cerrarVisorStories() {
+        pausarTimerStory();
+
+        const videoEl = document.getElementById('storyViewerVideo');
+        if (videoEl) {
+            videoEl.pause();
+            videoEl.src = '';
+        }
+
+        // Detener música
+        const audioEl = document.getElementById('storyMusicPlayer');
+        if (audioEl) {
+            audioEl.pause();
+            audioEl.src = '';
+        }
+        document.getElementById('storyMusicIndicator').style.display = 'none';
+
+        // Limpiar overlays
+        document.getElementById('storyOverlaysContainer').innerHTML = '';
+
+        document.getElementById('storyViewerOverlay').classList.remove('active');
+        document.body.style.overflow = '';
+        document.body.classList.remove('story-viewer-open');
+    }
+
+    // Marcar story como vista
+    async function marcarStoryVista(storyId) {
+        try {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+            const formData = new FormData();
+            formData.append('__RequestVerificationToken', token);
+
+            await fetch(`/Stories/MarcarVisto/${storyId}`, {
+                method: 'POST',
+                body: formData
+            });
+        } catch (error) {
+            console.error('Error al marcar story como vista:', error);
+        }
+    }
+
+    // Cerrar con Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            if (document.getElementById('storyViewerOverlay').classList.contains('active')) {
+                cerrarVisorStories();
+            }
+            if (document.getElementById('createStoryModal').classList.contains('active')) {
+                cerrarModalCrearStory();
+            }
+        }
+        // Navegación con flechas
+        if (document.getElementById('storyViewerOverlay').classList.contains('active')) {
+            if (e.key === 'ArrowLeft') storyAnterior();
+            if (e.key === 'ArrowRight') storySiguiente();
+        }
+    });
+
+    // ========================================
+    // CREAR STORY
+    // ========================================
+
+    // ID del usuario actual para verificar stories propias
+    const currentUserId = '@(usuarioActual?.Id ?? "")';
+
+    // Manejar click en "Tu Story"
+    function manejarTuStoryClick() {
+        const ring = document.getElementById('tuStoryRing');
+        if (ring && ring.classList.contains('has-story')) {
+            // Si tiene stories, abrir visor con sus propias stories
+            abrirVisorStories(currentUserId);
+        } else {
+            // Si no tiene stories, abrir modal de crear
+            abrirModalCrearStory();
+        }
+    }
+
+    // Abrir modal
+    function abrirModalCrearStory() {
+        document.getElementById('createStoryModal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    // Cerrar modal
+    function cerrarModalCrearStory() {
+        document.getElementById('createStoryModal').classList.remove('active');
+        document.body.style.overflow = '';
+        eliminarPreviewStory();
+    }
+
+    // Previsualizar archivo
+    function previsualizarStory(input) {
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            storyArchivoSeleccionado = file;
+
+            const preview = document.getElementById('createStoryPreview');
+            const upload = document.getElementById('createStoryUpload');
+            const imgEl = document.getElementById('storyPreviewImage');
+            const videoEl = document.getElementById('storyPreviewVideo');
+            const submitBtn = document.getElementById('storySubmitBtn');
+
+            // Ocultar zona de upload
+            upload.style.display = 'none';
+            preview.classList.add('active');
+
+            if (file.type.startsWith('video/')) {
+                imgEl.style.display = 'none';
+                videoEl.src = URL.createObjectURL(file);
+                videoEl.style.display = 'block';
+                videoEl.play();
+            } else {
+                videoEl.style.display = 'none';
+                imgEl.src = URL.createObjectURL(file);
+                imgEl.style.display = 'block';
+            }
+
+            submitBtn.disabled = false;
+        }
+    }
+
+    // Eliminar preview
+    function eliminarPreviewStory() {
+        storyArchivoSeleccionado = null;
+
+        const preview = document.getElementById('createStoryPreview');
+        const upload = document.getElementById('createStoryUpload');
+        const imgEl = document.getElementById('storyPreviewImage');
+        const videoEl = document.getElementById('storyPreviewVideo');
+        const submitBtn = document.getElementById('storySubmitBtn');
+        const fileInput = document.getElementById('storyFileInput');
+        const textoInput = document.getElementById('storyTexto');
+
+        preview.classList.remove('active');
+        upload.style.display = 'block';
+
+        imgEl.src = '';
+        imgEl.style.display = 'none';
+        videoEl.src = '';
+        videoEl.style.display = 'none';
+
+        fileInput.value = '';
+        textoInput.value = '';
+        submitBtn.disabled = true;
+    }
+
+    // Crear story
+    async function crearStory() {
+        if (!storyArchivoSeleccionado) {
+            showToast('Selecciona una foto o video');
+            return;
+        }
+
+        const submitBtn = document.getElementById('storySubmitBtn');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Publicando...';
+
+        try {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+            const formData = new FormData();
+            formData.append('archivo', storyArchivoSeleccionado);
+            formData.append('__RequestVerificationToken', token);
+
+            const texto = document.getElementById('storyTexto').value;
+            if (texto) {
+                formData.append('texto', texto);
+            }
+
+            const tipoLado = document.querySelector('input[name="storyTipoLado"]:checked').value;
+            formData.append('tipoLado', tipoLado);
+
+            const response = await fetch('/Stories/Crear', {
+                method: 'POST',
+                headers: {
+                    'RequestVerificationToken': token
+                },
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('Historia publicada');
+                cerrarModalCrearStory();
+                // Actualizar la barra de stories
+                actualizarBarraStories();
+            } else {
+                showToast(data.message || 'Error al publicar');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Compartir historia';
+            }
+        } catch (error) {
+            console.error('Error al crear story:', error);
+            showToast('Error al publicar la historia');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Compartir historia';
+        }
+    }
+
+    // Actualizar barra de stories
+    async function actualizarBarraStories() {
+        try {
+            const response = await fetch('/Stories/Obtener');
+            const data = await response.json();
+
+            if (data.success && data.stories) {
+                const scrollContainer = document.querySelector('.stories-scroll');
+                if (!scrollContainer) return;
+
+                // Mantener "Tu Story" y reconstruir el resto
+                const tuStory = scrollContainer.querySelector('.story-item:first-child');
+
+                // Limpiar todo excepto "Tu Story"
+                scrollContainer.innerHTML = '';
+                if (tuStory) {
+                    scrollContainer.appendChild(tuStory);
+                }
+
+                // Agregar stories
+                data.stories.forEach(group => {
+                    // Saltar stories propias (ya están en "Tu Story")
+                    if (group.creadorId === currentUserId) {
+                        // Actualizar "Tu Story" para mostrar que tiene stories
+                        const yourStoryRing = tuStory?.querySelector('.story-ring');
+                        if (yourStoryRing) {
+                            yourStoryRing.classList.add('has-story');
+                        }
+                        return;
+                    }
+
+                    const item = document.createElement('div');
+                    item.className = 'story-item';
+                    item.onclick = () => abrirVisorStories(group.creadorId);
+
+                    const ringClass = group.tieneStorysSinVer ? '' : 'seen';
+                    const avatarHtml = group.creador.avatar
+                        ? `<img src="${group.creador.avatar}" alt="" class="story-avatar">`
+                        : `<div class="story-avatar-placeholder">${group.creador.nombre?.charAt(0)?.toUpperCase() || '?'}</div>`;
+
+                    item.innerHTML = `
+                        <div class="story-ring ${ringClass}">
+                            <div class="story-ring-inner">
+                                ${avatarHtml}
+                            </div>
+                        </div>
+                        <span class="story-username">${group.creador.nombre.split(' ')[0]}</span>
+                    `;
+
+                    scrollContainer.appendChild(item);
+                });
+            }
+        } catch (error) {
+            console.error('Error al actualizar barra de stories:', error);
+        }
+    }
+
+    // Cargar stories al iniciar
+    document.addEventListener('DOMContentLoaded', function() {
+        actualizarBarraStories();
+    });
 </script>
 
 <!-- Modal: No tienes acceso al post compartido -->

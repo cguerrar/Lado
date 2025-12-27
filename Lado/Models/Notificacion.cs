@@ -15,7 +15,9 @@ namespace Lado.Models
         PropuestaDesafio = 7,
         PagoRecibido = 8,
         RetiroCompletado = 9,
-        Sistema = 10             // Notificaciones del sistema
+        Sistema = 10,            // Notificaciones del sistema
+        MencionEnStory = 11,     // Mencionado en una historia
+        LikeEnStory = 12         // Like en una historia
     }
 
     public class Notificacion
@@ -49,6 +51,7 @@ namespace Lado.Models
         public int? MensajeId { get; set; }
         public int? DesafioId { get; set; }
         public int? ComentarioId { get; set; }
+        public int? StoryId { get; set; }
 
         // URL para navegar al hacer clic
         [MaxLength(500)]

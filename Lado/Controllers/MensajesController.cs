@@ -149,7 +149,7 @@ namespace Lado.Controllers
         // CHAT - VISTA DE CONVERSACIÓN
         // ========================================
 
-        public async Task<IActionResult> Chat(string id)
+        public async Task<IActionResult> Chat(string id, int? storyId = null)
         {
             var usuario = await _userManager.GetUserAsync(User);
             if (usuario == null)
@@ -173,6 +173,29 @@ namespace Lado.Controllers
 
             _logger.LogInformation("Abriendo chat entre {Usuario} y {Destinatario}",
                 usuario.UserName, destinatario.UserName);
+
+            // ========================================
+            // CARGAR HISTORIA SI SE PASA storyId
+            // ========================================
+            if (storyId.HasValue)
+            {
+                var story = await _context.Stories
+                    .Include(s => s.Creador)
+                    .FirstOrDefaultAsync(s => s.Id == storyId.Value && s.EstaActivo && s.CreadorId == id);
+
+                if (story != null)
+                {
+                    ViewBag.StoryReferencia = new
+                    {
+                        Id = story.Id,
+                        ImagenUrl = story.RutaArchivo,
+                        CreadorNombre = story.Creador?.NombreCompleto ?? "Usuario",
+                        CreadorUsername = story.Creador?.UserName ?? "",
+                        FechaPublicacion = story.FechaPublicacion
+                    };
+                    _logger.LogInformation("Chat abierto con referencia a Story {StoryId}", storyId.Value);
+                }
+            }
 
             // ========================================
             // VERIFICAR BLOQUEO
@@ -537,6 +560,78 @@ namespace Lado.Controllers
                 _logger.LogError(ex, "Error al eliminar conversación");
                 TempData["Error"] = "Error al eliminar la conversación";
                 return RedirectToAction("Index");
+            }
+        }
+
+        // ========================================
+        // ELIMINAR MENSAJE INDIVIDUAL
+        // ========================================
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarMensaje(int mensajeId)
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
+                {
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                var mensaje = await _context.MensajesPrivados
+                    .FirstOrDefaultAsync(m => m.Id == mensajeId);
+
+                if (mensaje == null)
+                {
+                    return Json(new { success = false, message = "Mensaje no encontrado" });
+                }
+
+                // Verificar que el usuario sea el remitente o destinatario
+                bool esRemitente = mensaje.RemitenteId == usuario.Id;
+                bool esDestinatario = mensaje.DestinatarioId == usuario.Id;
+
+                if (!esRemitente && !esDestinatario)
+                {
+                    _logger.LogWarning("⚠️ Intento de eliminar mensaje ajeno. Usuario: {UserId}, Mensaje: {MensajeId}",
+                        usuario.Id, mensajeId);
+                    return Json(new { success = false, message = "No tienes permiso para eliminar este mensaje" });
+                }
+
+                // Marcar como eliminado para este usuario
+                if (esRemitente)
+                {
+                    mensaje.EliminadoPorRemitente = true;
+                }
+                else
+                {
+                    mensaje.EliminadoPorDestinatario = true;
+                }
+
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("✅ Mensaje {MensajeId} eliminado por {Usuario} (esRemitente: {EsRemitente})",
+                    mensajeId, usuario.UserName, esRemitente);
+
+                // Notificar via SignalR al otro usuario (opcional: para que vea "mensaje eliminado")
+                var otroUsuarioId = esRemitente ? mensaje.DestinatarioId : mensaje.RemitenteId;
+                await _hubContext.Clients.Group($"user_{otroUsuarioId}").SendAsync("MensajeEliminado", new
+                {
+                    mensajeId = mensaje.Id,
+                    eliminadoPor = usuario.Id,
+                    eliminadoPorRemitente = esRemitente
+                });
+
+                return Json(new {
+                    success = true,
+                    message = "Mensaje eliminado",
+                    eliminadoParaTodos = false // Solo para el usuario actual
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al eliminar mensaje {MensajeId}", mensajeId);
+                return Json(new { success = false, message = "Error al eliminar el mensaje" });
             }
         }
 

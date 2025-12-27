@@ -36,6 +36,7 @@ namespace Lado.Data
         // ========================================
         public DbSet<Story> Stories { get; set; }
         public DbSet<StoryVista> StoryVistas { get; set; }
+        public DbSet<StoryLike> StoryLikes { get; set; }
         public DbSet<Reaccion> Reacciones { get; set; }
         public DbSet<Coleccion> Colecciones { get; set; }
         public DbSet<ContenidoColeccion> ContenidoColecciones { get; set; }
@@ -244,6 +245,32 @@ namespace Lado.Data
                 entity.HasIndex(sv => new { sv.StoryId, sv.UsuarioId })
                     .IsUnique()
                     .HasDatabaseName("IX_StoryVistas_Story_Usuario_Unique");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE STORY LIKES
+            // ========================================
+            modelBuilder.Entity<StoryLike>(entity =>
+            {
+                entity.HasKey(sl => sl.Id);
+
+                entity.HasOne(sl => sl.Story)
+                    .WithMany(s => s.Likes)
+                    .HasForeignKey(sl => sl.StoryId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(sl => sl.Usuario)
+                    .WithMany()
+                    .HasForeignKey(sl => sl.UsuarioId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // Un usuario solo puede dar like una vez por story
+                entity.HasIndex(sl => new { sl.StoryId, sl.UsuarioId })
+                    .IsUnique()
+                    .HasDatabaseName("IX_StoryLikes_Story_Usuario_Unique");
+
+                entity.HasIndex(sl => sl.StoryId)
+                    .HasDatabaseName("IX_StoryLikes_StoryId");
             });
 
             // ========================================

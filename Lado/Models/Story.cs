@@ -33,17 +33,57 @@ namespace Lado.Models
 
         public int NumeroVistas { get; set; } = 0;
 
+        public int NumeroLikes { get; set; } = 0;
+
         [MaxLength(500)]
-        public string? Texto { get; set; } // Texto opcional sobre la imagen/video
+        public string? Texto { get; set; } // Texto simple (legacy, ahora usar ElementosJson)
 
         // Sistema LadoA / LadoB para stories
         public TipoLado TipoLado { get; set; } = TipoLado.LadoA;
+
+        // ========================================
+        // EDITOR DE STORIES - Elementos visuales
+        // ========================================
+
+        /// <summary>
+        /// JSON con todos los elementos del editor:
+        /// - textos: array de objetos {id, texto, x, y, fontSize, color, fontFamily, rotation, backgroundColor}
+        /// - stickers: array de objetos {id, tipo, valor, x, y, scale, rotation}
+        /// - dibujos: array de objetos {id, pathData, color, strokeWidth}
+        /// - menciones: array de objetos {id, usuarioId, username, x, y}
+        /// </summary>
+        public string? ElementosJson { get; set; }
+
+        /// <summary>
+        /// IDs de usuarios mencionados (para notificaciones)
+        /// </summary>
+        [MaxLength(2000)]
+        public string? MencionesIds { get; set; }
+
+        // ========================================
+        // MÚSICA EN STORIES
+        // ========================================
+
+        /// <summary>
+        /// ID de la pista musical (si tiene música)
+        /// </summary>
+        public int? PistaMusicalId { get; set; }
+
+        /// <summary>
+        /// Segundo de inicio de la música (ej: 30 para empezar en 0:30)
+        /// </summary>
+        public int? MusicaInicioSegundos { get; set; }
 
         // Navegación
         [ForeignKey("CreadorId")]
         public virtual ApplicationUser Creador { get; set; }
 
+        [ForeignKey("PistaMusicalId")]
+        public virtual PistaMusical? PistaMusical { get; set; }
+
         public virtual ICollection<StoryVista> Vistas { get; set; }
+
+        public virtual ICollection<StoryLike> Likes { get; set; }
     }
 
     /// <summary>

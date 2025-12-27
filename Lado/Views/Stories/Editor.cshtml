@@ -1,0 +1,1830 @@
+@{
+    var modo = ViewBag.Modo ?? "story";
+    var titulo = ViewBag.Titulo ?? "Crear Historia";
+    var textoPublicar = ViewBag.TextoPublicar ?? "Publicar";
+    ViewData["Title"] = titulo;
+    Layout = null; // Full screen sin layout
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>@ViewData["Title"] - Lado</title>
+    <link rel="icon" type="image/png" href="/images/favicon.png" />
+
+    <!-- Fabric.js para canvas interactivo -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+
+    <style>
+        /* ========================================
+           TEMA - Sincronizado con el sistema
+           ======================================== */
+        :root {
+            /* Colores base - Modo claro (default) */
+            --primary: #4682B4;
+            --primary-dark: #36648B;
+            --primary-light: #B0C4DE;
+            --primary-hover: #5a9fd4;
+            --primary-rgb: 70, 130, 180;
+            --danger: #dc3545;
+            --success: #28a745;
+
+            /* Modo claro */
+            --bg: #f1f5f9;
+            --bg-secondary: #e2e8f0;
+            --surface: #ffffff;
+            --surface-hover: #f8fafc;
+            --surface-elevated: #ffffff;
+            --fg: #0f172a;
+            --fg-secondary: #475569;
+            --muted: #64748b;
+            --line: #e2e8f0;
+            --line-light: #f1f5f9;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --shadow-strong: rgba(0, 0, 0, 0.15);
+            --glass-bg: rgba(255, 255, 255, 0.8);
+            --glass-border: rgba(255, 255, 255, 0.3);
+            --canvas-bg: #1a1a1a;
+        }
+
+        [data-theme="dark"] {
+            /* Modo oscuro */
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --surface: #1e293b;
+            --surface-hover: #334155;
+            --surface-elevated: #334155;
+            --fg: #f8fafc;
+            --fg-secondary: #e2e8f0;
+            --muted: #94a3b8;
+            --line: #334155;
+            --line-light: #1e293b;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --shadow-strong: rgba(0, 0, 0, 0.5);
+            --glass-bg: rgba(30, 41, 59, 0.85);
+            --glass-border: rgba(51, 65, 85, 0.5);
+            --canvas-bg: #000000;
+            --primary: #6CA6CD;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            overflow: hidden;
+            height: 100vh;
+            height: 100dvh; /* Dynamic viewport height para móviles */
+            width: 100vw;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* ========================================
+           LAYOUT PRINCIPAL
+           ======================================== */
+        .story-editor {
+            display: flex;
+            height: 100vh;
+            height: 100dvh;
+            width: 100vw;
+            position: relative;
+        }
+
+        /* Panel izquierdo - Herramientas (Desktop) */
+        .tools-panel {
+            width: 72px;
+            background: var(--surface);
+            border-right: 1px solid var(--line);
+            display: flex;
+            flex-direction: column;
+            padding: 16px 12px;
+            gap: 6px;
+            transition: all 0.3s ease;
+            z-index: 50;
+        }
+
+        .tool-btn {
+            width: 48px;
+            height: 48px;
+            border: none;
+            background: transparent;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted);
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .tool-btn:hover {
+            background: var(--surface-hover);
+            color: var(--fg);
+            transform: scale(1.05);
+        }
+
+        .tool-btn:active {
+            transform: scale(0.95);
+        }
+
+        .tool-btn.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
+        }
+
+        .tool-btn svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        /* Tooltip para herramientas */
+        .tool-btn::after {
+            content: attr(title);
+            position: absolute;
+            left: 100%;
+            margin-left: 8px;
+            padding: 6px 10px;
+            background: var(--surface-elevated);
+            color: var(--fg);
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 6px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px var(--shadow);
+            border: 1px solid var(--line);
+            z-index: 100;
+        }
+
+        .tool-btn:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .tools-divider {
+            height: 1px;
+            background: var(--line);
+            margin: 8px 4px;
+        }
+
+        /* Panel central - Canvas */
+        .canvas-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-secondary);
+            position: relative;
+            padding: 20px;
+            transition: background-color 0.3s ease;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 380px;
+            aspect-ratio: 9/16;
+            background: var(--canvas-bg);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px var(--shadow-strong), 0 0 0 1px var(--line);
+            transition: box-shadow 0.3s ease;
+        }
+
+        .canvas-wrapper:hover {
+            box-shadow: 0 25px 70px var(--shadow-strong), 0 0 0 1px var(--primary);
+        }
+
+        #storyCanvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Panel derecho - Opciones (Desktop) */
+        .options-panel {
+            width: 340px;
+            background: var(--surface);
+            border-left: 1px solid var(--line);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            z-index: 50;
+        }
+
+        .options-header {
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--surface);
+        }
+
+        .options-header h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--fg);
+        }
+
+        .options-header .close-btn {
+            display: none;
+        }
+
+        @@media (max-width: 768px) {
+            .options-header .close-btn {
+                display: flex;
+                width: 36px;
+                height: 36px;
+            }
+        }
+
+        .options-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--line) transparent;
+        }
+
+        .options-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .options-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .options-content::-webkit-scrollbar-thumb {
+            background: var(--line);
+            border-radius: 3px;
+        }
+
+        .options-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--line);
+            display: flex;
+            gap: 12px;
+            background: var(--surface);
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            flex: 1;
+            box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.25);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(var(--primary-rgb), 0.35);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: var(--surface-hover);
+            color: var(--fg);
+            border: 1px solid var(--line);
+        }
+
+        .btn-secondary:hover {
+            background: var(--line);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        /* ========================================
+           SECCIONES DE OPCIONES
+           ======================================== */
+        .option-section {
+            display: none;
+        }
+
+        .option-section.active {
+            display: block;
+        }
+
+        .option-group {
+            margin-bottom: 20px;
+        }
+
+        .option-label {
+            font-size: 12px;
+            color: var(--muted);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        /* Input de texto */
+        .text-input {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            color: var(--fg);
+            font-size: 14px;
+            resize: none;
+        }
+
+        .text-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Selector de fuentes */
+        .font-selector {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .font-option {
+            padding: 10px;
+            background: var(--bg);
+            border: 2px solid var(--line);
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .font-option:hover {
+            border-color: var(--muted);
+        }
+
+        .font-option.selected {
+            border-color: var(--primary);
+            background: rgba(70, 130, 180, 0.1);
+        }
+
+        /* Selector de colores */
+        .color-picker {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .color-option {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .color-option:hover {
+            transform: scale(1.1);
+        }
+
+        .color-option.selected {
+            border-color: var(--fg);
+        }
+
+        /* Slider de tamaño */
+        .size-slider {
+            width: 100%;
+            -webkit-appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--line);
+            outline: none;
+        }
+
+        .size-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+        }
+
+        /* Grid de stickers */
+        .sticker-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .sticker-item {
+            width: 100%;
+            aspect-ratio: 1;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sticker-item:hover {
+            background: var(--surface-hover);
+            transform: scale(1.1);
+        }
+
+        /* Buscador de menciones */
+        .mention-search {
+            position: relative;
+        }
+
+        .mention-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 10;
+            display: none;
+        }
+
+        .mention-results.active {
+            display: block;
+        }
+
+        .mention-item {
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .mention-item:hover {
+            background: var(--surface-hover);
+        }
+
+        .mention-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: var(--primary);
+        }
+
+        /* Selector de música */
+        .music-item {
+            padding: 12px;
+            background: var(--bg);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .music-item:hover {
+            background: var(--surface-hover);
+        }
+
+        .music-item.selected {
+            border: 2px solid var(--primary);
+        }
+
+        .music-cover {
+            width: 48px;
+            height: 48px;
+            border-radius: 6px;
+            background: var(--line);
+            object-fit: cover;
+        }
+
+        .music-info {
+            flex: 1;
+        }
+
+        .music-title {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .music-artist {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        /* Herramientas de dibujo */
+        .brush-sizes {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .brush-size {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--bg);
+            border: 2px solid var(--line);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .brush-size:hover {
+            border-color: var(--muted);
+        }
+
+        .brush-size.selected {
+            border-color: var(--primary);
+        }
+
+        .brush-size-dot {
+            border-radius: 50%;
+            background: var(--fg);
+        }
+
+        /* Selector Lado A/B */
+        .lado-selector {
+            display: flex;
+            gap: 12px;
+        }
+
+        .lado-option {
+            flex: 1;
+            padding: 12px;
+            background: var(--bg);
+            border: 2px solid var(--line);
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .lado-option:hover {
+            border-color: var(--muted);
+        }
+
+        .lado-option.selected {
+            border-color: var(--primary);
+            background: rgba(70, 130, 180, 0.1);
+        }
+
+        /* Upload inicial */
+        .upload-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--surface);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            cursor: pointer;
+            z-index: 100;
+        }
+
+        .upload-overlay.hidden {
+            display: none;
+        }
+
+        .upload-overlay svg {
+            width: 64px;
+            height: 64px;
+            color: var(--muted);
+        }
+
+        .upload-overlay p {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .upload-overlay span {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        /* ========================================
+           RESPONSIVE - Tablet (1024px - 768px)
+           ======================================== */
+        @@media (max-width: 1024px) {
+            .options-panel {
+                width: 300px;
+            }
+
+            .canvas-wrapper {
+                max-width: 340px;
+            }
+        }
+
+        /* ========================================
+           RESPONSIVE - Móvil (< 768px)
+           ======================================== */
+        @@media (max-width: 768px) {
+            /* Ocultar tooltip en móvil */
+            .tool-btn::after {
+                display: none;
+            }
+
+            /* Panel de opciones como bottom sheet */
+            .options-panel {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                width: 100%;
+                height: 55vh;
+                max-height: 55vh;
+                z-index: 200;
+                border-left: none;
+                border-top: none;
+                border-radius: 20px 20px 0 0;
+                transform: translateY(100%);
+                transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+                box-shadow: 0 -10px 40px var(--shadow-strong);
+            }
+
+            .options-panel::before {
+                content: '';
+                position: absolute;
+                top: 8px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 40px;
+                height: 4px;
+                background: var(--line);
+                border-radius: 2px;
+            }
+
+            .options-panel.open {
+                transform: translateY(0);
+            }
+
+            .options-header {
+                padding-top: 24px;
+            }
+
+            /* Backdrop para cerrar el panel */
+            .options-backdrop {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 199;
+                opacity: 0;
+                visibility: hidden;
+                transition: all 0.3s;
+            }
+
+            .options-backdrop.active {
+                opacity: 1;
+                visibility: visible;
+            }
+
+            /* Panel de herramientas inferior */
+            .tools-panel {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                width: 100%;
+                height: auto;
+                flex-direction: row;
+                justify-content: space-around;
+                align-items: center;
+                padding: 8px 12px;
+                padding-bottom: calc(8px + env(safe-area-inset-bottom));
+                border-right: none;
+                border-top: 1px solid var(--line);
+                background: var(--glass-bg);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                z-index: 100;
+            }
+
+            .tools-panel .tools-divider {
+                display: none;
+            }
+
+            .tool-btn {
+                width: 44px;
+                height: 44px;
+            }
+
+            .tool-btn svg {
+                width: 20px;
+                height: 20px;
+            }
+
+            /* Canvas centrado con espacio para paneles */
+            .canvas-container {
+                padding: 0;
+                padding-top: 60px;
+                padding-bottom: 72px;
+            }
+
+            .canvas-wrapper {
+                max-width: 100%;
+                width: 100%;
+                border-radius: 0;
+                box-shadow: none;
+            }
+
+            .canvas-wrapper:hover {
+                box-shadow: none;
+            }
+        }
+
+        /* Header móvil */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--line);
+            padding: 0 12px;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 150;
+        }
+
+        @@media (max-width: 768px) {
+            .mobile-header {
+                display: flex;
+            }
+        }
+
+        .close-btn {
+            width: 44px;
+            height: 44px;
+            border: none;
+            background: transparent;
+            color: var(--fg);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        .close-btn:hover {
+            background: var(--surface-hover);
+        }
+
+        .close-btn:active {
+            transform: scale(0.9);
+        }
+
+        .mobile-header .title {
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--fg);
+        }
+
+        .mobile-header .btn-primary {
+            padding: 10px 18px;
+            font-size: 13px;
+        }
+
+        /* ========================================
+           RESPONSIVE - Móvil pequeño (< 400px)
+           ======================================== */
+        @@media (max-width: 400px) {
+            .tool-btn {
+                width: 40px;
+                height: 40px;
+            }
+
+            .tool-btn svg {
+                width: 18px;
+                height: 18px;
+            }
+
+            .options-content {
+                padding: 16px;
+            }
+
+            .sticker-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+
+            .font-selector {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 16px;
+            z-index: 1000;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--line);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @@keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    @Html.AntiForgeryToken()
+
+    <!-- Script para detectar y aplicar tema guardado (sincronizado con Layout) -->
+    <script>
+        // ThemeStorage - copia del Layout para consistencia
+        const ThemeStorage = {
+            _storage: null,
+            _memoryFallback: {},
+
+            init: function() {
+                try {
+                    const test = '__storage_test__';
+                    localStorage.setItem(test, test);
+                    localStorage.removeItem(test);
+                    this._storage = localStorage;
+                } catch (e) {
+                    console.log('localStorage no disponible, usando fallback en memoria');
+                    this._storage = null;
+                }
+            },
+
+            getItem: function(key) {
+                if (this._storage) {
+                    return this._storage.getItem(key);
+                }
+                return this._memoryFallback[key] || null;
+            },
+
+            setItem: function(key, value) {
+                if (this._storage) {
+                    try {
+                        this._storage.setItem(key, value);
+                    } catch (e) {
+                        this._memoryFallback[key] = value;
+                    }
+                } else {
+                    this._memoryFallback[key] = value;
+                }
+            }
+        };
+
+        ThemeStorage.init();
+
+        (function() {
+            // Detectar tema guardado
+            var savedTheme = ThemeStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            document.body?.classList.remove('theme-light', 'theme-dark');
+            document.body?.classList.add('theme-' + savedTheme);
+        })();
+
+        // Escuchar cambios de tema desde otras pestanas
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'theme') {
+                var newTheme = e.newValue || 'light';
+                document.documentElement.setAttribute('data-theme', newTheme);
+                document.body.classList.remove('theme-light', 'theme-dark');
+                document.body.classList.add('theme-' + newTheme);
+            }
+        });
+    </script>
+
+    <!-- Backdrop para cerrar panel en móvil -->
+    <div class="options-backdrop" id="optionsBackdrop" onclick="cerrarPanelOpciones()"></div>
+
+    <div class="story-editor">
+        <!-- Header móvil -->
+        <div class="mobile-header">
+            <button class="close-btn" onclick="cancelarEditor()" aria-label="Cerrar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            <span class="title">@titulo</span>
+            <button class="btn btn-primary" onclick="publicarStory()">@textoPublicar</button>
+        </div>
+
+        <!-- Panel de herramientas -->
+        <div class="tools-panel">
+            <button class="tool-btn active" data-tool="text" title="Texto" onclick="seleccionarHerramienta('text')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 7V4h16v3M9 20h6M12 4v16"/>
+                </svg>
+            </button>
+            <button class="tool-btn" data-tool="sticker" title="Stickers" onclick="seleccionarHerramienta('sticker')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                    <line x1="9" y1="9" x2="9.01" y2="9"/>
+                    <line x1="15" y1="9" x2="15.01" y2="9"/>
+                </svg>
+            </button>
+            <button class="tool-btn" data-tool="mention" title="Mencionar" onclick="seleccionarHerramienta('mention')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="4"/>
+                    <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/>
+                </svg>
+            </button>
+            <button class="tool-btn" data-tool="draw" title="Dibujar" onclick="seleccionarHerramienta('draw')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+                    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+                    <path d="M2 2l7.586 7.586"/>
+                    <circle cx="11" cy="11" r="2"/>
+                </svg>
+            </button>
+            <button class="tool-btn" data-tool="music" title="Música" onclick="seleccionarHerramienta('music')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 18V5l12-2v13"/>
+                    <circle cx="6" cy="18" r="3"/>
+                    <circle cx="18" cy="16" r="3"/>
+                </svg>
+            </button>
+
+            <div class="tools-divider"></div>
+
+            <button class="tool-btn" title="Deshacer" onclick="deshacerCambio()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 7v6h6"/>
+                    <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
+                </svg>
+            </button>
+            <button class="tool-btn" title="Eliminar selección" onclick="eliminarSeleccion()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Canvas central -->
+        <div class="canvas-container">
+            <div class="canvas-wrapper" id="canvasWrapper">
+                <!-- Overlay de upload inicial -->
+                <div class="upload-overlay" id="uploadOverlay" onclick="document.getElementById('fileInput').click()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    <p><span>Toca para subir</span> una foto o video</p>
+                </div>
+                <input type="file" id="fileInput" accept="image/*,video/*" style="display:none;" onchange="cargarMedia(this)">
+
+                <canvas id="storyCanvas"></canvas>
+            </div>
+        </div>
+
+        <!-- Panel de opciones -->
+        <div class="options-panel" id="optionsPanel">
+            <div class="options-header">
+                <h3 id="optionsTitle">Texto</h3>
+                <button class="close-btn" onclick="cerrarPanelOpciones()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="options-content">
+                <!-- TEXTO -->
+                <div class="option-section active" id="textOptions">
+                    <div class="option-group">
+                        <label class="option-label">Tu texto</label>
+                        <textarea class="text-input" id="textInput" rows="3" placeholder="Escribe aquí..." oninput="actualizarTextoSeleccionado()"></textarea>
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">Fuente</label>
+                        <div class="font-selector">
+                            <div class="font-option selected" data-font="Arial" onclick="cambiarFuente('Arial', this)" style="font-family: Arial;">Arial</div>
+                            <div class="font-option" data-font="Georgia" onclick="cambiarFuente('Georgia', this)" style="font-family: Georgia;">Georgia</div>
+                            <div class="font-option" data-font="Impact" onclick="cambiarFuente('Impact', this)" style="font-family: Impact;">Impact</div>
+                            <div class="font-option" data-font="Comic Sans MS" onclick="cambiarFuente('Comic Sans MS', this)" style="font-family: 'Comic Sans MS';">Comic</div>
+                        </div>
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">Tamaño: <span id="fontSizeLabel">32</span>px</label>
+                        <input type="range" class="size-slider" id="fontSizeSlider" min="16" max="72" value="32" oninput="cambiarTamanoTexto(this.value)">
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">Color del texto</label>
+                        <div class="color-picker" id="textColorPicker">
+                            <div class="color-option selected" style="background: #ffffff;" onclick="cambiarColorTexto('#ffffff', this)"></div>
+                            <div class="color-option" style="background: #000000;" onclick="cambiarColorTexto('#000000', this)"></div>
+                            <div class="color-option" style="background: #ff3b5c;" onclick="cambiarColorTexto('#ff3b5c', this)"></div>
+                            <div class="color-option" style="background: #00d4ff;" onclick="cambiarColorTexto('#00d4ff', this)"></div>
+                            <div class="color-option" style="background: #ffdd00;" onclick="cambiarColorTexto('#ffdd00', this)"></div>
+                            <div class="color-option" style="background: #00ff88;" onclick="cambiarColorTexto('#00ff88', this)"></div>
+                            <div class="color-option" style="background: #ff00ff;" onclick="cambiarColorTexto('#ff00ff', this)"></div>
+                            <div class="color-option" style="background: #ff8800;" onclick="cambiarColorTexto('#ff8800', this)"></div>
+                        </div>
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">Fondo del texto</label>
+                        <div class="color-picker" id="textBgPicker">
+                            <div class="color-option selected" style="background: transparent; border: 2px dashed #666;" onclick="cambiarFondoTexto('transparent', this)"></div>
+                            <div class="color-option" style="background: rgba(0,0,0,0.7);" onclick="cambiarFondoTexto('rgba(0,0,0,0.7)', this)"></div>
+                            <div class="color-option" style="background: rgba(255,255,255,0.9);" onclick="cambiarFondoTexto('rgba(255,255,255,0.9)', this)"></div>
+                            <div class="color-option" style="background: rgba(70,130,180,0.8);" onclick="cambiarFondoTexto('rgba(70,130,180,0.8)', this)"></div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" style="width: 100%; margin-top: 12px;" onclick="agregarTexto()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Agregar texto
+                    </button>
+                </div>
+
+                <!-- STICKERS -->
+                <div class="option-section" id="stickerOptions">
+                    <div class="option-group">
+                        <label class="option-label">Emojis populares</label>
+                        <div class="sticker-grid" id="emojiGrid">
+                            <!-- Se llena con JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MENCIONES -->
+                <div class="option-section" id="mentionOptions">
+                    <div class="option-group">
+                        <label class="option-label">Buscar usuario</label>
+                        <div class="mention-search">
+                            <input type="text" class="text-input" id="mentionSearch" placeholder="@@usuario" oninput="buscarUsuarios(this.value)">
+                            <div class="mention-results" id="mentionResults"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DIBUJO -->
+                <div class="option-section" id="drawOptions">
+                    <div class="option-group">
+                        <label class="option-label">Grosor del pincel</label>
+                        <div class="brush-sizes">
+                            <div class="brush-size selected" onclick="cambiarGrosorPincel(3, this)">
+                                <div class="brush-size-dot" style="width: 6px; height: 6px;"></div>
+                            </div>
+                            <div class="brush-size" onclick="cambiarGrosorPincel(6, this)">
+                                <div class="brush-size-dot" style="width: 10px; height: 10px;"></div>
+                            </div>
+                            <div class="brush-size" onclick="cambiarGrosorPincel(12, this)">
+                                <div class="brush-size-dot" style="width: 16px; height: 16px;"></div>
+                            </div>
+                            <div class="brush-size" onclick="cambiarGrosorPincel(20, this)">
+                                <div class="brush-size-dot" style="width: 22px; height: 22px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">Color del pincel</label>
+                        <div class="color-picker" id="brushColorPicker">
+                            <div class="color-option selected" style="background: #ff3b5c;" onclick="cambiarColorPincel('#ff3b5c', this)"></div>
+                            <div class="color-option" style="background: #ffffff;" onclick="cambiarColorPincel('#ffffff', this)"></div>
+                            <div class="color-option" style="background: #000000;" onclick="cambiarColorPincel('#000000', this)"></div>
+                            <div class="color-option" style="background: #00d4ff;" onclick="cambiarColorPincel('#00d4ff', this)"></div>
+                            <div class="color-option" style="background: #ffdd00;" onclick="cambiarColorPincel('#ffdd00', this)"></div>
+                            <div class="color-option" style="background: #00ff88;" onclick="cambiarColorPincel('#00ff88', this)"></div>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary" style="width: 100%; margin-top: 12px;" onclick="borrarDibujo()">
+                        Borrar todo el dibujo
+                    </button>
+                </div>
+
+                <!-- MÚSICA -->
+                <div class="option-section" id="musicOptions">
+                    <div class="option-group">
+                        <label class="option-label">Buscar canción</label>
+                        <input type="text" class="text-input" id="musicSearch" placeholder="Buscar música..." oninput="buscarMusica(this.value)">
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">Canciones disponibles</label>
+                        <div id="musicList">
+                            <p style="color: var(--muted); font-size: 13px;">Escribe para buscar canciones...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PUBLICAR -->
+                <div class="option-section" id="publishOptions">
+                    <div class="option-group">
+                        <label class="option-label">Visibilidad</label>
+                        <div class="lado-selector">
+                            <div class="lado-option selected" data-lado="LadoA" onclick="seleccionarLado('LadoA', this)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24" style="margin-bottom: 4px;">
+                                    <circle cx="12" cy="12" r="10"/>
+                                </svg>
+                                <div style="font-weight: 600;">Lado A</div>
+                                <div style="font-size: 11px; color: var(--muted);">Visible para todos</div>
+                            </div>
+                            <div class="lado-option" data-lado="LadoB" onclick="seleccionarLado('LadoB', this)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24" style="margin-bottom: 4px;">
+                                    <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zM2 12h20"/>
+                                </svg>
+                                <div style="font-weight: 600;">Lado B</div>
+                                <div style="font-size: 11px; color: var(--muted);">Solo suscriptores</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="options-footer">
+                <button class="btn btn-secondary" onclick="cancelarEditor()">Cancelar</button>
+                <button class="btn btn-primary" id="publishBtn" onclick="publicarStory()" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                    @textoPublicar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <p id="loadingText">Publicando @(modo == "reel" ? "reel" : "historia")...</p>
+    </div>
+
+    <script>
+        // ========================================
+        // VARIABLES GLOBALES
+        // ========================================
+        const MODO_EDITOR = '@modo';
+        const URL_CREAR = MODO_EDITOR === 'reel' ? '/Stories/CrearReel' : '/Stories/Crear';
+        const URL_REDIRECT = MODO_EDITOR === 'reel' ? '/Feed' : '/Feed';
+
+        let canvas;
+        let currentTool = 'text';
+        let selectedLado = 'LadoA';
+        let selectedMusic = null;
+        let mediaFile = null;
+        let mediaUrl = null;
+        let canvasHistory = [];
+        let historyIndex = -1;
+
+        // Configuración de texto
+        let textConfig = {
+            font: 'Arial',
+            size: 32,
+            color: '#ffffff',
+            backgroundColor: 'transparent'
+        };
+
+        // Configuración de dibujo
+        let drawConfig = {
+            color: '#ff3b5c',
+            width: 3
+        };
+
+        // Emojis populares
+        const emojis = [
+            '😀', '😍', '🥳', '😎', '🤩', '😂', '🥰', '😘', '🤗', '🙌',
+            '❤️', '🔥', '✨', '💯', '🎉', '🎊', '💪', '👏', '🙏', '💕',
+            '🌟', '⭐', '💫', '🌈', '☀️', '🌙', '💖', '💝', '💗', '💓',
+            '👑', '🦋', '🌸', '🌺', '🌻', '🍀', '🎵', '🎶', '🎤', '🎧',
+            '📸', '🎬', '🎨', '✌️', '🤟', '👍', '💋', '👀', '💅', '💄'
+        ];
+
+        // ========================================
+        // INICIALIZACIÓN
+        // ========================================
+        document.addEventListener('DOMContentLoaded', function() {
+            // Reaplicar tema al cargar el DOM (por si acaso)
+            var savedTheme = ThemeStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            document.body.classList.remove('theme-light', 'theme-dark');
+            document.body.classList.add('theme-' + savedTheme);
+
+            initCanvas();
+            initEmojis();
+        });
+
+        function initCanvas() {
+            const wrapper = document.getElementById('canvasWrapper');
+            const width = wrapper.clientWidth;
+            const height = wrapper.clientHeight;
+
+            canvas = new fabric.Canvas('storyCanvas', {
+                width: width,
+                height: height,
+                backgroundColor: '#000',
+                selection: true,
+                preserveObjectStacking: true
+            });
+
+            // Guardar estado inicial
+            saveHistory();
+
+            // Eventos de selección
+            canvas.on('selection:created', onObjectSelected);
+            canvas.on('selection:updated', onObjectSelected);
+            canvas.on('selection:cleared', onSelectionCleared);
+        }
+
+        function initEmojis() {
+            const grid = document.getElementById('emojiGrid');
+            emojis.forEach(emoji => {
+                const item = document.createElement('div');
+                item.className = 'sticker-item';
+                item.textContent = emoji;
+                item.onclick = () => agregarSticker(emoji);
+                grid.appendChild(item);
+            });
+        }
+
+        // ========================================
+        // CARGAR MEDIA
+        // ========================================
+        function cargarMedia(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                mediaFile = file;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    mediaUrl = e.target.result;
+
+                    if (file.type.startsWith('image/')) {
+                        fabric.Image.fromURL(mediaUrl, function(img) {
+                            // Escalar para cubrir todo el canvas
+                            const scale = Math.max(
+                                canvas.width / img.width,
+                                canvas.height / img.height
+                            );
+                            img.scale(scale);
+                            img.set({
+                                left: canvas.width / 2,
+                                top: canvas.height / 2,
+                                originX: 'center',
+                                originY: 'center',
+                                selectable: false,
+                                evented: false,
+                                lockMovementX: true,
+                                lockMovementY: true
+                            });
+                            canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+                            saveHistory();
+                        });
+                    }
+
+                    // Ocultar overlay de upload
+                    document.getElementById('uploadOverlay').classList.add('hidden');
+                    document.getElementById('publishBtn').disabled = false;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // ========================================
+        // HERRAMIENTAS
+        // ========================================
+        function seleccionarHerramienta(tool) {
+            currentTool = tool;
+
+            // Actualizar botones
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tool === tool);
+            });
+
+            // Mostrar panel de opciones correspondiente
+            document.querySelectorAll('.option-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById(tool + 'Options').classList.add('active');
+
+            // Actualizar título
+            const titles = {
+                'text': 'Texto',
+                'sticker': 'Stickers',
+                'mention': 'Mencionar',
+                'draw': 'Dibujar',
+                'music': 'Música'
+            };
+            document.getElementById('optionsTitle').textContent = titles[tool] || 'Opciones';
+
+            // Modo dibujo
+            canvas.isDrawingMode = (tool === 'draw');
+            if (tool === 'draw') {
+                canvas.freeDrawingBrush.color = drawConfig.color;
+                canvas.freeDrawingBrush.width = drawConfig.width;
+            }
+
+            // Abrir panel en móvil
+            if (window.innerWidth <= 768) {
+                abrirPanelOpciones();
+            }
+        }
+
+        function abrirPanelOpciones() {
+            document.getElementById('optionsPanel').classList.add('open');
+            document.getElementById('optionsBackdrop').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function cerrarPanelOpciones() {
+            document.getElementById('optionsPanel').classList.remove('open');
+            document.getElementById('optionsBackdrop').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // ========================================
+        // TEXTO
+        // ========================================
+        function agregarTexto() {
+            const texto = document.getElementById('textInput').value.trim();
+            if (!texto) return;
+
+            const textObj = new fabric.IText(texto, {
+                left: canvas.width / 2,
+                top: canvas.height / 2,
+                originX: 'center',
+                originY: 'center',
+                fontFamily: textConfig.font,
+                fontSize: textConfig.size,
+                fill: textConfig.color,
+                textBackgroundColor: textConfig.backgroundColor === 'transparent' ? '' : textConfig.backgroundColor,
+                padding: 8,
+                borderRadius: 4
+            });
+
+            canvas.add(textObj);
+            canvas.setActiveObject(textObj);
+            canvas.renderAll();
+            saveHistory();
+
+            // Limpiar input
+            document.getElementById('textInput').value = '';
+        }
+
+        function actualizarTextoSeleccionado() {
+            const obj = canvas.getActiveObject();
+            if (obj && obj.type === 'i-text') {
+                obj.set('text', document.getElementById('textInput').value);
+                canvas.renderAll();
+            }
+        }
+
+        function cambiarFuente(font, el) {
+            textConfig.font = font;
+            document.querySelectorAll('.font-option').forEach(opt => opt.classList.remove('selected'));
+            el.classList.add('selected');
+
+            const obj = canvas.getActiveObject();
+            if (obj && obj.type === 'i-text') {
+                obj.set('fontFamily', font);
+                canvas.renderAll();
+            }
+        }
+
+        function cambiarTamanoTexto(size) {
+            textConfig.size = parseInt(size);
+            document.getElementById('fontSizeLabel').textContent = size;
+
+            const obj = canvas.getActiveObject();
+            if (obj && obj.type === 'i-text') {
+                obj.set('fontSize', parseInt(size));
+                canvas.renderAll();
+            }
+        }
+
+        function cambiarColorTexto(color, el) {
+            textConfig.color = color;
+            document.querySelectorAll('#textColorPicker .color-option').forEach(opt => opt.classList.remove('selected'));
+            el.classList.add('selected');
+
+            const obj = canvas.getActiveObject();
+            if (obj && obj.type === 'i-text') {
+                obj.set('fill', color);
+                canvas.renderAll();
+            }
+        }
+
+        function cambiarFondoTexto(color, el) {
+            textConfig.backgroundColor = color;
+            document.querySelectorAll('#textBgPicker .color-option').forEach(opt => opt.classList.remove('selected'));
+            el.classList.add('selected');
+
+            const obj = canvas.getActiveObject();
+            if (obj && obj.type === 'i-text') {
+                obj.set('textBackgroundColor', color === 'transparent' ? '' : color);
+                canvas.renderAll();
+            }
+        }
+
+        // ========================================
+        // STICKERS
+        // ========================================
+        function agregarSticker(emoji) {
+            const text = new fabric.Text(emoji, {
+                left: canvas.width / 2,
+                top: canvas.height / 2,
+                originX: 'center',
+                originY: 'center',
+                fontSize: 64,
+                selectable: true
+            });
+
+            canvas.add(text);
+            canvas.setActiveObject(text);
+            canvas.renderAll();
+            saveHistory();
+        }
+
+        // ========================================
+        // MENCIONES
+        // ========================================
+        let searchTimeout;
+
+        async function buscarUsuarios(query) {
+            clearTimeout(searchTimeout);
+            const resultsDiv = document.getElementById('mentionResults');
+
+            if (query.length < 2) {
+                resultsDiv.classList.remove('active');
+                return;
+            }
+
+            searchTimeout = setTimeout(async () => {
+                try {
+                    const response = await fetch(`/Stories/BuscarUsuarios?query=${encodeURIComponent(query)}`);
+                    const data = await response.json();
+
+                    if (data.success && data.usuarios && data.usuarios.length > 0) {
+                        resultsDiv.innerHTML = data.usuarios.map(u => `
+                            <div class="mention-item" onclick="agregarMencion('${escapeHtml(u.id)}', '${escapeHtml(u.username)}', '${escapeHtml(u.avatar || '')}')">
+                                ${u.avatar
+                                    ? `<img src="${escapeHtml(u.avatar)}" class="mention-avatar" />`
+                                    : `<div class="mention-avatar" style="display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;">${escapeHtml(u.nombre?.charAt(0) || '?')}</div>`
+                                }
+                                <div>
+                                    <div style="font-weight:600;">@@${escapeHtml(u.username)}</div>
+                                    <div style="font-size:12px;color:var(--muted);">${escapeHtml(u.nombre)}</div>
+                                </div>
+                            </div>
+                        `).join('');
+                        resultsDiv.classList.add('active');
+                    } else {
+                        resultsDiv.innerHTML = '<div style="padding:12px;color:var(--muted);">No se encontraron usuarios</div>';
+                        resultsDiv.classList.add('active');
+                    }
+                } catch (error) {
+                    console.error('Error buscando usuarios:', error);
+                }
+            }, 300);
+        }
+
+        function agregarMencion(userId, username, avatar) {
+            const text = new fabric.IText('@@' + username, {
+                left: canvas.width / 2,
+                top: canvas.height / 2,
+                originX: 'center',
+                originY: 'center',
+                fontFamily: 'Arial',
+                fontSize: 28,
+                fill: '#ffffff',
+                fontWeight: 'bold',
+                textBackgroundColor: 'rgba(0,0,0,0.5)',
+                padding: 6,
+                userId: userId,     // Metadata para guardar
+                username: username  // Username sin arroba
+            });
+
+            canvas.add(text);
+            canvas.setActiveObject(text);
+            canvas.renderAll();
+            saveHistory();
+
+            // Cerrar resultados
+            document.getElementById('mentionResults').classList.remove('active');
+            document.getElementById('mentionSearch').value = '';
+        }
+
+        // ========================================
+        // DIBUJO
+        // ========================================
+        function cambiarGrosorPincel(width, el) {
+            drawConfig.width = width;
+            canvas.freeDrawingBrush.width = width;
+            document.querySelectorAll('.brush-size').forEach(btn => btn.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        function cambiarColorPincel(color, el) {
+            drawConfig.color = color;
+            canvas.freeDrawingBrush.color = color;
+            document.querySelectorAll('#brushColorPicker .color-option').forEach(opt => opt.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        function borrarDibujo() {
+            const objects = canvas.getObjects().filter(obj => obj.type === 'path');
+            objects.forEach(obj => canvas.remove(obj));
+            canvas.renderAll();
+            saveHistory();
+        }
+
+        // ========================================
+        // MÚSICA
+        // ========================================
+        async function buscarMusica(query) {
+            const listDiv = document.getElementById('musicList');
+
+            if (query.length < 2) {
+                listDiv.innerHTML = '<p style="color: var(--muted); font-size: 13px;">Escribe para buscar canciones...</p>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/Stories/BuscarMusica?query=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (data.success && data.pistas && data.pistas.length > 0) {
+                    listDiv.innerHTML = data.pistas.map(p => `
+                        <div class="music-item ${selectedMusic?.id === p.id ? 'selected' : ''}" onclick="seleccionarMusica(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                            <img src="${escapeHtml(p.portada) || '/images/music-placeholder.png'}" class="music-cover" onerror="this.src='/images/music-placeholder.png'" />
+                            <div class="music-info">
+                                <div class="music-title">${escapeHtml(p.titulo)}</div>
+                                <div class="music-artist">${escapeHtml(p.artista)}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    listDiv.innerHTML = '<p style="color: var(--muted); font-size: 13px;">No se encontraron canciones</p>';
+                }
+            } catch (error) {
+                console.error('Error buscando música:', error);
+            }
+        }
+
+        function seleccionarMusica(pista) {
+            selectedMusic = pista;
+            document.querySelectorAll('.music-item').forEach(item => item.classList.remove('selected'));
+            event.currentTarget.classList.add('selected');
+        }
+
+        // ========================================
+        // UTILIDADES
+        // ========================================
+
+        // Escapar HTML para prevenir XSS
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function onObjectSelected(e) {
+            const obj = e.selected[0];
+            if (obj && obj.type === 'i-text') {
+                document.getElementById('textInput').value = obj.text;
+            }
+        }
+
+        function onSelectionCleared() {
+            // Opcional: limpiar inputs
+        }
+
+        function eliminarSeleccion() {
+            const obj = canvas.getActiveObject();
+            if (obj) {
+                canvas.remove(obj);
+                canvas.renderAll();
+                saveHistory();
+            }
+        }
+
+        function saveHistory() {
+            historyIndex++;
+            canvasHistory = canvasHistory.slice(0, historyIndex);
+            canvasHistory.push(canvas.toJSON());
+        }
+
+        function deshacerCambio() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                canvas.loadFromJSON(canvasHistory[historyIndex], function() {
+                    canvas.renderAll();
+                });
+            }
+        }
+
+        function seleccionarLado(lado, el) {
+            selectedLado = lado;
+            document.querySelectorAll('.lado-option').forEach(opt => opt.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        // ========================================
+        // PUBLICAR
+        // ========================================
+        async function publicarStory() {
+            if (!mediaFile) {
+                alert(MODO_EDITOR === 'reel' ? 'Debes subir una imagen o video para el reel' : 'Debes subir una imagen o video');
+                return;
+            }
+
+            document.getElementById('loadingOverlay').classList.add('active');
+
+            try {
+                // Recopilar elementos del canvas
+                const elementos = {
+                    textos: [],
+                    stickers: [],
+                    dibujos: [],
+                    menciones: [],
+                    canvasWidth: canvas.width,
+                    canvasHeight: canvas.height
+                };
+
+                const mencionesIds = [];
+
+                // Obtener dimensiones del canvas para convertir a porcentajes
+                const canvasWidth = canvas.width;
+                const canvasHeight = canvas.height;
+
+                // Función para convertir path de Fabric.js a string SVG
+                function fabricPathToSvg(pathArray) {
+                    if (!pathArray || !Array.isArray(pathArray)) return '';
+                    return pathArray.map(cmd => {
+                        if (Array.isArray(cmd)) {
+                            return cmd.join(' ');
+                        }
+                        return cmd;
+                    }).join(' ');
+                }
+
+                canvas.getObjects().forEach((obj, index) => {
+                    // Convertir coordenadas a porcentajes
+                    const xPercent = (obj.left / canvasWidth) * 100;
+                    const yPercent = (obj.top / canvasHeight) * 100;
+
+                    if (obj.type === 'i-text') {
+                        if (obj.userId) {
+                            // Es una mención
+                            elementos.menciones.push({
+                                id: index,
+                                usuarioId: obj.userId,
+                                username: obj.username || obj.text.replace('@@', ''),
+                                x: xPercent,
+                                y: yPercent,
+                                fontSize: obj.fontSize,
+                                color: obj.fill
+                            });
+                            mencionesIds.push(obj.userId);
+                        } else {
+                            // Es texto normal
+                            elementos.textos.push({
+                                id: index,
+                                texto: obj.text,
+                                x: xPercent,
+                                y: yPercent,
+                                fontSize: obj.fontSize,
+                                fontFamily: obj.fontFamily,
+                                color: obj.fill,
+                                backgroundColor: obj.textBackgroundColor,
+                                rotation: obj.angle
+                            });
+                        }
+                    } else if (obj.type === 'text' && obj.text.length <= 4) {
+                        // Es un sticker/emoji
+                        elementos.stickers.push({
+                            id: index,
+                            valor: obj.text,
+                            x: xPercent,
+                            y: yPercent,
+                            scale: obj.scaleX,
+                            rotation: obj.angle
+                        });
+                    } else if (obj.type === 'path') {
+                        // Es un dibujo - convertir path a SVG string
+                        elementos.dibujos.push({
+                            id: index,
+                            pathData: fabricPathToSvg(obj.path),
+                            color: obj.stroke,
+                            strokeWidth: obj.strokeWidth
+                        });
+                    }
+                });
+
+                // Crear FormData
+                const formData = new FormData();
+                formData.append('archivo', mediaFile);
+                formData.append('tipoLado', selectedLado);
+                formData.append('elementosJson', JSON.stringify(elementos));
+                formData.append('mencionesIds', mencionesIds.join(','));
+
+                if (selectedMusic) {
+                    formData.append('pistaMusicalId', selectedMusic.id);
+                }
+
+                // Obtener token
+                const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+                if (tokenInput) {
+                    formData.append('__RequestVerificationToken', tokenInput.value);
+                }
+
+                const response = await fetch(URL_CREAR, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    window.location.href = URL_REDIRECT;
+                } else {
+                    alert(data.message || 'Error al publicar');
+                    document.getElementById('loadingOverlay').classList.remove('active');
+                }
+            } catch (error) {
+                console.error('Error al publicar:', error);
+                alert(MODO_EDITOR === 'reel' ? 'Error al publicar el reel' : 'Error al publicar la historia');
+                document.getElementById('loadingOverlay').classList.remove('active');
+            }
+        }
+
+        function cancelarEditor() {
+            const mensaje = MODO_EDITOR === 'reel' ? '¿Descartar reel?' : '¿Descartar historia?';
+            if (confirm(mensaje)) {
+                window.location.href = '/Feed';
+            }
+        }
+    </script>
+</body>
+</html>

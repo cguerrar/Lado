@@ -4,6 +4,7 @@ using Lado.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Lado.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251227013743_AgregarEditorStories")]
+    partial class AgregarEditorStories
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1299,7 +1302,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "ComisionBilleteraElectronica",
                             Descripcion = "Comision por usar billetera electronica (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 27, 0, 13, 26, 654, DateTimeKind.Local).AddTicks(8250),
+                            UltimaModificacion = new DateTime(2025, 12, 26, 22, 37, 43, 327, DateTimeKind.Local).AddTicks(5161),
                             Valor = "2.5"
                         },
                         new
@@ -1308,7 +1311,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "TiempoProcesoRetiro",
                             Descripcion = "Tiempo estimado para procesar retiros",
-                            UltimaModificacion = new DateTime(2025, 12, 27, 0, 13, 26, 654, DateTimeKind.Local).AddTicks(8320),
+                            UltimaModificacion = new DateTime(2025, 12, 26, 22, 37, 43, 327, DateTimeKind.Local).AddTicks(5238),
                             Valor = "3-5 dias habiles"
                         },
                         new
@@ -1317,7 +1320,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMinimoRecarga",
                             Descripcion = "Monto minimo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 27, 0, 13, 26, 654, DateTimeKind.Local).AddTicks(8322),
+                            UltimaModificacion = new DateTime(2025, 12, 26, 22, 37, 43, 327, DateTimeKind.Local).AddTicks(5239),
                             Valor = "5"
                         },
                         new
@@ -1326,7 +1329,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMaximoRecarga",
                             Descripcion = "Monto maximo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 27, 0, 13, 26, 654, DateTimeKind.Local).AddTicks(8323),
+                            UltimaModificacion = new DateTime(2025, 12, 26, 22, 37, 43, 327, DateTimeKind.Local).AddTicks(5241),
                             Valor = "1000"
                         },
                         new
@@ -1335,7 +1338,7 @@ namespace Lado.Migrations
                             Categoria = "General",
                             Clave = "ComisionPlataforma",
                             Descripcion = "Comision general de la plataforma (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 27, 0, 13, 26, 654, DateTimeKind.Local).AddTicks(8324),
+                            UltimaModificacion = new DateTime(2025, 12, 26, 22, 37, 43, 327, DateTimeKind.Local).AddTicks(5242),
                             Valor = "20"
                         });
                 });
@@ -2271,9 +2274,6 @@ namespace Lado.Migrations
                     b.Property<int?>("MensajeId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("StoryId")
-                        .HasColumnType("int");
-
                     b.Property<int>("Tipo")
                         .HasColumnType("int");
 
@@ -2855,9 +2855,6 @@ namespace Lado.Migrations
                     b.Property<int?>("MusicaInicioSegundos")
                         .HasColumnType("int");
 
-                    b.Property<int>("NumeroLikes")
-                        .HasColumnType("int");
-
                     b.Property<int>("NumeroVistas")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
@@ -2895,38 +2892,6 @@ namespace Lado.Migrations
                         .HasDatabaseName("IX_Stories_Creador_Expiracion_Activo");
 
                     b.ToTable("Stories");
-                });
-
-            modelBuilder.Entity("Lado.Models.StoryLike", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("FechaLike")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("StoryId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("UsuarioId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StoryId")
-                        .HasDatabaseName("IX_StoryLikes_StoryId");
-
-                    b.HasIndex("UsuarioId");
-
-                    b.HasIndex("StoryId", "UsuarioId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_StoryLikes_Story_Usuario_Unique");
-
-                    b.ToTable("StoryLikes");
                 });
 
             modelBuilder.Entity("Lado.Models.StoryVista", b =>
@@ -4012,25 +3977,6 @@ namespace Lado.Migrations
                     b.Navigation("PistaMusical");
                 });
 
-            modelBuilder.Entity("Lado.Models.StoryLike", b =>
-                {
-                    b.HasOne("Lado.Models.Story", "Story")
-                        .WithMany("Likes")
-                        .HasForeignKey("StoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Lado.Models.ApplicationUser", "Usuario")
-                        .WithMany()
-                        .HasForeignKey("UsuarioId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Story");
-
-                    b.Navigation("Usuario");
-                });
-
             modelBuilder.Entity("Lado.Models.StoryVista", b =>
                 {
                     b.HasOne("Lado.Models.Story", "Story")
@@ -4240,8 +4186,6 @@ namespace Lado.Migrations
 
             modelBuilder.Entity("Lado.Models.Story", b =>
                 {
-                    b.Navigation("Likes");
-
                     b.Navigation("Vistas");
                 });
 #pragma warning restore 612, 618

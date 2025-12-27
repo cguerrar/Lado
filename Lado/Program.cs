@@ -359,12 +359,12 @@ app.Use(async (context, next) =>
         !path.StartsWith("/uploads") && !path.StartsWith("/audio"))
     {
         var csp = "default-src 'self'; " +
-                  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://www.google.com https://www.gstatic.com https://accounts.google.com; " +
-                  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://accounts.google.com; " +
+                  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://ajax.aspnetcdn.com https://unpkg.com https://d3js.org https://www.google.com https://www.gstatic.com https://accounts.google.com; " +
+                  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://accounts.google.com; " +
                   "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; " +
                   "img-src 'self' data: blob: https: http:; " +
                   "media-src 'self' data: blob: https: http:; " +
-                  "connect-src 'self' wss: ws: https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://api.openstreetmap.org https://nominatim.openstreetmap.org https://accounts.google.com https://oauth2.googleapis.com; " +
+                  "connect-src 'self' wss: ws: https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://api.openstreetmap.org https://nominatim.openstreetmap.org https://accounts.google.com https://oauth2.googleapis.com; " +
                   "frame-src 'self' https://www.google.com https://www.youtube.com https://accounts.google.com; " +
                   "worker-src 'self' blob:; " +
                   "manifest-src 'self'; " +
