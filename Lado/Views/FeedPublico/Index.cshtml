@@ -618,8 +618,16 @@
             // Función para limpiar comillas de rutas (datos legacy)
             string LimpiarRuta(string ruta) {
                 if (string.IsNullOrEmpty(ruta)) return "";
-                // Remover comillas al inicio y final, y también comillas escapadas
-                return ruta.Trim().Trim('"').Trim('\'').Replace("\"", "").Replace("&quot;", "");
+                // Remover todo tipo de comillas y escapes
+                var limpia = ruta.Trim();
+                // Quitar comillas al inicio
+                while (limpia.StartsWith("\"") || limpia.StartsWith("'") || limpia.StartsWith("\\\""))
+                    limpia = limpia.TrimStart('"', '\'', '\\');
+                // Quitar comillas al final
+                while (limpia.EndsWith("\"") || limpia.EndsWith("'") || limpia.EndsWith("\\\""))
+                    limpia = limpia.TrimEnd('"', '\'', '\\');
+                // Limpiar cualquier comilla restante y entidades HTML
+                return limpia.Replace("\"", "").Replace("'", "").Replace("&quot;", "").Replace("%22", "");
             }
 
             foreach (var item in itemsParaMostrar)
