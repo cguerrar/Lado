@@ -1,19 +1,31 @@
-// Service Worker para LADO PWA
-const CACHE_NAME = 'lado-cache-v3';
+// Service Worker para LADO PWA v11.0
+// Compatible con iOS Safari y Android Chrome
+const CACHE_NAME = 'lado-cache-v11';
 const OFFLINE_URL = '/offline.html';
+const DYNAMIC_CACHE = 'lado-dynamic-v11';
+const IMAGE_CACHE = 'lado-images-v11';
 
 // Recursos para pre-cachear (shell de la app)
 const PRECACHE_ASSETS = [
     '/',
+    '/Feed',
+    '/Feed/Explorar',
     '/offline.html',
     '/css/site.css',
     '/js/site.js',
     '/manifest.json',
     '/images/angelito.png',
     '/images/diablito.png',
-    // Fuentes de Google (si las usas)
+    '/images/icons/icon-192x192.png',
+    '/images/icons/icon-512x512.png',
+    // Fuentes de Google
     'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'
 ];
+
+// Tiempo de vida de cache dinámico (24 horas)
+const DYNAMIC_CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
+// Máximo de imágenes en cache
+const IMAGE_CACHE_MAX_ITEMS = 100;
 
 // Instalar - Pre-cachear recursos esenciales
 self.addEventListener('install', (event) => {
@@ -44,12 +56,14 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
     console.log('[SW] Activando Service Worker...');
 
+    const VALID_CACHES = [CACHE_NAME, DYNAMIC_CACHE, IMAGE_CACHE];
+
     event.waitUntil(
         caches.keys()
             .then((cacheNames) => {
                 return Promise.all(
                     cacheNames
-                        .filter((name) => name !== CACHE_NAME)
+                        .filter((name) => !VALID_CACHES.includes(name))
                         .map((name) => {
                             console.log(`[SW] Eliminando cache antiguo: ${name}`);
                             return caches.delete(name);
@@ -254,10 +268,19 @@ self.addEventListener('notificationclick', (event) => {
     event.notification.close();
 
     const url = event.notification.data?.url || '/';
+    const action = event.action;
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true })
             .then((clientList) => {
+                // Manejar acciones específicas
+                if (action === 'view') {
+                    // Acción ver - navegar a la URL
+                } else if (action === 'dismiss') {
+                    // Solo cerrar
+                    return;
+                }
+
                 // Si ya hay una ventana abierta, enfocarla
                 for (const client of clientList) {
                     if (client.url.includes(self.location.origin) && 'focus' in client) {
@@ -272,3 +295,202 @@ self.addEventListener('notificationclick', (event) => {
             })
     );
 });
+
+// ========================================
+// BACKGROUND SYNC - Para acciones offline
+// ========================================
+self.addEventListener('sync', (event) => {
+    console.log('[SW] Background Sync:', event.tag);
+
+    if (event.tag === 'sync-likes') {
+        event.waitUntil(syncLikes());
+    } else if (event.tag === 'sync-comments') {
+        event.waitUntil(syncComments());
+    } else if (event.tag === 'sync-follows') {
+        event.waitUntil(syncFollows());
+    }
+});
+
+// Sincronizar likes pendientes
+async function syncLikes() {
+    try {
+        const db = await openIndexedDB();
+        const pendingLikes = await db.getAll('pending-likes');
+
+        for (const like of pendingLikes) {
+            try {
+                const response = await fetch('/Feed/Like', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': like.token
+                    },
+                    body: JSON.stringify({ contenidoId: like.contenidoId })
+                });
+
+                if (response.ok) {
+                    await db.delete('pending-likes', like.id);
+                }
+            } catch (error) {
+                console.warn('[SW] Error sincronizando like:', error);
+            }
+        }
+    } catch (error) {
+        console.warn('[SW] Error en syncLikes:', error);
+    }
+}
+
+// Sincronizar comentarios pendientes
+async function syncComments() {
+    try {
+        const db = await openIndexedDB();
+        const pendingComments = await db.getAll('pending-comments');
+
+        for (const comment of pendingComments) {
+            try {
+                const response = await fetch('/Feed/Comentar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': comment.token
+                    },
+                    body: JSON.stringify({
+                        contenidoId: comment.contenidoId,
+                        texto: comment.texto
+                    })
+                });
+
+                if (response.ok) {
+                    await db.delete('pending-comments', comment.id);
+                    // Notificar al cliente
+                    const clients = await self.clients.matchAll();
+                    clients.forEach(client => {
+                        client.postMessage({
+                            type: 'COMMENT_SYNCED',
+                            contenidoId: comment.contenidoId
+                        });
+                    });
+                }
+            } catch (error) {
+                console.warn('[SW] Error sincronizando comentario:', error);
+            }
+        }
+    } catch (error) {
+        console.warn('[SW] Error en syncComments:', error);
+    }
+}
+
+// Sincronizar follows pendientes
+async function syncFollows() {
+    try {
+        const db = await openIndexedDB();
+        const pendingFollows = await db.getAll('pending-follows');
+
+        for (const follow of pendingFollows) {
+            try {
+                const response = await fetch('/Feed/Seguir', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': follow.token
+                    },
+                    body: JSON.stringify({ creadorId: follow.creadorId })
+                });
+
+                if (response.ok) {
+                    await db.delete('pending-follows', follow.id);
+                }
+            } catch (error) {
+                console.warn('[SW] Error sincronizando follow:', error);
+            }
+        }
+    } catch (error) {
+        console.warn('[SW] Error en syncFollows:', error);
+    }
+}
+
+// Helper para IndexedDB
+function openIndexedDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('lado-offline', 1);
+
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            const db = request.result;
+            resolve({
+                getAll: (store) => new Promise((res, rej) => {
+                    const tx = db.transaction(store, 'readonly');
+                    const req = tx.objectStore(store).getAll();
+                    req.onsuccess = () => res(req.result);
+                    req.onerror = () => rej(req.error);
+                }),
+                delete: (store, key) => new Promise((res, rej) => {
+                    const tx = db.transaction(store, 'readwrite');
+                    const req = tx.objectStore(store).delete(key);
+                    req.onsuccess = () => res();
+                    req.onerror = () => rej(req.error);
+                })
+            });
+        };
+
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains('pending-likes')) {
+                db.createObjectStore('pending-likes', { keyPath: 'id', autoIncrement: true });
+            }
+            if (!db.objectStoreNames.contains('pending-comments')) {
+                db.createObjectStore('pending-comments', { keyPath: 'id', autoIncrement: true });
+            }
+            if (!db.objectStoreNames.contains('pending-follows')) {
+                db.createObjectStore('pending-follows', { keyPath: 'id', autoIncrement: true });
+            }
+        };
+    });
+}
+
+// ========================================
+// PERIODIC BACKGROUND SYNC
+// ========================================
+self.addEventListener('periodicsync', (event) => {
+    if (event.tag === 'check-notifications') {
+        event.waitUntil(checkNewNotifications());
+    }
+});
+
+async function checkNewNotifications() {
+    try {
+        const response = await fetch('/api/Notificaciones/NuevasCount');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.count > 0) {
+                self.registration.showNotification('Lado', {
+                    body: `Tienes ${data.count} nuevas notificaciones`,
+                    icon: '/images/icons/icon-192x192.png',
+                    badge: '/images/icons/icon-72x72.png',
+                    tag: 'new-notifications',
+                    data: { url: '/Usuario/Notificaciones' }
+                });
+            }
+        }
+    } catch (error) {
+        console.warn('[SW] Error checking notifications:', error);
+    }
+}
+
+// ========================================
+// LIMPIEZA DE CACHE
+// ========================================
+async function cleanupCaches() {
+    // Limpiar cache de imágenes si excede el límite
+    const imageCache = await caches.open(IMAGE_CACHE);
+    const imageKeys = await imageCache.keys();
+
+    if (imageKeys.length > IMAGE_CACHE_MAX_ITEMS) {
+        // Eliminar las más antiguas (primeras en la lista)
+        const toDelete = imageKeys.slice(0, imageKeys.length - IMAGE_CACHE_MAX_ITEMS);
+        for (const request of toDelete) {
+            await imageCache.delete(request);
+        }
+        console.log(`[SW] Limpiadas ${toDelete.length} imágenes del cache`);
+    }
+}

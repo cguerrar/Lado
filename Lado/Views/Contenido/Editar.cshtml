@@ -378,6 +378,70 @@
         margin: 0;
     }
 
+    /* Tipo actual display (para editar) */
+    .tipo-actual-display {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+    }
+
+    .tipo-actual-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .tipo-actual-icon svg {
+        color: white;
+    }
+
+    .tipo-actual-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: 1;
+    }
+
+    .tipo-actual-label {
+        font-size: 11px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .tipo-actual-value {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--fg);
+    }
+
+    .tipo-auto-badge {
+        padding: 4px 10px;
+        background: rgba(34, 197, 94, 0.15);
+        color: #22c55e;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .tipo-hint {
+        margin: 8px 0 0 0;
+        font-size: 12px;
+        color: var(--muted);
+        text-align: center;
+    }
+
     /* Upload Zone */
     .upload-zone {
         position: relative;
@@ -1106,10 +1170,444 @@
         flex: 1;
     }
 
-    /* Responsive */
-    @@media (max-width: 900px) {
+    /* Toast de auto-detección */
+    .auto-detect-toast {
+        position: fixed;
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        background: var(--success, #22c55e);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        opacity: 0;
+        transition: all 0.3s ease;
+        z-index: 9999;
+    }
+
+    .auto-detect-toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+
+    /* =============================================
+       AUDIO CUTTER - Waveform Editor
+       ============================================= */
+    .audio-cutter {
+        margin-top: 16px;
+        background: linear-gradient(135deg, #1a9be6 0%, #0d7bc5 100%);
+        border-radius: 12px;
+        padding: 16px;
+        color: white;
+    }
+
+    .audio-cutter-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        font-size: 12px;
+    }
+
+    .audio-cutter-filename {
+        font-weight: 600;
+        max-width: 60%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .audio-cutter-info {
+        opacity: 0.8;
+        font-size: 11px;
+    }
+
+    /* Waveform container */
+    .waveform-container {
+        position: relative;
+        height: 80px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 12px;
+    }
+
+    .waveform-canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+
+    /* Selection overlay */
+    .waveform-selection {
+        position: absolute;
+        top: 0;
+        height: 100%;
+        background: rgba(45, 212, 191, 0.4);
+        border-left: 3px solid #2dd4bf;
+        border-right: 3px solid #2dd4bf;
+    }
+
+    /* Selection handles */
+    .selection-handle {
+        position: absolute;
+        top: 0;
+        width: 20px;
+        height: 100%;
+        cursor: ew-resize;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        touch-action: none;
+    }
+
+    .selection-handle .handle-bar {
+        width: 6px;
+        height: 50px;
+        background: white;
+        border-radius: 3px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        pointer-events: none;
+    }
+
+    .selection-handle:hover .handle-bar,
+    .selection-handle.dragging .handle-bar {
+        background: #2dd4bf;
+        transform: scaleY(1.1);
+    }
+
+    .selection-handle.dragging {
+        z-index: 30;
+    }
+
+    .selection-handle.handle-left {
+        left: 0;
+        transform: translateX(-50%);
+    }
+
+    .selection-handle.handle-right {
+        right: 0;
+        transform: translateX(50%);
+    }
+
+    /* Playhead */
+    .waveform-playhead {
+        position: absolute;
+        top: 0;
+        width: 2px;
+        height: 100%;
+        background: white;
+        pointer-events: none;
+        display: none;
+        z-index: 5;
+    }
+
+    .waveform-playhead.active {
+        display: block;
+    }
+
+    /* Time indicator */
+    .time-indicator {
+        position: absolute;
+        top: 4px;
+        left: 8px;
+        background: rgba(0,0,0,0.6);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        font-family: monospace;
+    }
+
+    /* Controls row */
+    .audio-cutter-controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .cutter-play-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: white;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: transform 0.15s;
+    }
+
+    .cutter-play-btn:hover {
+        transform: scale(1.05);
+    }
+
+    .cutter-play-btn:active {
+        transform: scale(0.95);
+    }
+
+    .cutter-play-btn svg {
+        width: 20px;
+        height: 20px;
+        fill: #1a9be6;
+    }
+
+    .cutter-play-btn .pause-icon {
+        display: none;
+    }
+
+    .cutter-play-btn.playing .play-icon {
+        display: none;
+    }
+
+    .cutter-play-btn.playing .pause-icon {
+        display: block;
+    }
+
+    /* Time inputs */
+    .cutter-time-inputs {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+    }
+
+    .cutter-time-inputs label {
+        opacity: 0.8;
+    }
+
+    .cutter-time-input {
+        width: 70px;
+        padding: 6px 8px;
+        border: none;
+        border-radius: 4px;
+        background: rgba(255,255,255,0.2);
+        color: white;
+        font-size: 12px;
+        font-family: monospace;
+        text-align: center;
+    }
+
+    .cutter-time-input:focus {
+        outline: none;
+        background: rgba(255,255,255,0.3);
+    }
+
+    .cutter-time-input::placeholder {
+        color: rgba(255,255,255,0.5);
+    }
+
+    /* Volume control */
+    .cutter-volume {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: auto;
+    }
+
+    .cutter-volume svg {
+        width: 18px;
+        height: 18px;
+        opacity: 0.8;
+    }
+
+    .cutter-volume-slider {
+        width: 80px;
+        height: 4px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: rgba(255,255,255,0.3);
+        border-radius: 2px;
+        outline: none;
+    }
+
+    .cutter-volume-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: white;
+        cursor: pointer;
+    }
+
+    .cutter-volume-slider::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: white;
+        cursor: pointer;
+        border: none;
+    }
+
+    /* Time input groups */
+    .time-input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .time-input-group label {
+        font-size: 11px;
+        opacity: 0.8;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .time-input {
+        width: 75px;
+        padding: 8px 10px;
+        border: none;
+        border-radius: 6px;
+        background: rgba(255,255,255,0.15);
+        color: white;
+        font-size: 13px;
+        font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+        text-align: center;
+    }
+
+    .time-input:focus {
+        outline: none;
+        background: rgba(255,255,255,0.25);
+    }
+
+    .duration-group .selection-duration {
+        font-size: 14px;
+        font-weight: 600;
+        color: #2dd4bf;
+    }
+
+    /* Cutter actions */
+    .cutter-actions {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-left: auto;
+    }
+
+    /* Volume slider inline */
+    .cutter-volume .volume-slider {
+        width: 80px;
+        height: 4px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: rgba(255,255,255,0.3);
+        border-radius: 2px;
+        outline: none;
+    }
+
+    .cutter-volume .volume-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: white;
+        cursor: pointer;
+    }
+
+    .cutter-volume .volume-slider::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: white;
+        cursor: pointer;
+        border: none;
+    }
+
+    .cutter-volume .volume-value {
+        font-size: 12px;
+        opacity: 0.8;
+        min-width: 35px;
+    }
+
+    /* Waveform time display */
+    .waveform-time {
+        position: absolute;
+        top: 6px;
+        left: 8px;
+        background: rgba(0,0,0,0.6);
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+        z-index: 10;
+    }
+
+    /* Cutter hint */
+    .cutter-hint {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255,255,255,0.1);
+        font-size: 12px;
+        opacity: 0.7;
+    }
+
+    .cutter-hint svg {
+        flex-shrink: 0;
+    }
+
+    /* Loading state */
+    .audio-cutter.loading .waveform-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .audio-cutter.loading .waveform-container::after {
+        content: 'Cargando audio...';
+        color: rgba(255,255,255,0.7);
+        font-size: 13px;
+    }
+
+    .audio-cutter.loading .waveform-canvas,
+    .audio-cutter.loading .waveform-selection,
+    .audio-cutter.loading .selection-handle {
+        display: none;
+    }
+
+    /* =============================================
+       MOBILE OPTIMIZATIONS - Editar Contenido
+       ============================================= */
+    @@media (max-width: 767px) {
+        .edit-page {
+            padding: 12px;
+            padding-bottom: calc(80px + env(safe-area-inset-bottom, 20px));
+        }
+
+        .page-header {
+            margin-bottom: 20px;
+        }
+
+        .page-title {
+            font-size: 22px;
+            gap: 10px;
+        }
+
+        .page-title svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .page-subtitle {
+            font-size: 14px;
+        }
+
         .edit-layout {
             grid-template-columns: 1fr;
+            gap: 16px;
         }
 
         .preview-sidebar {
@@ -1117,20 +1615,480 @@
             order: -1;
         }
 
+        .edit-card {
+            padding: 20px 16px;
+            border-radius: 12px;
+        }
+
+        .preview-card {
+            border-radius: 12px;
+        }
+
+        .preview-header {
+            padding: 14px 16px;
+        }
+
+        .preview-info {
+            padding: 14px 16px;
+        }
+
+        .current-media {
+            aspect-ratio: 4/3;
+        }
+
+        /* Status badge mobile */
+        .status-badge {
+            font-size: 12px;
+            padding: 8px 14px;
+            margin-bottom: 20px;
+        }
+
+        /* Form sections mobile */
+        .form-section {
+            margin-bottom: 20px;
+        }
+
+        .section-label {
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        /* Lado selector mobile */
         .lado-selector {
             grid-template-columns: 1fr;
+            gap: 10px;
         }
 
+        .lado-option {
+            padding: 14px;
+            gap: 12px;
+        }
+
+        .lado-mascota {
+            height: 45px;
+            right: 8px;
+        }
+
+        .lado-badge {
+            width: 38px;
+            height: 38px;
+            font-size: 16px;
+        }
+
+        .lado-info h4 {
+            font-size: 14px;
+        }
+
+        .lado-info p {
+            font-size: 12px;
+        }
+
+        .lado-check {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Tipo actual display mobile */
+        .tipo-actual-display {
+            padding: 12px 14px;
+            gap: 10px;
+        }
+
+        .tipo-actual-icon {
+            width: 40px;
+            height: 40px;
+        }
+
+        .tipo-actual-icon svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .tipo-actual-value {
+            font-size: 15px;
+        }
+
+        .tipo-auto-badge {
+            padding: 3px 8px;
+            font-size: 10px;
+        }
+
+        .tipo-hint {
+            font-size: 11px;
+        }
+
+        /* Tipo grid mobile - horizontal scroll (legacy) */
         .tipo-grid {
-            grid-template-columns: 1fr;
+            display: flex;
+            overflow-x: auto;
+            gap: 10px;
+            padding-bottom: 8px;
+            -webkit-overflow-scrolling: touch;
+            scroll-snap-type: x mandatory;
         }
 
+        .tipo-card {
+            flex: 0 0 auto;
+            width: 110px;
+            padding: 16px 12px;
+            scroll-snap-align: start;
+        }
+
+        .tipo-card svg {
+            width: 28px;
+            height: 28px;
+        }
+
+        .tipo-card h4 {
+            font-size: 13px;
+        }
+
+        .tipo-card p {
+            font-size: 11px;
+        }
+
+        /* Upload zone mobile */
+        .upload-zone {
+            padding: 28px 16px;
+            border-radius: 12px;
+        }
+
+        .upload-content svg {
+            width: 40px;
+            height: 40px;
+        }
+
+        .upload-content h4 {
+            font-size: 15px;
+        }
+
+        .upload-content p {
+            font-size: 13px;
+        }
+
+        /* Textarea mobile */
+        .form-textarea {
+            font-size: 16px;
+            padding: 14px;
+            border-radius: 10px;
+            min-height: 100px;
+        }
+
+        /* Toggle cards mobile */
+        .publico-card,
+        .privado-card,
+        .premium-card,
+        .music-card {
+            padding: 16px;
+            border-radius: 10px;
+        }
+
+        .publico-header h4,
+        .privado-header h4,
+        .premium-header h4,
+        .music-header h4 {
+            font-size: 14px;
+        }
+
+        .publico-desc,
+        .privado-desc,
+        .premium-desc,
+        .music-desc {
+            font-size: 12px;
+        }
+
+        .publico-toggle {
+            width: 48px;
+            height: 26px;
+        }
+
+        .toggle-slider:before {
+            height: 18px;
+            width: 18px;
+        }
+
+        .publico-toggle input:checked + .toggle-slider:before {
+            transform: translateX(22px);
+        }
+
+        .toggle-label {
+            font-size: 13px;
+        }
+
+        /* Premium input mobile */
+        .precio-input-group {
+            max-width: 100%;
+        }
+
+        .precio-select {
+            font-size: 16px;
+            padding: 12px;
+        }
+
+        /* Music modal as bottom sheet */
+        .music-modal-content {
+            border-radius: 16px 16px 0 0;
+            max-height: 85vh;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            max-width: 100%;
+        }
+
+        .music-search input {
+            font-size: 16px;
+        }
+
+        /* Form actions sticky */
         .form-actions {
             flex-direction: column;
+            gap: 10px;
+            position: sticky;
+            bottom: 0;
+            background: var(--surface);
+            padding: 16px;
+            margin: 0 -16px -20px;
+            border-top: 1px solid var(--line);
+            z-index: 10;
         }
 
         .btn {
             width: 100%;
+            padding: 14px 20px;
+            font-size: 15px;
+            border-radius: 10px;
+        }
+
+        .btn-primary {
+            order: -1;
+        }
+
+        /* Tips card - hide on mobile */
+        .tips-card {
+            display: none;
+        }
+
+        /* Profile photo actions */
+        .profile-photo-actions {
+            padding: 14px 16px !important;
+        }
+
+        .profile-photo-actions > div {
+            flex-direction: column !important;
+        }
+
+        .btn-profile-photo {
+            width: 100% !important;
+        }
+
+        /* Audio cutter mobile */
+        .audio-cutter {
+            padding: 12px;
+            border-radius: 10px;
+        }
+
+        .audio-cutter-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+        }
+
+        .audio-cutter-filename {
+            max-width: 100%;
+        }
+
+        .waveform-container {
+            height: 70px;
+        }
+
+        .selection-handle {
+            width: 28px;
+        }
+
+        .selection-handle .handle-bar {
+            width: 8px;
+            height: 55px;
+        }
+
+        .audio-cutter-controls {
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .cutter-play-btn {
+            width: 48px;
+            height: 48px;
+        }
+
+        .cutter-time-inputs {
+            flex-wrap: wrap;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+        .cutter-time-input {
+            width: 65px;
+            padding: 8px 6px;
+        }
+
+        .cutter-volume {
+            width: 100%;
+            margin-left: 0;
+            margin-top: 8px;
+            justify-content: center;
+        }
+
+        .cutter-volume-slider,
+        .volume-slider {
+            width: 120px;
+        }
+
+        .time-input-group {
+            flex: 1;
+            min-width: 70px;
+        }
+
+        .time-input {
+            width: 100%;
+            font-size: 12px;
+            padding: 6px 8px;
+        }
+
+        .cutter-actions {
+            width: 100%;
+            justify-content: center;
+            margin-left: 0;
+            margin-top: 8px;
+        }
+
+        .cutter-hint {
+            font-size: 11px;
+            text-align: center;
+            justify-content: center;
+        }
+
+        .waveform-time {
+            font-size: 10px;
+            padding: 2px 6px;
+        }
+
+        /* Toast mobile */
+        .auto-detect-toast {
+            bottom: 120px;
+            left: 16px;
+            right: 16px;
+            transform: translateY(20px);
+            justify-content: center;
+        }
+
+        .auto-detect-toast.show {
+            transform: translateY(0);
+        }
+    }
+
+    /* Extra small screens */
+    @@media (max-width: 479px) {
+        .edit-page {
+            padding: 8px;
+        }
+
+        .edit-card {
+            padding: 16px 12px;
+            border-radius: 10px;
+        }
+
+        .page-title {
+            font-size: 20px;
+        }
+
+        .lado-option {
+            padding: 12px;
+        }
+
+        .lado-badge {
+            width: 34px;
+            height: 34px;
+            font-size: 14px;
+        }
+
+        .tipo-card {
+            width: 100px;
+            padding: 14px 10px;
+        }
+
+        .form-actions {
+            margin: 0 -12px -16px;
+            padding: 12px;
+        }
+    }
+
+    /* Very small screens */
+    @@media (max-width: 359px) {
+        .page-title {
+            font-size: 18px;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+        }
+
+        .tipo-card {
+            width: 90px;
+        }
+
+        .lado-info h4 {
+            font-size: 13px;
+        }
+    }
+
+    /* Touch device optimizations */
+    @@media (hover: none) and (pointer: coarse) {
+        .lado-option:hover {
+            border-color: var(--line);
+            background: var(--surface);
+        }
+
+        .lado-option:active {
+            transform: scale(0.98);
+            background: rgba(70, 130, 180, 0.05);
+        }
+
+        .tipo-card:hover {
+            transform: none;
+        }
+
+        .tipo-card:active {
+            transform: scale(0.97);
+        }
+
+        .upload-zone:hover {
+            background: rgba(70, 130, 180, 0.03);
+        }
+
+        .btn:hover {
+            transform: none;
+        }
+
+        .btn:active {
+            transform: scale(0.97);
+            opacity: 0.9;
+        }
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+    }
+
+    /* iOS safe area */
+    @@supports (padding-bottom: env(safe-area-inset-bottom)) {
+        @@media (max-width: 767px) {
+            .edit-page {
+                padding-bottom: calc(80px + env(safe-area-inset-bottom));
+            }
+
+            .form-actions {
+                padding-bottom: calc(16px + env(safe-area-inset-bottom));
+            }
         }
     }
 </style>
@@ -1256,35 +2214,36 @@
                     </div>
                 </div>
 
-                <!-- Tipo de Contenido -->
+                <!-- Tipo de Contenido (automático) -->
+                @{
+                    var tipoActual = Model.TipoContenido;
+                    var tipoIcono = tipoActual == Lado.Models.TipoContenido.Foto ? "M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" :
+                                    tipoActual == Lado.Models.TipoContenido.Video ? "M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" :
+                                    "M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z";
+                    var tipoNombre = tipoActual == Lado.Models.TipoContenido.Foto ? "Foto" :
+                                     tipoActual == Lado.Models.TipoContenido.Video ? "Video" : "Post";
+                }
                 <div class="form-section">
-                    <label class="section-label">Tipo de contenido</label>
-                    <div class="tipo-grid">
-                        <div class="tipo-card @(Model.TipoContenido == Lado.Models.TipoContenido.Foto ? "active" : "")" data-tipo="0">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                    <div class="tipo-actual-display">
+                        <div class="tipo-actual-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="@tipoIcono"/>
                             </svg>
-                            <h4>Foto</h4>
-                            <p>JPG, PNG, GIF</p>
                         </div>
-
-                        <div class="tipo-card @(Model.TipoContenido == Lado.Models.TipoContenido.Video ? "active" : "")" data-tipo="1">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
-                            </svg>
-                            <h4>Video</h4>
-                            <p>MP4, MOV, AVI</p>
+                        <div class="tipo-actual-info">
+                            <span class="tipo-actual-label">Tipo de contenido</span>
+                            <span class="tipo-actual-value" id="tipoActualValue">@tipoNombre</span>
                         </div>
-
-                        <div class="tipo-card @(Model.TipoContenido == Lado.Models.TipoContenido.Post ? "active" : "")" data-tipo="3">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
-                            </svg>
-                            <h4>Post</h4>
-                            <p>Solo texto</p>
-                        </div>
+                        <span class="tipo-auto-badge">Auto</span>
                     </div>
+                    <p class="tipo-hint">El tipo se detecta automáticamente al subir un nuevo archivo</p>
                     <input type="hidden" name="TipoContenido" id="tipoContenidoInput" value="@((int)Model.TipoContenido)" />
+                    <!-- Hidden tipo-cards para JavaScript -->
+                    <div style="display:none;">
+                        <div class="tipo-card" data-tipo="0"></div>
+                        <div class="tipo-card" data-tipo="1"></div>
+                        <div class="tipo-card" data-tipo="3"></div>
+                    </div>
                 </div>
 
                 <!-- Subir Nuevo Archivo -->
@@ -1359,6 +2318,83 @@
                                     <div class="current-music-artist" id="currentMusicArtist">@(Model.PistaMusical?.Artista ?? "")</div>
                                 </div>
                                 <button type="button" class="current-music-remove" id="removeMusicBtn">Quitar</button>
+                            </div>
+
+                            <!-- Audio Cutter Elaborado -->
+                            <div class="audio-cutter" id="audioCutterContainer">
+                                <div class="audio-cutter-header">
+                                    <div class="audio-cutter-filename" id="cutterFilename">@(Model.PistaMusical?.Titulo ?? "Audio")</div>
+                                    <div class="audio-cutter-info">
+                                        <span id="cutterDuration">00:00</span>
+                                    </div>
+                                </div>
+
+                                <!-- Contenedor de forma de onda -->
+                                <div class="waveform-container" id="waveformContainer">
+                                    <canvas class="waveform-canvas" id="waveformCanvas"></canvas>
+                                    <div class="waveform-selection" id="waveformSelection">
+                                        <div class="selection-handle handle-left" id="handleLeft">
+                                            <div class="handle-bar"></div>
+                                        </div>
+                                        <div class="selection-handle handle-right" id="handleRight">
+                                            <div class="handle-bar"></div>
+                                        </div>
+                                    </div>
+                                    <div class="waveform-playhead" id="waveformPlayhead"></div>
+                                    <div class="waveform-time" id="waveformTime">00:00.0</div>
+                                </div>
+
+                                <!-- Controles del cutter -->
+                                <div class="audio-cutter-controls">
+                                    <div class="cutter-time-inputs">
+                                        <div class="time-input-group">
+                                            <label>Desde</label>
+                                            <input type="text" class="time-input" id="cutStartInput" value="00:00.0" readonly>
+                                        </div>
+                                        <div class="time-input-group">
+                                            <label>Hasta</label>
+                                            <input type="text" class="time-input" id="cutEndInput" value="00:15.0" readonly>
+                                        </div>
+                                        <div class="time-input-group duration-group">
+                                            <label>Duración</label>
+                                            <span class="selection-duration" id="selectionDuration">15.0s</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="cutter-actions">
+                                        <button type="button" class="cutter-play-btn" id="cutterPlayBtn">
+                                            <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M8 5v14l11-7z"/>
+                                            </svg>
+                                            <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+                                                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                                            </svg>
+                                        </button>
+
+                                        @{
+                                            // Normalizar volumen: si es mayor a 1, asumir que está en escala 0-100
+                                            var volumenRaw = Model.MusicaVolumen ?? 0.7m;
+                                            // Limitar el rango ANTES de convertir a int para evitar OverflowException
+                                            var volumenDecimal = volumenRaw > 1 ? volumenRaw : volumenRaw * 100;
+                                            volumenDecimal = Math.Min(100m, Math.Max(0m, volumenDecimal));
+                                            var volumenNormalizado = (int)volumenDecimal;
+                                        }
+                                        <div class="cutter-volume">
+                                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                                            </svg>
+                                            <input type="range" class="volume-slider" id="cutterVolumeSlider" min="0" max="100" value="@volumenNormalizado">
+                                            <span class="volume-value" id="cutterVolumeValue">@volumenNormalizado%</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="cutter-hint">
+                                    <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                                    </svg>
+                                    Arrastra los controles para seleccionar el fragmento de audio
+                                </div>
                             </div>
                         </div>
 
@@ -1789,7 +2825,10 @@
                 const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
                 newFileInfo.textContent = `Nuevo archivo: ${file.name} (${sizeMB} MB)`;
 
+                // Auto-detectar tipo de contenido
+                let detectedTipo = null;
                 if (file.type.startsWith('image/')) {
+                    detectedTipo = '0'; // Foto
                     newVideoPreview.classList.remove('show');
                     newImagePreview.classList.add('show');
                     reader.onload = (e) => {
@@ -1797,6 +2836,7 @@
                     };
                     reader.readAsDataURL(file);
                 } else if (file.type.startsWith('video/')) {
+                    detectedTipo = '1'; // Video
                     newImagePreview.classList.remove('show');
                     newVideoPreview.classList.add('show');
                     reader.onload = (e) => {
@@ -1804,6 +2844,69 @@
                     };
                     reader.readAsDataURL(file);
                 }
+
+                // Auto-seleccionar tipo de contenido si se detectó
+                if (detectedTipo !== null) {
+                    const currentTipo = tipoInput.value;
+                    const tipoNombre = detectedTipo === '0' ? 'Foto' : 'Video';
+
+                    // Actualizar hidden input
+                    tipoInput.value = detectedTipo;
+
+                    // Actualizar display visual del tipo
+                    const tipoActualValue = document.getElementById('tipoActualValue');
+                    const tipoActualIcon = document.querySelector('.tipo-actual-icon svg path');
+                    if (tipoActualValue) {
+                        tipoActualValue.textContent = tipoNombre;
+                    }
+                    if (tipoActualIcon) {
+                        const iconPath = detectedTipo === '0'
+                            ? 'M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'
+                            : 'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z';
+                        tipoActualIcon.setAttribute('d', iconPath);
+                    }
+
+                    // Mostrar/ocultar sección de música
+                    if (musicSection) {
+                        musicSection.style.display = (detectedTipo === '0') ? 'block' : 'none';
+                    }
+
+                    // Mostrar/ocultar sección de archivo
+                    if (archivoSection) {
+                        archivoSection.style.display = 'block';
+                    }
+
+                    // Mostrar notificación solo si cambió el tipo
+                    if (currentTipo !== detectedTipo) {
+                        showAutoDetectToast(tipoNombre);
+                    }
+                }
+            }
+
+            // Mostrar toast de auto-detección
+            function showAutoDetectToast(tipo) {
+                // Remover toast anterior si existe
+                const oldToast = document.querySelector('.auto-detect-toast');
+                if (oldToast) oldToast.remove();
+
+                const toast = document.createElement('div');
+                toast.className = 'auto-detect-toast';
+                toast.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                    Tipo detectado: ${tipo}
+                `;
+                document.body.appendChild(toast);
+
+                // Animar entrada
+                setTimeout(() => toast.classList.add('show'), 10);
+
+                // Remover después de 2.5s
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => toast.remove(), 300);
+                }, 2500);
             }
 
             // Character counter
@@ -2070,11 +3173,437 @@
                     audioTrimInicioInput.value = '';
                     musicaVolumenInput.value = '';
 
+                    // Detener preview si está reproduciendo
+                    stopAudioPreview();
+
                     // Actualizar UI
                     currentMusicContainer.style.display = 'none';
                     addMusicBtn.style.display = 'flex';
                 });
             }
+
+            // === AUDIO CUTTER ELABORADO ===
+            const audioCutter = document.getElementById('audioCutterContainer');
+            const waveformCanvas = document.getElementById('waveformCanvas');
+            const waveformContainer = document.getElementById('waveformContainer');
+            const waveformSelection = document.getElementById('waveformSelection');
+            const handleLeft = document.getElementById('handleLeft');
+            const handleRight = document.getElementById('handleRight');
+            const waveformPlayhead = document.getElementById('waveformPlayhead');
+            const waveformTime = document.getElementById('waveformTime');
+            const cutStartInput = document.getElementById('cutStartInput');
+            const cutEndInput = document.getElementById('cutEndInput');
+            const selectionDurationSpan = document.getElementById('selectionDuration');
+            const cutterPlayBtn = document.getElementById('cutterPlayBtn');
+            const cutterVolumeSlider = document.getElementById('cutterVolumeSlider');
+            const cutterVolumeValue = document.getElementById('cutterVolumeValue');
+            const cutterFilename = document.getElementById('cutterFilename');
+            const cutterDuration = document.getElementById('cutterDuration');
+
+            let audioContext = null;
+            let audioBuffer = null;
+            let audioDuration = 0;
+            let selectionStart = 0;
+            let selectionEnd = 15;
+            let isPlaying = false;
+            let playbackSource = null;
+            let playbackStartTime = 0;
+            let playbackAnimationId = null;
+            let currentMusicUrl = '@(Model.PistaMusical?.RutaArchivo ?? "")';
+            let isDragging = false;
+            let dragHandle = null;
+
+            // Inicializar Audio Cutter si hay música
+            if (currentMusicUrl && audioCutter) {
+                initAudioCutter(currentMusicUrl);
+            }
+
+            async function initAudioCutter(url) {
+                if (!waveformCanvas || !url) return;
+
+                audioCutter.classList.add('loading');
+
+                try {
+                    // Crear AudioContext
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                    // Cargar audio
+                    const response = await fetch(url);
+                    const arrayBuffer = await response.arrayBuffer();
+                    audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                    audioDuration = audioBuffer.duration;
+
+                    // Actualizar UI
+                    cutterDuration.textContent = formatTime(audioDuration);
+                    selectionEnd = Math.min(15, audioDuration);
+
+                    // Cargar valores guardados
+                    const savedStart = parseFloat(audioTrimInicioInput.value) || 0;
+                    if (savedStart > 0 && savedStart < audioDuration) {
+                        selectionStart = savedStart;
+                        selectionEnd = Math.min(savedStart + 15, audioDuration);
+                    }
+
+                    // Dibujar forma de onda
+                    drawWaveform();
+                    updateSelection();
+
+                    audioCutter.classList.remove('loading');
+                } catch (error) {
+                    console.error('Error cargando audio:', error);
+                    audioCutter.classList.remove('loading');
+                }
+            }
+
+            function drawWaveform() {
+                if (!audioBuffer || !waveformCanvas) return;
+
+                const ctx = waveformCanvas.getContext('2d');
+                const width = waveformContainer.offsetWidth;
+                const height = waveformContainer.offsetHeight;
+
+                waveformCanvas.width = width * window.devicePixelRatio;
+                waveformCanvas.height = height * window.devicePixelRatio;
+                waveformCanvas.style.width = width + 'px';
+                waveformCanvas.style.height = height + 'px';
+                ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+                // Combinar canales si es stereo
+                const channelData = audioBuffer.getChannelData(0);
+                const data = audioBuffer.numberOfChannels > 1
+                    ? mergeChannels(channelData, audioBuffer.getChannelData(1))
+                    : channelData;
+
+                // Calcular pico máximo para normalizar
+                let maxPeak = 0;
+                for (let i = 0; i < data.length; i++) {
+                    const absVal = Math.abs(data[i]);
+                    if (absVal > maxPeak) maxPeak = absVal;
+                }
+                maxPeak = maxPeak || 1;
+
+                // Configuración de barras
+                const barWidth = 3;
+                const barGap = 1;
+                const barCount = Math.floor(width / (barWidth + barGap));
+                const samplesPerBar = Math.floor(data.length / barCount);
+                const centerY = height / 2;
+
+                ctx.clearRect(0, 0, width, height);
+
+                for (let i = 0; i < barCount; i++) {
+                    const startSample = i * samplesPerBar;
+                    const endSample = startSample + samplesPerBar;
+
+                    // Calcular RMS (Root Mean Square) para mejor representación
+                    let sumSquares = 0;
+                    let peakInBar = 0;
+                    for (let j = startSample; j < endSample && j < data.length; j++) {
+                        const val = Math.abs(data[j]);
+                        sumSquares += val * val;
+                        if (val > peakInBar) peakInBar = val;
+                    }
+                    const rms = Math.sqrt(sumSquares / samplesPerBar);
+
+                    // Combinar RMS y pico para visualización más dinámica
+                    const normalizedValue = ((rms * 0.7) + (peakInBar * 0.3)) / maxPeak;
+
+                    // Altura de la barra (mínimo 2px, máximo 90% del canvas)
+                    const barHeight = Math.max(2, normalizedValue * height * 0.9);
+
+                    const x = i * (barWidth + barGap);
+                    const y = centerY - (barHeight / 2);
+
+                    // Gradiente de color para las barras
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+
+                    // Dibujar barra con bordes redondeados
+                    ctx.beginPath();
+                    ctx.roundRect(x, y, barWidth, barHeight, 1);
+                    ctx.fill();
+                }
+            }
+
+            function mergeChannels(ch1, ch2) {
+                const merged = new Float32Array(ch1.length);
+                for (let i = 0; i < ch1.length; i++) {
+                    merged[i] = (ch1[i] + ch2[i]) / 2;
+                }
+                return merged;
+            }
+
+            function updateSelection() {
+                if (!waveformContainer || !waveformSelection) return;
+
+                const width = waveformContainer.offsetWidth;
+                const startPercent = (selectionStart / audioDuration) * 100;
+                const endPercent = (selectionEnd / audioDuration) * 100;
+
+                waveformSelection.style.left = startPercent + '%';
+                waveformSelection.style.width = (endPercent - startPercent) + '%';
+
+                // Actualizar inputs de tiempo
+                if (cutStartInput) cutStartInput.value = formatTimeMs(selectionStart);
+                if (cutEndInput) cutEndInput.value = formatTimeMs(selectionEnd);
+                if (selectionDurationSpan) {
+                    selectionDurationSpan.textContent = (selectionEnd - selectionStart).toFixed(1) + 's';
+                }
+
+                // Guardar en hidden input (como entero para el modelo)
+                audioTrimInicioInput.value = Math.round(selectionStart).toString();
+            }
+
+            function formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+
+            function formatTimeMs(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = (seconds % 60).toFixed(1);
+                return `${mins.toString().padStart(2, '0')}:${secs.padStart(4, '0')}`;
+            }
+
+            // Drag handles para selección
+            function setupDragHandles() {
+                if (!handleLeft || !handleRight || !waveformContainer) {
+                    console.log('Handles not found:', { handleLeft, handleRight, waveformContainer });
+                    return;
+                }
+
+                console.log('Setting up drag handles');
+
+                const startDrag = (e, handle) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    isDragging = true;
+                    dragHandle = handle;
+
+                    // Visual feedback
+                    document.body.style.cursor = 'ew-resize';
+                    if (handle === 'left') {
+                        handleLeft.classList.add('dragging');
+                    } else {
+                        handleRight.classList.add('dragging');
+                    }
+
+                    document.addEventListener('mousemove', onDrag);
+                    document.addEventListener('mouseup', stopDrag);
+                    document.addEventListener('touchmove', onDrag, { passive: false });
+                    document.addEventListener('touchend', stopDrag);
+                };
+
+                // Mouse events
+                handleLeft.addEventListener('mousedown', (e) => startDrag(e, 'left'));
+                handleRight.addEventListener('mousedown', (e) => startDrag(e, 'right'));
+
+                // Touch events con passive: false
+                handleLeft.addEventListener('touchstart', (e) => startDrag(e, 'left'), { passive: false });
+                handleRight.addEventListener('touchstart', (e) => startDrag(e, 'right'), { passive: false });
+            }
+
+            function onDrag(e) {
+                if (!isDragging || !waveformContainer || !audioDuration) return;
+                e.preventDefault();
+
+                const rect = waveformContainer.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                let x = clientX - rect.left;
+                x = Math.max(0, Math.min(x, rect.width));
+
+                const time = (x / rect.width) * audioDuration;
+
+                if (dragHandle === 'left') {
+                    selectionStart = Math.min(time, selectionEnd - 1);
+                    selectionStart = Math.max(0, selectionStart);
+                } else {
+                    selectionEnd = Math.max(time, selectionStart + 1);
+                    selectionEnd = Math.min(audioDuration, selectionEnd);
+                }
+
+                updateSelection();
+            }
+
+            function stopDrag() {
+                isDragging = false;
+                document.body.style.cursor = '';
+
+                if (handleLeft) handleLeft.classList.remove('dragging');
+                if (handleRight) handleRight.classList.remove('dragging');
+
+                dragHandle = null;
+                document.removeEventListener('mousemove', onDrag);
+                document.removeEventListener('mouseup', stopDrag);
+                document.removeEventListener('touchmove', onDrag);
+                document.removeEventListener('touchend', stopDrag);
+            }
+
+            // Click en waveform para mover selección
+            if (waveformContainer) {
+                waveformContainer.addEventListener('click', function(e) {
+                    if (isDragging) return;
+                    if (e.target.closest('.selection-handle')) return;
+                    if (!audioDuration) return;
+
+                    const rect = waveformContainer.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const clickTime = (x / rect.width) * audioDuration;
+
+                    // Mover selección centrada en el click
+                    const duration = selectionEnd - selectionStart;
+                    let newStart = clickTime - (duration / 2);
+                    newStart = Math.max(0, Math.min(newStart, audioDuration - duration));
+
+                    selectionStart = newStart;
+                    selectionEnd = newStart + duration;
+                    updateSelection();
+                });
+            }
+
+            setupDragHandles();
+
+            // Reproducir selección
+            if (cutterPlayBtn) {
+                cutterPlayBtn.addEventListener('click', function() {
+                    if (isPlaying) {
+                        stopPlayback();
+                    } else {
+                        playSelection();
+                    }
+                });
+            }
+
+            function playSelection() {
+                if (!audioBuffer || !audioContext) return;
+
+                // Resume context si está suspendido
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+
+                const volume = (cutterVolumeSlider?.value || 70) / 100;
+
+                // Crear source
+                playbackSource = audioContext.createBufferSource();
+                playbackSource.buffer = audioBuffer;
+
+                // Gain node para volumen
+                const gainNode = audioContext.createGain();
+                gainNode.gain.value = volume;
+
+                playbackSource.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                // Reproducir selección
+                const duration = selectionEnd - selectionStart;
+                playbackStartTime = audioContext.currentTime;
+                playbackSource.start(0, selectionStart, duration);
+
+                playbackSource.onended = () => {
+                    stopPlayback();
+                };
+
+                isPlaying = true;
+                updatePlayButton(true);
+                animatePlayhead();
+            }
+
+            function stopPlayback() {
+                if (playbackSource) {
+                    try {
+                        playbackSource.stop();
+                    } catch(e) {}
+                    playbackSource = null;
+                }
+                if (playbackAnimationId) {
+                    cancelAnimationFrame(playbackAnimationId);
+                    playbackAnimationId = null;
+                }
+                isPlaying = false;
+                updatePlayButton(false);
+                if (waveformPlayhead) {
+                    waveformPlayhead.style.display = 'none';
+                }
+            }
+
+            function animatePlayhead() {
+                if (!isPlaying || !waveformPlayhead || !audioContext) return;
+
+                const elapsed = audioContext.currentTime - playbackStartTime;
+                const currentTime = selectionStart + elapsed;
+
+                if (currentTime >= selectionEnd) {
+                    stopPlayback();
+                    return;
+                }
+
+                const percent = (currentTime / audioDuration) * 100;
+                waveformPlayhead.style.display = 'block';
+                waveformPlayhead.style.left = percent + '%';
+
+                // Actualizar tiempo mostrado
+                if (waveformTime) {
+                    waveformTime.textContent = formatTimeMs(currentTime);
+                }
+
+                playbackAnimationId = requestAnimationFrame(animatePlayhead);
+            }
+
+            function updatePlayButton(playing) {
+                if (!cutterPlayBtn) return;
+                const playIcon = cutterPlayBtn.querySelector('.play-icon');
+                const pauseIcon = cutterPlayBtn.querySelector('.pause-icon');
+
+                if (playing) {
+                    cutterPlayBtn.classList.add('playing');
+                    if (playIcon) playIcon.style.display = 'none';
+                    if (pauseIcon) pauseIcon.style.display = 'block';
+                } else {
+                    cutterPlayBtn.classList.remove('playing');
+                    if (playIcon) playIcon.style.display = 'block';
+                    if (pauseIcon) pauseIcon.style.display = 'none';
+                }
+            }
+
+            // Control de volumen
+            if (cutterVolumeSlider) {
+                cutterVolumeSlider.addEventListener('input', function() {
+                    const value = parseInt(this.value);
+                    if (cutterVolumeValue) {
+                        cutterVolumeValue.textContent = value + '%';
+                    }
+                    musicaVolumenInput.value = (value / 100).toFixed(2);
+                });
+            }
+
+            // Actualizar cuando se selecciona nueva música
+            if (selectMusicBtn) {
+                selectMusicBtn.addEventListener('click', function() {
+                    if (selectedTrack) {
+                        currentMusicUrl = selectedTrack.url;
+                        selectionStart = 0;
+                        selectionEnd = 15;
+                        audioTrimInicioInput.value = '0';
+                        musicaVolumenInput.value = '0.7';
+                        if (cutterVolumeSlider) cutterVolumeSlider.value = 70;
+                        if (cutterVolumeValue) cutterVolumeValue.textContent = '70%';
+                        if (cutterFilename) cutterFilename.textContent = selectedTrack.title;
+
+                        // Reiniciar audio cutter
+                        stopPlayback();
+                        initAudioCutter(currentMusicUrl);
+                    }
+                });
+            }
+
+            // Redimensionar canvas en resize
+            window.addEventListener('resize', () => {
+                if (audioBuffer) {
+                    drawWaveform();
+                    updateSelection();
+                }
+            });
         });
 
         // Usar como foto de perfil

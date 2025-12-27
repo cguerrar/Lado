@@ -20,11 +20,10 @@ namespace Lado.Controllers
         private readonly IWebHostEnvironment _environment;
         private readonly IDateTimeService _dateTimeService;
         private readonly IRateLimitService _rateLimitService;
+        private readonly IFileValidationService _fileValidationService;
 
         // Límite de archivo: 10 MB
         private const long MaxFileSize = 10 * 1024 * 1024;
-        private static readonly string[] AllowedImageExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
-        private static readonly string[] AllowedVideoExtensions = { ".mp4", ".mov", ".webm" };
 
         public MensajesController(
             ApplicationDbContext context,
@@ -33,7 +32,8 @@ namespace Lado.Controllers
             IHubContext<ChatHub> hubContext,
             IWebHostEnvironment environment,
             IDateTimeService dateTimeService,
-            IRateLimitService rateLimitService)
+            IRateLimitService rateLimitService,
+            IFileValidationService fileValidationService)
         {
             _context = context;
             _userManager = userManager;
@@ -42,6 +42,7 @@ namespace Lado.Controllers
             _environment = environment;
             _dateTimeService = dateTimeService;
             _rateLimitService = rateLimitService;
+            _fileValidationService = fileValidationService;
         }
 
         // ========================================
@@ -361,14 +362,21 @@ namespace Lado.Controllers
                         return Json(new { success = false, message = "El archivo no puede superar 10 MB" });
                     }
 
-                    var extension = Path.GetExtension(archivo.FileName).ToLowerInvariant();
+                    // ✅ SEGURIDAD: Validar archivo con magic bytes (no solo extensión)
+                    var validacionArchivo = await _fileValidationService.ValidarMediaAsync(archivo);
+                    if (!validacionArchivo.EsValido)
+                    {
+                        _logger.LogWarning("⚠️ Archivo rechazado en Mensaje: {FileName}, Error: {Error}",
+                            archivo.FileName, validacionArchivo.MensajeError);
+                        return Json(new { success = false, message = validacionArchivo.MensajeError ?? "Tipo de archivo no permitido" });
+                    }
 
-                    // Determinar tipo de mensaje
-                    if (AllowedImageExtensions.Contains(extension))
+                    // Determinar tipo de mensaje basado en validación real
+                    if (validacionArchivo.Tipo == TipoArchivoValidacion.Imagen)
                     {
                         mensaje.TipoMensaje = TipoMensaje.Imagen;
                     }
-                    else if (AllowedVideoExtensions.Contains(extension))
+                    else if (validacionArchivo.Tipo == TipoArchivoValidacion.Video)
                     {
                         mensaje.TipoMensaje = TipoMensaje.Video;
                     }
@@ -377,7 +385,8 @@ namespace Lado.Controllers
                         return Json(new { success = false, message = "Tipo de archivo no permitido. Solo imágenes y videos." });
                     }
 
-                    // Guardar archivo
+                    // Guardar archivo con extensión validada
+                    var extension = validacionArchivo.Extension ?? Path.GetExtension(archivo.FileName).ToLowerInvariant();
                     var nombreArchivo = $"{Guid.NewGuid()}{extension}";
                     var carpeta = Path.Combine(_environment.WebRootPath, "uploads", "mensajes", usuario.UserName ?? usuario.Id);
 

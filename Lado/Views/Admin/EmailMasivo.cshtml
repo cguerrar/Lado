@@ -1,0 +1,809 @@
+@{
+    ViewData["Title"] = "Email Masivo";
+    var plantillas = ViewBag.Plantillas as List<Lado.Models.PlantillaEmail> ?? new List<Lado.Models.PlantillaEmail>();
+    var campanas = ViewBag.Campanas as List<Lado.Models.CampanaEmail> ?? new List<Lado.Models.CampanaEmail>();
+    var categorias = ViewBag.PlantillasCategorias as string[] ?? new string[0];
+    var placeholders = ViewBag.Placeholders as Dictionary<string, string> ?? new Dictionary<string, string>();
+}
+
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h2><i class="fas fa-mail-bulk text-secondary"></i> Email Masivo</h2>
+            <p class="text-muted">Envia correos masivos a usuarios de la plataforma</p>
+        </div>
+        <div class="col-md-6 text-end">
+            <a href="@Url.Action("ConfiguracionEmail", "Admin")" class="btn btn-outline-info me-2">
+                <i class="fas fa-cog"></i> Configurar Email
+            </a>
+            <a href="@Url.Action("Index", "Admin")" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </div>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle"></i> @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle"></i> @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Warning"] != null)
+    {
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-triangle"></i> @TempData["Warning"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Estadisticas Rapidas -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3>@ViewBag.TotalEnviados</h3>
+                    <small>Emails Enviados</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm bg-success text-white">
+                <div class="card-body text-center">
+                    <h3>@ViewBag.TotalCampanas</h3>
+                    <small>Campanas</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm bg-info text-white">
+                <div class="card-body text-center">
+                    <h3>@plantillas.Count</h3>
+                    <small>Plantillas</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h3>@campanas.Count(c => c.Estado == Lado.Models.EstadoCampanaEmail.EnProgreso)</h3>
+                    <small>En Progreso</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#tabCampanas">
+                <i class="fas fa-bullhorn"></i> Campanas
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#tabPlantillas">
+                <i class="fas fa-file-alt"></i> Plantillas
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#tabNuevaCampana">
+                <i class="fas fa-plus"></i> Nueva Campana
+            </a>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <!-- Tab Campanas -->
+        <div class="tab-pane fade show active" id="tabCampanas">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-list"></i> Historial de Campanas</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Destinatarios</th>
+                                    <th>Estado</th>
+                                    <th>Progreso</th>
+                                    <th>Fecha</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var campana in campanas)
+                                {
+                                    <tr>
+                                        <td>
+                                            <strong>@campana.Nombre</strong>
+                                            <br><small class="text-muted">@campana.TipoDestinatarioDescripcion</small>
+                                        </td>
+                                        <td>@campana.TotalDestinatarios</td>
+                                        <td>
+                                            <span class="badge @campana.EstadoBadgeClass">
+                                                @campana.Estado
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @if (campana.Estado == Lado.Models.EstadoCampanaEmail.Enviada ||
+                                                campana.Estado == Lado.Models.EstadoCampanaEmail.EnProgreso)
+                                            {
+                                                <div class="progress" style="height: 20px;">
+                                                    <div class="progress-bar bg-success" style="width: @campana.PorcentajeProgreso%">
+                                                        @campana.Enviados/@campana.TotalDestinatarios
+                                                    </div>
+                                                </div>
+                                                @if (campana.Fallidos > 0)
+                                                {
+                                                    <small class="text-danger">@campana.Fallidos fallidos</small>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <small>@campana.FechaCreacion.ToString("dd/MM/yy HH:mm")</small>
+                                        </td>
+                                        <td>
+                                            @if (campana.Estado == Lado.Models.EstadoCampanaEmail.Borrador)
+                                            {
+                                                <form method="post" action="@Url.Action("EnviarCampana")" class="d-inline"
+                                                      onsubmit="return confirm('Enviar esta campana a @campana.TotalDestinatarios usuarios?')">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@campana.Id" />
+                                                    <button type="submit" class="btn btn-sm btn-success" title="Enviar">
+                                                        <i class="fas fa-paper-plane"></i>
+                                                    </button>
+                                                </form>
+                                            }
+                                            @if (campana.Estado == Lado.Models.EstadoCampanaEmail.EnProgreso)
+                                            {
+                                                <form method="post" action="@Url.Action("CancelarCampana")" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@campana.Id" />
+                                                    <button type="submit" class="btn btn-sm btn-warning" title="Cancelar">
+                                                        <i class="fas fa-stop"></i>
+                                                    </button>
+                                                </form>
+                                            }
+                                            <button type="button" class="btn btn-sm btn-outline-info"
+                                                    onclick="verDetalleCampana(@campana.Id)" title="Ver Detalle">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            @if (campana.Estado != Lado.Models.EstadoCampanaEmail.EnProgreso)
+                                            {
+                                                <form method="post" action="@Url.Action("EliminarCampana")" class="d-inline"
+                                                      onsubmit="return confirm('Eliminar esta campana?')">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@campana.Id" />
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                                @if (!campanas.Any())
+                                {
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-4">
+                                            <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                                            No hay campanas creadas
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Plantillas -->
+        <div class="tab-pane fade" id="tabPlantillas">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-file-alt"></i> Plantillas Disponibles</h5>
+                            <div>
+                                <form method="post" action="@Url.Action("RegenerarPlantillasPredeterminadas")" class="d-inline"
+                                      onsubmit="return confirm('Esto eliminara las plantillas predeterminadas actuales y creara nuevas versiones. Continuar?')">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-outline-warning btn-sm me-2" title="Actualiza las plantillas del sistema">
+                                        <i class="fas fa-sync-alt"></i> Regenerar
+                                    </button>
+                                </form>
+                                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalPlantilla">
+                                    <i class="fas fa-plus"></i> Nueva Plantilla
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Nombre</th>
+                                            <th>Categoria</th>
+                                            <th>Asunto</th>
+                                            <th>Creada</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var plantilla in plantillas)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <strong>@plantilla.Nombre</strong>
+                                                    @if (!string.IsNullOrEmpty(plantilla.Descripcion))
+                                                    {
+                                                        <br><small class="text-muted">@plantilla.Descripcion</small>
+                                                    }
+                                                </td>
+                                                <td><span class="badge bg-secondary">@plantilla.Categoria</span></td>
+                                                <td><small>@plantilla.Asunto</small></td>
+                                                <td><small>@plantilla.FechaCreacion.ToString("dd/MM/yy")</small></td>
+                                                <td>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary"
+                                                            onclick="editarPlantilla(@plantilla.Id)" title="Editar">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-outline-info"
+                                                            onclick="previsualizarPlantilla(@plantilla.Id)" title="Vista Previa">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                    <form method="post" action="@Url.Action("EliminarPlantilla")" class="d-inline"
+                                                          onsubmit="return confirm('Eliminar esta plantilla?')">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="id" value="@plantilla.Id" />
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        }
+                                        @if (!plantillas.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="5" class="text-center text-muted py-4">
+                                                    No hay plantillas creadas
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0"><i class="fas fa-code"></i> Placeholders Disponibles</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small">Usa estos placeholders en tus plantillas:</p>
+                            <table class="table table-sm">
+                                @foreach (var ph in placeholders)
+                                {
+                                    <tr>
+                                        <td><code>@ph.Key</code></td>
+                                        <td><small>@ph.Value</small></td>
+                                    </tr>
+                                }
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Nueva Campana -->
+        <div class="tab-pane fade" id="tabNuevaCampana">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-plus-circle"></i> Crear Nueva Campana</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="@Url.Action("CrearCampana")" id="formCampana">
+                        @Html.AntiForgeryToken()
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Nombre de la Campana *</label>
+                                <input type="text" name="nombre" class="form-control" required
+                                       placeholder="Ej: Promocion Navidad 2025">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Usar Plantilla</label>
+                                <select name="plantillaId" class="form-select" id="selectPlantilla">
+                                    <option value="">-- Sin plantilla (personalizado) --</option>
+                                    @foreach (var p in plantillas)
+                                    {
+                                        <option value="@p.Id">@p.Nombre (@p.Categoria)</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Tipo de Destinatarios *</label>
+                                <select name="tipoDestinatario" class="form-select" id="selectTipoDestinatario" required>
+                                    <option value="0">Todos los usuarios</option>
+                                    <option value="1">Solo creadores</option>
+                                    <option value="2">Solo fans</option>
+                                    <option value="3">Usuarios activos (30 dias)</option>
+                                    <option value="4">Lista de emails especificos</option>
+                                </select>
+
+                                <!-- Boton y panel de destinatarios -->
+                                <div class="mt-3">
+                                    <button type="button" class="btn btn-primary w-100 mb-2" onclick="contarDestinatarios()" id="btnContarDestinatarios">
+                                        <i class="fas fa-calculator me-2"></i>Contar Destinatarios
+                                    </button>
+
+                                    <div id="panelDestinatarios" class="p-3 border rounded" style="background:#f8f9fa; display:none;">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-users fa-lg text-primary me-2" id="iconoDestinatarios"></i>
+                                                <div>
+                                                    <div class="fw-bold" id="textoDestinatarios">-</div>
+                                                    <small class="text-muted" id="descripcionDestinatarios">-</small>
+                                                </div>
+                                            </div>
+                                            <span class="badge bg-primary fs-4" id="badgeConteo" style="min-width:60px;">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6" id="divEmailsEspecificos" style="display:none;">
+                                <label class="form-label fw-bold">Emails Especificos</label>
+                                <textarea name="emailsEspecificos" id="textareaEmailsEspecificos" class="form-control" rows="4"
+                                          placeholder="email1@ejemplo.com&#10;email2@ejemplo.com&#10;email3@ejemplo.com"></textarea>
+                                <div class="d-flex justify-content-between align-items-center mt-2">
+                                    <small class="text-muted">Un email por linea o separados por comas</small>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="contarDestinatarios()">
+                                        <i class="fas fa-sync-alt"></i> Actualizar Conteo
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="divContenidoPersonalizado">
+                                <div class="col-12">
+                                    <label class="form-label fw-bold">Asunto del Email *</label>
+                                    <input type="text" name="asunto" class="form-control" id="inputAsunto"
+                                           placeholder="Hola {{nombre}}, tenemos novedades para ti">
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label fw-bold d-flex justify-content-between align-items-center">
+                                        <span>Contenido HTML *</span>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertarPlantillaBase()">
+                                            <i class="fas fa-magic"></i> Insertar Plantilla Base
+                                        </button>
+                                    </label>
+                                    <textarea name="contenidoHtml" class="form-control" id="textareaContenido" rows="12"
+                                              placeholder="<h1>Hola {{nombre}}</h1><p>Tu contenido aqui...</p>"></textarea>
+                                    <small class="text-muted">Puedes usar HTML y los placeholders disponibles: {{nombre}}, {{email}}, {{usuario}}, {{fecha}}</small>
+                                </div>
+
+                                <div class="col-12 mt-2">
+                                    <button type="button" class="btn btn-outline-info" onclick="previewEmail()">
+                                        <i class="fas fa-eye"></i> Vista Previa
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <hr>
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-save"></i> Crear Campana (Borrador)
+                                </button>
+                                <small class="text-muted ms-2">
+                                    La campana se creara como borrador. Podras revisarla antes de enviar.
+                                </small>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Crear/Editar Plantilla -->
+<div class="modal fade" id="modalPlantilla" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="post" id="formPlantilla">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="plantillaId" />
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalPlantillaTitle">Nueva Plantilla</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Nombre *</label>
+                            <input type="text" name="nombre" class="form-control" id="plantillaNombre" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Categoria</label>
+                            <select name="categoria" class="form-select" id="plantillaCategoria">
+                                @foreach (var cat in categorias)
+                                {
+                                    <option value="@cat">@cat</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Descripcion</label>
+                            <input type="text" name="descripcion" class="form-control" id="plantillaDescripcion">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Asunto *</label>
+                            <input type="text" name="asunto" class="form-control" id="plantillaAsunto" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Contenido HTML *</label>
+                            <textarea name="contenidoHtml" class="form-control" id="plantillaContenido" rows="10" required></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Preview -->
+<div class="modal fade" id="modalPreview" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Vista Previa del Email</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <strong>Asunto:</strong> <span id="previewAsunto"></span>
+                </div>
+                <div class="border p-3" id="previewContenido" style="background: #fff;">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detalle Campana -->
+<div class="modal fade" id="modalDetalleCampana" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalle de Campana</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detalleCampanaBody">
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Contador de destinatarios
+    let contadorTimeout = null;
+    const tipoDescripciones = {
+        '0': { nombre: 'Todos los usuarios', desc: 'Usuarios con marketing habilitado', icono: 'fa-users' },
+        '1': { nombre: 'Solo creadores', desc: 'Creadores de contenido', icono: 'fa-star' },
+        '2': { nombre: 'Solo fans', desc: 'Usuarios que no son creadores', icono: 'fa-heart' },
+        '3': { nombre: 'Usuarios activos', desc: 'Activos en los ultimos 30 dias', icono: 'fa-bolt' },
+        '4': { nombre: 'Lista personalizada', desc: 'Emails especificos', icono: 'fa-list' }
+    };
+
+    function actualizarPanelDestinatarios(count, tipo, estado) {
+        const badge = document.getElementById('badgeConteo');
+        const texto = document.getElementById('textoDestinatarios');
+        const descripcion = document.getElementById('descripcionDestinatarios');
+        const icono = document.getElementById('iconoDestinatarios');
+        const panel = document.getElementById('panelDestinatarios');
+        const btn = document.getElementById('btnContarDestinatarios');
+        const info = tipoDescripciones[tipo] || tipoDescripciones['0'];
+
+        icono.className = `fas ${info.icono} fa-lg me-2`;
+
+        if (estado === 'loading') {
+            panel.style.display = 'none';
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Contando...';
+        } else {
+            panel.style.display = 'block';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Actualizar Conteo';
+
+            if (estado === 'success' && count > 0) {
+                badge.textContent = count;
+                badge.className = 'badge bg-success fs-4';
+                texto.innerHTML = `<i class="fas fa-check-circle text-success me-1"></i>${count} destinatarios listos para enviar`;
+                descripcion.textContent = info.nombre + ' - ' + info.desc;
+                panel.style.background = '#d4edda';
+                panel.style.borderColor = '#28a745';
+                icono.className += ' text-success';
+            } else if (estado === 'warning') {
+                badge.textContent = count;
+                badge.className = 'badge bg-warning text-dark fs-4';
+                texto.innerHTML = `<i class="fas fa-exclamation-circle text-warning me-1"></i>${count} emails ingresados`;
+                descripcion.textContent = 'Ingrese emails en el campo de abajo';
+                panel.style.background = '#fff3cd';
+                panel.style.borderColor = '#ffc107';
+                icono.className += ' text-warning';
+            } else {
+                badge.textContent = '0';
+                badge.className = 'badge bg-danger fs-4';
+                texto.innerHTML = `<i class="fas fa-times-circle text-danger me-1"></i>Sin destinatarios`;
+                descripcion.textContent = tipo === '4' ? 'Ingrese emails en el campo de abajo' : 'No hay usuarios que coincidan';
+                panel.style.background = '#f8d7da';
+                panel.style.borderColor = '#dc3545';
+                icono.className += ' text-danger';
+            }
+        }
+    }
+
+    async function contarDestinatarios() {
+        const tipo = document.getElementById('selectTipoDestinatario').value;
+        const emailsTextarea = document.getElementById('textareaEmailsEspecificos');
+        const emails = emailsTextarea?.value || '';
+
+        actualizarPanelDestinatarios(0, tipo, 'loading');
+
+        // Si es tipo EmailsEspecificos (4), contar localmente primero
+        if (tipo === '4') {
+            const emailList = emails
+                .split(/[,\n\r;]+/)
+                .map(e => e.trim())
+                .filter(e => e.includes('@@') && e.length > 3);
+
+            if (emailList.length === 0) {
+                actualizarPanelDestinatarios(0, tipo, 'warning');
+                return;
+            }
+
+            // Mostrar conteo local
+            actualizarPanelDestinatarios(emailList.length, tipo, 'success');
+        } else {
+            try {
+                const response = await fetch(`/Admin/ContarDestinatarios?tipo=${tipo}&emails=${encodeURIComponent(emails)}`);
+                const data = await response.json();
+                actualizarPanelDestinatarios(data.count, tipo, data.count > 0 ? 'success' : 'error');
+            } catch (e) {
+                actualizarPanelDestinatarios(0, tipo, 'error');
+            }
+        }
+    }
+
+    // Cambio de tipo destinatario - ocultar panel y mostrar/ocultar campo de emails
+    document.getElementById('selectTipoDestinatario').addEventListener('change', function() {
+        const divEmails = document.getElementById('divEmailsEspecificos');
+        const panel = document.getElementById('panelDestinatarios');
+        const btn = document.getElementById('btnContarDestinatarios');
+
+        divEmails.style.display = this.value === '4' ? 'block' : 'none';
+        panel.style.display = 'none';
+        btn.innerHTML = '<i class="fas fa-calculator me-2"></i>Contar Destinatarios';
+    });
+
+    // Cambio de plantilla
+    document.getElementById('selectPlantilla').addEventListener('change', async function() {
+        const plantillaId = this.value;
+        const divContenido = document.getElementById('divContenidoPersonalizado');
+
+        if (plantillaId) {
+            divContenido.style.display = 'none';
+            document.getElementById('inputAsunto').removeAttribute('required');
+            document.getElementById('textareaContenido').removeAttribute('required');
+        } else {
+            divContenido.style.display = 'block';
+            document.getElementById('inputAsunto').setAttribute('required', 'required');
+            document.getElementById('textareaContenido').setAttribute('required', 'required');
+        }
+    });
+
+    // Editar plantilla
+    async function editarPlantilla(id) {
+        try {
+            const response = await fetch(`/Admin/ObtenerPlantilla?id=${id}`);
+            const data = await response.json();
+
+            document.getElementById('plantillaId').value = data.id;
+            document.getElementById('plantillaNombre').value = data.nombre;
+            document.getElementById('plantillaDescripcion').value = data.descripcion || '';
+            document.getElementById('plantillaAsunto').value = data.asunto;
+            document.getElementById('plantillaContenido').value = data.contenidoHtml;
+            document.getElementById('plantillaCategoria').value = data.categoria;
+
+            document.getElementById('modalPlantillaTitle').textContent = 'Editar Plantilla';
+            document.getElementById('formPlantilla').action = '/Admin/EditarPlantilla';
+
+            new bootstrap.Modal(document.getElementById('modalPlantilla')).show();
+        } catch (e) {
+            alert('Error al cargar plantilla');
+        }
+    }
+
+    // Nueva plantilla
+    document.getElementById('modalPlantilla').addEventListener('show.bs.modal', function(e) {
+        if (!e.relatedTarget) return; // Solo si es click del boton
+        document.getElementById('formPlantilla').reset();
+        document.getElementById('plantillaId').value = '';
+        document.getElementById('modalPlantillaTitle').textContent = 'Nueva Plantilla';
+        document.getElementById('formPlantilla').action = '/Admin/CrearPlantilla';
+    });
+
+    // Preview plantilla
+    async function previsualizarPlantilla(id) {
+        try {
+            const response = await fetch(`/Admin/ObtenerPlantilla?id=${id}`);
+            const data = await response.json();
+            mostrarPreview(data.asunto, data.contenidoHtml);
+        } catch (e) {
+            alert('Error al cargar preview');
+        }
+    }
+
+    // Preview email - reemplaza placeholders localmente
+    function previewEmail() {
+        const asunto = document.getElementById('inputAsunto').value || '';
+        const contenido = document.getElementById('textareaContenido').value || '';
+
+        if (!asunto && !contenido) {
+            alert('Ingresa asunto y contenido para ver la vista previa');
+            return;
+        }
+
+        // Reemplazar placeholders con datos de ejemplo
+        const reemplazos = {
+            '{{nombre}}': 'Usuario Demo',
+            '{{email}}': 'demo@ejemplo.com',
+            '{{usuario}}': '@@usuario_demo',
+            '{{fecha}}': new Date().toLocaleDateString('es-ES'),
+            '{{año}}': new Date().getFullYear().toString()
+        };
+
+        let asuntoPreview = asunto;
+        let contenidoPreview = contenido;
+
+        for (const [placeholder, valor] of Object.entries(reemplazos)) {
+            asuntoPreview = asuntoPreview.split(placeholder).join(valor);
+            contenidoPreview = contenidoPreview.split(placeholder).join(valor);
+        }
+
+        mostrarPreview(asuntoPreview, contenidoPreview);
+    }
+
+    function mostrarPreview(asunto, contenido) {
+        document.getElementById('previewAsunto').textContent = asunto;
+        document.getElementById('previewContenido').innerHTML = contenido;
+        new bootstrap.Modal(document.getElementById('modalPreview')).show();
+    }
+
+    // Insertar plantilla base con estilos de Lado
+    function insertarPlantillaBase() {
+        const plantillaBase = `<!DOCTYPE html>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'></head>
+<body style='margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,sans-serif;'>
+<div style='max-width:600px;margin:0 auto;padding:40px 20px;'>
+<div style='background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);'>
+
+<!-- Header con gradiente -->
+<div style='background:linear-gradient(135deg,#4682B4 0%,#36648B 100%);padding:30px;text-align:center;'>
+<h1 style='color:#ffffff;margin:0;font-size:28px;'>Lado</h1>
+<p style='color:#B0C4DE;margin:10px 0 0 0;font-size:14px;'>Tu subtitulo aqui</p>
+</div>
+
+<!-- Contenido principal -->
+<div style='padding:40px 30px;'>
+<h2 style='color:#333;margin:0 0 20px 0;font-size:22px;'>Hola {{nombre}},</h2>
+
+<p style='color:#666;font-size:16px;line-height:1.8;margin:0 0 20px 0;'>
+Tu mensaje principal aqui. Puedes escribir varios parrafos.
+</p>
+
+<!-- Caja destacada (opcional) -->
+<div style='background:#f8f9fa;border-left:4px solid #4682B4;padding:20px;margin:25px 0;border-radius:0 8px 8px 0;'>
+<p style='color:#666;margin:0;font-size:15px;line-height:1.6;'>
+Contenido destacado o informacion importante.
+</p>
+</div>
+
+<p style='color:#666;font-size:16px;line-height:1.8;margin:20px 0;'>
+Mas texto si es necesario.
+</p>
+
+<!-- Boton CTA -->
+<div style='text-align:center;margin:30px 0;'>
+<a href='https://ladoapp.com' style='display:inline-block;background:#4682B4;color:#ffffff;padding:16px 40px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px;'>Ir a Lado</a>
+</div>
+</div>
+
+<!-- Footer -->
+<div style='background:#f8f9fa;padding:20px 30px;text-align:center;border-top:1px solid #eee;'>
+<p style='color:#999;font-size:12px;margin:0;'>&copy; ${new Date().getFullYear()} Lado. Todos los derechos reservados.</p>
+<p style='margin:10px 0 0 0;'><a href='https://ladoapp.com' style='color:#4682B4;text-decoration:none;font-size:12px;'>www.ladoapp.com</a></p>
+</div>
+
+</div>
+</div>
+</body>
+</html>`;
+
+        document.getElementById('textareaContenido').value = plantillaBase;
+        document.getElementById('inputAsunto').value = 'Hola {{nombre}}, tenemos novedades para ti';
+    }
+
+    // Ver detalle campana
+    async function verDetalleCampana(id) {
+        try {
+            const response = await fetch(`/Admin/ObtenerCampana?id=${id}`);
+            const c = await response.json();
+
+            let erroresHtml = '';
+            if (c.detalleErrores) {
+                try {
+                    const errores = JSON.parse(c.detalleErrores);
+                    erroresHtml = `<div class="mt-3"><h6>Errores:</h6><ul class="list-group">
+                        ${errores.map(e => `<li class="list-group-item list-group-item-danger small">${e}</li>`).join('')}
+                    </ul></div>`;
+                } catch(e) {}
+            }
+
+            document.getElementById('detalleCampanaBody').innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Nombre:</strong> ${c.nombre}</p>
+                        <p><strong>Asunto:</strong> ${c.asunto}</p>
+                        <p><strong>Destinatarios:</strong> ${c.tipoDestinatarioNombre}</p>
+                        <p><strong>Estado:</strong> <span class="badge bg-${c.estado === 3 ? 'success' : 'secondary'}">${c.estadoNombre}</span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Total:</strong> ${c.totalDestinatarios}</p>
+                        <p><strong>Enviados:</strong> ${c.enviados}</p>
+                        <p><strong>Fallidos:</strong> ${c.fallidos}</p>
+                        <p><strong>Tasa de exito:</strong> ${c.tasaExito}%</p>
+                    </div>
+                </div>
+                <hr>
+                <h6>Contenido:</h6>
+                <div class="border p-2" style="max-height: 300px; overflow-y: auto;">
+                    ${c.contenidoHtml}
+                </div>
+                ${erroresHtml}
+            `;
+
+            new bootstrap.Modal(document.getElementById('modalDetalleCampana')).show();
+        } catch (e) {
+            alert('Error al cargar detalle');
+        }
+    }
+
+</script>
+}

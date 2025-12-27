@@ -263,6 +263,11 @@ namespace Lado.Controllers
                 {
                     _logger.LogInformation("✅ Login exitoso para: {Username}", user.UserName);
 
+                    // ✅ Actualizar contador de ingresos y ultima actividad
+                    user.ContadorIngresos++;
+                    user.UltimaActividad = DateTime.Now;
+                    await _userManager.UpdateAsync(user);
+
                     // ✅ Verificar si es Admin
                     var roles = await _userManager.GetRolesAsync(user);
                     _logger.LogInformation("Roles del usuario: {Roles}", string.Join(", ", roles));
@@ -691,6 +696,11 @@ namespace Lado.Controllers
                     var user = await _userManager.FindByLoginAsync(info.LoginProvider, info.ProviderKey);
                     if (user != null)
                     {
+                        // Actualizar contador de ingresos y ultima actividad
+                        user.ContadorIngresos++;
+                        user.UltimaActividad = DateTime.Now;
+                        await _userManager.UpdateAsync(user);
+
                         var roles = await _userManager.GetRolesAsync(user);
                         if (roles.Contains("Admin"))
                         {

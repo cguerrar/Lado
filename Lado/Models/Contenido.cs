@@ -203,6 +203,16 @@ namespace Lado.Models
         public ICollection<CompraContenido> Compras { get; set; } = new List<CompraContenido>();
 
         // ========================================
+        // OBJETOS DETECTADOS (para busqueda visual)
+        // ========================================
+
+        /// <summary>
+        /// Objetos detectados automaticamente en el contenido visual.
+        /// Permite busquedas tipo "mostrar contenido con motos".
+        /// </summary>
+        public ICollection<ObjetoContenido> ObjetosDetectados { get; set; } = new List<ObjetoContenido>();
+
+        // ========================================
         // MÚLTIPLES ARCHIVOS (CARRUSEL)
         // ========================================
 

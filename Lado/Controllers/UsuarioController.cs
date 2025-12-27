@@ -15,19 +15,25 @@ namespace Lado.Controllers
         private readonly ApplicationDbContext _context;
         private readonly IWebHostEnvironment _environment;
         private readonly Services.IInteresesService _interesesService;
+        private readonly Services.IFileValidationService _fileValidationService;
+        private readonly ILogger<UsuarioController> _logger;
 
         public UsuarioController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             ApplicationDbContext context,
             IWebHostEnvironment environment,
-            Services.IInteresesService interesesService)
+            Services.IInteresesService interesesService,
+            Services.IFileValidationService fileValidationService,
+            ILogger<UsuarioController> logger)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _context = context;
             _environment = environment;
             _interesesService = interesesService;
+            _fileValidationService = fileValidationService;
+            _logger = logger;
         }
 
         // GET: /Usuario/Perfil
@@ -95,25 +101,33 @@ namespace Lado.Controllers
             // Actualizar seudónimo
             usuario.Seudonimo = model.Seudonimo;
 
-            // Procesar foto de perfil LadoA (público)
-            if (fotoPerfil != null && fotoPerfil.Length > 0)
+            try
             {
-                var fileName = await GuardarArchivo(fotoPerfil, "perfiles");
-                usuario.FotoPerfil = fileName;
-            }
+                // Procesar foto de perfil LadoA (público)
+                if (fotoPerfil != null && fotoPerfil.Length > 0)
+                {
+                    var fileName = await GuardarArchivo(fotoPerfil, "perfiles");
+                    if (fileName != null) usuario.FotoPerfil = fileName;
+                }
 
-            // Procesar foto de perfil LadoB (premium)
-            if (fotoPerfilLadoB != null && fotoPerfilLadoB.Length > 0)
-            {
-                var fileName = await GuardarArchivo(fotoPerfilLadoB, "perfiles-ladob");
-                usuario.FotoPerfilLadoB = fileName;
-            }
+                // Procesar foto de perfil LadoB (premium)
+                if (fotoPerfilLadoB != null && fotoPerfilLadoB.Length > 0)
+                {
+                    var fileName = await GuardarArchivo(fotoPerfilLadoB, "perfiles-ladob");
+                    if (fileName != null) usuario.FotoPerfilLadoB = fileName;
+                }
 
-            // Procesar foto de portada (opcional, solo creadores)
-            if (fotoPortada != null && fotoPortada.Length > 0 && usuario.TipoUsuario == 1)
+                // Procesar foto de portada (opcional, solo creadores)
+                if (fotoPortada != null && fotoPortada.Length > 0 && usuario.TipoUsuario == 1)
+                {
+                    var fileName = await GuardarArchivo(fotoPortada, "portadas");
+                    if (fileName != null) usuario.FotoPortada = fileName;
+                }
+            }
+            catch (InvalidOperationException ex)
             {
-                var fileName = await GuardarArchivo(fotoPortada, "portadas");
-                usuario.FotoPortada = fileName;
+                TempData["Error"] = ex.Message;
+                return View(model);
             }
 
             var result = await _userManager.UpdateAsync(usuario);
@@ -714,6 +728,72 @@ namespace Lado.Controllers
             });
         }
 
+        // POST: /Usuario/CambiarBloqueoLadoB
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CambiarBloqueoLadoB([FromBody] CambiarBloqueoLadoBRequest request)
+        {
+            if (request == null)
+            {
+                return Json(new { success = false, message = "Datos inválidos" });
+            }
+
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            usuario.BloquearLadoB = request.Bloquear;
+            var result = await _userManager.UpdateAsync(usuario);
+
+            if (!result.Succeeded)
+            {
+                var errores = string.Join(", ", result.Errors.Select(e => e.Description));
+                return Json(new { success = false, message = $"Error al guardar: {errores}" });
+            }
+
+            return Json(new {
+                success = true,
+                message = request.Bloquear
+                    ? "Contenido LadoB bloqueado. No verás contenido para adultos."
+                    : "Contenido LadoB desbloqueado."
+            });
+        }
+
+        // POST: /Usuario/CambiarOcultarFeedPublico
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CambiarOcultarFeedPublico([FromBody] CambiarOcultarFeedPublicoRequest request)
+        {
+            if (request == null)
+            {
+                return Json(new { success = false, message = "Datos inválidos" });
+            }
+
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            usuario.OcultarDeFeedPublico = request.Ocultar;
+            var result = await _userManager.UpdateAsync(usuario);
+
+            if (!result.Succeeded)
+            {
+                var errores = string.Join(", ", result.Errors.Select(e => e.Description));
+                return Json(new { success = false, message = $"Error al guardar: {errores}" });
+            }
+
+            return Json(new {
+                success = true,
+                message = request.Ocultar
+                    ? "Tu contenido ya no aparecerá en el Feed Público."
+                    : "Tu contenido ahora será visible en el Feed Público."
+            });
+        }
+
         // POST: /Usuario/CambiarPromocionLadoB
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -1052,16 +1132,27 @@ namespace Lado.Controllers
             }
         }
 
-        // Método auxiliar para guardar archivos
-        private async Task<string> GuardarArchivo(IFormFile archivo, string carpeta)
+        // Método auxiliar para guardar archivos con validación de magic bytes
+        private async Task<string?> GuardarArchivo(IFormFile archivo, string carpeta)
         {
             if (archivo == null || archivo.Length == 0)
                 return null;
 
+            // ✅ SEGURIDAD: Validar archivo con magic bytes (no solo extensión)
+            var validacionArchivo = await _fileValidationService.ValidarImagenAsync(archivo);
+            if (!validacionArchivo.EsValido)
+            {
+                _logger.LogWarning("⚠️ Archivo de perfil rechazado: {FileName}, Error: {Error}",
+                    archivo.FileName, validacionArchivo.MensajeError);
+                throw new InvalidOperationException(validacionArchivo.MensajeError ?? "Tipo de archivo no válido");
+            }
+
             var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", carpeta);
             Directory.CreateDirectory(uploadsFolder);
 
-            var uniqueFileName = Guid.NewGuid().ToString() + "_" + archivo.FileName;
+            // Usar extensión validada
+            var extension = validacionArchivo.Extension ?? Path.GetExtension(archivo.FileName).ToLowerInvariant();
+            var uniqueFileName = $"{Guid.NewGuid()}{extension}";
             var filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
             using (var fileStream = new FileStream(filePath, FileMode.Create))
@@ -1665,6 +1756,18 @@ namespace Lado.Controllers
     {
         [System.Text.Json.Serialization.JsonPropertyName("ladoPreferido")]
         public int LadoPreferido { get; set; } = 0;
+    }
+
+    public class CambiarBloqueoLadoBRequest
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("bloquear")]
+        public bool Bloquear { get; set; } = false;
+    }
+
+    public class CambiarOcultarFeedPublicoRequest
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("ocultar")]
+        public bool Ocultar { get; set; } = false;
     }
 
     public class CambiarPromocionLadoBRequest

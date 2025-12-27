@@ -10,8 +10,12 @@
     var creadoresSugeridos = ViewBag.CreadoresSugeridos as List<ApplicationUser> ?? new List<ApplicationUser>();
     var contenidoBloqueadoIds = ViewBag.ContenidoBloqueadoIds as List<int> ?? new List<int>();
     var anuncios = ViewBag.Anuncios as List<Lado.Models.Anuncio> ?? new List<Lado.Models.Anuncio>();
+    var anunciosIntervalo = ViewBag.AnunciosIntervalo as int? ?? 8;
     var algoritmoActual = ViewBag.AlgoritmoActual as AlgoritmoFeed;
     var algoritmosDisponibles = ViewBag.AlgoritmosDisponibles as List<AlgoritmoFeed> ?? new List<AlgoritmoFeed>();
+
+    // Función para limpiar comillas de rutas (datos legacy)
+    string LimpiarRuta(string ruta) => string.IsNullOrEmpty(ruta) ? "" : ruta.Trim('"');
 }
 
 @Html.AntiForgeryToken()
@@ -116,6 +120,26 @@
         padding: 8px;
         background: var(--surface);
         color: var(--fg);
+    }
+
+    /* ========================================
+       PLACEHOLDER PARA MEDIOS CON ERROR
+       ======================================== */
+    .media-error-placeholder {
+        width: 100%;
+        height: 100%;
+        min-height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        border-radius: 8px;
+    }
+
+    .media-error-placeholder svg {
+        width: 64px;
+        height: 64px;
+        opacity: 0.5;
     }
 
     /* ========================================
@@ -281,13 +305,48 @@
         color: white;
     }
 
+    .badge-reel {
+        background: linear-gradient(135deg, #f093fb, #f5576c);
+        color: white;
+    }
+
+    .badge-musica {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        padding: 0;
+        margin-left: 4px;
+    }
+
+    .badge-musica img {
+        width: 18px;
+        height: 18px;
+        object-fit: contain;
+    }
+
     .verified-icon {
-        width: 16px;
-        height: 16px;
+        width: 18px;
+        height: 18px;
         margin-left: 4px;
         vertical-align: middle;
         flex-shrink: 0;
         display: inline-block;
+        object-fit: contain;
+    }
+
+    /* Mejor definición para los badges */
+    .post-username {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+
+    .post-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .post-menu {
@@ -787,6 +846,57 @@
         to { transform: rotate(360deg); }
     }
 
+    /* Video error - mostrar icono de reintento */
+    .video-error::before {
+        content: '\f01e'; /* fa-refresh */
+        font-family: 'Font Awesome 6 Free', 'Font Awesome 5 Free', FontAwesome;
+        font-weight: 900;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 32px;
+        color: rgba(255, 255, 255, 0.7);
+        z-index: 20;
+        cursor: pointer;
+    }
+
+    .video-error::after {
+        content: 'Toca para reintentar';
+        position: absolute;
+        top: calc(50% + 30px);
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+        z-index: 20;
+        white-space: nowrap;
+    }
+
+    /* iOS: Indicador visual de que requiere tap para reproducir */
+    .post-media.needs-tap::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80px;
+        height: 80px;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 50%;
+        z-index: 15;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='white' viewBox='0 0 24 24'%3E%3Cpath d='M8 5v14l11-7z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 40px;
+        animation: tapPulse 2s infinite;
+    }
+
+    @@keyframes tapPulse {
+        0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.9; }
+        50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+    }
+
     /* MOVIL/iOS: Ocultar icono completamente - solo tap para play/pause */
     @@media (hover: none) and (pointer: coarse) {
         .video-play-icon {
@@ -820,23 +930,152 @@
         height: 20px;
     }
 
+    /* Botón mute para música de foto */
+    .photo-music-mute-btn {
+        position: absolute;
+        bottom: 16px;
+        right: 16px;
+        width: 36px;
+        height: 36px;
+        background: rgba(0, 0, 0, 0.6);
+        border: none;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.2s ease;
+        z-index: 10;
+    }
+
+    .photo-music-mute-btn:hover {
+        background: rgba(0, 0, 0, 0.8);
+    }
+
+    .photo-music-mute-btn svg {
+        width: 20px;
+        height: 20px;
+    }
+
     .feed-video {
         object-fit: contain;
         max-height: 600px;
     }
 
     .post-media-audio {
-        padding: 48px 24px;
+        padding: 32px 24px;
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 16px;
         background: linear-gradient(135deg, var(--primary-light) 0%, var(--surface) 100%);
+        position: relative;
+        min-height: 180px;
     }
 
-    .post-media-audio audio {
-        width: 100%;
-        max-width: 400px;
+    .post-media-audio .audio-visual {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .post-media-audio .audio-icon {
+        width: 48px;
+        height: 48px;
+    }
+
+    .post-media-audio .audio-waves {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        height: 24px;
+    }
+
+    .post-media-audio .audio-waves span {
+        width: 4px;
+        height: 8px;
+        background: var(--primary);
+        border-radius: 2px;
+        opacity: 0.4;
+    }
+
+    .post-media-audio.playing .audio-waves span {
+        animation: audioWave 0.8s ease-in-out infinite;
+        opacity: 1;
+    }
+
+    .post-media-audio.playing .audio-waves span:nth-child(1) { animation-delay: 0s; }
+    .post-media-audio.playing .audio-waves span:nth-child(2) { animation-delay: 0.1s; }
+    .post-media-audio.playing .audio-waves span:nth-child(3) { animation-delay: 0.2s; }
+    .post-media-audio.playing .audio-waves span:nth-child(4) { animation-delay: 0.3s; }
+    .post-media-audio.playing .audio-waves span:nth-child(5) { animation-delay: 0.4s; }
+
+    @@keyframes audioWave {
+        0%, 100% { height: 8px; }
+        50% { height: 24px; }
+    }
+
+    .post-media-audio .post-audio-player {
+        display: none;
+    }
+
+    .post-media-audio .audio-controls-overlay {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .post-media-audio .audio-play-btn,
+    .post-media-audio .audio-mute-btn {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+
+    .post-media-audio .audio-play-btn {
+        background: var(--primary);
+    }
+
+    .post-media-audio .audio-play-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.4);
+    }
+
+    .post-media-audio .audio-mute-btn {
+        background: rgba(255,255,255,0.2);
+    }
+
+    .post-media-audio .audio-mute-btn:hover {
+        background: rgba(255,255,255,0.3);
+    }
+
+    .post-media-audio .audio-play-btn svg,
+    .post-media-audio .audio-mute-btn svg {
+        width: 24px;
+        height: 24px;
+    }
+
+    .post-media-audio .audio-progress {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: rgba(255,255,255,0.2);
+    }
+
+    .post-media-audio .audio-progress-bar {
+        height: 100%;
+        width: 0%;
+        background: var(--primary);
+        transition: width 0.1s linear;
     }
 
     .post-text-content {
@@ -3930,6 +4169,642 @@
         }
     }
 
+    /* ========================================
+       TOOLTIP DE LIKES (Desktop hover)
+       ======================================== */
+    .likes-tooltip {
+        position: absolute;
+        z-index: 1000;
+        background: var(--surface, #fff);
+        border: 1px solid var(--line, #dbdbdb);
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        padding: 12px;
+        min-width: 200px;
+        max-width: 280px;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(10px);
+        transition: all 0.2s ease;
+        pointer-events: none;
+    }
+
+    .likes-tooltip.visible {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .likes-tooltip-header {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted, #8e8e8e);
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--line, #efefef);
+    }
+
+    .likes-tooltip-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .likes-tooltip-user {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+        color: var(--fg, #262626);
+        padding: 4px;
+        border-radius: 8px;
+        transition: background 0.15s;
+    }
+
+    .likes-tooltip-user:hover {
+        background: var(--bg-tertiary, #fafafa);
+    }
+
+    .likes-tooltip-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: var(--bg-tertiary, #fafafa);
+    }
+
+    .likes-tooltip-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .likes-tooltip-username {
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .likes-tooltip-username .verified {
+        color: var(--primary, #4682B4);
+        font-size: 12px;
+    }
+
+    .likes-tooltip-name {
+        font-size: 12px;
+        color: var(--muted, #8e8e8e);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .likes-tooltip-more {
+        font-size: 12px;
+        color: var(--primary, #4682B4);
+        text-align: center;
+        padding-top: 8px;
+        border-top: 1px solid var(--line, #efefef);
+        margin-top: 8px;
+        cursor: pointer;
+    }
+
+    .likes-tooltip-loading {
+        display: flex;
+        justify-content: center;
+        padding: 20px;
+        color: var(--muted, #8e8e8e);
+    }
+
+    /* ========================================
+       MODAL DE LIKES (Móvil - long press)
+       ======================================== */
+    .likes-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 9999;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .likes-modal-overlay.visible {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .likes-modal {
+        background: var(--surface, #fff);
+        border-radius: 16px 16px 0 0;
+        width: 100%;
+        max-width: 500px;
+        max-height: 70vh;
+        transform: translateY(100%);
+        transition: transform 0.3s ease;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .likes-modal-overlay.visible .likes-modal {
+        transform: translateY(0);
+    }
+
+    .likes-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--line, #efefef);
+    }
+
+    .likes-modal-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--fg, #262626);
+    }
+
+    .likes-modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: var(--muted, #8e8e8e);
+        cursor: pointer;
+        padding: 4px;
+        line-height: 1;
+    }
+
+    .likes-modal-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px 20px 20px;
+    }
+
+    .likes-modal-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .likes-modal-user {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+        color: var(--fg, #262626);
+        padding: 8px;
+        border-radius: 12px;
+        transition: background 0.15s;
+    }
+
+    .likes-modal-user:hover {
+        background: var(--bg-tertiary, #fafafa);
+    }
+
+    .likes-modal-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: var(--bg-tertiary, #fafafa);
+    }
+
+    .likes-modal-info {
+        flex: 1;
+    }
+
+    .likes-modal-username {
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .likes-modal-username .verified {
+        color: var(--primary, #4682B4);
+        font-size: 14px;
+    }
+
+    .likes-modal-name {
+        font-size: 13px;
+        color: var(--muted, #8e8e8e);
+    }
+
+    .likes-modal-empty {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--muted, #8e8e8e);
+    }
+
+    .likes-modal-empty i {
+        font-size: 48px;
+        margin-bottom: 12px;
+        opacity: 0.5;
+    }
+
+    @@media (prefers-color-scheme: dark) {
+        .likes-tooltip,
+        .likes-modal {
+            background: var(--surface, #262626);
+            border-color: var(--line, #363636);
+        }
+    }
+
+    /* ========================================
+       SIMPLIFICACIÓN MÓVIL - DISEÑO LIMPIO
+       ======================================== */
+
+    /* Móvil Grande (< 768px) */
+    @@media (max-width: 767px) {
+        /* Layout edge-to-edge */
+        .feed-page-layout {
+            padding: 0 !important;
+            gap: 0 !important;
+        }
+
+        .feed-container {
+            max-width: 100%;
+        }
+
+        /* Ocultar selector de algoritmo en móvil - usar desplegable simple */
+        .algorithm-selector {
+            border-radius: 0;
+            border-left: none;
+            border-right: none;
+            margin-bottom: 0;
+            padding: 10px 16px;
+            border-bottom: none;
+        }
+
+        .algorithm-label {
+            font-size: 12px;
+        }
+
+        .algorithm-select {
+            padding: 6px 28px 6px 10px;
+            font-size: 12px;
+            min-width: 130px;
+            border-radius: 16px;
+        }
+
+        /* Stories más compactos */
+        .stories-bar {
+            border-radius: 0;
+            border-left: none;
+            border-right: none;
+            padding: 12px;
+            margin-bottom: 0;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .stories-scroll {
+            gap: 12px;
+        }
+
+        .story-ring {
+            width: 56px;
+            height: 56px;
+        }
+
+        .story-username {
+            font-size: 11px;
+            max-width: 56px;
+        }
+
+        /* Posts sin bordes laterales */
+        .post {
+            border-radius: 0;
+            border-left: none;
+            border-right: none;
+            margin-bottom: 0;
+            border-bottom: 8px solid var(--bg);
+        }
+
+        /* Header del post más compacto */
+        .post-header {
+            padding: 10px 12px;
+        }
+
+        .post-avatar,
+        .post-avatar-placeholder {
+            width: 36px !important;
+            height: 36px !important;
+        }
+
+        .post-username {
+            font-size: 13px;
+        }
+
+        .post-time {
+            font-size: 11px;
+        }
+
+        .post-badge {
+            font-size: 9px;
+            padding: 1px 5px;
+        }
+
+        /* Acciones con mejor touch target */
+        .post-actions {
+            padding: 8px 12px 0;
+            gap: 20px;
+        }
+
+        .action-btn {
+            padding: 12px;
+            margin: -12px;
+            min-width: 48px;
+            min-height: 48px;
+        }
+
+        .action-btn svg {
+            width: 26px;
+            height: 26px;
+        }
+
+        /* Ocultar botón de comentarios en móvil - tap en el post abre detalle */
+        .comment-btn {
+            display: none !important;
+        }
+
+        /* Likes y caption más compactos */
+        .post-likes {
+            padding: 0 12px;
+            margin-top: 6px;
+        }
+
+        .post-likes-count {
+            font-size: 13px;
+        }
+
+        .post-caption {
+            padding: 6px 12px;
+        }
+
+        .post-caption-text {
+            font-size: 13px;
+            line-height: 1.35;
+        }
+
+        /* Comentarios más compactos */
+        .post-comments-preview {
+            padding: 0 12px 6px;
+        }
+
+        .view-all-comments {
+            font-size: 13px;
+        }
+
+        /* Input de comentario optimizado para móvil */
+        .post-add-comment {
+            padding: 8px 12px;
+            gap: 10px;
+        }
+
+        .comment-input {
+            font-size: 14px;
+            padding: 10px 0;
+        }
+
+        .comment-post-btn {
+            font-size: 13px;
+            padding: 8px 12px;
+        }
+
+        /* Timestamp más discreto */
+        .post-timestamp {
+            padding: 4px 12px 12px;
+            font-size: 10px;
+        }
+
+        /* Menú de post más accesible */
+        .post-menu {
+            padding: 12px;
+            margin: -8px;
+        }
+
+        .post-menu-dropdown {
+            min-width: 180px;
+        }
+
+        .post-menu-item {
+            padding: 14px 16px;
+            font-size: 15px;
+        }
+
+        /* Pull to refresh ajustado */
+        .pull-to-refresh {
+            top: 56px;
+        }
+
+        /* Carrusel optimizado */
+        .carousel-btn {
+            width: 36px;
+            height: 36px;
+        }
+
+        /* Location badge más pequeño */
+        .location-badge {
+            padding: 3px 8px;
+            font-size: 11px;
+        }
+    }
+
+    /* Móvil Pequeño (< 480px) */
+    @@media (max-width: 479px) {
+        /* Stories aún más compactos */
+        .story-ring {
+            width: 52px;
+            height: 52px;
+        }
+
+        .story-username {
+            font-size: 10px;
+            max-width: 52px;
+        }
+
+        .stories-scroll {
+            gap: 10px;
+        }
+
+        /* Header del post ultra compacto */
+        .post-header {
+            padding: 8px 10px;
+        }
+
+        .post-avatar,
+        .post-avatar-placeholder {
+            width: 32px !important;
+            height: 32px !important;
+        }
+
+        .post-header-left {
+            gap: 10px;
+        }
+
+        .post-username {
+            font-size: 12px;
+        }
+
+        .post-time {
+            font-size: 10px;
+        }
+
+        /* Acciones aún más grandes para dedos */
+        .post-actions {
+            padding: 6px 10px 0;
+            gap: 24px;
+        }
+
+        .action-btn svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        /* Contenido más compacto */
+        .post-likes {
+            padding: 0 10px;
+        }
+
+        .post-caption {
+            padding: 4px 10px;
+        }
+
+        .post-comments-preview {
+            padding: 0 10px 4px;
+        }
+
+        .post-add-comment {
+            padding: 6px 10px;
+        }
+
+        .post-timestamp {
+            padding: 2px 10px 10px;
+        }
+
+        /* Ocultar label del algoritmo en pantallas muy pequeñas */
+        .algorithm-label span {
+            display: none;
+        }
+
+        .algorithm-select {
+            min-width: 110px;
+        }
+
+        /* Preview blur más compacto */
+        .preview-blur-text {
+            font-size: 13px;
+        }
+
+        .preview-blur-subtext {
+            font-size: 11px;
+        }
+
+        .preview-blur-btn {
+            padding: 8px 20px;
+            font-size: 12px;
+        }
+
+        /* Locked content más compacto */
+        .locked-icon {
+            width: 52px;
+            height: 52px;
+        }
+
+        .locked-icon svg {
+            width: 26px;
+            height: 26px;
+        }
+
+        .locked-text {
+            font-size: 14px;
+        }
+
+        .locked-subscribe-btn {
+            padding: 10px 24px;
+            font-size: 13px;
+        }
+    }
+
+    /* Pantallas muy pequeñas (< 360px) - iPhone SE, etc */
+    @@media (max-width: 359px) {
+        .story-ring {
+            width: 48px;
+            height: 48px;
+        }
+
+        .story-username {
+            max-width: 48px;
+        }
+
+        .stories-scroll {
+            gap: 8px;
+        }
+
+        .post-avatar,
+        .post-avatar-placeholder {
+            width: 28px !important;
+            height: 28px !important;
+        }
+
+        .post-actions {
+            gap: 20px;
+        }
+
+        .action-btn svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        .algorithm-selector {
+            padding: 8px 10px;
+        }
+    }
+
+    /* Safe area para iPhone X+ */
+    @@supports (padding-bottom: env(safe-area-inset-bottom)) {
+        @@media (max-width: 767px) {
+            .feed-page-layout {
+                padding-bottom: calc(70px + env(safe-area-inset-bottom)) !important;
+            }
+        }
+    }
+
+    /* Mejoras de rendimiento móvil */
+    @@media (max-width: 767px) {
+        .post-media img,
+        .post-media video {
+            will-change: auto;
+        }
+
+        /* Reducir animaciones en móvil para mejor rendimiento */
+        .post,
+        .action-btn,
+        .story-item {
+            transition-duration: 0.15s;
+        }
+
+        /* Scroll suave nativo */
+        .stories-scroll {
+            -webkit-overflow-scrolling: touch;
+            scroll-snap-type: x proximity;
+        }
+
+        .story-item {
+            scroll-snap-align: start;
+        }
+    }
+
 </style>
 
 <div class="feed-page-layout">
@@ -4009,7 +4884,7 @@
     {
         var postIndex = 0;
         var anuncioIndex = 0;
-        var insertarAnuncioCada = 5; // Insertar anuncio cada 5 posts
+        var insertarAnuncioCada = anunciosIntervalo; // Usar intervalo desde configuración
 
         @foreach (var post in Model.Take(10))
         {
@@ -4061,14 +4936,21 @@
                                 @usernameMostrado
                                 @if (post.Usuario?.CreadorVerificado == true)
                                 {
-                                    <svg class="verified-icon" viewBox="0 0 24 24" fill="#10b981" width="16" height="16" title="Creador verificado">
-                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                                        <polyline points="9 12 12 15 16 10" fill="none" stroke="white" stroke-width="2"></polyline>
-                                    </svg>
+                                    <img src="/images/verified-badge.png" alt="Verificado" class="verified-icon" title="Creador verificado">
                                 }
                                 @if (post.TipoLado == TipoLado.LadoB)
                                 {
                                     <span class="post-badge badge-ladob">B</span>
+                                }
+                                @if (post.EsReel)
+                                {
+                                    <span class="post-badge badge-reel" title="Reel"><i class="fas fa-film"></i></span>
+                                }
+                                @if (post.PistaMusicalId != null)
+                                {
+                                    <span class="post-badge badge-musica" title="@(post.PistaMusical?.Titulo ?? "Con música")">
+                                        <img src="/images/music-badge.png" alt="Música">
+                                    </span>
                                 }
                             </span>
                             <span class="post-time">@tiempoTexto</span>
@@ -4145,14 +5027,27 @@
                         </div>
                         @if (tieneArchivo)
                         {
+                            var rutaArchivoLimpia = LimpiarRuta(post.RutaArchivo);
                             <div class="post-media">
                                 @if (esImagen || (!esVideo && !esAudio))
                                 {
-                                    <img src="@post.RutaArchivo" alt="" loading="lazy">
+                                    <img src="@rutaArchivoLimpia" alt="" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'media-error-placeholder\'></div>';">
                                 }
                                 else if (esVideo)
                                 {
-                                    <video src="@post.RutaArchivo" class="feed-video" muted loop playsinline webkit-playsinline x-webkit-airplay="allow" preload="metadata"></video>
+                                    <video src="@rutaArchivoLimpia"
+                                           class="feed-video"
+                                           autoplay
+                                           muted
+                                           loop
+                                           playsinline
+                                           webkit-playsinline=""
+                                           x-webkit-airplay="allow"
+                                           disablepictureinpicture
+                                           disableremoteplayback
+                                           preload="auto"
+                                           data-post-id="@post.Id"
+                                           onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'media-error-placeholder\'><svg viewBox=\'0 0 24 24\' fill=\'rgba(255,255,255,0.3)\'><path d=\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\'/></svg></div>';"></video>
                                 }
                                 else if (esAudio)
                                 {
@@ -4160,6 +5055,7 @@
                                         <svg width="64" height="64" viewBox="0 0 24 24" fill="var(--primary)">
                                             <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
                                         </svg>
+                                        <audio src="@rutaArchivoLimpia" controls preload="metadata" onclick="event.stopPropagation()"></audio>
                                     </div>
                                 }
                             </div>
@@ -4206,10 +5102,23 @@
                                 {
                                     var archivo = archivosCarrusel[i];
                                     var esArchivoVideo = archivo.TipoArchivo == TipoArchivo.Video;
+                                    var rutaArchivoCarrusel = LimpiarRuta(archivo.RutaArchivo);
                                     <div class="carousel-slide" data-index="@i" style="width: @(100.0 / archivosCarrusel.Count)%;">
                                         @if (esArchivoVideo)
                                         {
-                                            <video src="@archivo.RutaArchivo" class="carousel-media feed-video" muted loop playsinline webkit-playsinline x-webkit-airplay="allow" preload="metadata"></video>
+                                            <video src="@rutaArchivoCarrusel"
+                                                   class="carousel-media feed-video"
+                                                   autoplay
+                                                   muted
+                                                   loop
+                                                   playsinline
+                                                   webkit-playsinline=""
+                                                   x-webkit-airplay="allow"
+                                                   disablepictureinpicture
+                                                   disableremoteplayback
+                                                   preload="auto"
+                                                   data-post-id="@post.Id"
+                                                   onerror="this.parentElement.innerHTML='<div class=\'media-error-placeholder\'><svg viewBox=\'0 0 24 24\' fill=\'rgba(255,255,255,0.3)\'><path d=\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\'/></svg></div>';"></video>
                                             <div class="video-play-icon carousel-play-icon">
                                                 <svg class="icon-play" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
                                                 <svg class="icon-pause" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
@@ -4217,7 +5126,7 @@
                                         }
                                         else
                                         {
-                                            <img src="@archivo.RutaArchivo" alt="" class="carousel-media" loading="lazy">
+                                            <img src="@rutaArchivoCarrusel" alt="" class="carousel-media" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E';">
                                         }
                                     </div>
                                 }
@@ -4255,6 +5164,38 @@
                                     <button class="sensitive-reveal-btn" onclick="revelarContenidoSensible(event, @post.Id)">Ver</button>
                                 </div>
                             </div>
+                        }
+                        @* Badge de música para carruseles *@
+                        @if (post.PistaMusical != null)
+                        {
+                            <div class="music-badge" data-post-id="@post.Id">
+                                <div class="music-badge-icon">
+                                    <svg viewBox="0 0 24 24" fill="white">
+                                        <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                                    </svg>
+                                </div>
+                                <div class="music-badge-info">
+                                    <div class="music-badge-title">@post.PistaMusical.Titulo</div>
+                                    <div class="music-badge-artist">@post.PistaMusical.Artista</div>
+                                </div>
+                            </div>
+                            <audio class="photo-audio-player"
+                                   data-post-id="@post.Id"
+                                   src="@post.PistaMusical.RutaArchivo"
+                                   preload="metadata"
+                                   loop
+                                   data-start="@(post.AudioTrimInicio ?? 0)"
+                                   data-volume="@(((double)(post.MusicaVolumen ?? 0.7m)).ToString(System.Globalization.CultureInfo.InvariantCulture))">
+                            </audio>
+                            <!-- Botón mute para música de carrusel -->
+                            <button class="photo-music-mute-btn" data-post-id="@post.Id" onclick="togglePhotoMusicMute(event, this)" title="Silenciar/Activar música">
+                                <svg class="muted-icon" viewBox="0 0 24 24" fill="white" style="display:none;">
+                                    <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                                </svg>
+                                <svg class="unmuted-icon" viewBox="0 0 24 24" fill="white">
+                                    <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                                </svg>
+                            </button>
                         }
                     </div>
                 }
@@ -4315,9 +5256,10 @@
                                 </a>
                             </div>
                         }
+                        @{var rutaPostMedia = LimpiarRuta(post.RutaArchivo);}
                         @if (esImagen)
                         {
-                            <img src="@post.RutaArchivo" alt="" loading="lazy">
+                            <img src="@rutaPostMedia" alt="" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E';">
                             @if (!string.IsNullOrEmpty(post.NombreUbicacion))
                             {
                                 <!-- Badge de ubicación -->
@@ -4343,6 +5285,15 @@
                                         <div class="music-badge-artist">@post.PistaMusical.Artista</div>
                                     </div>
                                 </div>
+                                <!-- Botón mute para música de foto -->
+                                <button class="photo-music-mute-btn" data-post-id="@post.Id" onclick="togglePhotoMusicMute(event, this)" title="Silenciar/Activar música">
+                                    <svg class="muted-icon" viewBox="0 0 24 24" fill="white" style="display:none;">
+                                        <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                                    </svg>
+                                    <svg class="unmuted-icon" viewBox="0 0 24 24" fill="white">
+                                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                                    </svg>
+                                </button>
                                 <!-- Audio oculto para reproducción -->
                                 <audio class="photo-audio-player"
                                        data-post-id="@post.Id"
@@ -4356,15 +5307,19 @@
                         }
                         else if (esVideo)
                         {
-                            <video src="@post.RutaArchivo"
+                            <video src="@rutaPostMedia"
                                    class="feed-video"
+                                   autoplay
                                    muted
                                    loop
                                    playsinline
-                                   webkit-playsinline
+                                   webkit-playsinline=""
                                    x-webkit-airplay="allow"
-                                   preload="metadata"
-                                   data-post-id="@post.Id">
+                                   disablepictureinpicture
+                                   disableremoteplayback
+                                   preload="auto"
+                                   data-post-id="@post.Id"
+                                   onerror="this.parentElement.innerHTML='<div class=\'media-error-placeholder\'><svg viewBox=\'0 0 24 24\' fill=\'rgba(255,255,255,0.3)\'><path d=\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\'/></svg></div>';">
                             </video>
                             <div class="video-controls-overlay" onclick="handleVideoClick(event, this)">
                                 <div class="video-play-icon">
@@ -4383,16 +5338,38 @@
                         }
                         else if (esAudio)
                         {
-                            <div class="post-media-audio">
-                                <svg width="64" height="64" viewBox="0 0 24 24" fill="var(--primary)">
-                                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-                                </svg>
-                                <audio src="@post.RutaArchivo" controls preload="metadata" onclick="event.stopPropagation()"></audio>
+                            <div class="post-media-audio" data-post-id="@post.Id">
+                                <div class="audio-visual">
+                                    <svg class="audio-icon" viewBox="0 0 24 24" fill="var(--primary)">
+                                        <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                                    </svg>
+                                    <div class="audio-waves">
+                                        <span></span><span></span><span></span><span></span><span></span>
+                                    </div>
+                                </div>
+                                <audio class="post-audio-player" src="@rutaPostMedia" preload="metadata" data-post-id="@post.Id"></audio>
+                                <div class="audio-controls-overlay">
+                                    <button class="audio-play-btn" onclick="toggleAudioPlay(event, this)" title="Reproducir/Pausar">
+                                        <svg class="icon-play" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                                        <svg class="icon-pause" viewBox="0 0 24 24" fill="white" style="display:none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                                    </button>
+                                    <button class="audio-mute-btn" onclick="toggleAudioMute(event, this)" title="Activar/Desactivar sonido">
+                                        <svg class="muted-icon" viewBox="0 0 24 24" fill="white" style="display:none;">
+                                            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                                        </svg>
+                                        <svg class="unmuted-icon" viewBox="0 0 24 24" fill="white">
+                                            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div class="audio-progress">
+                                    <div class="audio-progress-bar"></div>
+                                </div>
                             </div>
                         }
                         else
                         {
-                            <img src="@post.RutaArchivo" alt="" loading="lazy" onerror="this.style.display='none'">
+                            <img src="@rutaPostMedia" alt="" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E';">
                             @if (!string.IsNullOrEmpty(post.NombreUbicacion))
                             {
                                 <!-- Badge de ubicación -->
@@ -5092,6 +6069,33 @@
     </div>
 </div>
 
+<!-- TOOLTIP DE LIKES (Desktop) -->
+<div class="likes-tooltip" id="likesTooltip">
+    <div class="likes-tooltip-header" id="likesTooltipHeader">Me gusta</div>
+    <div class="likes-tooltip-list" id="likesTooltipList">
+        <div class="likes-tooltip-loading">
+            <i class="fas fa-spinner fa-spin"></i>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE LIKES (Móvil) -->
+<div class="likes-modal-overlay" id="likesModalOverlay" onclick="closeLikesModal()">
+    <div class="likes-modal" onclick="event.stopPropagation()">
+        <div class="likes-modal-header">
+            <span class="likes-modal-title">Me gusta</span>
+            <button class="likes-modal-close" onclick="closeLikesModal()">&times;</button>
+        </div>
+        <div class="likes-modal-content">
+            <div class="likes-modal-list" id="likesModalList">
+                <div class="likes-tooltip-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 @functions {
     string GetTimeAgo(DateTime fecha)
     {
@@ -5316,7 +6320,10 @@
         observer.observe(loader);
     }
 
-    async function loadMorePosts() {
+    let loadRetryCount = 0;
+    const MAX_RETRIES = 3;
+
+    async function loadMorePosts(isRetry = false) {
         if (isLoadingMore || !hasMorePosts) return;
 
         isLoadingMore = true;
@@ -5324,9 +6331,22 @@
         const endMessage = document.getElementById('infiniteScrollEnd');
 
         loader.classList.add('visible');
+        hideLoadError(); // Ocultar error previo si existe
 
         try {
-            const response = await fetch(`/Feed/CargarMasPosts?pagina=${currentPage}&cantidad=10`);
+            // Fetch con timeout de 15 segundos
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+            const response = await fetch(`/Feed/CargarMasPosts?pagina=${currentPage}&cantidad=10`, {
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
             const data = await response.json();
 
             if (data.success && data.posts.length > 0) {
@@ -5339,6 +6359,7 @@
 
                 currentPage++;
                 hasMorePosts = data.hayMas;
+                loadRetryCount = 0; // Reset retry count on success
 
                 // Reinicializar carruseles y observers para los nuevos posts
                 if (typeof initCarousels === 'function') {
@@ -5347,6 +6368,11 @@
 
                 // Reinicializar video observers
                 initVideoObserversForNewPosts();
+
+                // Reinicializar observers de música en fotos
+                if (typeof initPhotoMusicObserversForNewPosts === 'function') {
+                    initPhotoMusicObserversForNewPosts();
+                }
 
                 // Limpiar observers antiguos para evitar memory leak
                 cleanupOldObservers();
@@ -5362,10 +6388,56 @@
 
         } catch (error) {
             console.error('Error cargando más posts:', error);
+            loadRetryCount++;
+
+            // Reintentar automáticamente hasta MAX_RETRIES
+            if (loadRetryCount < MAX_RETRIES && !isRetry) {
+                console.log(`Reintentando... (${loadRetryCount}/${MAX_RETRIES})`);
+                isLoadingMore = false;
+                setTimeout(() => loadMorePosts(true), 2000);
+                return;
+            }
+
+            // Mostrar mensaje de error con opción de reintentar
+            showLoadError();
         } finally {
             isLoadingMore = false;
             loader.classList.remove('visible');
         }
+    }
+
+    function showLoadError() {
+        let errorDiv = document.getElementById('loadErrorMessage');
+        if (!errorDiv) {
+            errorDiv = document.createElement('div');
+            errorDiv.id = 'loadErrorMessage';
+            errorDiv.style.cssText = 'text-align:center;padding:20px;color:#888;';
+            errorDiv.innerHTML = `
+                <p style="margin-bottom:10px;">No se pudieron cargar más publicaciones</p>
+                <button onclick="retryLoad()" style="background:var(--primary-color,#e91e63);color:#fff;border:none;padding:10px 20px;border-radius:20px;cursor:pointer;">
+                    Reintentar
+                </button>
+            `;
+            const loader = document.getElementById('infiniteScrollLoader');
+            loader.parentNode.insertBefore(errorDiv, loader.nextSibling);
+        }
+        errorDiv.style.display = 'block';
+    }
+
+    function hideLoadError() {
+        const errorDiv = document.getElementById('loadErrorMessage');
+        if (errorDiv) errorDiv.style.display = 'none';
+    }
+
+    function retryLoad() {
+        loadRetryCount = 0;
+        loadMorePosts();
+    }
+
+    // Función para limpiar comillas de rutas (datos legacy)
+    function limpiarRuta(ruta) {
+        if (!ruta) return '';
+        return ruta.replace(/^"|"$/g, '');
     }
 
     function renderPost(post) {
@@ -5377,10 +6449,47 @@
         const fotoPerfilMostrar = post.tipoLado === 1 ? (post.fotoPerfilLadoB || post.fotoPerfil) : post.fotoPerfil;
         const usernameMostrado = post.tipoLado === 1 ? '******' : post.username;
 
+        // Limpiar rutas de archivos
+        const rutaArchivoLimpia = limpiarRuta(post.rutaArchivo);
+
         let mediaHtml = '';
-        if (post.rutaArchivo) {
+        if (rutaArchivoLimpia) {
             if (post.esCarrusel && post.archivos.length > 1) {
                 const archivosJson = JSON.stringify(post.archivos).replace(/"/g, '&quot;');
+
+                // Construir badges y audio para carruseles con música
+                let carouselMusicHtml = '';
+                if (post.pistaMusical) {
+                    carouselMusicHtml = `
+                        <div class="music-badge" data-post-id="${post.id}">
+                            <div class="music-badge-icon">
+                                <svg viewBox="0 0 24 24" fill="white">
+                                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                                </svg>
+                            </div>
+                            <div class="music-badge-info">
+                                <div class="music-badge-title">${escapeHtml(post.pistaMusical.titulo || '')}</div>
+                                <div class="music-badge-artist">${escapeHtml(post.pistaMusical.artista || '')}</div>
+                            </div>
+                        </div>
+                        <audio class="photo-audio-player"
+                               data-post-id="${post.id}"
+                               src="${limpiarRuta(post.pistaMusical.rutaArchivo)}"
+                               preload="metadata"
+                               loop
+                               data-start="${post.audioTrimInicio || 0}"
+                               data-volume="${post.musicaVolumen || 0.7}">
+                        </audio>
+                        <button class="photo-music-mute-btn" data-post-id="${post.id}" onclick="togglePhotoMusicMute(event, this)" title="Silenciar/Activar música">
+                            <svg class="muted-icon" viewBox="0 0 24 24" fill="white" style="display:${isGlobalMuted ? 'block' : 'none'};">
+                                <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                            </svg>
+                            <svg class="unmuted-icon" viewBox="0 0 24 24" fill="white" style="display:${isGlobalMuted ? 'none' : 'block'};">
+                                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                            </svg>
+                        </button>`;
+                }
+
                 mediaHtml = `
                     <div class="post-carousel post-media"
                          data-post-id="${post.id}"
@@ -5390,16 +6499,17 @@
                          style="cursor: pointer;">
                         <img src="${post.archivos[0].rutaArchivo}" alt="" loading="lazy">
                         <div class="carousel-counter">1/${post.archivos.length}</div>
+                        ${carouselMusicHtml}
                     </div>`;
             } else if (post.esVideo) {
                 mediaHtml = `
                     <div class="post-media video-paused"
                          data-post-id="${post.id}"
                          data-media-type="video"
-                         data-media-src="${post.rutaArchivo}"
+                         data-media-src="${rutaArchivoLimpia}"
                          onclick="openFullscreenViewer(event, ${post.id})"
                          style="cursor: pointer;">
-                        <video src="${post.rutaArchivo}" class="feed-video" muted loop playsinline webkit-playsinline x-webkit-airplay="allow" preload="metadata" data-post-id="${post.id}"></video>
+                        <video src="${rutaArchivoLimpia}" class="feed-video" autoplay muted loop playsinline webkit-playsinline="" x-webkit-airplay="allow" disablepictureinpicture disableremoteplayback preload="auto" data-post-id="${post.id}" onerror="this.parentElement.innerHTML='<div class=\\'media-error-placeholder\\'><svg viewBox=\\'0 0 24 24\\' fill=\\'rgba(255,255,255,0.3)\\'><path d=\\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\\'/></svg></div>';"></video>
                         <div class="video-controls-overlay" onclick="handleVideoClick(event, this)">
                             <div class="video-play-icon">
                                 <svg class="icon-play" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
@@ -5415,23 +6525,95 @@
                             </button>
                         </div>
                     </div>`;
+            } else if (post.esAudio) {
+                // Posts de tipo audio con controles
+                mediaHtml = `
+                    <div class="post-media"
+                         data-post-id="${post.id}"
+                         data-media-type="audio">
+                        <div class="post-media-audio" data-post-id="${post.id}">
+                            <div class="audio-visual">
+                                <svg class="audio-icon" viewBox="0 0 24 24" fill="var(--primary)">
+                                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                                </svg>
+                                <div class="audio-waves">
+                                    <span></span><span></span><span></span><span></span><span></span>
+                                </div>
+                            </div>
+                            <audio class="post-audio-player" src="${rutaArchivoLimpia}" preload="metadata" data-post-id="${post.id}"></audio>
+                            <div class="audio-controls-overlay">
+                                <button class="audio-play-btn" onclick="toggleAudioPlay(event, this)" title="Reproducir/Pausar">
+                                    <svg class="icon-play" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                                    <svg class="icon-pause" viewBox="0 0 24 24" fill="white" style="display:none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                                </button>
+                                <button class="audio-mute-btn" onclick="toggleAudioMute(event, this)" title="Activar/Desactivar sonido">
+                                    <svg class="muted-icon" viewBox="0 0 24 24" fill="white" style="display:none;">
+                                        <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                                    </svg>
+                                    <svg class="unmuted-icon" viewBox="0 0 24 24" fill="white">
+                                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="audio-progress">
+                                <div class="audio-progress-bar"></div>
+                            </div>
+                        </div>
+                    </div>`;
             } else {
+                // Construir badges y audio para imágenes
+                let musicBadgeHtml = '';
+                let photoAudioHtml = '';
+                if (post.pistaMusical) {
+                    musicBadgeHtml = `
+                        <div class="music-badge" data-post-id="${post.id}">
+                            <div class="music-badge-icon">
+                                <svg viewBox="0 0 24 24" fill="white">
+                                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                                </svg>
+                            </div>
+                            <div class="music-badge-info">
+                                <div class="music-badge-title">${escapeHtml(post.pistaMusical.titulo || '')}</div>
+                                <div class="music-badge-artist">${escapeHtml(post.pistaMusical.artista || '')}</div>
+                            </div>
+                        </div>`;
+                    photoAudioHtml = `
+                        <audio class="photo-audio-player"
+                               data-post-id="${post.id}"
+                               src="${limpiarRuta(post.pistaMusical.rutaArchivo)}"
+                               preload="metadata"
+                               loop
+                               data-start="${post.audioTrimInicio || 0}"
+                               data-volume="${post.musicaVolumen || 0.7}">
+                        </audio>
+                        <button class="photo-music-mute-btn" data-post-id="${post.id}" onclick="togglePhotoMusicMute(event, this)" title="Silenciar/Activar música">
+                            <svg class="muted-icon" viewBox="0 0 24 24" fill="white" style="display:${isGlobalMuted ? 'block' : 'none'};">
+                                <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                            </svg>
+                            <svg class="unmuted-icon" viewBox="0 0 24 24" fill="white" style="display:${isGlobalMuted ? 'none' : 'block'};">
+                                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                            </svg>
+                        </button>`;
+                }
+
                 mediaHtml = `
                     <div class="post-media"
                          data-post-id="${post.id}"
                          data-media-type="image"
-                         data-media-src="${post.rutaArchivo}"
+                         data-media-src="${rutaArchivoLimpia}"
                          onclick="openFullscreenViewer(event, ${post.id})"
                          style="cursor: pointer;">
-                        <img src="${post.rutaArchivo}" alt="" loading="lazy">
+                        <img src="${rutaArchivoLimpia}" alt="" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E';">
                         ${post.nombreUbicacion ? `
                         <div class="location-badge">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                                 <circle cx="12" cy="10" r="3"></circle>
                             </svg>
-                            <span>${post.nombreUbicacion}</span>
+                            <span>${escapeHtml(post.nombreUbicacion)}</span>
                         </div>` : ''}
+                        ${musicBadgeHtml}
+                        ${photoAudioHtml}
                     </div>`;
             }
         }
@@ -5448,8 +6630,10 @@
                         <div class="post-user-info">
                             <span class="post-username">
                                 ${usernameMostrado}
-                                ${post.verificado ? '<svg class="verified-icon" viewBox="0 0 24 24" fill="#10b981" width="16" height="16"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-4" fill="none" stroke="white" stroke-width="2"></path></svg>' : ''}
+                                ${post.verificado ? '<img src="/images/verified-badge.png" alt="Verificado" class="verified-icon" title="Creador verificado">' : ''}
                                 ${post.tipoLado === 1 ? '<span class="post-badge badge-ladob">B</span>' : ''}
+                                ${post.esReel ? '<span class="post-badge badge-reel" title="Reel"><i class="fas fa-film"></i></span>' : ''}
+                                ${post.pistaMusicalId ? '<span class="post-badge badge-musica" title="Con música"><img src="/images/music-badge.png" alt="Música"></span>' : ''}
                             </span>
                             <span class="post-time">${tiempoTexto}</span>
                         </div>
@@ -5491,7 +6675,7 @@
                 ${post.descripcion ? `
                 <div class="post-caption">
                     <p class="post-caption-text">
-                        <span class="post-caption-username">${usernameMostrado}</span>${post.descripcion}
+                        <span class="post-caption-username">${escapeHtml(usernameMostrado)}</span>${escapeHtml(post.descripcion)}
                     </p>
                 </div>` : ''}
 
@@ -5577,26 +6761,47 @@
         });
     }
 
-    // Reproducir video - estrategia para iOS
+    // Reproducir video - estrategia para iOS (usa iOSMediaFix si disponible)
     async function playVideo(video) {
         const postMedia = video?.closest('.post-media');
         if (!video || !postMedia) return false;
 
-        // Asegurar muted para autoplay
-        video.muted = true;
+        // 🍎 iOS: Usar el nuevo API iOSMediaFix para mejor compatibilidad
+        if (window.iOSMediaFix?.isIOS) {
+            const success = await window.iOSMediaFix.playVideo(video);
+            if (!success) {
+                // Mostrar indicador visual de que necesita tap
+                postMedia.classList.add('needs-tap');
+                postMedia.classList.remove('video-playing');
+                postMedia.classList.add('video-paused');
+            } else {
+                postMedia.classList.remove('needs-tap');
+                // IMPORTANTE: Aplicar estado global de mute después de reproducir
+                video.muted = isGlobalMuted;
+            }
+            return success;
+        }
 
-        // Esperar a que el video tenga datos
+        // Fallback para navegadores sin iOSMediaFix
+        video.muted = isGlobalMuted; // Respetar estado global de mute
+
         if (video.readyState < 2) {
-            // Forzar carga
             video.load();
             await new Promise(resolve => {
                 const onCanPlay = () => {
                     video.removeEventListener('canplay', onCanPlay);
+                    video.removeEventListener('error', onError);
+                    resolve();
+                };
+                const onError = () => {
+                    video.removeEventListener('canplay', onCanPlay);
+                    video.removeEventListener('error', onError);
                     resolve();
                 };
                 video.addEventListener('canplay', onCanPlay);
-                // Timeout de seguridad
-                setTimeout(resolve, 3000);
+                video.addEventListener('error', onError);
+                // Timeout más largo para conexiones 3G/LTE lentas (8 segundos)
+                setTimeout(resolve, 8000);
             });
         }
 
@@ -5605,7 +6810,6 @@
             if (playPromise !== undefined) {
                 await playPromise;
             }
-            // Forzar estado visual inmediatamente
             postMedia.classList.remove('video-paused');
             postMedia.classList.add('video-playing');
             return true;
@@ -5617,7 +6821,7 @@
         }
     }
 
-    // Handler para click en overlay
+    // Handler para click en overlay - toggle play/pause con tap
     function handleVideoClick(event, overlay) {
         event.stopPropagation();
         event.preventDefault();
@@ -5628,8 +6832,26 @@
 
         const videoId = video.getAttribute('data-post-id') || video.src;
 
+        // 🍎 iOS: Usar iOSMediaFix.toggleVideo para mejor compatibilidad
+        if (window.iOSMediaFix?.isIOS) {
+            if (video.paused) {
+                // Usuario quiere reproducir
+                manuallyPausedVideos.delete(videoId);
+                postMedia.classList.remove('needs-tap');
+                video.muted = isGlobalMuted;
+            } else {
+                // Usuario quiere pausar - marcar como pausa manual
+                manuallyPausedVideos.add(videoId);
+            }
+
+            window.iOSMediaFix.toggleVideo(video, { preserveMuteState: false });
+            // Asegurar estado mute correcto después del toggle
+            video.muted = isGlobalMuted;
+            return;
+        }
+
+        // Fallback para navegadores sin iOSMediaFix
         if (video.paused) {
-            // Usuario quiere reproducir
             manuallyPausedVideos.delete(videoId);
             pauseAllVideosExcept(video);
             video.muted = isGlobalMuted;
@@ -5640,7 +6862,6 @@
                 updateVideoState(video, false);
             });
         } else {
-            // Usuario quiere pausar - marcar como pausa manual
             manuallyPausedVideos.add(videoId);
             video.pause();
             updateVideoState(video, false);
@@ -5649,7 +6870,17 @@
 
     // Actualizar iconos de mute
     function updateAllMuteIcons() {
+        // Actualizar iconos de video
         document.querySelectorAll('.video-mute-btn').forEach(btn => {
+            const mi = btn.querySelector('.muted-icon');
+            const ui = btn.querySelector('.unmuted-icon');
+            if (mi && ui) {
+                mi.style.display = isGlobalMuted ? 'block' : 'none';
+                ui.style.display = isGlobalMuted ? 'none' : 'block';
+            }
+        });
+        // Actualizar iconos de música de foto
+        document.querySelectorAll('.photo-music-mute-btn').forEach(btn => {
             const mi = btn.querySelector('.muted-icon');
             const ui = btn.querySelector('.unmuted-icon');
             if (mi && ui) {
@@ -5685,7 +6916,10 @@
         threshold: 0.5
     });
 
-    // Preload observer
+    // Preload observer - rootMargin reducido para móviles para evitar sobrecargar la red
+    const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const preloadMargin = isMobileDevice ? '200px' : '500px'; // Menor margen en móvil
+
     const videoPreloadObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
@@ -5696,22 +6930,33 @@
                 videoPreloadObserver.unobserve(video);
             }
         });
-    }, { rootMargin: '800px' });
+    }, { rootMargin: preloadMargin });
 
     function initVideoObserversForNewPosts() {
         document.querySelectorAll('.post-media video.feed-video:not([data-observed])').forEach(video => {
             video.setAttribute('data-observed', 'true');
 
-            // Forzar atributos para iOS
+            // 🍎 iOS: Usar iOSMediaFix.enhance() para configurar atributos correctamente
+            if (window.iOSMediaFix?.isIOS) {
+                window.iOSMediaFix.enhance(video);
+            }
+
+            // Forzar atributos para iOS (también aplica si no hay iOSMediaFix)
             video.playsInline = true;
-            video.muted = true;
+            video.setAttribute('playsinline', '');
+            video.setAttribute('webkit-playsinline', '');
+            video.muted = isGlobalMuted; // Respetar estado global de mute
             video.autoplay = false; // Controlamos nosotros el autoplay
 
             // Eventos de estado
             video.addEventListener('playing', () => {
                 console.log('[Video] playing event');
                 updateVideoState(video, true);
-                video.closest('.post-media')?.classList.remove('video-loading');
+                const postMedia = video.closest('.post-media');
+                if (postMedia) {
+                    postMedia.classList.remove('video-loading');
+                    postMedia.classList.remove('needs-tap');
+                }
             });
             video.addEventListener('pause', () => {
                 console.log('[Video] pause event');
@@ -5720,6 +6965,39 @@
             video.addEventListener('waiting', () => {
                 video.closest('.post-media')?.classList.add('video-loading');
             });
+
+            // Manejar errores de carga - remover spinner y mostrar estado de error
+            video.addEventListener('error', () => {
+                console.log('[Video] Error cargando video');
+                const postMedia = video.closest('.post-media');
+                if (postMedia) {
+                    postMedia.classList.remove('video-loading');
+                    postMedia.classList.add('video-error');
+
+                    // Handler para reintentar con click/tap
+                    const retryHandler = () => {
+                        if (postMedia.classList.contains('video-error')) {
+                            console.log('[Video] Reintentando por tap...');
+                            postMedia.classList.remove('video-error');
+                            postMedia.classList.add('video-loading');
+                            video.load();
+                            playVideo(video);
+                        }
+                        postMedia.removeEventListener('click', retryHandler);
+                    };
+                    postMedia.addEventListener('click', retryHandler, { once: true });
+
+                    // También reintentar automáticamente después de 5 segundos
+                    setTimeout(() => {
+                        if (postMedia.classList.contains('video-error')) {
+                            console.log('[Video] Reintentando automáticamente...');
+                            postMedia.classList.remove('video-error');
+                            video.load();
+                        }
+                    }, 5000);
+                }
+            });
+
             // timeupdate: se dispara constantemente mientras el video reproduce
             // Esto asegura que el estado visual se mantenga correcto en iOS
             video.addEventListener('timeupdate', () => {
@@ -5728,6 +7006,19 @@
                     if (postMedia && !postMedia.classList.contains('video-playing')) {
                         updateVideoState(video, true);
                     }
+                }
+            });
+
+            // 🍎 iOS: Manejar el evento stalled para recuperar videos que se quedan cargando
+            video.addEventListener('stalled', () => {
+                if (isIOSDevice && !video.paused) {
+                    console.log('[Video] Stalled - recuperando...');
+                    setTimeout(() => {
+                        if (!video.paused && video.readyState < 3) {
+                            video.load();
+                            playVideo(video);
+                        }
+                    }, 500);
                 }
             });
 
@@ -5776,6 +7067,90 @@
         initPullToRefresh();
         initInfiniteScroll();
 
+        // 🍎 iOS Debug Panel - Solo visible en iOS para diagnóstico
+        if (isIOSDevice) {
+            const debugPanel = document.createElement('div');
+            debugPanel.id = 'ios-debug-panel';
+            debugPanel.style.cssText = `
+                position: fixed;
+                bottom: 80px;
+                right: 10px;
+                background: rgba(0,0,0,0.85);
+                color: #0f0;
+                font-size: 10px;
+                font-family: monospace;
+                padding: 8px;
+                border-radius: 8px;
+                z-index: 99999;
+                max-width: 200px;
+                max-height: 150px;
+                overflow: auto;
+                display: none;
+            `;
+            debugPanel.innerHTML = '<div>iOS Debug</div>';
+            document.body.appendChild(debugPanel);
+
+            // Triple tap para mostrar/ocultar debug
+            let tapCount = 0;
+            let tapTimer = null;
+            document.addEventListener('touchend', () => {
+                tapCount++;
+                if (tapCount === 3) {
+                    debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
+                    tapCount = 0;
+                }
+                clearTimeout(tapTimer);
+                tapTimer = setTimeout(() => tapCount = 0, 500);
+            }, { passive: true });
+
+            // Función para loggear en el panel
+            window.iOSDebug = function(msg) {
+                const line = document.createElement('div');
+                line.textContent = new Date().toLocaleTimeString().substr(0,8) + ' ' + msg;
+                debugPanel.appendChild(line);
+                debugPanel.scrollTop = debugPanel.scrollHeight;
+                console.log('[iOS Debug]', msg);
+            };
+
+            // Log inicial
+            window.iOSDebug('iOS detectado');
+            window.iOSDebug('iOSMediaFix: ' + (window.iOSMediaFix ? 'OK' : 'NO'));
+        }
+
+        // 🍎 iOS: Forzar reproducción del primer video visible después de cualquier interacción
+        if (isIOSDevice) {
+            let firstInteractionHandled = false;
+
+            const forcePlayOnInteraction = () => {
+                if (firstInteractionHandled) return;
+                firstInteractionHandled = true;
+
+                if (window.iOSDebug) window.iOSDebug('Primera interacción');
+
+                // Esperar un momento y luego intentar reproducir
+                setTimeout(() => {
+                    const videos = document.querySelectorAll('video.feed-video');
+                    videos.forEach(video => {
+                        const rect = video.getBoundingClientRect();
+                        const isVisible = rect.top < window.innerHeight && rect.bottom > 0 &&
+                                         rect.left < window.innerWidth && rect.right > 0;
+
+                        if (isVisible && video.paused) {
+                            if (window.iOSDebug) window.iOSDebug('Intentando reproducir video visible');
+                            playVideo(video).then(success => {
+                                if (window.iOSDebug) window.iOSDebug('Resultado: ' + (success ? 'OK' : 'FAIL'));
+                            });
+                        }
+                    });
+                }, 100);
+            };
+
+            // Escuchar múltiples eventos de interacción
+            ['touchstart', 'touchend', 'click'].forEach(event => {
+                document.addEventListener(event, forcePlayOnInteraction, { once: true, passive: true });
+            });
+        }
+
         // SharedPostId se maneja al final del script donde openFullscreenViewer ya está definido
     });
 
@@ -5791,6 +7166,7 @@
     const photoMusicObserver = new IntersectionObserver((entries) => {
         // NO reproducir audio del feed si el fullscreen está activo
         if (isFullscreenActive) {
+            console.log('[PhotoMusic] Fullscreen activo, ignorando');
             return;
         }
 
@@ -5798,15 +7174,33 @@
             const postMedia = entry.target;
             const audio = postMedia.querySelector('.photo-audio-player');
 
+            console.log('[PhotoMusic] Entry:', {
+                isIntersecting: entry.isIntersecting,
+                ratio: entry.intersectionRatio,
+                hasAudio: !!audio,
+                audioSrc: audio?.src
+            });
+
             if (!audio) return;
 
             if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
                 // Verificar de nuevo que fullscreen no esté activo
                 if (isFullscreenActive) return;
 
-                // La foto está visible - reproducir música
-                if (currentPhotoAudio && currentPhotoAudio !== audio) {
-                    currentPhotoAudio.pause();
+                // Si el audio global está muteado, no reproducir música de fotos
+                console.log('[PhotoMusic] isGlobalMuted:', isGlobalMuted);
+                if (isGlobalMuted) {
+                    // Pausar si estaba sonando
+                    if (currentPhotoAudio === audio) {
+                        if (window.iOSMediaFix?.isIOS) {
+                            window.iOSMediaFix.pause(audio);
+                        } else {
+                            audio.pause();
+                        }
+                        const badge = postMedia.querySelector('.music-badge');
+                        if (badge) badge.classList.remove('playing');
+                    }
+                    return;
                 }
 
                 const startTime = parseFloat(audio.dataset.start) || 0;
@@ -5814,54 +7208,70 @@
 
                 // Normalizar volumen al rango [0, 1]
                 if (volume > 1) {
-                    volume = volume / 10; // Si es 7, convertir a 0.7
+                    volume = volume / 10;
                 }
                 volume = Math.min(1, Math.max(0, volume));
 
-                audio.currentTime = startTime;
-                audio.volume = volume;
-
-                // 🍎 iOS Fix: Usar el wrapper seguro si está disponible
                 const badge = postMedia.querySelector('.music-badge');
 
-                if (window.iOSAudioFix && window.iOSAudioFix.isIOS) {
+                // 🍎 iOS: Usar iOSMediaFix.playPhotoMusic para mejor compatibilidad
+                if (window.iOSMediaFix?.isIOS) {
+                    // Pausar audio anterior si existe
+                    if (currentPhotoAudio && currentPhotoAudio !== audio) {
+                        window.iOSMediaFix.pause(currentPhotoAudio);
+                        // Limpiar badge del audio anterior
+                        document.querySelectorAll('.music-badge.playing').forEach(b => {
+                            if (b !== badge) b.classList.remove('playing');
+                        });
+                    }
+
                     // En iOS, verificar si necesita interacción del usuario
-                    if (window.iOSAudioFix.needsUserInteraction()) {
-                        // Mostrar indicador visual de que requiere tap
+                    if (window.iOSMediaFix.needsUserInteraction()) {
                         if (badge) {
                             badge.classList.add('needs-tap');
                             badge.title = 'Toca para reproducir música';
                         }
                         console.log('[iOS] Audio requiere interacción del usuario');
+                        currentPhotoAudio = audio;
                     } else {
-                        // iOS desbloqueado - reproducir
-                        window.iOSAudioFix.play(audio).then(success => {
+                        // iOS desbloqueado o no es iOS - reproducir
+                        window.iOSMediaFix.playPhotoMusic(audio, { startTime, volume }).then(success => {
                             if (success && badge) {
                                 badge.classList.remove('needs-tap');
                                 badge.classList.add('playing');
                             }
+                            currentPhotoAudio = audio;
                         });
                     }
                 } else {
-                    // No iOS - reproducir normalmente
-                    audio.play().catch(() => {
-                        console.log('Autoplay bloqueado - haga click para reproducir');
-                        if (badge) {
-                            badge.classList.add('needs-tap');
-                        }
+                    // Fallback: sin iOSMediaFix (non-iOS)
+                    console.log('[PhotoMusic] Reproduciendo audio (non-iOS):', audio.src, 'startTime:', startTime, 'volume:', volume);
+
+                    if (currentPhotoAudio && currentPhotoAudio !== audio) {
+                        currentPhotoAudio.pause();
+                    }
+
+                    audio.currentTime = startTime;
+                    audio.volume = volume;
+
+                    audio.play().then(() => {
+                        console.log('[PhotoMusic] ✓ Audio reproduciéndose');
+                        if (badge) badge.classList.add('playing');
+                        currentPhotoAudio = audio;
+                    }).catch((err) => {
+                        console.log('[PhotoMusic] ✗ Autoplay bloqueado:', err.message);
+                        if (badge) badge.classList.add('needs-tap');
+                        currentPhotoAudio = audio;
                     });
-                }
-
-                currentPhotoAudio = audio;
-
-                // Animar el badge de música
-                if (badge && !window.iOSAudioFix?.needsUserInteraction()) {
-                    badge.classList.add('playing');
                 }
             } else {
                 // La foto no está visible - pausar música
                 if (currentPhotoAudio === audio) {
-                    audio.pause();
+                    if (window.iOSMediaFix?.isIOS) {
+                        window.iOSMediaFix.pause(audio);
+                    } else {
+                        audio.pause();
+                    }
                     currentPhotoAudio = null;
                 }
 
@@ -5876,33 +7286,105 @@
         threshold: [0.5]
     });
 
-    // Observar todas las fotos con música
-    document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('.post-media').forEach(media => {
-            if (media.querySelector('.photo-audio-player')) {
+    // Función para observar nuevos posts con música (llamada desde loadMorePosts)
+    function initPhotoMusicObserversForNewPosts() {
+        const mediaElements = document.querySelectorAll('.post-media:not([data-music-observed])');
+        console.log('[PhotoMusic] Buscando posts con música, encontrados:', mediaElements.length);
+
+        mediaElements.forEach(media => {
+            const audioPlayer = media.querySelector('.photo-audio-player');
+            if (audioPlayer) {
+                console.log('[PhotoMusic] Observando post con audio:', audioPlayer.src);
                 media.setAttribute('data-music-observed', 'true');
                 photoMusicObserver.observe(media);
+
+                // Configurar loop manual para respetar el startTime
+                if (!audioPlayer.hasAttribute('data-loop-configured')) {
+                    audioPlayer.setAttribute('data-loop-configured', 'true');
+                    audioPlayer.removeAttribute('loop'); // Quitar loop nativo
+
+                    const startTimeValue = parseFloat(audioPlayer.dataset.start) || 0;
+                    console.log('[PhotoMusic] Configurando audio - PostID:', audioPlayer.dataset.postId, 'StartTime:', startTimeValue);
+
+                    // Establecer tiempo inicial al cargar
+                    audioPlayer.addEventListener('loadedmetadata', function() {
+                        const st = parseFloat(this.dataset.start) || 0;
+                        if (st > 0 && this.currentTime < st) {
+                            this.currentTime = st;
+                            console.log('[PhotoMusic] loadedmetadata - Tiempo inicial establecido a:', st);
+                        }
+                    });
+
+                    // Cuando el audio termina, reiniciar desde startTime
+                    audioPlayer.addEventListener('ended', function() {
+                        const startTime = parseFloat(this.dataset.start) || 0;
+                        console.log('[PhotoMusic] Audio terminó, reiniciando desde:', startTime);
+                        this.currentTime = startTime;
+                        this.play().catch(() => {});
+                    });
+
+                    // También verificar en timeupdate
+                    audioPlayer.addEventListener('timeupdate', function() {
+                        const startTime = parseFloat(this.dataset.start) || 0;
+                        // Si el audio está antes del startTime y está reproduciéndose, corregir
+                        if (startTime > 0 && this.currentTime < startTime && this.currentTime < 1 && !this.paused) {
+                            console.log('[PhotoMusic] Corrigiendo tiempo de', this.currentTime, 'a', startTime);
+                            this.currentTime = startTime;
+                        }
+                    });
+                }
             }
         });
+    }
+
+    // Observar todas las fotos con música al cargar
+    document.addEventListener('DOMContentLoaded', () => {
+        initPhotoMusicObserversForNewPosts();
     });
 
-    // 🍎 iOS: Primer toque en cualquier lugar desbloquea el audio
-    if (window.iOSAudioFix && window.iOSAudioFix.isIOS) {
-        let audioUnlockHandled = false;
-        document.addEventListener('touchstart', function unlockAudioOnTouch() {
-            if (audioUnlockHandled) return;
-            audioUnlockHandled = true;
+    // 🍎 iOS: Evento cuando el media se desbloquea (disparado por iOSMediaFix)
+    document.addEventListener('iOSMediaUnlocked', () => {
+        console.log('[iOS Feed] Media desbloqueado - reproduciendo contenido visible');
 
-            window.iOSAudioFix.resume().then(() => {
-                console.log('[iOS] Audio desbloqueado por interacción');
-                // Remover clase needs-tap de todos los badges
-                document.querySelectorAll('.music-badge.needs-tap').forEach(badge => {
-                    badge.classList.remove('needs-tap');
-                });
-                // Intentar reproducir el audio actual si hay uno visible
-                if (currentPhotoAudio && currentPhotoAudio.paused) {
-                    window.iOSAudioFix.play(currentPhotoAudio);
-                }
+        // Remover indicadores de needs-tap
+        document.querySelectorAll('.needs-tap').forEach(el => {
+            el.classList.remove('needs-tap');
+        });
+        document.querySelectorAll('.music-badge.needs-tap').forEach(badge => {
+            badge.classList.remove('needs-tap');
+        });
+
+        // Reproducir el video visible si hay uno
+        const visibleVideo = document.querySelector('.post-media.video-paused video.feed-video');
+        if (visibleVideo && visibleVideo.paused) {
+            const rect = visibleVideo.getBoundingClientRect();
+            const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+            if (isVisible) {
+                playVideo(visibleVideo);
+            }
+        }
+
+        // Reproducir el audio visible si hay uno
+        if (currentPhotoAudio && currentPhotoAudio.paused) {
+            const startTime = parseFloat(currentPhotoAudio.dataset.start) || 0;
+            let volume = parseFloat(currentPhotoAudio.dataset.volume) || 0.7;
+            if (volume > 1) volume = volume / 10;
+
+            if (window.iOSMediaFix?.isIOS) {
+                window.iOSMediaFix.playPhotoMusic(currentPhotoAudio, { startTime, volume });
+            }
+        }
+    });
+
+    // 🍎 iOS: Primer toque en cualquier lugar desbloquea el media
+    if (window.iOSMediaFix && window.iOSMediaFix.isIOS) {
+        let mediaUnlockHandled = false;
+        document.addEventListener('touchstart', function unlockMediaOnTouch() {
+            if (mediaUnlockHandled) return;
+            mediaUnlockHandled = true;
+
+            window.iOSMediaFix.resume().then(() => {
+                console.log('[iOS] Media desbloqueado por interacción');
             });
         }, { once: true, passive: true });
     }
@@ -5922,24 +7404,26 @@
         if (!audio) return;
 
         if (audio.paused) {
+            // Pausar audio anterior si existe
             if (currentPhotoAudio && currentPhotoAudio !== audio) {
-                currentPhotoAudio.pause();
+                if (window.iOSMediaFix?.isIOS) {
+                    window.iOSMediaFix.pause(currentPhotoAudio);
+                } else {
+                    currentPhotoAudio.pause();
+                }
                 // Limpiar badge anterior
                 document.querySelectorAll('.music-badge.playing').forEach(b => b.classList.remove('playing'));
             }
+
             const startTime = parseFloat(audio.dataset.start) || 0;
             let volume = parseFloat(audio.dataset.volume) || 0.7;
-            // Normalizar volumen al rango [0, 1]
             if (volume > 1) volume = volume / 10;
             volume = Math.min(1, Math.max(0, volume));
 
-            audio.currentTime = startTime;
-            audio.volume = volume;
-
-            // 🍎 iOS Fix: El click del usuario desbloquea el audio
-            if (window.iOSAudioFix && window.iOSAudioFix.isIOS) {
-                window.iOSAudioFix.resume().then(() => {
-                    window.iOSAudioFix.play(audio).then(success => {
+            // 🍎 iOS/Android: Usar iOSMediaFix para mejor compatibilidad
+            if (window.iOSMediaFix?.isIOS) {
+                window.iOSMediaFix.resume().then(() => {
+                    window.iOSMediaFix.playPhotoMusic(audio, { startTime, volume }).then(success => {
                         if (success) {
                             badge.classList.remove('needs-tap');
                             badge.classList.add('playing');
@@ -5948,6 +7432,8 @@
                     });
                 });
             } else {
+                audio.currentTime = startTime;
+                audio.volume = volume;
                 audio.play().then(() => {
                     badge.classList.add('playing');
                     currentPhotoAudio = audio;
@@ -5956,7 +7442,12 @@
                 });
             }
         } else {
-            audio.pause();
+            // Pausar audio
+            if (window.iOSMediaFix?.isIOS) {
+                window.iOSMediaFix.pause(audio);
+            } else {
+                audio.pause();
+            }
             currentPhotoAudio = null;
             badge.classList.remove('playing');
             badge.classList.remove('needs-tap');
@@ -6814,8 +8305,197 @@
             v.muted = isGlobalMuted;
         });
 
+        // Aplicar a audio de fotos
+        if (isGlobalMuted) {
+            // Pausar el audio de foto actual si existe
+            if (currentPhotoAudio) {
+                if (window.iOSMediaFix?.isIOS) {
+                    window.iOSMediaFix.pause(currentPhotoAudio);
+                } else {
+                    currentPhotoAudio.pause();
+                }
+                // Quitar indicador de playing del badge
+                document.querySelectorAll('.music-badge.playing').forEach(b => {
+                    b.classList.remove('playing');
+                });
+            }
+        } else {
+            // Si se activa el audio, intentar reproducir la música de la foto visible
+            const visiblePhotoWithMusic = document.querySelector('.post-media[data-music-observed] .photo-audio-player');
+            if (visiblePhotoWithMusic) {
+                const postMedia = visiblePhotoWithMusic.closest('.post-media');
+                const rect = postMedia?.getBoundingClientRect();
+                // Verificar si está visible en el viewport
+                if (rect && rect.top < window.innerHeight && rect.bottom > 0) {
+                    const startTime = parseFloat(visiblePhotoWithMusic.dataset.start) || 0;
+                    let volume = parseFloat(visiblePhotoWithMusic.dataset.volume) || 0.7;
+                    if (volume > 1) volume = volume / 10;
+                    volume = Math.min(1, Math.max(0, volume));
+
+                    if (window.iOSMediaFix?.isIOS) {
+                        window.iOSMediaFix.playPhotoMusic(visiblePhotoWithMusic, { startTime, volume });
+                    } else {
+                        visiblePhotoWithMusic.currentTime = startTime;
+                        visiblePhotoWithMusic.volume = volume;
+                        visiblePhotoWithMusic.play().catch(() => {});
+                    }
+                    currentPhotoAudio = visiblePhotoWithMusic;
+                    const badge = postMedia?.querySelector('.music-badge');
+                    if (badge) badge.classList.add('playing');
+                }
+            }
+        }
+
         updateAllMuteIcons();
     }
+
+    // Toggle mute para música de foto
+    function togglePhotoMusicMute(event, btn) {
+        event.stopPropagation();
+        event.preventDefault();
+        userHasInteracted = true;
+
+        isGlobalMuted = !isGlobalMuted;
+
+        // Aplicar a todos los videos también
+        document.querySelectorAll('.feed-video').forEach(v => {
+            v.muted = isGlobalMuted;
+        });
+
+        // Aplicar a audio de fotos
+        if (isGlobalMuted) {
+            // Pausar el audio de foto actual si existe
+            if (currentPhotoAudio) {
+                if (window.iOSMediaFix?.isIOS) {
+                    window.iOSMediaFix.pause(currentPhotoAudio);
+                } else {
+                    currentPhotoAudio.pause();
+                }
+                // Quitar indicador de playing del badge
+                document.querySelectorAll('.music-badge.playing').forEach(b => {
+                    b.classList.remove('playing');
+                });
+            }
+        } else {
+            // Si se activa el audio, intentar reproducir la música de la foto actual
+            const postMedia = btn.closest('.post-media');
+            const audioPlayer = postMedia?.querySelector('.photo-audio-player');
+            if (audioPlayer) {
+                const startTime = parseFloat(audioPlayer.dataset.start) || 0;
+                let volume = parseFloat(audioPlayer.dataset.volume) || 0.7;
+                if (volume > 1) volume = volume / 10;
+                volume = Math.min(1, Math.max(0, volume));
+
+                if (window.iOSMediaFix?.isIOS) {
+                    window.iOSMediaFix.playPhotoMusic(audioPlayer, { startTime, volume });
+                } else {
+                    audioPlayer.currentTime = startTime;
+                    audioPlayer.volume = volume;
+                    audioPlayer.play().catch(() => {});
+                }
+                currentPhotoAudio = audioPlayer;
+                const badge = postMedia?.querySelector('.music-badge');
+                if (badge) badge.classList.add('playing');
+            }
+        }
+
+        updateAllMuteIcons();
+    }
+
+    // ========================================
+    // AUDIO POST CONTROLS
+    // ========================================
+    let currentPostAudio = null;
+
+    function toggleAudioPlay(event, btn) {
+        event.stopPropagation();
+        event.preventDefault();
+
+        const container = btn.closest('.post-media-audio');
+        const audio = container.querySelector('.post-audio-player');
+        if (!audio) return;
+
+        const playIcon = btn.querySelector('.icon-play');
+        const pauseIcon = btn.querySelector('.icon-pause');
+
+        if (audio.paused) {
+            // Pausar cualquier otro audio reproduciéndose
+            if (currentPostAudio && currentPostAudio !== audio) {
+                currentPostAudio.pause();
+                const otherContainer = currentPostAudio.closest('.post-media-audio');
+                if (otherContainer) {
+                    otherContainer.classList.remove('playing');
+                    const otherPlayIcon = otherContainer.querySelector('.icon-play');
+                    const otherPauseIcon = otherContainer.querySelector('.icon-pause');
+                    if (otherPlayIcon) otherPlayIcon.style.display = 'block';
+                    if (otherPauseIcon) otherPauseIcon.style.display = 'none';
+                }
+            }
+
+            audio.play().then(() => {
+                container.classList.add('playing');
+                playIcon.style.display = 'none';
+                pauseIcon.style.display = 'block';
+                currentPostAudio = audio;
+            }).catch(err => {
+                console.log('Error reproduciendo audio:', err);
+            });
+        } else {
+            audio.pause();
+            container.classList.remove('playing');
+            playIcon.style.display = 'block';
+            pauseIcon.style.display = 'none';
+        }
+    }
+
+    function toggleAudioMute(event, btn) {
+        event.stopPropagation();
+        event.preventDefault();
+
+        const container = btn.closest('.post-media-audio');
+        const audio = container.querySelector('.post-audio-player');
+        if (!audio) return;
+
+        const mutedIcon = btn.querySelector('.muted-icon');
+        const unmutedIcon = btn.querySelector('.unmuted-icon');
+
+        audio.muted = !audio.muted;
+
+        if (audio.muted) {
+            mutedIcon.style.display = 'block';
+            unmutedIcon.style.display = 'none';
+        } else {
+            mutedIcon.style.display = 'none';
+            unmutedIcon.style.display = 'block';
+        }
+    }
+
+    // Actualizar barra de progreso del audio
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.post-audio-player').forEach(audio => {
+            audio.addEventListener('timeupdate', function() {
+                const container = this.closest('.post-media-audio');
+                const progressBar = container?.querySelector('.audio-progress-bar');
+                if (progressBar && this.duration) {
+                    const percent = (this.currentTime / this.duration) * 100;
+                    progressBar.style.width = percent + '%';
+                }
+            });
+
+            audio.addEventListener('ended', function() {
+                const container = this.closest('.post-media-audio');
+                if (container) {
+                    container.classList.remove('playing');
+                    const playIcon = container.querySelector('.icon-play');
+                    const pauseIcon = container.querySelector('.icon-pause');
+                    if (playIcon) playIcon.style.display = 'block';
+                    if (pauseIcon) pauseIcon.style.display = 'none';
+                    const progressBar = container.querySelector('.audio-progress-bar');
+                    if (progressBar) progressBar.style.width = '0%';
+                }
+            });
+        });
+    });
 
     // Inicializar observers para videos existentes al cargar la página
     document.addEventListener('DOMContentLoaded', function() {
@@ -6824,6 +8504,212 @@
         // Actualizar iconos de mute
         updateAllMuteIcons();
     });
+
+    // ========================================
+    // TOOLTIP DE LIKES (Desktop hover + Mobile long press)
+    // ========================================
+
+    let likesTooltipTimeout = null;
+    let likesCache = {};
+    let longPressTimer = null;
+    const LONG_PRESS_DURATION = 500; // ms
+
+    // Detectar si es dispositivo táctil
+    function isTouchDevice() {
+        return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    }
+
+    // Obtener likes de un contenido
+    async function fetchLikesUsuarios(contenidoId) {
+        // Usar cache si existe y es reciente (5 minutos)
+        const cached = likesCache[contenidoId];
+        if (cached && (Date.now() - cached.timestamp) < 300000) {
+            return cached.data;
+        }
+
+        try {
+            const response = await fetch(`/Feed/ObtenerLikesUsuarios?contenidoId=${contenidoId}&limit=10`);
+            const data = await response.json();
+
+            if (data.success) {
+                likesCache[contenidoId] = {
+                    data: data,
+                    timestamp: Date.now()
+                };
+                return data;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error obteniendo likes:', error);
+            return null;
+        }
+    }
+
+    // Renderizar lista de usuarios
+    function renderLikesUsuarios(usuarios, total, hayMas, isModal = false) {
+        if (!usuarios || usuarios.length === 0) {
+            return isModal
+                ? '<div class="likes-modal-empty"><i class="far fa-heart"></i><p>Aún no hay likes</p></div>'
+                : '<div class="likes-tooltip-loading">Sin likes aún</div>';
+        }
+
+        const prefix = isModal ? 'likes-modal' : 'likes-tooltip';
+        let html = '';
+
+        usuarios.forEach(u => {
+            const verifiedBadge = u.esVerificado ? '<i class="fas fa-check-circle verified"></i>' : '';
+            html += `
+                <a href="/Feed/Perfil/${u.id}" class="${prefix}-user">
+                    <img src="${u.foto}" alt="" class="${prefix}-avatar" onerror="this.src='/images/default-avatar.png'">
+                    <div class="${prefix}-info">
+                        <div class="${prefix}-username">${escapeHtml(u.username)}${verifiedBadge}</div>
+                        <div class="${prefix}-name">${escapeHtml(u.nombre)}</div>
+                    </div>
+                </a>
+            `;
+        });
+
+        if (hayMas && !isModal) {
+            html += `<div class="likes-tooltip-more">y ${total - usuarios.length} más...</div>`;
+        }
+
+        return html;
+    }
+
+    // Mostrar tooltip (Desktop)
+    function showLikesTooltip(element, contenidoId) {
+        if (isTouchDevice()) return; // No mostrar en móvil
+
+        const tooltip = document.getElementById('likesTooltip');
+        const list = document.getElementById('likesTooltipList');
+
+        // Posicionar tooltip
+        const rect = element.getBoundingClientRect();
+        tooltip.style.left = rect.left + 'px';
+        tooltip.style.top = (rect.bottom + 8) + 'px';
+
+        // Mostrar loading
+        list.innerHTML = '<div class="likes-tooltip-loading"><i class="fas fa-spinner fa-spin"></i></div>';
+        tooltip.classList.add('visible');
+
+        // Cargar datos
+        fetchLikesUsuarios(contenidoId).then(data => {
+            if (data) {
+                document.getElementById('likesTooltipHeader').textContent = `${data.total} Me gusta`;
+                list.innerHTML = renderLikesUsuarios(data.usuarios, data.total, data.hayMas, false);
+            } else {
+                list.innerHTML = '<div class="likes-tooltip-loading">Error al cargar</div>';
+            }
+        });
+    }
+
+    // Ocultar tooltip
+    function hideLikesTooltip() {
+        const tooltip = document.getElementById('likesTooltip');
+        tooltip.classList.remove('visible');
+    }
+
+    // Mostrar modal (Móvil)
+    function showLikesModal(contenidoId) {
+        const overlay = document.getElementById('likesModalOverlay');
+        const list = document.getElementById('likesModalList');
+
+        // Mostrar loading
+        list.innerHTML = '<div class="likes-tooltip-loading"><i class="fas fa-spinner fa-spin"></i></div>';
+        overlay.classList.add('visible');
+        document.body.style.overflow = 'hidden';
+
+        // Cargar datos
+        fetchLikesUsuarios(contenidoId).then(data => {
+            if (data) {
+                list.innerHTML = renderLikesUsuarios(data.usuarios, data.total, data.hayMas, true);
+            } else {
+                list.innerHTML = '<div class="likes-modal-empty"><i class="fas fa-exclamation-circle"></i><p>Error al cargar</p></div>';
+            }
+        });
+    }
+
+    // Cerrar modal
+    function closeLikesModal() {
+        const overlay = document.getElementById('likesModalOverlay');
+        overlay.classList.remove('visible');
+        document.body.style.overflow = '';
+    }
+
+    // Inicializar eventos de likes en elementos .post-likes
+    function initLikesTooltipEvents() {
+        document.querySelectorAll('.post-likes').forEach(likesEl => {
+            const postId = likesEl.closest('.post-card')?.querySelector('.like-btn')?.dataset?.id ||
+                          likesEl.closest('.post-card')?.dataset?.postId;
+
+            if (!postId) return;
+
+            // Agregar cursor pointer
+            likesEl.style.cursor = 'pointer';
+
+            // Desktop: hover
+            likesEl.addEventListener('mouseenter', function() {
+                clearTimeout(likesTooltipTimeout);
+                likesTooltipTimeout = setTimeout(() => {
+                    showLikesTooltip(this, postId);
+                }, 300);
+            });
+
+            likesEl.addEventListener('mouseleave', function() {
+                clearTimeout(likesTooltipTimeout);
+                likesTooltipTimeout = setTimeout(() => {
+                    hideLikesTooltip();
+                }, 200);
+            });
+
+            // Móvil: long press
+            likesEl.addEventListener('touchstart', function(e) {
+                longPressTimer = setTimeout(() => {
+                    e.preventDefault();
+                    showLikesModal(postId);
+                }, LONG_PRESS_DURATION);
+            }, { passive: false });
+
+            likesEl.addEventListener('touchend', function() {
+                clearTimeout(longPressTimer);
+            });
+
+            likesEl.addEventListener('touchmove', function() {
+                clearTimeout(longPressTimer);
+            });
+        });
+
+        // Mantener tooltip visible al hover sobre él
+        const tooltip = document.getElementById('likesTooltip');
+        tooltip.addEventListener('mouseenter', function() {
+            clearTimeout(likesTooltipTimeout);
+        });
+
+        tooltip.addEventListener('mouseleave', function() {
+            likesTooltipTimeout = setTimeout(() => {
+                hideLikesTooltip();
+            }, 200);
+        });
+    }
+
+    // Inicializar al cargar
+    document.addEventListener('DOMContentLoaded', initLikesTooltipEvents);
+
+    // Re-inicializar cuando se carguen nuevos posts
+    const likesObserver = new MutationObserver((mutations) => {
+        mutations.forEach(mutation => {
+            mutation.addedNodes.forEach(node => {
+                if (node.nodeType === 1 && node.classList?.contains('post-card')) {
+                    initLikesTooltipEvents();
+                }
+            });
+        });
+    });
+
+    const feedContainer = document.querySelector('.feed-container');
+    if (feedContainer) {
+        likesObserver.observe(feedContainer, { childList: true, subtree: true });
+    }
 </script>
 
 <!-- ========================================
@@ -7175,6 +9061,13 @@
         .dm-popup-container {
             bottom: 16px;
             right: 16px;
+        }
+    }
+
+    /* Ocultar FAB de mensajes en móvil - se muestra en header */
+    @@media (max-width: 768px) {
+        .dm-popup-container {
+            display: none !important;
         }
     }
 </style>

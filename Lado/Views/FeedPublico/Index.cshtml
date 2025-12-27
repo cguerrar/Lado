@@ -109,6 +109,22 @@
         100% { background-position: -200% 0; }
     }
 
+    /* Placeholder para videos con error */
+    .video-error-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    }
+
+    .video-error-placeholder svg {
+        width: 40%;
+        height: 40%;
+        opacity: 0.5;
+    }
+
     .mosaic-item:hover img,
     .mosaic-item:hover video {
         transform: scale(1.1);
@@ -261,6 +277,37 @@
     .mosaic-btn svg {
         width: 20px;
         height: 20px;
+    }
+
+    /* Botón "¿Qué es Lado?" - Solo visible en móvil */
+    .mosaic-btn-info {
+        display: none;
+        background: transparent;
+        color: rgba(255, 255, 255, 0.7);
+        border: none;
+        font-size: 13px;
+        padding: 10px 16px;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+    }
+
+    .mosaic-btn-info:hover {
+        color: #fff;
+    }
+
+    @@media (max-width: 768px) {
+        .mosaic-btn-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            justify-content: center;
+            margin-top: 8px;
+        }
+
+        .mosaic-btn-info i {
+            font-size: 12px;
+        }
     }
 
     /* ========================================
@@ -535,45 +582,109 @@
         @{
             // Crear un grid de imagenes aleatorias
             var random = new Random();
-            var contenidoAleatorio = contenidoLista
+            var contenidoConArchivo = contenidoLista
                 .Where(c => !string.IsNullOrEmpty(c.RutaArchivo))
+                .ToList();
+
+            var contenidoAleatorio = contenidoConArchivo
                 .OrderBy(x => random.Next())
                 .ToList();
 
             // Necesitamos suficientes items para llenar toda la pantalla
             // Para pantalla 1920x1080 con items de 100px = ~20 cols x 12 rows = 240 items
             var itemsNecesarios = 250;
-            while (contenidoAleatorio.Count < itemsNecesarios && contenidoLista.Any())
+
+            // Solo duplicar si hay contenido disponible (protección contra loop infinito)
+            if (contenidoConArchivo.Any())
             {
-                contenidoAleatorio.AddRange(contenidoLista
-                    .Where(c => !string.IsNullOrEmpty(c.RutaArchivo))
-                    .OrderBy(x => random.Next()));
+                while (contenidoAleatorio.Count < itemsNecesarios)
+                {
+                    contenidoAleatorio.AddRange(contenidoConArchivo
+                        .OrderBy(x => random.Next()));
+                }
             }
 
             var itemsParaMostrar = contenidoAleatorio.Take(itemsNecesarios).ToList();
+            var hayContenido = itemsParaMostrar.Any();
         }
 
-        @foreach (var item in itemsParaMostrar)
+        @if (hayContenido)
         {
-            var esVideo = item.TipoContenido == TipoContenido.Video;
-            // Usar thumbnail si existe para carga más rápida
-            var imagenSrc = !string.IsNullOrEmpty(item.Thumbnail) ? item.Thumbnail : item.RutaArchivo;
-            <div class="mosaic-item" data-tipo="@(esVideo ? "video" : "image")" onclick="window.location.href='@Url.Action("Login", "Account")'">
-                @if (esVideo)
-                {
-                    <video data-src="@item.RutaArchivo" muted loop playsinline preload="none" poster="@(item.Thumbnail ?? "")"></video>
-                    <div class="video-badge">
-                        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                    </div>
-                }
-                else
-                {
-                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E"
-                         data-src="@imagenSrc"
-                         alt=""
-                         loading="lazy"
-                         decoding="async">
-                }
+            var contador = 0;
+            var contadorVideos = 0;
+            var cargarDirecto = 50; // Primeras 50 imágenes cargan directo sin lazy loading
+            var videosConAutoplay = 10; // Solo los primeros 10 videos tendrán autoplay
+
+            // Función para limpiar comillas de rutas (datos legacy)
+            string LimpiarRuta(string ruta) => string.IsNullOrEmpty(ruta) ? "" : ruta.Trim('"');
+
+            foreach (var item in itemsParaMostrar)
+            {
+                var esVideo = item.TipoContenido == TipoContenido.Video;
+                // Limpiar comillas de rutas (puede haber datos legacy con comillas)
+                var rutaArchivo = LimpiarRuta(item.RutaArchivo);
+                var thumbnailUrl = LimpiarRuta(item.Thumbnail);
+                // Usar thumbnail si existe para carga más rápida
+                var imagenSrc = !string.IsNullOrEmpty(thumbnailUrl) ? thumbnailUrl : rutaArchivo;
+                var usarLazy = contador >= cargarDirecto;
+                var videoAutoplay = esVideo && contadorVideos < videosConAutoplay;
+                if (esVideo) contadorVideos++;
+                contador++;
+
+                <div class="mosaic-item @(usarLazy ? "" : "media-loaded")" data-tipo="@(esVideo ? "video" : "image")" onclick="window.location.href='@Url.Action("Login", "Account")'">
+                    @if (esVideo)
+                    {
+                        // Videos: cargar video real, autoplay solo para los primeros N
+                        var posterUrl = !string.IsNullOrEmpty(thumbnailUrl) ? thumbnailUrl : "";
+                        <video src="@rutaArchivo"
+                               @(string.IsNullOrEmpty(posterUrl) ? "" : $"poster=\"{posterUrl}\"")
+                               @(videoAutoplay ? "autoplay" : "")
+                               muted
+                               loop
+                               playsinline
+                               webkit-playsinline
+                               preload="@(videoAutoplay ? "auto" : "metadata")"
+                               class="loaded"
+                               onerror="this.parentElement.innerHTML='<div class=\'video-error-placeholder\'><svg viewBox=\'0 0 24 24\' fill=\'rgba(255,255,255,0.3)\'><path d=\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\'/></svg></div>';">
+                        </video>
+                        <div class="video-badge">
+                            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </div>
+                    }
+                    else
+                    {
+                        if (usarLazy)
+                        {
+                            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E"
+                                 data-src="@imagenSrc"
+                                 alt=""
+                                 loading="lazy"
+                                 decoding="async"
+                                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E'; this.classList.add('loaded');">
+                        }
+                        else
+                        {
+                            <img src="@imagenSrc"
+                                 alt=""
+                                 class="loaded"
+                                 loading="eager"
+                                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E'">
+                        }
+                    }
+                </div>
+            }
+        }
+        else
+        {
+            <!-- Fallback cuando no hay contenido -->
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: rgba(255,255,255,0.6); padding: 40px;">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 20px; opacity: 0.5;">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                <h3 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 10px; color: white;">Bienvenido a LADO</h3>
+                <p style="font-size: 1rem; opacity: 0.8; max-width: 400px;">Pronto habrá contenido increíble para descubrir. ¡Regístrate para ser de los primeros!</p>
             </div>
         }
     </div>
@@ -607,6 +718,11 @@
                         <line x1="15" y1="12" x2="3" y2="12"></line>
                     </svg>
                     Iniciar sesion
+                </a>
+                <!-- Enlace a landing informativo (solo móvil) -->
+                <a href="/Home/Index?desktop=true" class="mosaic-btn-info">
+                    <i class="fas fa-info-circle"></i>
+                    ¿Qué es Lado?
                 </a>
             </div>
         }
@@ -646,8 +762,8 @@
             // SISTEMA DE CARGA OPTIMIZADO CON INTERSECTION OBSERVER
             // ========================================
 
-            // Imagen de fallback en caso de error (gradiente sutil)
-            const fallbackSrc = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%231a1a2e'/%3E%3Cstop offset='100%25' style='stop-color:%232d2d44'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23g)' width='100' height='100'/%3E%3C/svg%3E";
+            // Imagen de fallback en caso de error (fondo oscuro simple)
+            const fallbackSrc = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%231a1a2e' width='100' height='100'/%3E%3C/svg%3E";
 
             // Tracking de items cargados
             const loadedItems = new Set();
@@ -858,39 +974,48 @@
                 setTimeout(setupGrid, 100);
             });
 
-            // Manejo de videos - solo después de que se carguen
+            // Forzar que todos los videos muestren su primer frame
+            function showVideoFirstFrame(video) {
+                if (!video.src) return;
+
+                video.muted = true;
+                video.playsInline = true;
+
+                // Cuando los metadatos estén listos, ir al primer frame
+                const showFrame = () => {
+                    video.currentTime = 0.001; // Ir al primer frame
+                    video.classList.add('loaded');
+                    video.closest('.mosaic-item')?.classList.add('media-loaded');
+                };
+
+                if (video.readyState >= 1) {
+                    showFrame();
+                } else {
+                    video.addEventListener('loadedmetadata', showFrame, { once: true });
+                }
+            }
+
+            // Inicializar todos los videos
+            const allVideos = grid.querySelectorAll('video');
+            allVideos.forEach(showVideoFirstFrame);
+
+            // Manejo de videos - interacción
             if (!isTouchDevice) {
-                // Desktop: hover para reproducir (solo si el video ya cargó)
+                // Desktop: hover para reproducir
                 items.forEach(item => {
                     const video = item.querySelector('video');
                     if (video) {
                         item.addEventListener('mouseenter', () => {
-                            // Solo reproducir si ya tiene src y está cargado
                             if (video.src && video.readyState >= 2) {
                                 video.play().catch(() => {});
                             }
                         });
                         item.addEventListener('mouseleave', () => {
                             video.pause();
-                            video.currentTime = 0;
+                            video.currentTime = 0.001;
                         });
                     }
                 });
-            } else {
-                // Movil: reproducir algunos videos después de cargarlos
-                setTimeout(() => {
-                    const videos = Array.from(grid.querySelectorAll('video'))
-                        .filter(v => v.src && v.readyState >= 2);
-                    const videosToPlay = videos.slice(0, Math.min(2, videos.length));
-
-                    videosToPlay.forEach(video => {
-                        video.muted = true;
-                        video.playsInline = true;
-                        video.setAttribute('playsinline', '');
-                        video.setAttribute('webkit-playsinline', '');
-                        video.play().catch(() => {});
-                    });
-                }, 2000); // Esperar a que carguen
             }
 
             // Animar stats

@@ -93,5 +93,48 @@ namespace Lado.Models
         public const string LIMITE_TAMANO_FOTO_MB = "Limite_TamanoFoto_MB";     // Default: 10
         public const string LIMITE_TAMANO_VIDEO_MB = "Limite_TamanoVideo_MB";   // Default: 100
         public const string LIMITE_CANTIDAD_ARCHIVOS = "Limite_CantidadArchivos"; // Default: 10
+
+        // ========================================
+        // DISTRIBUCIÓN DE PREVIEWS LADOB EN FEED
+        // ========================================
+        public const string LADOB_PREVIEW_CANTIDAD = "LadoB_Preview_Cantidad";   // Default: 1 (cuántos previews mostrar)
+        public const string LADOB_PREVIEW_INTERVALO = "LadoB_Preview_Intervalo"; // Default: 5 (cada cuántos posts)
+
+        // ========================================
+        // LÍMITES DE CARGA DEL FEED
+        // ========================================
+        public const string FEED_LIMITE_LADOA = "Feed_Limite_LadoA";                     // Default: 30
+        public const string FEED_LIMITE_LADOB_SUSCRIPTOS = "Feed_Limite_LadoB_Suscriptos"; // Default: 15
+        public const string FEED_LIMITE_LADOB_PROPIO = "Feed_Limite_LadoB_Propio";       // Default: 10
+        public const string FEED_LIMITE_COMPRADO = "Feed_Limite_Comprado";               // Default: 10
+        public const string FEED_LIMITE_TOTAL = "Feed_Limite_Total";                     // Default: 50
+
+        // ========================================
+        // DESCUBRIMIENTO EN EL FEED
+        // ========================================
+        public const string FEED_DESCUBRIMIENTO_LADOA_CANTIDAD = "Feed_Descubrimiento_LadoA_Cantidad";   // Default: 5
+        public const string FEED_DESCUBRIMIENTO_LADOB_CANTIDAD = "Feed_Descubrimiento_LadoB_Cantidad";   // Default: 5
+        public const string FEED_DESCUBRIMIENTO_USUARIOS_CANTIDAD = "Feed_Descubrimiento_Usuarios";       // Default: 5
+
+        // ========================================
+        // VARIEDAD DE CREADORES EN FEED
+        // ========================================
+        public const string FEED_MAX_POSTS_CONSECUTIVOS_CREADOR = "Feed_MaxPostsConsecutivos"; // Default: 2
+
+        // ========================================
+        // INTERCALACIÓN DE ANUNCIOS EN FEED
+        // ========================================
+        public const string FEED_ANUNCIOS_INTERVALO = "Feed_Anuncios_Intervalo";   // Default: 8 (cada cuántos posts)
+        public const string FEED_ANUNCIOS_CANTIDAD = "Feed_Anuncios_Cantidad";     // Default: 3 (cuántos anuncios cargar)
+
+        // ========================================
+        // EXPLORAR - LÍMITES Y CONFIGURACIÓN
+        // ========================================
+        public const string EXPLORAR_LIMITE_CREADORES = "Explorar_Limite_Creadores";           // Default: 50
+        public const string EXPLORAR_LIMITE_CONTENIDO = "Explorar_Limite_Contenido";           // Default: 100
+        public const string EXPLORAR_LIMITE_ZONAS_MAPA = "Explorar_Limite_ZonasMapa";          // Default: 20
+        public const string EXPLORAR_LIMITE_CONTENIDO_MAPA = "Explorar_Limite_ContenidoMapa";  // Default: 30
+        public const string EXPLORAR_PAGE_SIZE = "Explorar_PageSize";                          // Default: 30
+        public const string EXPLORAR_CONFIANZA_OBJETOS = "Explorar_Confianza_Objetos";         // Default: 70 (0.7 * 100)
     }
 }

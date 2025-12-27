@@ -21,6 +21,8 @@ namespace Lado.Controllers
         private readonly IClaudeClassificationService _classificationService;
         private readonly IRateLimitService _rateLimitService;
         private readonly IExifService _exifService;
+        private readonly ILogEventoService _logEventoService;
+        private readonly IFileValidationService _fileValidationService;
 
         public ContenidoController(
             ApplicationDbContext context,
@@ -31,7 +33,9 @@ namespace Lado.Controllers
             IImageService imageService,
             IClaudeClassificationService classificationService,
             IRateLimitService rateLimitService,
-            IExifService exifService)
+            IExifService exifService,
+            ILogEventoService logEventoService,
+            IFileValidationService fileValidationService)
         {
             _context = context;
             _userManager = userManager;
@@ -42,6 +46,8 @@ namespace Lado.Controllers
             _classificationService = classificationService;
             _rateLimitService = rateLimitService;
             _exifService = exifService;
+            _logEventoService = logEventoService;
+            _fileValidationService = fileValidationService;
         }
 
         // ========================================
@@ -304,17 +310,31 @@ namespace Lado.Controllers
                         return View();
                     }
 
-                    var extension = Path.GetExtension(archivo.FileName).ToLower();
-                    var tiposPermitidosImg = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".bmp" };
-                    var tiposPermitidosVideo = new[] { ".mp4", ".mov", ".avi", ".webm", ".m4v", ".3gp" };
-                    var tiposPermitidos = tiposPermitidosImg.Concat(tiposPermitidosVideo).ToArray();
+                    // ✅ SEGURIDAD: Validar archivo con magic bytes (no solo extensión)
+                    var tipoEsperado = contenido.TipoContenido == Models.TipoContenido.Foto
+                        ? Services.TipoArchivoValidacion.Imagen
+                        : Services.TipoArchivoValidacion.Video;
 
-                    if (!tiposPermitidos.Contains(extension))
+                    FileValidationResult validacionArchivo;
+                    if (tipoEsperado == Services.TipoArchivoValidacion.Imagen)
                     {
-                        TempData["Error"] = "Tipo de archivo no permitido. Formatos válidos: JPG, PNG, GIF, WEBP, HEIC, MP4, MOV, AVI";
+                        validacionArchivo = await _fileValidationService.ValidarImagenAsync(archivo);
+                    }
+                    else
+                    {
+                        validacionArchivo = await _fileValidationService.ValidarVideoAsync(archivo);
+                    }
+
+                    if (!validacionArchivo.EsValido)
+                    {
+                        _logger.LogWarning("⚠️ Archivo rechazado en Crear: {FileName}, Error: {Error}",
+                            archivo.FileName, validacionArchivo.MensajeError);
+                        TempData["Error"] = validacionArchivo.MensajeError ?? "El archivo no es válido";
                         ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
                         return View();
                     }
+
+                    var extension = validacionArchivo.Extension ?? Path.GetExtension(archivo.FileName).ToLower();
 
                     var carpetaUsuario = usuario.UserName?.Replace("@", "_").Replace(".", "_") ?? usuario.Id;
                     var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", carpetaUsuario);
@@ -366,13 +386,16 @@ namespace Lado.Controllers
                     }
                 }
 
-                // Clasificar contenido automaticamente con Claude AI
+                // ========================================
+                // CLASIFICAR + DETECTAR OBJETOS (UNA SOLA LLAMADA A CLAUDE)
+                // ========================================
+                List<Services.ObjetoDetectado> objetosParaGuardar = new();
                 try
                 {
                     byte[]? imagenBytes = null;
                     string? mimeType = null;
 
-                    // Leer el archivo guardado para clasificacion
+                    // Leer el archivo guardado
                     if (!string.IsNullOrEmpty(contenido.RutaArchivo))
                     {
                         var extension = Path.GetExtension(contenido.RutaArchivo).ToLower();
@@ -384,7 +407,7 @@ namespace Lado.Controllers
                             if (System.IO.File.Exists(rutaCompleta))
                             {
                                 var fileInfo = new FileInfo(rutaCompleta);
-                                if (fileInfo.Length < 5 * 1024 * 1024) // Max 5MB para clasificacion
+                                if (fileInfo.Length < 5 * 1024 * 1024)
                                 {
                                     imagenBytes = await System.IO.File.ReadAllBytesAsync(rutaCompleta);
                                     mimeType = extension switch
@@ -400,30 +423,24 @@ namespace Lado.Controllers
                         }
                     }
 
-                    var resultado = await _classificationService.ClasificarContenidoDetalladoAsync(
+                    // UNA SOLA llamada a Claude para clasificacion Y deteccion de objetos
+                    var resultado = await _classificationService.ClasificarYDetectarObjetosAsync(
                         imagenBytes, Descripcion, mimeType);
 
-                    if (resultado.Exito && resultado.CategoriaId.HasValue)
+                    if (resultado.Clasificacion.Exito && resultado.Clasificacion.CategoriaId.HasValue)
                     {
-                        contenido.CategoriaInteresId = resultado.CategoriaId.Value;
-                        if (resultado.CategoriaCreada)
-                        {
-                            _logger.LogInformation("Nueva categoria creada por IA: {Nombre} (ID: {Id})",
-                                resultado.CategoriaNombre, resultado.CategoriaId.Value);
-                        }
-                        else
-                        {
-                            _logger.LogInformation("Contenido clasificado en categoria {CategoriaId}", resultado.CategoriaId.Value);
-                        }
+                        contenido.CategoriaInteresId = resultado.Clasificacion.CategoriaId.Value;
+                        _logger.LogInformation("Contenido clasificado en categoria {CategoriaId}", resultado.Clasificacion.CategoriaId.Value);
                     }
-                    else if (!string.IsNullOrEmpty(resultado.Error))
-                    {
-                        _logger.LogWarning("No se pudo clasificar: {Error} - {Detalle}", resultado.Error, resultado.DetalleError);
-                    }
+
+                    // Guardar objetos para despues (necesitamos el ID del contenido)
+                    objetosParaGuardar = resultado.ObjetosDetectados;
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Error al clasificar contenido, continuando sin categoria");
+                    _ = _logEventoService.RegistrarErrorAsync(ex, Models.CategoriaEvento.Contenido,
+                        usuario?.Id, usuario?.UserName);
                 }
 
                 _context.Contenidos.Add(contenido);
@@ -431,6 +448,24 @@ namespace Lado.Controllers
 
                 _logger.LogInformation("Contenido guardado - ID: {Id}, TipoLado: {TipoLado}, CategoriaId: {CategoriaId}",
                     contenido.Id, contenido.TipoLado, contenido.CategoriaInteresId);
+
+                // Guardar objetos detectados (ahora tenemos el ID del contenido)
+                if (objetosParaGuardar.Any())
+                {
+                    foreach (var obj in objetosParaGuardar)
+                    {
+                        _context.ObjetosContenido.Add(new Models.ObjetoContenido
+                        {
+                            ContenidoId = contenido.Id,
+                            NombreObjeto = obj.Nombre,
+                            Confianza = obj.Confianza,
+                            FechaDeteccion = DateTime.Now
+                        });
+                    }
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("Guardados {Count} objetos para contenido {Id}",
+                        objetosParaGuardar.Count, contenido.Id);
+                }
 
                 // ========================================
                 // CREAR PREVIEW BLUR PARA LADOA (si se solicitó)
@@ -604,11 +639,64 @@ namespace Lado.Controllers
                     contenido.Thumbnail = thumbnail;
                 }
 
+                // ========================================
+                // CLASIFICAR + DETECTAR OBJETOS (UNA SOLA LLAMADA A CLAUDE)
+                // ========================================
+                List<Services.ObjetoDetectado> objetosEditor = new();
+                try
+                {
+                    var fileInfo = new FileInfo(filePath);
+                    if (fileInfo.Length < 5 * 1024 * 1024)
+                    {
+                        var imagenBytes = await System.IO.File.ReadAllBytesAsync(filePath);
+                        var mimeType = extension switch
+                        {
+                            ".jpg" or ".jpeg" => "image/jpeg",
+                            ".png" => "image/png",
+                            ".gif" => "image/gif",
+                            ".webp" => "image/webp",
+                            _ => "image/jpeg"
+                        };
+
+                        var resultado = await _classificationService.ClasificarYDetectarObjetosAsync(
+                            imagenBytes, descripcion, mimeType);
+
+                        if (resultado.Clasificacion.Exito && resultado.Clasificacion.CategoriaId.HasValue)
+                        {
+                            contenido.CategoriaInteresId = resultado.Clasificacion.CategoriaId.Value;
+                        }
+
+                        objetosEditor = resultado.ObjetosDetectados;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error al clasificar contenido del editor, continuando sin categoria");
+                    _ = _logEventoService.RegistrarErrorAsync(ex, Models.CategoriaEvento.Contenido,
+                        usuario?.Id, usuario?.UserName);
+                }
+
                 _context.Contenidos.Add(contenido);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Contenido creado desde editor - ID: {Id}, Usuario: {Usuario}",
-                    contenido.Id, usuario.UserName);
+                // Guardar objetos detectados
+                if (objetosEditor.Any())
+                {
+                    foreach (var obj in objetosEditor)
+                    {
+                        _context.ObjetosContenido.Add(new Models.ObjetoContenido
+                        {
+                            ContenidoId = contenido.Id,
+                            NombreObjeto = obj.Nombre,
+                            Confianza = obj.Confianza,
+                            FechaDeteccion = DateTime.Now
+                        });
+                    }
+                    await _context.SaveChangesAsync();
+                }
+
+                _logger.LogInformation("Contenido creado desde editor - ID: {Id}, Usuario: {Usuario}, Categoria: {Cat}",
+                    contenido.Id, usuario.UserName, contenido.CategoriaInteresId);
 
                 // Notificar a seguidores
                 _ = _notificationService.NotificarNuevoContenidoAsync(
@@ -880,7 +968,10 @@ namespace Lado.Controllers
                 }
                 // Si solo hay videos, dejar Thumbnail null para que la vista use el tag <video>
 
-                // Clasificar contenido automaticamente con Claude AI
+                // ========================================
+                // CLASIFICAR + DETECTAR OBJETOS (UNA SOLA LLAMADA A CLAUDE)
+                // ========================================
+                List<Services.ObjetoDetectado> objetosCarrusel = new();
                 try
                 {
                     byte[]? imagenBytes = null;
@@ -914,36 +1005,47 @@ namespace Lado.Controllers
                         }
                     }
 
-                    var resultado = await _classificationService.ClasificarContenidoDetalladoAsync(
+                    // UNA SOLA llamada a Claude
+                    var resultado = await _classificationService.ClasificarYDetectarObjetosAsync(
                         imagenBytes, Descripcion, mimeType);
 
-                    if (resultado.Exito && resultado.CategoriaId.HasValue)
+                    if (resultado.Clasificacion.Exito && resultado.Clasificacion.CategoriaId.HasValue)
                     {
-                        contenido.CategoriaInteresId = resultado.CategoriaId.Value;
-                        if (resultado.CategoriaCreada)
-                        {
-                            _logger.LogInformation("Carrusel: Nueva categoria creada por IA: {Nombre} (ID: {Id})",
-                                resultado.CategoriaNombre, resultado.CategoriaId.Value);
-                        }
-                        else
-                        {
-                            _logger.LogInformation("Carrusel clasificado en categoria {CategoriaId}", resultado.CategoriaId.Value);
-                        }
+                        contenido.CategoriaInteresId = resultado.Clasificacion.CategoriaId.Value;
+                        _logger.LogInformation("Carrusel clasificado en categoria {CategoriaId}", resultado.Clasificacion.CategoriaId.Value);
                     }
-                    else if (!string.IsNullOrEmpty(resultado.Error))
-                    {
-                        _logger.LogWarning("Carrusel no clasificado: {Error} - {Detalle}", resultado.Error, resultado.DetalleError);
-                    }
+
+                    objetosCarrusel = resultado.ObjetosDetectados;
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Error al clasificar carrusel, continuando sin categoria");
+                    _ = _logEventoService.RegistrarErrorAsync(ex, Models.CategoriaEvento.Contenido,
+                        usuario?.Id, usuario?.UserName);
                 }
 
                 await _context.SaveChangesAsync();
 
                 _logger.LogInformation("Carrusel creado - ID: {Id}, Archivos: {Count}, CategoriaId: {CategoriaId}",
                     contenido.Id, archivosGuardados.Count, contenido.CategoriaInteresId);
+
+                // Guardar objetos detectados
+                if (objetosCarrusel.Any())
+                {
+                    foreach (var obj in objetosCarrusel)
+                    {
+                        _context.ObjetosContenido.Add(new Models.ObjetoContenido
+                        {
+                            ContenidoId = contenido.Id,
+                            NombreObjeto = obj.Nombre,
+                            Confianza = obj.Confianza,
+                            FechaDeteccion = DateTime.Now
+                        });
+                    }
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("Guardados {Count} objetos para carrusel {Id}",
+                        objetosCarrusel.Count, contenido.Id);
+                }
 
                 // Notificar a seguidores
                 if (!EsBorrador)
@@ -1202,7 +1304,10 @@ namespace Lado.Controllers
                     }
                 }
 
-                // Clasificar contenido automaticamente con Claude AI
+                // ========================================
+                // CLASIFICAR + DETECTAR OBJETOS (UNA SOLA LLAMADA A CLAUDE)
+                // ========================================
+                List<Services.ObjetoDetectado> objetosReel = new();
                 try
                 {
                     byte[]? imagenBytes = null;
@@ -1225,30 +1330,23 @@ namespace Lado.Controllers
                         }
                     }
 
-                    var resultado = await _classificationService.ClasificarContenidoDetalladoAsync(
+                    // UNA SOLA llamada a Claude
+                    var resultado = await _classificationService.ClasificarYDetectarObjetosAsync(
                         imagenBytes, descripcion, mimeType);
 
-                    if (resultado.Exito && resultado.CategoriaId.HasValue)
+                    if (resultado.Clasificacion.Exito && resultado.Clasificacion.CategoriaId.HasValue)
                     {
-                        contenido.CategoriaInteresId = resultado.CategoriaId.Value;
-                        if (resultado.CategoriaCreada)
-                        {
-                            _logger.LogInformation("Reel: Nueva categoria creada por IA: {Nombre} (ID: {Id})",
-                                resultado.CategoriaNombre, resultado.CategoriaId.Value);
-                        }
-                        else
-                        {
-                            _logger.LogInformation("Reel clasificado en categoria {CategoriaId}", resultado.CategoriaId.Value);
-                        }
+                        contenido.CategoriaInteresId = resultado.Clasificacion.CategoriaId.Value;
+                        _logger.LogInformation("Reel clasificado en categoria {CategoriaId}", resultado.Clasificacion.CategoriaId.Value);
                     }
-                    else if (!string.IsNullOrEmpty(resultado.Error))
-                    {
-                        _logger.LogWarning("Reel no clasificado: {Error} - {Detalle}", resultado.Error, resultado.DetalleError);
-                    }
+
+                    objetosReel = resultado.ObjetosDetectados;
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Error al clasificar reel, continuando sin categoria");
+                    _ = _logEventoService.RegistrarErrorAsync(ex, Models.CategoriaEvento.Contenido,
+                        usuario?.Id, usuario?.UserName);
                 }
 
                 _context.Contenidos.Add(contenido);
@@ -1256,6 +1354,24 @@ namespace Lado.Controllers
 
                 _logger.LogInformation("Contenido creado desde Reels - ID: {Id}, CategoriaId: {CategoriaId}",
                     contenido.Id, contenido.CategoriaInteresId);
+
+                // Guardar objetos detectados
+                if (objetosReel.Any())
+                {
+                    foreach (var obj in objetosReel)
+                    {
+                        _context.ObjetosContenido.Add(new Models.ObjetoContenido
+                        {
+                            ContenidoId = contenido.Id,
+                            NombreObjeto = obj.Nombre,
+                            Confianza = obj.Confianza,
+                            FechaDeteccion = DateTime.Now
+                        });
+                    }
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("Guardados {Count} objetos para reel {Id}",
+                        objetosReel.Count, contenido.Id);
+                }
 
                 // Notificar a seguidores sobre el nuevo contenido
                 _ = _notificationService.NotificarNuevoContenidoAsync(
@@ -1472,7 +1588,21 @@ namespace Lado.Controllers
                             contenido.PistaMusicalId = PistaMusicalId.Value;
                             contenido.AudioTrimInicio = AudioTrimInicio ?? 0;
                             contenido.MusicaVolumen = MusicaVolumen ?? 0.7m;
-                            _logger.LogInformation("Música ID {MusicaId} asociada al contenido ID {Id}", PistaMusicalId.Value, id);
+                            _logger.LogInformation("Música ID {MusicaId} asociada al contenido ID {Id}, AudioTrimInicio={Trim}, Volumen={Vol}",
+                                PistaMusicalId.Value, id, AudioTrimInicio, MusicaVolumen);
+                        }
+                    }
+                    // Si ya tiene música pero solo se actualizan los controles
+                    else if (contenido.PistaMusicalId.HasValue && contenido.PistaMusicalId > 0)
+                    {
+                        if (AudioTrimInicio.HasValue)
+                        {
+                            contenido.AudioTrimInicio = AudioTrimInicio.Value;
+                            _logger.LogInformation("AudioTrimInicio actualizado a {Trim} para contenido {Id}", AudioTrimInicio.Value, id);
+                        }
+                        if (MusicaVolumen.HasValue)
+                        {
+                            contenido.MusicaVolumen = MusicaVolumen.Value;
                         }
                     }
                 }
@@ -1485,19 +1615,26 @@ namespace Lado.Controllers
                 // ✅ Subir nuevo archivo si se proporciona
                 if (archivo != null && archivo.Length > 0)
                 {
-                    var extensionPermitida = false;
+                    // ✅ SEGURIDAD: Validar archivo con magic bytes (no solo Content-Type)
+                    FileValidationResult validacionArchivo;
                     if (contenido.TipoContenido == Models.TipoContenido.Foto)
                     {
-                        extensionPermitida = archivo.ContentType.StartsWith("image/");
+                        validacionArchivo = await _fileValidationService.ValidarImagenAsync(archivo);
                     }
                     else if (contenido.TipoContenido == Models.TipoContenido.Video)
                     {
-                        extensionPermitida = archivo.ContentType.StartsWith("video/");
+                        validacionArchivo = await _fileValidationService.ValidarVideoAsync(archivo);
+                    }
+                    else
+                    {
+                        validacionArchivo = await _fileValidationService.ValidarMediaAsync(archivo);
                     }
 
-                    if (!extensionPermitida)
+                    if (!validacionArchivo.EsValido)
                     {
-                        TempData["Error"] = "El tipo de archivo no coincide con el tipo de contenido seleccionado";
+                        _logger.LogWarning("Archivo rechazado en Editar: {FileName}, Razón: {Razon}",
+                            archivo.FileName, validacionArchivo.MensajeError);
+                        TempData["Error"] = validacionArchivo.MensajeError ?? "El tipo de archivo no es válido";
                         ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
                         return View(contenido);
                     }

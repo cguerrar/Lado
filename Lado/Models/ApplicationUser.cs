@@ -170,6 +170,9 @@ namespace Lado.Models
         [Display(Name = "Última Actividad")]
         public DateTime? UltimaActividad { get; set; }
 
+        [Display(Name = "Contador de Ingresos")]
+        public int ContadorIngresos { get; set; } = 0;
+
         [Display(Name = "Mensajes Recibidos (total)")]
         public int MensajesRecibidosTotal { get; set; } = 0;
 
@@ -213,6 +216,20 @@ namespace Lado.Models
         [Display(Name = "Lado Preferido")]
         public TipoLado LadoPreferido { get; set; } = TipoLado.LadoA; // LadoA = Público, LadoB = Premium
 
+        /// <summary>
+        /// Si es true, bloquea todo el contenido LadoB del feed y explorar.
+        /// No verá usuarios con contenido premium ni su contenido.
+        /// </summary>
+        [Display(Name = "Bloquear Contenido Adulto (LadoB)")]
+        public bool BloquearLadoB { get; set; } = false;
+
+        /// <summary>
+        /// Si es true, el contenido del usuario no aparecerá en el Feed Público.
+        /// Solo usuarios autenticados podrán ver su contenido en el feed normal.
+        /// </summary>
+        [Display(Name = "Ocultar del Feed Público")]
+        public bool OcultarDeFeedPublico { get; set; } = false;
+
         // ========================================
         // PROMOCIÓN DE LADOB DESDE LADOA
         // ========================================
@@ -227,6 +244,22 @@ namespace Lado.Models
         /// </summary>
         [Display(Name = "Permitir Preview Blur de LadoB")]
         public bool PermitirPreviewBlurLadoB { get; set; } = false;
+
+        // ========================================
+        // PREFERENCIAS DE EMAIL
+        // ========================================
+
+        /// <summary>
+        /// Si es true, el usuario recibe emails de marketing y promociones
+        /// </summary>
+        [Display(Name = "Recibir Emails de Marketing")]
+        public bool RecibirEmailsMarketing { get; set; } = true;
+
+        /// <summary>
+        /// Si es true, el usuario recibe comunicados oficiales de la plataforma
+        /// </summary>
+        [Display(Name = "Recibir Comunicados")]
+        public bool RecibirEmailsComunicados { get; set; } = true;
 
         // ========================================
         // ESTADO EN LÍNEA Y PRIVACIDAD

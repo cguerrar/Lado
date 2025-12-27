@@ -14,8 +14,22 @@ namespace Lado.Controllers
             _context = context;
         }
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(bool desktop = false)
         {
+            // En móvil, redirigir directamente al feed público (experiencia tipo TikTok)
+            // A menos que el usuario explícitamente quiera ver el landing (desktop=true)
+            if (!desktop)
+            {
+                var userAgent = Request.Headers["User-Agent"].ToString().ToLower();
+                var esMobile = userAgent.Contains("mobile") || userAgent.Contains("android") ||
+                              (userAgent.Contains("iphone") || userAgent.Contains("ipad"));
+
+                if (esMobile)
+                {
+                    return RedirectToAction("Index", "FeedPublico");
+                }
+            }
+
             // Obtener imagenes para el mosaico del hero (solo fotos, no videos)
             // IMPORTANTE: Solo contenido de LadoA (público) - NO mostrar LadoB en landing
             // Preferir thumbnail si existe para carga más rápida

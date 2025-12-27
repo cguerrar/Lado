@@ -40,6 +40,12 @@ namespace Lado.Controllers
                 var estaAutenticado = User.Identity?.IsAuthenticated ?? false;
                 ViewBag.EstaAutenticado = estaAutenticado;
 
+                // Obtener IDs de usuarios que quieren ocultar su contenido del feed público
+                var usuariosOcultos = await _userManager.Users
+                    .Where(u => u.OcultarDeFeedPublico)
+                    .Select(u => u.Id)
+                    .ToListAsync();
+
                 // 1. CONTENIDO PÚBLICO para el mosaico - obtener mas contenido
                 // IMPORTANTE: Solo LadoA (público) - NO mostrar LadoB en feed público
                 var contenidoPublico = await _context.Contenidos
@@ -52,7 +58,8 @@ namespace Lado.Controllers
                             && c.TipoLado == TipoLado.LadoA  // Solo contenido público LadoA
                             && !string.IsNullOrEmpty(c.RutaArchivo)  // Solo contenido con media
                             && c.Usuario != null
-                            && c.Usuario.EstaActivo)
+                            && c.Usuario.EstaActivo
+                            && !usuariosOcultos.Contains(c.UsuarioId))  // Respetar privacidad del usuario
                     .OrderByDescending(c => c.NumeroLikes + c.NumeroVistas)
                     .ThenByDescending(c => c.FechaPublicacion)
                     .Take(300)  // Obtener suficiente contenido para llenar toda la pantalla
@@ -67,7 +74,8 @@ namespace Lado.Controllers
                             && !c.EsPrivado
                             && c.TipoLado == TipoLado.LadoB
                             && c.Usuario != null
-                            && c.Usuario.EstaActivo)
+                            && c.Usuario.EstaActivo
+                            && !usuariosOcultos.Contains(c.UsuarioId))  // Respetar privacidad del usuario
                     .OrderByDescending(c => c.NumeroLikes)
                     .ThenByDescending(c => c.FechaPublicacion)
                     .Take(10)
@@ -82,7 +90,8 @@ namespace Lado.Controllers
                             && u.CreadorVerificado
                             && u.EsCreador
                             && u.UserName != "admin"
-                            && !u.Email.ToLower().Contains("admin"))
+                            && !u.Email.ToLower().Contains("admin")
+                            && !usuariosOcultos.Contains(u.Id))  // Respetar privacidad del usuario
                     .OrderByDescending(u => u.NumeroSeguidores)
                     .Take(8)
                     .ToListAsync();
@@ -95,6 +104,7 @@ namespace Lado.Controllers
                                 && u.EsCreador
                                 && u.UserName != "admin"
                                 && !u.Email.ToLower().Contains("admin")
+                                && !usuariosOcultos.Contains(u.Id)  // Respetar privacidad del usuario
                                 && !creadoresSugeridos.Select(cs => cs.Id).Contains(u.Id))
                         .OrderByDescending(u => u.NumeroSeguidores)
                         .Take(8 - creadoresSugeridos.Count)
@@ -107,7 +117,8 @@ namespace Lado.Controllers
 
                 // 4. CREADORES PREMIUM (usuarios con contenido LadoB público)
                 var creadoresPremiumIds = await _context.Contenidos
-                    .Where(c => c.TipoLado == TipoLado.LadoB && c.EstaActivo && !c.EsBorrador && !c.EsPrivado)
+                    .Where(c => c.TipoLado == TipoLado.LadoB && c.EstaActivo && !c.EsBorrador && !c.EsPrivado
+                            && !usuariosOcultos.Contains(c.UsuarioId))  // Respetar privacidad
                     .Select(c => c.UsuarioId)
                     .Distinct()
                     .ToListAsync();
@@ -116,7 +127,8 @@ namespace Lado.Controllers
                     .Where(u => creadoresPremiumIds.Contains(u.Id)
                             && u.EstaActivo
                             && u.UserName != "admin"
-                            && !u.Email.ToLower().Contains("admin"))
+                            && !u.Email.ToLower().Contains("admin")
+                            && !usuariosOcultos.Contains(u.Id))  // Respetar privacidad del usuario
                     .OrderByDescending(u => u.NumeroSeguidores)
                     .Take(6)
                     .ToListAsync();
@@ -146,8 +158,8 @@ namespace Lado.Controllers
                     }
                 }
 
-                _logger.LogInformation("Feed público: {TotalPublico} públicos, {TotalPremium} premium, {TotalSugeridos} creadores sugeridos",
-                    contenidoPublico.Count, contenidoPremium.Count, creadoresSugeridos.Count);
+                _logger.LogInformation("Feed público: {TotalPublico} públicos, {TotalPremium} premium, {TotalSugeridos} creadores sugeridos, {UsuariosOcultos} usuarios ocultos",
+                    contenidoPublico.Count, contenidoPremium.Count, creadoresSugeridos.Count, usuariosOcultos.Count);
 
                 // 6. CARGAR ANUNCIOS PUBLICITARIOS
                 var usuarioId = estaAutenticado ? _userManager.GetUserId(User) : null;

@@ -17,17 +17,20 @@ namespace Lado.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILogger<StoriesController> _logger;
         private readonly IRateLimitService _rateLimitService;
+        private readonly IFileValidationService _fileValidationService;
 
         public StoriesController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             ILogger<StoriesController> logger,
-            IRateLimitService rateLimitService)
+            IRateLimitService rateLimitService,
+            IFileValidationService fileValidationService)
         {
             _context = context;
             _userManager = userManager;
             _logger = logger;
             _rateLimitService = rateLimitService;
+            _fileValidationService = fileValidationService;
         }
 
         /// <summary>
@@ -221,17 +224,17 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "Debe subir un archivo" });
                 }
 
-                // Validar tipo de archivo
-                var extensionesPermitidas = new[] { ".jpg", ".jpeg", ".png", ".gif", ".mp4", ".mov" };
-                var extension = Path.GetExtension(archivo.FileName).ToLowerInvariant();
-
-                if (!extensionesPermitidas.Contains(extension))
+                // ✅ SEGURIDAD: Validar archivo con magic bytes (no solo extensión)
+                var validacionArchivo = await _fileValidationService.ValidarMediaAsync(archivo);
+                if (!validacionArchivo.EsValido)
                 {
-                    return Json(new { success = false, message = "Formato de archivo no permitido" });
+                    _logger.LogWarning("⚠️ Archivo rechazado en Story: {FileName}, Error: {Error}",
+                        archivo.FileName, validacionArchivo.MensajeError);
+                    return Json(new { success = false, message = validacionArchivo.MensajeError ?? "Archivo no válido" });
                 }
 
-                // Determinar tipo de contenido
-                var tipoContenido = extension == ".mp4" || extension == ".mov"
+                // Determinar tipo de contenido basado en validación real
+                var tipoContenido = validacionArchivo.Tipo == TipoArchivoValidacion.Video
                     ? TipoContenido.Video
                     : TipoContenido.Imagen;
 

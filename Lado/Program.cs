@@ -232,6 +232,7 @@ builder.Services.AddScoped<Lado.Services.StripeSimuladoService>();
 builder.Services.AddScoped<Lado.Services.IAdService, Lado.Services.AdService>();
 builder.Services.AddSingleton<Lado.Services.IServerMetricsService, Lado.Services.ServerMetricsService>();
 builder.Services.AddScoped<Lado.Services.IEmailService, Lado.Services.EmailService>();
+builder.Services.AddScoped<Lado.Services.IBulkEmailService, Lado.Services.BulkEmailService>();
 builder.Services.AddScoped<Lado.Services.IVisitasService, Lado.Services.VisitasService>();
 builder.Services.AddScoped<Lado.Services.INotificationService, Lado.Services.NotificationService>();
 builder.Services.AddScoped<Lado.Services.IFeedAlgorithmService, Lado.Services.FeedAlgorithmService>();
@@ -249,6 +250,11 @@ builder.Services.AddHostedService<Lado.Services.SuscripcionExpirationService>();
 // CONFIGURACIÓN JWT SERVICE (API Móvil)
 // ========================================
 builder.Services.AddScoped<Lado.Services.IJwtService, Lado.Services.JwtService>();
+
+// ========================================
+// SERVICIO DE VALIDACIÓN DE ARCHIVOS (Seguridad)
+// ========================================
+builder.Services.AddScoped<Lado.Services.IFileValidationService, Lado.Services.FileValidationService>();
 
 // ========================================
 // CONFIGURACIÓN DE CLAUDE API (Clasificación de contenido)
@@ -326,15 +332,50 @@ if (app.Environment.IsDevelopment())
 }
 
 // ========================================
-// HEADERS DE SEGURIDAD
+// HEADERS DE SEGURIDAD MEJORADOS
 // ========================================
 app.Use(async (context, next) =>
 {
+    var path = context.Request.Path.Value?.ToLower() ?? "";
+
+    // Headers básicos de seguridad
     context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
     context.Response.Headers.Append("X-Frame-Options", "SAMEORIGIN");
     context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
     context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
-    context.Response.Headers.Append("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+
+    // Permissions Policy - Permitir cámara y micrófono para funcionalidades de la app
+    context.Response.Headers.Append("Permissions-Policy",
+        "camera=(self), microphone=(self), geolocation=(self), fullscreen=(self), payment=(self)");
+
+    // Cross-Origin policies para mejor aislamiento
+    context.Response.Headers.Append("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+    context.Response.Headers.Append("Cross-Origin-Resource-Policy", "same-site");
+
+    // Content Security Policy - Flexible para permitir recursos necesarios
+    // Solo aplicar CSP a páginas HTML, no a assets estáticos
+    if (!path.StartsWith("/css") && !path.StartsWith("/js") &&
+        !path.StartsWith("/lib") && !path.StartsWith("/images") &&
+        !path.StartsWith("/uploads") && !path.StartsWith("/audio"))
+    {
+        var csp = "default-src 'self'; " +
+                  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://www.google.com https://www.gstatic.com https://accounts.google.com; " +
+                  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://accounts.google.com; " +
+                  "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; " +
+                  "img-src 'self' data: blob: https: http:; " +
+                  "media-src 'self' data: blob: https: http:; " +
+                  "connect-src 'self' wss: ws: https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://api.openstreetmap.org https://nominatim.openstreetmap.org https://accounts.google.com https://oauth2.googleapis.com; " +
+                  "frame-src 'self' https://www.google.com https://www.youtube.com https://accounts.google.com; " +
+                  "worker-src 'self' blob:; " +
+                  "manifest-src 'self'; " +
+                  "base-uri 'self'; " +
+                  "form-action 'self' https://accounts.google.com; " +
+                  "frame-ancestors 'self'; " +
+                  "upgrade-insecure-requests;";
+
+        context.Response.Headers.Append("Content-Security-Policy", csp);
+    }
+
     await next();
 });
 

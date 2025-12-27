@@ -128,6 +128,17 @@ namespace Lado.Data
         // ========================================
         public DbSet<LikeComentario> LikesComentarios { get; set; }
 
+        // ========================================
+        // ⭐ DbSets NUEVOS - OBJETOS DETECTADOS EN CONTENIDO
+        // ========================================
+        public DbSet<ObjetoContenido> ObjetosContenido { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - EMAIL MASIVO
+        // ========================================
+        public DbSet<PlantillaEmail> PlantillasEmail { get; set; }
+        public DbSet<CampanaEmail> CampanasEmail { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -1289,6 +1300,137 @@ namespace Lado.Data
                 // Índice para limpieza de tokens expirados
                 entity.HasIndex(a => new { a.ExpiresAt, a.IsRevoked })
                     .HasDatabaseName("IX_ActiveTokens_Cleanup");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE OBJETOS DETECTADOS EN CONTENIDO
+            // ========================================
+            modelBuilder.Entity<ObjetoContenido>(entity =>
+            {
+                entity.HasKey(o => o.Id);
+
+                entity.HasOne(o => o.Contenido)
+                    .WithMany(c => c.ObjetosDetectados)
+                    .HasForeignKey(o => o.ContenidoId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(o => o.NombreObjeto)
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                entity.Property(o => o.Confianza)
+                    .HasDefaultValue(0.8f);
+
+                // Índices para búsqueda rápida por objeto
+                entity.HasIndex(o => o.NombreObjeto)
+                    .HasDatabaseName("IX_ObjetosContenido_NombreObjeto");
+
+                entity.HasIndex(o => o.ContenidoId)
+                    .HasDatabaseName("IX_ObjetosContenido_ContenidoId");
+
+                // Índice compuesto para búsquedas con confianza
+                entity.HasIndex(o => new { o.NombreObjeto, o.Confianza })
+                    .HasDatabaseName("IX_ObjetosContenido_Objeto_Confianza");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE PLANTILLAS EMAIL
+            // ========================================
+            modelBuilder.Entity<PlantillaEmail>(entity =>
+            {
+                entity.HasKey(p => p.Id);
+
+                entity.Property(p => p.Nombre)
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                entity.Property(p => p.Descripcion)
+                    .HasMaxLength(255)
+                    .IsRequired(false);
+
+                entity.Property(p => p.Asunto)
+                    .HasMaxLength(200)
+                    .IsRequired();
+
+                entity.Property(p => p.ContenidoHtml)
+                    .IsRequired();
+
+                entity.Property(p => p.Categoria)
+                    .HasMaxLength(50)
+                    .HasDefaultValue("Marketing");
+
+                entity.Property(p => p.EstaActiva)
+                    .HasDefaultValue(true);
+
+                // Índices
+                entity.HasIndex(p => p.Categoria)
+                    .HasDatabaseName("IX_PlantillasEmail_Categoria");
+
+                entity.HasIndex(p => p.EstaActiva)
+                    .HasDatabaseName("IX_PlantillasEmail_EstaActiva");
+
+                entity.HasIndex(p => new { p.EstaActiva, p.Categoria })
+                    .HasDatabaseName("IX_PlantillasEmail_Activa_Categoria");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE CAMPAÑAS EMAIL
+            // ========================================
+            modelBuilder.Entity<CampanaEmail>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+
+                entity.HasOne(c => c.Plantilla)
+                    .WithMany()
+                    .HasForeignKey(c => c.PlantillaId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(c => c.CreadoPor)
+                    .WithMany()
+                    .HasForeignKey(c => c.CreadoPorId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.Property(c => c.Nombre)
+                    .HasMaxLength(150)
+                    .IsRequired();
+
+                entity.Property(c => c.Asunto)
+                    .HasMaxLength(200)
+                    .IsRequired();
+
+                entity.Property(c => c.ContenidoHtml)
+                    .IsRequired();
+
+                entity.Property(c => c.EmailsEspecificos)
+                    .IsRequired(false);
+
+                entity.Property(c => c.FiltroAdicional)
+                    .IsRequired(false);
+
+                entity.Property(c => c.DetalleErrores)
+                    .IsRequired(false);
+
+                entity.Property(c => c.TotalDestinatarios)
+                    .HasDefaultValue(0);
+
+                entity.Property(c => c.Enviados)
+                    .HasDefaultValue(0);
+
+                entity.Property(c => c.Fallidos)
+                    .HasDefaultValue(0);
+
+                // Índices
+                entity.HasIndex(c => c.Estado)
+                    .HasDatabaseName("IX_CampanasEmail_Estado");
+
+                entity.HasIndex(c => c.FechaCreacion)
+                    .HasDatabaseName("IX_CampanasEmail_FechaCreacion");
+
+                entity.HasIndex(c => c.PlantillaId)
+                    .HasDatabaseName("IX_CampanasEmail_PlantillaId");
+
+                entity.HasIndex(c => new { c.Estado, c.FechaCreacion })
+                    .HasDatabaseName("IX_CampanasEmail_Estado_Fecha");
             });
 
             // ========================================

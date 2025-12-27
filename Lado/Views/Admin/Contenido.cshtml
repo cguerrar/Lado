@@ -12,6 +12,9 @@
             <p class="text-muted">Total: @Model.Count contenidos</p>
         </div>
         <div class="col-md-6 text-end">
+            <button type="button" class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#reclasificarTodoModal">
+                <i class="fas fa-brain"></i> Reclasificar Todo con IA
+            </button>
             <a href="@Url.Action("Index", "Admin")" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left"></i> Volver al Dashboard
             </a>
@@ -72,11 +75,22 @@
                         </div>
 
                         <!-- Imagen de preview -->
+                        @{
+                            var objetosTexto = contenido.ObjetosDetectados?.Any() == true
+                                ? string.Join(", ", contenido.ObjetosDetectados.OrderByDescending(o => o.Confianza).Select(o => o.NombreObjeto))
+                                : "Sin objetos detectados";
+                            var tieneObjetos = contenido.ObjetosDetectados?.Any() == true;
+                        }
                         <div class="position-relative" style="height: 250px; overflow: hidden;">
                             @if ((int)contenido.TipoContenido == 1 && !string.IsNullOrEmpty(contenido.RutaArchivo))
                             {
-                                <img src="@contenido.RutaArchivo" class="w-100 h-100" style="object-fit: cover; @(contenido.EsContenidoSensible ? "filter: blur(20px);" : "")"
-                                     alt="Contenido">
+                                <img src="@contenido.RutaArchivo" class="w-100 h-100 imagen-con-objetos"
+                                     style="object-fit: cover; @(contenido.EsContenidoSensible ? "filter: blur(20px);" : "")"
+                                     alt="Contenido"
+                                     data-bs-toggle="tooltip"
+                                     data-bs-placement="bottom"
+                                     data-bs-html="true"
+                                     title="<i class='fas fa-tags me-1'></i> @objetosTexto">
                                 @if (contenido.Censurado)
                                 {
                                     <div class="position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-flex align-items-center justify-content-center">
@@ -465,7 +479,77 @@
     </div>
 </div>
 
+<!-- Modal Reclasificar Todo con IA -->
+<div class="modal fade" id="reclasificarTodoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-brain"></i> Reclasificar Todo el Contenido con IA</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning mb-3">
+                    <h5><i class="fas fa-exclamation-triangle"></i> ADVERTENCIA DE COSTO</h5>
+                    <p class="mb-2">Esta operacion usa la API de Claude (Anthropic) para clasificar cada imagen individualmente.</p>
+                    <ul class="mb-2">
+                        <li><strong>Costo estimado:</strong> ~$0.001 - $0.003 USD por imagen</li>
+                        <li><strong>Total contenidos:</strong> @Model.Count</li>
+                        <li><strong>Costo maximo estimado:</strong> ~$@((Model.Count * 0.003m).ToString("F2")) USD</li>
+                    </ul>
+                    <p class="mb-0 text-danger"><strong>El costo real depende del tamano de las imagenes y la respuesta de la IA.</strong></p>
+                </div>
+
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-info-circle"></i> Que hace esta operacion?</h6>
+                    <ol class="mb-0">
+                        <li>Elimina TODAS las categorias existentes</li>
+                        <li>Procesa hasta 200 contenidos con imagenes</li>
+                        <li>Claude analiza cada imagen y asigna/crea categorias</li>
+                        <li>Crea subcategorias automaticamente si una categoria tiene 10+ items</li>
+                    </ol>
+                </div>
+
+                <div id="reclasificarProgreso" style="display: none;">
+                    <hr>
+                    <h6><i class="fas fa-spinner fa-spin"></i> Procesando...</h6>
+                    <div class="progress mb-2">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <p class="text-muted small" id="reclasificarStatus">Iniciando...</p>
+                </div>
+
+                <div id="reclasificarResultado" style="display: none;">
+                    <hr>
+                    <div class="alert alert-success">
+                        <h6><i class="fas fa-check-circle"></i> Proceso completado</h6>
+                        <ul class="mb-0" id="reclasificarStats"></ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer flex-wrap gap-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="btnCancelarReclasificar">Cancelar</button>
+                <button type="button" class="btn btn-success" id="btnClasificarPendientes" onclick="clasificarPendientes()">
+                    <i class="fas fa-forward"></i> Solo Clasificar Pendientes
+                </button>
+                <button type="button" class="btn btn-danger" id="btnIniciarReclasificar" onclick="iniciarReclasificacionMasiva()">
+                    <i class="fas fa-trash-alt"></i> Limpiar Todo y Reclasificar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+    // Inicializar tooltips de Bootstrap para mostrar objetos detectados
+    document.addEventListener('DOMContentLoaded', function() {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.forEach(function(tooltipTriggerEl) {
+            new bootstrap.Tooltip(tooltipTriggerEl, {
+                delay: { show: 200, hide: 100 }
+            });
+        });
+    });
+
     // Función de escape para prevenir XSS
     function escapeHtml(text) {
         if (!text) return '';
@@ -501,6 +585,21 @@
                         <i class="fas fa-robot ms-auto text-muted" style="font-size: 0.7rem;" title="Clasificado por IA (${data.tiempoMs}ms)"></i>
                     </div>
                 `;
+
+                // Actualizar tooltip con objetos detectados
+                const card = document.querySelector(`.content-card[data-id="${id}"]`);
+                const img = card?.querySelector('img.imagen-con-objetos');
+                if (img && data.objetosDetectados && data.objetosDetectados.length > 0) {
+                    const objetosTexto = data.objetosDetectados.join(', ');
+                    const tooltipInstance = bootstrap.Tooltip.getInstance(img);
+                    if (tooltipInstance) {
+                        tooltipInstance.setContent({ '.tooltip-inner': `<i class="fas fa-tags me-1"></i> ${objetosTexto}` });
+                    } else {
+                        img.setAttribute('title', `<i class="fas fa-tags me-1"></i> ${objetosTexto}`);
+                        new bootstrap.Tooltip(img, { delay: { show: 200, hide: 100 } });
+                    }
+                }
+
                 icon.className = 'fas fa-check text-success';
                 setTimeout(() => { icon.className = 'fas fa-robot'; }, 2000);
             } else {
@@ -716,6 +815,204 @@
         });
 
         document.getElementById('formBulkUncensor').submit();
+    }
+
+    // Variables globales para el proceso
+    let reclasificarCancelado = false;
+    let totalClasificados = 0;
+    let totalErrores = 0;
+    let totalCategoriasCreadas = 0;
+    let totalSubcategoriasCreadas = 0;
+
+    // Reclasificar todo el contenido con IA (en lotes)
+    async function iniciarReclasificacionMasiva() {
+        const btnIniciar = document.getElementById('btnIniciarReclasificar');
+        const btnPendientes = document.getElementById('btnClasificarPendientes');
+        const btnCancelar = document.getElementById('btnCancelarReclasificar');
+        const progreso = document.getElementById('reclasificarProgreso');
+        const resultado = document.getElementById('reclasificarResultado');
+        const progressBar = progreso.querySelector('.progress-bar');
+        const status = document.getElementById('reclasificarStatus');
+        const stats = document.getElementById('reclasificarStats');
+
+        // Reset
+        reclasificarCancelado = false;
+        totalClasificados = 0;
+        totalErrores = 0;
+        totalCategoriasCreadas = 0;
+        totalSubcategoriasCreadas = 0;
+
+        // UI
+        btnIniciar.disabled = true;
+        btnPendientes.disabled = true;
+        btnIniciar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+        btnCancelar.textContent = 'Detener';
+        btnCancelar.onclick = function() { reclasificarCancelado = true; };
+        progreso.style.display = 'block';
+        resultado.style.display = 'none';
+        progressBar.style.width = '5%';
+        progressBar.classList.add('progress-bar-animated');
+        status.textContent = 'Limpiando categorias existentes...';
+
+        try {
+            // Paso 1: Limpiar categorías
+            const limpiarResp = await fetch('@Url.Action("ReclasificarContenidoIA", "Admin")', { method: 'POST' });
+            const limpiarData = await limpiarResp.json();
+
+            if (!limpiarData.success) {
+                throw new Error(limpiarData.message || 'Error al limpiar');
+            }
+
+            let pendientes = limpiarData.pendientes;
+            const totalInicial = pendientes;
+            progressBar.style.width = '10%';
+            status.textContent = `Iniciando clasificacion de ${pendientes} contenidos...`;
+
+            // Paso 2: Clasificar en lotes de 5
+            while (pendientes > 0 && !reclasificarCancelado) {
+                const loteResp = await fetch('@Url.Action("ReclasificarLoteIA", "Admin")', { method: 'POST' });
+                const loteData = await loteResp.json();
+
+                if (!loteData.success) {
+                    throw new Error(loteData.message || 'Error en lote');
+                }
+
+                totalClasificados += loteData.clasificados || 0;
+                totalErrores += loteData.errores || 0;
+                totalCategoriasCreadas += loteData.categoriasCreadas || 0;
+                totalSubcategoriasCreadas += loteData.subcategoriasCreadas || 0;
+                pendientes = loteData.pendientes;
+
+                // Mostrar errores en consola si hay
+                if (loteData.detallesErrores && loteData.detallesErrores.length > 0) {
+                    console.warn('Errores en lote:', loteData.detallesErrores);
+                }
+
+                // Actualizar progreso
+                const porcentaje = totalInicial > 0 ? Math.round(((totalInicial - pendientes) / totalInicial) * 90) + 10 : 100;
+                progressBar.style.width = porcentaje + '%';
+                status.textContent = `Clasificados: ${totalClasificados} | Errores: ${totalErrores} | Pendientes: ${pendientes}`;
+
+                if (loteData.terminado) break;
+            }
+
+            // Finalizado
+            progressBar.style.width = '100%';
+            progressBar.classList.remove('progress-bar-animated');
+            progreso.style.display = 'none';
+            resultado.style.display = 'block';
+
+            const estadoFinal = reclasificarCancelado ? '(Detenido por usuario)' : '';
+            stats.innerHTML = `
+                <li><strong>Contenidos clasificados:</strong> ${totalClasificados} ${estadoFinal}</li>
+                <li><strong>Errores:</strong> ${totalErrores}</li>
+                <li><strong>Categorias creadas:</strong> ${totalCategoriasCreadas}</li>
+                <li><strong>Subcategorias creadas:</strong> ${totalSubcategoriasCreadas}</li>
+            `;
+
+            btnCancelar.textContent = 'Cerrar y Recargar';
+            btnCancelar.onclick = function() { window.location.reload(); };
+            btnIniciar.style.display = 'none';
+            btnPendientes.style.display = 'none';
+
+        } catch (error) {
+            status.innerHTML = '<span class="text-danger"><i class="fas fa-times"></i> Error: ' + error.message + '</span>';
+            btnCancelar.disabled = false;
+            btnIniciar.disabled = false;
+            btnPendientes.disabled = false;
+            btnIniciar.innerHTML = '<i class="fas fa-trash-alt"></i> Reintentar';
+        }
+    }
+
+    // Solo clasificar pendientes (sin limpiar)
+    async function clasificarPendientes() {
+        const btnIniciar = document.getElementById('btnIniciarReclasificar');
+        const btnPendientes = document.getElementById('btnClasificarPendientes');
+        const btnCancelar = document.getElementById('btnCancelarReclasificar');
+        const progreso = document.getElementById('reclasificarProgreso');
+        const resultado = document.getElementById('reclasificarResultado');
+        const progressBar = progreso.querySelector('.progress-bar');
+        const status = document.getElementById('reclasificarStatus');
+        const stats = document.getElementById('reclasificarStats');
+
+        reclasificarCancelado = false;
+        totalClasificados = 0;
+        totalErrores = 0;
+        totalCategoriasCreadas = 0;
+        totalSubcategoriasCreadas = 0;
+
+        btnIniciar.disabled = true;
+        btnPendientes.disabled = true;
+        btnPendientes.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+        btnCancelar.textContent = 'Detener';
+        btnCancelar.onclick = function() { reclasificarCancelado = true; };
+        progreso.style.display = 'block';
+        resultado.style.display = 'none';
+        progressBar.style.width = '5%';
+        progressBar.classList.add('progress-bar-animated');
+
+        try {
+            // Obtener estado inicial
+            const estadoResp = await fetch('@Url.Action("EstadoClasificacionIA", "Admin")');
+            const estado = await estadoResp.json();
+
+            let pendientes = estado.sinClasificar;
+            const totalInicial = pendientes;
+
+            if (pendientes === 0) {
+                status.textContent = 'No hay contenidos pendientes de clasificar.';
+                btnCancelar.textContent = 'Cerrar';
+                btnCancelar.onclick = function() { bootstrap.Modal.getInstance(document.getElementById('reclasificarTodoModal')).hide(); };
+                return;
+            }
+
+            status.textContent = `Clasificando ${pendientes} contenidos pendientes...`;
+
+            while (pendientes > 0 && !reclasificarCancelado) {
+                const loteResp = await fetch('@Url.Action("ReclasificarLoteIA", "Admin")', { method: 'POST' });
+                const loteData = await loteResp.json();
+
+                if (!loteData.success) throw new Error(loteData.message);
+
+                totalClasificados += loteData.clasificados || 0;
+                totalErrores += loteData.errores || 0;
+                totalCategoriasCreadas += loteData.categoriasCreadas || 0;
+                totalSubcategoriasCreadas += loteData.subcategoriasCreadas || 0;
+                pendientes = loteData.pendientes;
+
+                // Mostrar errores en consola si hay
+                if (loteData.detallesErrores && loteData.detallesErrores.length > 0) {
+                    console.warn('Errores en lote:', loteData.detallesErrores);
+                }
+
+                const porcentaje = totalInicial > 0 ? Math.round(((totalInicial - pendientes) / totalInicial) * 100) : 100;
+                progressBar.style.width = porcentaje + '%';
+                status.textContent = `Clasificados: ${totalClasificados} | Errores: ${totalErrores} | Pendientes: ${pendientes}`;
+
+                if (loteData.terminado) break;
+            }
+
+            progressBar.style.width = '100%';
+            progressBar.classList.remove('progress-bar-animated');
+            progreso.style.display = 'none';
+            resultado.style.display = 'block';
+            stats.innerHTML = `
+                <li><strong>Contenidos clasificados:</strong> ${totalClasificados}</li>
+                <li><strong>Errores:</strong> ${totalErrores}</li>
+                <li><strong>Categorias creadas:</strong> ${totalCategoriasCreadas}</li>
+                <li><strong>Subcategorias creadas:</strong> ${totalSubcategoriasCreadas}</li>
+            `;
+            btnCancelar.textContent = 'Cerrar y Recargar';
+            btnCancelar.onclick = function() { window.location.reload(); };
+            btnIniciar.style.display = 'none';
+            btnPendientes.style.display = 'none';
+
+        } catch (error) {
+            status.innerHTML = '<span class="text-danger"><i class="fas fa-times"></i> Error: ' + error.message + '</span>';
+            btnIniciar.disabled = false;
+            btnPendientes.disabled = false;
+            btnPendientes.innerHTML = '<i class="fas fa-forward"></i> Solo Clasificar Pendientes';
+        }
     }
 </script>
 

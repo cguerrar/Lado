@@ -22,6 +22,12 @@ namespace Lado.Controllers
         private readonly ILogEventoService _logEventoService;
         private readonly IWebHostEnvironment _hostEnvironment;
         private readonly IRateLimitService _rateLimitService;
+        private readonly IBulkEmailService _bulkEmailService;
+
+        // Lista de IDs de contenidos que fallaron durante la clasificación por lotes
+        // Se limpia cuando se inicia una nueva reclasificación masiva
+        private static HashSet<int> _contenidosFallidosClasificacion = new();
+        private static readonly object _lockFallidos = new();
 
         public AdminController(
             ApplicationDbContext context,
@@ -33,7 +39,8 @@ namespace Lado.Controllers
             IEmailService emailService,
             ILogEventoService logEventoService,
             IWebHostEnvironment hostEnvironment,
-            IRateLimitService rateLimitService)
+            IRateLimitService rateLimitService,
+            IBulkEmailService bulkEmailService)
         {
             _context = context;
             _userManager = userManager;
@@ -45,6 +52,7 @@ namespace Lado.Controllers
             _logEventoService = logEventoService;
             _hostEnvironment = hostEnvironment;
             _rateLimitService = rateLimitService;
+            _bulkEmailService = bulkEmailService;
         }
 
         public override void OnActionExecuting(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext context)
@@ -547,6 +555,7 @@ namespace Lado.Controllers
                 .Include(c => c.Likes)
                 .Include(c => c.Comentarios)
                 .Include(c => c.CategoriaInteres)
+                .Include(c => c.ObjetosDetectados)
                 .OrderByDescending(c => c.FechaPublicacion)
                 .Take(100)
                 .ToListAsync();
@@ -605,23 +614,51 @@ namespace Lado.Controllers
                     }
                 }
 
-                // Usar el metodo detallado para obtener informacion de error
-                var resultado = await _claudeService.ClasificarContenidoDetalladoAsync(
+                // Usar metodo combinado para clasificar Y detectar objetos
+                var resultado = await _claudeService.ClasificarYDetectarObjetosAsync(
                     imagenBytes,
                     contenido.Descripcion,
                     mimeType);
 
-                if (resultado.Exito && resultado.CategoriaId.HasValue)
+                if (resultado.Clasificacion.Exito && resultado.Clasificacion.CategoriaId.HasValue)
                 {
-                    contenido.CategoriaInteresId = resultado.CategoriaId.Value;
+                    contenido.CategoriaInteresId = resultado.Clasificacion.CategoriaId.Value;
+
+                    // Guardar objetos detectados
+                    int objetosGuardados = 0;
+                    if (resultado.ObjetosDetectados.Any())
+                    {
+                        // Eliminar objetos anteriores si existían
+                        var objetosAnteriores = await _context.ObjetosContenido
+                            .Where(o => o.ContenidoId == contenido.Id)
+                            .ToListAsync();
+                        if (objetosAnteriores.Any())
+                        {
+                            _context.ObjetosContenido.RemoveRange(objetosAnteriores);
+                        }
+
+                        // Agregar nuevos objetos
+                        foreach (var obj in resultado.ObjetosDetectados)
+                        {
+                            _context.ObjetosContenido.Add(new Models.ObjetoContenido
+                            {
+                                ContenidoId = contenido.Id,
+                                NombreObjeto = obj.Nombre,
+                                Confianza = obj.Confianza,
+                                FechaDeteccion = DateTime.Now
+                            });
+                            objetosGuardados++;
+                        }
+                    }
+
                     await _context.SaveChangesAsync();
 
                     var categoria = await _context.CategoriasIntereses
-                        .Where(c => c.Id == resultado.CategoriaId.Value)
+                        .Where(c => c.Id == resultado.Clasificacion.CategoriaId.Value)
                         .Select(c => new { c.Id, c.Nombre, c.Icono, c.Color })
                         .FirstOrDefaultAsync();
 
-                    var mensaje = resultado.CategoriaCreada
+                    var mensaje = resultado.Clasificacion.CategoriaCreada
                         ? $"Nueva categoria creada: {categoria?.Nombre}"
                         : "Contenido reclasificado correctamente";
 
@@ -629,20 +666,22 @@ namespace Lado.Controllers
                     {
                         success = true,
                         message = mensaje,
-                        categoriaId = resultado.CategoriaId,
+                        categoriaId = resultado.Clasificacion.CategoriaId,
                         categoriaNombre = categoria?.Nombre,
                         categoriaIcono = categoria?.Icono,
                         categoriaColor = categoria?.Color,
-                        categoriaCreada = resultado.CategoriaCreada,
-                        tiempoMs = resultado.TiempoMs
+                        categoriaCreada = resultado.Clasificacion.CategoriaCreada,
+                        objetosDetectados = resultado.ObjetosDetectados.Select(o => o.Nombre).ToList(),
+                        objetosGuardados,
+                        tiempoMs = resultado.Clasificacion.TiempoMs
                     });
                 }
 
                 return Json(new {
                     success = false,
-                    message = resultado.Error ?? "Error desconocido",
-                    detalle = resultado.DetalleError,
-                    tiempoMs = resultado.TiempoMs
+                    message = resultado.Clasificacion.Error ?? "Error desconocido",
+                    detalle = resultado.Clasificacion.DetalleError,
+                    tiempoMs = resultado.Clasificacion.TiempoMs
                 });
             }
             catch (Exception ex)
@@ -1295,9 +1334,9 @@ namespace Lado.Controllers
         // ========================================
         public async Task<IActionResult> Configuracion()
         {
-            // Cargar configuraciones de billetera, regional y archivos
+            // Cargar configuraciones de billetera, regional, archivos y feed
             var configuraciones = await _context.ConfiguracionesPlataforma
-                .Where(c => c.Categoria == "Billetera" || c.Categoria == "General" || c.Categoria == "Regional" || c.Categoria == "Archivos")
+                .Where(c => c.Categoria == "Billetera" || c.Categoria == "General" || c.Categoria == "Regional" || c.Categoria == "Archivos" || c.Categoria == "Feed")
                 .ToDictionaryAsync(c => c.Clave, c => c.Valor);
 
             ViewBag.ComisionBilleteraElectronica = configuraciones.TryGetValue(ConfiguracionPlataforma.COMISION_BILLETERA_ELECTRONICA, out var comision) ? comision : "2.5";
@@ -1310,6 +1349,27 @@ namespace Lado.Controllers
             ViewBag.LimiteFotoMB = configuraciones.TryGetValue(ConfiguracionPlataforma.LIMITE_TAMANO_FOTO_MB, out var fotoMb) ? fotoMb : "10";
             ViewBag.LimiteVideoMB = configuraciones.TryGetValue(ConfiguracionPlataforma.LIMITE_TAMANO_VIDEO_MB, out var videoMb) ? videoMb : "100";
             ViewBag.LimiteCantidadArchivos = configuraciones.TryGetValue(ConfiguracionPlataforma.LIMITE_CANTIDAD_ARCHIVOS, out var cantArchivos) ? cantArchivos : "10";
+
+            // Distribución del Feed - LadoB Preview
+            ViewBag.LadoBPreviewCantidad = configuraciones.TryGetValue(ConfiguracionPlataforma.LADOB_PREVIEW_CANTIDAD, out var previewCant) ? previewCant : "1";
+            ViewBag.LadoBPreviewIntervalo = configuraciones.TryGetValue(ConfiguracionPlataforma.LADOB_PREVIEW_INTERVALO, out var previewInt) ? previewInt : "5";
+
+            // ⚡ NUEVO: Límites del Feed
+            ViewBag.FeedLimiteLadoA = configuraciones.TryGetValue(ConfiguracionPlataforma.FEED_LIMITE_LADOA, out var fla) ? fla : "30";
+            ViewBag.FeedLimiteLadoBSuscriptos = configuraciones.TryGetValue(ConfiguracionPlataforma.FEED_LIMITE_LADOB_SUSCRIPTOS, out var flbs) ? flbs : "15";
+            ViewBag.FeedLimiteLadoBPropio = configuraciones.TryGetValue(ConfiguracionPlataforma.FEED_LIMITE_LADOB_PROPIO, out var flbp) ? flbp : "10";
+            ViewBag.FeedLimiteComprado = configuraciones.TryGetValue(ConfiguracionPlataforma.FEED_LIMITE_COMPRADO, out var flc) ? flc : "10";
+            ViewBag.FeedLimiteTotal = configuraciones.TryGetValue(ConfiguracionPlataforma.FEED_LIMITE_TOTAL, out var flt) ? flt : "50";
+
+            // ⚡ NUEVO: Descubrimiento del Feed
+            ViewBag.FeedDescubrimientoLadoA = configuraciones.TryGetValue(ConfiguracionPlataforma.FEED_DESCUBRIMIENTO_LADOA_CANTIDAD, out var fdla) ? fdla : "5";
+            ViewBag.FeedDescubrimientoLadoB = configuraciones.TryGetValue(ConfiguracionPlataforma.FEED_DESCUBRIMIENTO_LADOB_CANTIDAD, out var fdlb) ? fdlb : "5";
+            ViewBag.FeedDescubrimientoUsuarios = configuraciones.TryGetValue(ConfiguracionPlataforma.FEED_DESCUBRIMIENTO_USUARIOS_CANTIDAD, out var fdu) ? fdu : "5";
+            ViewBag.FeedMaxPostsConsecutivos = configuraciones.TryGetValue(ConfiguracionPlataforma.FEED_MAX_POSTS_CONSECUTIVOS_CREADOR, out var fmpc) ? fmpc : "2";
+
+            // ⚡ NUEVO: Anuncios del Feed
+            ViewBag.FeedAnunciosCantidad = configuraciones.TryGetValue(ConfiguracionPlataforma.FEED_ANUNCIOS_CANTIDAD, out var fac) ? fac : "3";
+            ViewBag.FeedAnunciosIntervalo = configuraciones.TryGetValue(ConfiguracionPlataforma.FEED_ANUNCIOS_INTERVALO, out var fai) ? fai : "8";
 
             return View();
         }
@@ -1413,6 +1473,111 @@ namespace Lado.Controllers
                     UltimaModificacion = fecha
                 });
             }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ActualizarDistribucionFeed(
+            int ladoBPreviewCantidad,
+            int ladoBPreviewIntervalo,
+            int anunciosCantidad = 3,
+            int anunciosIntervalo = 8)
+        {
+            try
+            {
+                // Validar valores
+                ladoBPreviewCantidad = Math.Max(1, Math.Min(5, ladoBPreviewCantidad));
+                ladoBPreviewIntervalo = Math.Max(2, Math.Min(20, ladoBPreviewIntervalo));
+                anunciosCantidad = Math.Max(1, Math.Min(10, anunciosCantidad));
+                anunciosIntervalo = Math.Max(3, Math.Min(20, anunciosIntervalo));
+
+                var ahora = DateTime.Now;
+
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.LADOB_PREVIEW_CANTIDAD, ladoBPreviewCantidad.ToString(), ahora, "Feed");
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.LADOB_PREVIEW_INTERVALO, ladoBPreviewIntervalo.ToString(), ahora, "Feed");
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.FEED_ANUNCIOS_CANTIDAD, anunciosCantidad.ToString(), ahora, "Feed");
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.FEED_ANUNCIOS_INTERVALO, anunciosIntervalo.ToString(), ahora, "Feed");
+
+                await _context.SaveChangesAsync();
+
+                TempData["Success"] = $"Distribucion actualizada: {ladoBPreviewCantidad} preview(s) cada {ladoBPreviewIntervalo} posts, {anunciosCantidad} anuncio(s) cada {anunciosIntervalo} posts";
+            }
+            catch (Exception)
+            {
+                TempData["Error"] = "Error al actualizar la distribucion del feed";
+            }
+
+            return RedirectToAction(nameof(Configuracion));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ActualizarLimitesFeed(
+            int limiteLadoA,
+            int limiteLadoBSuscriptos,
+            int limiteLadoBPropio,
+            int limiteComprado,
+            int limiteTotal)
+        {
+            try
+            {
+                // Validar valores
+                limiteLadoA = Math.Max(10, Math.Min(100, limiteLadoA));
+                limiteLadoBSuscriptos = Math.Max(5, Math.Min(50, limiteLadoBSuscriptos));
+                limiteLadoBPropio = Math.Max(5, Math.Min(30, limiteLadoBPropio));
+                limiteComprado = Math.Max(5, Math.Min(30, limiteComprado));
+                limiteTotal = Math.Max(20, Math.Min(100, limiteTotal));
+
+                var ahora = DateTime.Now;
+
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.FEED_LIMITE_LADOA, limiteLadoA.ToString(), ahora, "Feed");
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.FEED_LIMITE_LADOB_SUSCRIPTOS, limiteLadoBSuscriptos.ToString(), ahora, "Feed");
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.FEED_LIMITE_LADOB_PROPIO, limiteLadoBPropio.ToString(), ahora, "Feed");
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.FEED_LIMITE_COMPRADO, limiteComprado.ToString(), ahora, "Feed");
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.FEED_LIMITE_TOTAL, limiteTotal.ToString(), ahora, "Feed");
+
+                await _context.SaveChangesAsync();
+
+                TempData["Success"] = "Limites del Feed actualizados correctamente";
+            }
+            catch (Exception)
+            {
+                TempData["Error"] = "Error al actualizar los limites del feed";
+            }
+
+            return RedirectToAction(nameof(Configuracion));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ActualizarDescubrimientoFeed(
+            int descubrimientoLadoA,
+            int descubrimientoLadoB,
+            int descubrimientoUsuarios,
+            int maxPostsConsecutivos)
+        {
+            try
+            {
+                // Validar valores
+                descubrimientoLadoA = Math.Max(0, Math.Min(15, descubrimientoLadoA));
+                descubrimientoLadoB = Math.Max(0, Math.Min(15, descubrimientoLadoB));
+                descubrimientoUsuarios = Math.Max(3, Math.Min(10, descubrimientoUsuarios));
+                maxPostsConsecutivos = Math.Max(1, Math.Min(5, maxPostsConsecutivos));
+
+                var ahora = DateTime.Now;
+
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.FEED_DESCUBRIMIENTO_LADOA_CANTIDAD, descubrimientoLadoA.ToString(), ahora, "Feed");
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.FEED_DESCUBRIMIENTO_LADOB_CANTIDAD, descubrimientoLadoB.ToString(), ahora, "Feed");
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.FEED_DESCUBRIMIENTO_USUARIOS_CANTIDAD, descubrimientoUsuarios.ToString(), ahora, "Feed");
+                await ActualizarConfiguracionAsync(ConfiguracionPlataforma.FEED_MAX_POSTS_CONSECUTIVOS_CREADOR, maxPostsConsecutivos.ToString(), ahora, "Feed");
+
+                await _context.SaveChangesAsync();
+
+                TempData["Success"] = $"Descubrimiento actualizado: LadoA={descubrimientoLadoA}, LadoB={descubrimientoLadoB}, Usuarios={descubrimientoUsuarios}, MaxConsecutivos={maxPostsConsecutivos}";
+            }
+            catch (Exception)
+            {
+                TempData["Error"] = "Error al actualizar el descubrimiento del feed";
+            }
+
+            return RedirectToAction(nameof(Configuracion));
         }
 
         // ========================================
@@ -3770,6 +3935,326 @@ namespace Lado.Controllers
             }
         }
 
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> LimpiarCategorias()
+        {
+            try
+            {
+                // 1. Quitar referencias de contenidos a categorías
+                var contenidosConCategoria = await _context.Contenidos
+                    .Where(c => c.CategoriaInteresId != null)
+                    .ToListAsync();
+
+                foreach (var contenido in contenidosConCategoria)
+                {
+                    contenido.CategoriaInteresId = null;
+                }
+
+                // 2. Eliminar intereses de usuarios
+                var intereses = await _context.InteresesUsuarios.ToListAsync();
+                _context.InteresesUsuarios.RemoveRange(intereses);
+
+                // 3. Eliminar subcategorías primero (por FK)
+                var subcategorias = await _context.CategoriasIntereses
+                    .Where(c => c.CategoriaPadreId != null)
+                    .ToListAsync();
+                _context.CategoriasIntereses.RemoveRange(subcategorias);
+
+                // 4. Eliminar categorías principales
+                var categorias = await _context.CategoriasIntereses.ToListAsync();
+                _context.CategoriasIntereses.RemoveRange(categorias);
+
+                await _context.SaveChangesAsync();
+
+                return Json(new
+                {
+                    success = true,
+                    message = "Categorías eliminadas. Se crearán automáticamente al subir nuevo contenido.",
+                    contenidosActualizados = contenidosConCategoria.Count,
+                    interesesEliminados = intereses.Count,
+                    categoriasEliminadas = subcategorias.Count + categorias.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        // Endpoint para obtener estado de clasificación
+        [HttpGet]
+        public async Task<IActionResult> EstadoClasificacionIA()
+        {
+            var total = await _context.Contenidos
+                .CountAsync(c => c.EstaActivo && !c.EsBorrador && !string.IsNullOrEmpty(c.RutaArchivo));
+
+            var sinClasificar = await _context.Contenidos
+                .CountAsync(c => c.EstaActivo && !c.EsBorrador && !string.IsNullOrEmpty(c.RutaArchivo) && c.CategoriaInteresId == null);
+
+            var categorias = await _context.CategoriasIntereses.CountAsync();
+
+            return Json(new {
+                total,
+                sinClasificar,
+                clasificados = total - sinClasificar,
+                categorias,
+                porcentaje = total > 0 ? ((total - sinClasificar) * 100 / total) : 0
+            });
+        }
+
+        // Endpoint para clasificar un lote pequeño (5 contenidos)
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> ReclasificarLoteIA()
+        {
+            try
+            {
+                int clasificados = 0;
+                int errores = 0;
+                int categoriasCreadas = 0;
+                int subcategoriasCreadas = 0;
+
+                // Obtener IDs a excluir (que ya fallaron)
+                List<int> idsExcluir;
+                lock (_lockFallidos)
+                {
+                    idsExcluir = _contenidosFallidosClasificacion.ToList();
+                }
+
+                // Obtener solo 5 contenidos SIN clasificar (imágenes), excluyendo los que ya fallaron
+                var contenidos = await _context.Contenidos
+                    .Where(c => c.EstaActivo && !c.EsBorrador &&
+                           !string.IsNullOrEmpty(c.RutaArchivo) &&
+                           c.CategoriaInteresId == null &&
+                           !idsExcluir.Contains(c.Id))
+                    .OrderByDescending(c => c.FechaPublicacion)
+                    .Take(5)
+                    .ToListAsync();
+
+                // Contar pendientes reales (sin contar los fallidos)
+                var pendientesReales = await _context.Contenidos
+                    .CountAsync(c => c.EstaActivo && !c.EsBorrador &&
+                               !string.IsNullOrEmpty(c.RutaArchivo) &&
+                               c.CategoriaInteresId == null &&
+                               !idsExcluir.Contains(c.Id));
+
+                if (!contenidos.Any())
+                {
+                    // Limpiar lista de fallidos para próxima sesión
+                    lock (_lockFallidos)
+                    {
+                        var cantidadFallidos = _contenidosFallidosClasificacion.Count;
+                        _contenidosFallidosClasificacion.Clear();
+
+                        return Json(new {
+                            success = true,
+                            terminado = true,
+                            mensaje = cantidadFallidos > 0
+                                ? $"No hay más contenidos por clasificar. {cantidadFallidos} contenidos no pudieron clasificarse (archivo no existe o formato no soportado)."
+                                : "No hay más contenidos por clasificar"
+                        });
+                    }
+                }
+
+                var detallesErrores = new List<string>();
+
+                foreach (var contenido in contenidos)
+                {
+                    try
+                    {
+                        byte[]? imagenBytes = null;
+                        string? mimeType = null;
+
+                        var rutaCompleta = Path.Combine(_hostEnvironment.WebRootPath, contenido.RutaArchivo.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+
+                        if (!System.IO.File.Exists(rutaCompleta))
+                        {
+                            detallesErrores.Add($"ID {contenido.Id}: Archivo no existe: {rutaCompleta}");
+                            errores++;
+                            // Marcar como fallido para no reintentar
+                            lock (_lockFallidos) { _contenidosFallidosClasificacion.Add(contenido.Id); }
+                            continue;
+                        }
+
+                        var extension = Path.GetExtension(rutaCompleta).ToLower();
+                        if (extension == ".jpg" || extension == ".jpeg" || extension == ".png" || extension == ".gif" || extension == ".webp")
+                        {
+                            imagenBytes = await System.IO.File.ReadAllBytesAsync(rutaCompleta);
+                            mimeType = extension switch
+                            {
+                                ".jpg" or ".jpeg" => "image/jpeg",
+                                ".png" => "image/png",
+                                ".gif" => "image/gif",
+                                ".webp" => "image/webp",
+                                _ => "image/jpeg"
+                            };
+                        }
+                        else
+                        {
+                            // Es video u otro formato, saltar
+                            detallesErrores.Add($"ID {contenido.Id}: Formato no soportado: {extension}");
+                            errores++;
+                            // Marcar como fallido para no reintentar
+                            lock (_lockFallidos) { _contenidosFallidosClasificacion.Add(contenido.Id); }
+                            continue;
+                        }
+
+                        // Usar método combinado para clasificar y detectar objetos
+                        var resultado = await _claudeService.ClasificarYDetectarObjetosAsync(
+                            imagenBytes,
+                            contenido.Descripcion,
+                            mimeType
+                        );
+
+                        if (resultado.Clasificacion.Exito && resultado.Clasificacion.CategoriaId.HasValue)
+                        {
+                            contenido.CategoriaInteresId = resultado.Clasificacion.CategoriaId.Value;
+                            clasificados++;
+
+                            if (resultado.Clasificacion.CategoriaCreada)
+                            {
+                                if (resultado.Clasificacion.CategoriaNombre?.Contains(">") == true)
+                                    subcategoriasCreadas++;
+                                else
+                                    categoriasCreadas++;
+                            }
+
+                            // Guardar objetos detectados
+                            if (resultado.ObjetosDetectados.Any())
+                            {
+                                // Eliminar objetos anteriores si existían
+                                var objetosAnteriores = await _context.ObjetosContenido
+                                    .Where(o => o.ContenidoId == contenido.Id)
+                                    .ToListAsync();
+                                if (objetosAnteriores.Any())
+                                {
+                                    _context.ObjetosContenido.RemoveRange(objetosAnteriores);
+                                }
+
+                                // Agregar nuevos objetos
+                                foreach (var obj in resultado.ObjetosDetectados)
+                                {
+                                    _context.ObjetosContenido.Add(new Models.ObjetoContenido
+                                    {
+                                        ContenidoId = contenido.Id,
+                                        NombreObjeto = obj.Nombre,
+                                        Confianza = obj.Confianza,
+                                        FechaDeteccion = DateTime.Now
+                                    });
+                                }
+                            }
+                        }
+                        else
+                        {
+                            var errorMsg = resultado.Clasificacion.Error ?? "Sin clasificar";
+                            detallesErrores.Add($"ID {contenido.Id}: {errorMsg}");
+                            errores++;
+
+                            // Marcar como fallido permanente si el servicio lo indica
+                            if (resultado.Clasificacion.EsErrorPermanente)
+                            {
+                                lock (_lockFallidos) { _contenidosFallidosClasificacion.Add(contenido.Id); }
+                            }
+                        }
+
+                        await Task.Delay(500); // Pausa entre llamadas para evitar rate limiting
+                    }
+                    catch (Exception ex)
+                    {
+                        detallesErrores.Add($"ID {contenido.Id}: Exception - {ex.Message}");
+                        errores++;
+                        // Marcar como fallido permanente
+                        lock (_lockFallidos) { _contenidosFallidosClasificacion.Add(contenido.Id); }
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+
+                // Obtener IDs fallidos actualizados
+                List<int> idsFallidos;
+                lock (_lockFallidos)
+                {
+                    idsFallidos = _contenidosFallidosClasificacion.ToList();
+                }
+
+                // Obtener estado actualizado (excluyendo fallidos para evitar loop infinito)
+                var pendientes = await _context.Contenidos
+                    .CountAsync(c => c.EstaActivo && !c.EsBorrador &&
+                               !string.IsNullOrEmpty(c.RutaArchivo) &&
+                               c.CategoriaInteresId == null &&
+                               !idsFallidos.Contains(c.Id));
+
+                return Json(new {
+                    success = true,
+                    terminado = pendientes == 0,
+                    clasificados,
+                    errores,
+                    categoriasCreadas,
+                    subcategoriasCreadas,
+                    pendientes,
+                    fallidosPermanentes = idsFallidos.Count,
+                    detallesErrores = detallesErrores.Take(10) // Mostrar primeros 10 errores
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> ReclasificarContenidoIA()
+        {
+            // Este endpoint ahora solo limpia las categorías
+            // La clasificación se hace con ReclasificarLoteIA
+            try
+            {
+                // Limpiar lista de contenidos fallidos para nueva sesión
+                lock (_lockFallidos)
+                {
+                    _contenidosFallidosClasificacion.Clear();
+                }
+
+                // 1. Limpiar categorías existentes
+                var intereses = await _context.InteresesUsuarios.ToListAsync();
+                _context.InteresesUsuarios.RemoveRange(intereses);
+
+                var subcategorias = await _context.CategoriasIntereses
+                    .Where(c => c.CategoriaPadreId != null)
+                    .ToListAsync();
+                _context.CategoriasIntereses.RemoveRange(subcategorias);
+
+                var categorias = await _context.CategoriasIntereses.ToListAsync();
+                _context.CategoriasIntereses.RemoveRange(categorias);
+
+                // Limpiar referencias en contenidos
+                await _context.Contenidos
+                    .ExecuteUpdateAsync(c => c.SetProperty(x => x.CategoriaInteresId, (int?)null));
+
+                await _context.SaveChangesAsync();
+
+                // Contar contenidos pendientes
+                var pendientes = await _context.Contenidos
+                    .CountAsync(c => c.EstaActivo && !c.EsBorrador &&
+                               !string.IsNullOrEmpty(c.RutaArchivo) &&
+                               c.CategoriaInteresId == null);
+
+                return Json(new
+                {
+                    success = true,
+                    limpiado = true,
+                    message = "Categorías limpiadas. Ahora inicia la clasificación.",
+                    pendientes
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
         // ========================================
         // PRUEBA DE CLASIFICACION CON CLAUDE
         // ========================================
@@ -5222,6 +5707,740 @@ namespace Lado.Controllers
                 TempData["Error"] = $"Error al resetear: {ex.Message}";
                 return RedirectToAction("ConfigurarConfianza");
             }
+        }
+
+        // ========================================
+        // EMAIL MASIVO
+        // ========================================
+
+        public async Task<IActionResult> EmailMasivo()
+        {
+            // Inicializar o actualizar plantillas predeterminadas
+            await CrearPlantillasPredeterminadasAsync();
+
+            var plantillas = await _context.PlantillasEmail
+                .Where(p => p.EstaActiva)
+                .OrderByDescending(p => p.FechaCreacion)
+                .ToListAsync();
+
+            var campanas = await _context.CampanasEmail
+                .Include(c => c.Plantilla)
+                .Include(c => c.CreadoPor)
+                .OrderByDescending(c => c.FechaCreacion)
+                .Take(50)
+                .ToListAsync();
+
+            // Estadísticas
+            var totalEnviados = await _context.CampanasEmail
+                .Where(c => c.Estado == EstadoCampanaEmail.Enviada)
+                .SumAsync(c => c.Enviados);
+
+            var totalCampanas = await _context.CampanasEmail.CountAsync();
+
+            ViewBag.Plantillas = plantillas;
+            ViewBag.Campanas = campanas;
+            ViewBag.TotalEnviados = totalEnviados;
+            ViewBag.TotalCampanas = totalCampanas;
+            ViewBag.PlantillasCategorias = PlantillaEmail.CategoriasDisponibles;
+            ViewBag.Placeholders = PlantillaEmail.PlaceholdersDisponibles;
+
+            return View();
+        }
+
+        private async Task CrearPlantillasPredeterminadasAsync()
+        {
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            var logoUrl = $"{baseUrl}/images/logo.png";
+            var year = DateTime.Now.Year;
+
+            // Obtener nombres de plantillas existentes
+            var plantillasExistentes = await _context.PlantillasEmail
+                .Select(p => p.Nombre)
+                .ToListAsync();
+
+            var plantillasNuevas = new List<PlantillaEmail>();
+            var todasLasPlantillas = new List<PlantillaEmail>
+            {
+                new PlantillaEmail
+                {
+                    Nombre = "Comunicado General",
+                    Descripcion = "Plantilla para comunicados oficiales de la plataforma",
+                    Categoria = "Comunicado",
+                    Asunto = "Comunicado importante de Lado",
+                    ContenidoHtml = $@"<!DOCTYPE html>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'></head>
+<body style='margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,sans-serif;'>
+<div style='max-width:600px;margin:0 auto;padding:40px 20px;'>
+<div style='background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);'>
+<div style='background:linear-gradient(135deg,#4682B4 0%,#36648B 100%);padding:30px;text-align:center;'>
+<img src='{logoUrl}' alt='Lado' style='height:50px;margin-bottom:10px;' onerror=""this.style.display='none'"">
+<h1 style='color:#ffffff;margin:0;font-size:24px;'>Lado</h1>
+</div>
+<div style='padding:40px 30px;'>
+<h2 style='color:#333;margin:0 0 20px 0;font-size:22px;'>Hola {{{{nombre}}}},</h2>
+<p style='color:#666;font-size:16px;line-height:1.8;margin:0 0 20px 0;'>
+[Tu mensaje aqui]
+</p>
+<p style='color:#666;font-size:16px;line-height:1.8;'>
+Gracias por ser parte de nuestra comunidad.
+</p>
+</div>
+<div style='background:#f8f9fa;padding:20px 30px;text-align:center;border-top:1px solid #eee;'>
+<p style='color:#999;font-size:12px;margin:0;'>&copy; {year} Lado. Todos los derechos reservados.</p>
+<p style='margin:10px 0 0 0;'><a href='{baseUrl}' style='color:#4682B4;text-decoration:none;font-size:12px;'>www.ladoapp.com</a></p>
+</div>
+</div>
+</div>
+</body>
+</html>"
+                },
+                new PlantillaEmail
+                {
+                    Nombre = "Promocion Especial",
+                    Descripcion = "Plantilla para promociones y ofertas especiales",
+                    Categoria = "Promocion",
+                    Asunto = "{{nombre}}, tenemos algo especial para ti",
+                    ContenidoHtml = $@"<!DOCTYPE html>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'></head>
+<body style='margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,sans-serif;'>
+<div style='max-width:600px;margin:0 auto;padding:40px 20px;'>
+<div style='background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);'>
+<div style='background:linear-gradient(135deg,#4682B4 0%,#36648B 100%);padding:40px;text-align:center;'>
+<img src='{logoUrl}' alt='Lado' style='height:50px;margin-bottom:15px;' onerror=""this.style.display='none'"">
+<h1 style='color:#ffffff;margin:0;font-size:28px;'>Oferta Especial</h1>
+<p style='color:#B0C4DE;margin:10px 0 0 0;font-size:16px;'>Solo por tiempo limitado</p>
+</div>
+<div style='padding:40px 30px;text-align:center;'>
+<h2 style='color:#333;margin:0 0 10px 0;font-size:24px;'>Hola {{{{nombre}}}},</h2>
+<p style='color:#666;font-size:16px;line-height:1.8;margin:0 0 30px 0;'>
+[Descripcion de la promocion]
+</p>
+<div style='background:linear-gradient(135deg,#4682B4 0%,#36648B 100%);border-radius:12px;padding:30px;margin:20px 0;'>
+<p style='color:#B0C4DE;margin:0 0 5px 0;font-size:14px;'>OFERTA ESPECIAL</p>
+<p style='color:#ffffff;margin:0;font-size:36px;font-weight:bold;'>[DESCUENTO]</p>
+</div>
+<a href='{baseUrl}' style='display:inline-block;background:#4682B4;color:#ffffff;padding:16px 40px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px;margin-top:20px;'>Aprovechar Ahora</a>
+</div>
+<div style='background:#f8f9fa;padding:20px 30px;text-align:center;border-top:1px solid #eee;'>
+<p style='color:#999;font-size:12px;margin:0;'>&copy; {year} Lado. Todos los derechos reservados.</p>
+</div>
+</div>
+</div>
+</body>
+</html>"
+                },
+                new PlantillaEmail
+                {
+                    Nombre = "Bienvenida Marketing",
+                    Descripcion = "Email de bienvenida para nuevos usuarios",
+                    Categoria = "Bienvenida",
+                    Asunto = "Bienvenido a Lado, {{nombre}}!",
+                    ContenidoHtml = $@"<!DOCTYPE html>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'></head>
+<body style='margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,sans-serif;'>
+<div style='max-width:600px;margin:0 auto;padding:40px 20px;'>
+<div style='background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);'>
+<div style='background:linear-gradient(135deg,#4682B4 0%,#36648B 100%);padding:40px;text-align:center;'>
+<img src='{logoUrl}' alt='Lado' style='height:60px;margin-bottom:15px;' onerror=""this.style.display='none'"">
+<h1 style='color:#ffffff;margin:0;font-size:32px;'>Bienvenido!</h1>
+</div>
+<div style='padding:40px 30px;'>
+<h2 style='color:#333;margin:0 0 20px 0;font-size:22px;'>Hola {{{{nombre}}}},</h2>
+<p style='color:#666;font-size:16px;line-height:1.8;margin:0 0 20px 0;'>
+Nos alegra tenerte en Lado. Ahora formas parte de una comunidad unica donde puedes conectar, compartir y descubrir contenido increible.
+</p>
+<div style='background:#f8f9fa;border-radius:12px;padding:25px;margin:25px 0;'>
+<h3 style='color:#4682B4;margin:0 0 15px 0;font-size:18px;'>Que puedes hacer en Lado:</h3>
+<ul style='color:#666;font-size:14px;line-height:2;margin:0;padding-left:20px;'>
+<li>Descubre creadores y contenido exclusivo</li>
+<li>Conecta con tu comunidad</li>
+<li>Comparte tus momentos especiales</li>
+<li>Monetiza tu contenido si eres creador</li>
+</ul>
+</div>
+<div style='text-align:center;margin-top:30px;'>
+<a href='{baseUrl}/Feed' style='display:inline-block;background:#4682B4;color:#ffffff;padding:16px 40px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px;'>Explorar Lado</a>
+</div>
+</div>
+<div style='background:#f8f9fa;padding:20px 30px;text-align:center;border-top:1px solid #eee;'>
+<p style='color:#999;font-size:12px;margin:0;'>&copy; {year} Lado. Todos los derechos reservados.</p>
+</div>
+</div>
+</div>
+</body>
+</html>"
+                },
+                new PlantillaEmail
+                {
+                    Nombre = "Newsletter Semanal",
+                    Descripcion = "Plantilla para newsletter con novedades",
+                    Categoria = "Marketing",
+                    Asunto = "{{nombre}}, mira lo nuevo en Lado esta semana",
+                    ContenidoHtml = $@"<!DOCTYPE html>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'></head>
+<body style='margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,sans-serif;'>
+<div style='max-width:600px;margin:0 auto;padding:40px 20px;'>
+<div style='background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);'>
+<div style='background:linear-gradient(135deg,#4682B4 0%,#36648B 100%);padding:30px;text-align:center;'>
+<img src='{logoUrl}' alt='Lado' style='height:45px;margin-bottom:10px;' onerror=""this.style.display='none'"">
+<p style='color:#B0C4DE;margin:0;font-size:14px;'>Newsletter Semanal</p>
+</div>
+<div style='padding:40px 30px;'>
+<h2 style='color:#333;margin:0 0 10px 0;font-size:22px;'>Hola {{{{nombre}}}},</h2>
+<p style='color:#999;font-size:14px;margin:0 0 25px 0;'>{{{{fecha}}}}</p>
+<p style='color:#666;font-size:16px;line-height:1.8;margin:0 0 30px 0;'>
+Aqui tienes las novedades mas destacadas de esta semana:
+</p>
+<div style='border-left:4px solid #4682B4;padding-left:20px;margin:25px 0;'>
+<h3 style='color:#4682B4;margin:0 0 10px 0;font-size:18px;'>Novedad 1</h3>
+<p style='color:#666;font-size:14px;line-height:1.6;margin:0;'>[Descripcion de la novedad]</p>
+</div>
+<div style='border-left:4px solid #36648B;padding-left:20px;margin:25px 0;'>
+<h3 style='color:#36648B;margin:0 0 10px 0;font-size:18px;'>Novedad 2</h3>
+<p style='color:#666;font-size:14px;line-height:1.6;margin:0;'>[Descripcion de la novedad]</p>
+</div>
+<div style='border-left:4px solid #B0C4DE;padding-left:20px;margin:25px 0;'>
+<h3 style='color:#4682B4;margin:0 0 10px 0;font-size:18px;'>Novedad 3</h3>
+<p style='color:#666;font-size:14px;line-height:1.6;margin:0;'>[Descripcion de la novedad]</p>
+</div>
+<div style='text-align:center;margin-top:30px;'>
+<a href='{baseUrl}/Feed' style='display:inline-block;background:#4682B4;color:#ffffff;padding:14px 35px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;'>Ver mas en Lado</a>
+</div>
+</div>
+<div style='background:#f8f9fa;padding:20px 30px;text-align:center;border-top:1px solid #eee;'>
+<p style='color:#999;font-size:11px;margin:0 0 10px 0;'>Recibes este email porque estas suscrito a nuestras novedades.</p>
+<p style='color:#999;font-size:12px;margin:0;'>&copy; {year} Lado</p>
+</div>
+</div>
+</div>
+</body>
+</html>"
+                },
+                new PlantillaEmail
+                {
+                    Nombre = "Alerta Simple",
+                    Descripcion = "Plantilla minimalista para alertas y avisos",
+                    Categoria = "Sistema",
+                    Asunto = "Aviso importante - Lado",
+                    ContenidoHtml = $@"<!DOCTYPE html>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'></head>
+<body style='margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,sans-serif;'>
+<div style='max-width:600px;margin:0 auto;padding:40px 20px;'>
+<div style='background:#ffffff;border-radius:16px;padding:40px;box-shadow:0 4px 20px rgba(0,0,0,0.1);'>
+<div style='text-align:center;margin-bottom:30px;'>
+<img src='{logoUrl}' alt='Lado' style='height:40px;' onerror=""this.style.display='none'"">
+</div>
+<h2 style='color:#333;margin:0 0 20px 0;font-size:20px;'>Hola {{{{nombre}}}},</h2>
+<div style='background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:20px;margin:20px 0;'>
+<p style='color:#856404;margin:0;font-size:15px;line-height:1.6;'>
+[Tu mensaje de alerta aqui]
+</p>
+</div>
+<p style='color:#666;font-size:14px;line-height:1.6;margin:20px 0 0 0;'>
+Si tienes preguntas, no dudes en contactarnos.
+</p>
+<hr style='border:none;border-top:1px solid #eee;margin:30px 0;'>
+<p style='color:#999;font-size:12px;text-align:center;margin:0;'>&copy; {year} Lado</p>
+</div>
+</div>
+</body>
+</html>"
+                },
+                new PlantillaEmail
+                {
+                    Nombre = "Invitacion Beta Exclusiva",
+                    Descripcion = "Invitacion para probar la version Beta y ayudar con feedback",
+                    Categoria = "Marketing",
+                    Asunto = "{{nombre}}, te invitamos a probar Lado Beta - Tu opinion es importante",
+                    ContenidoHtml = $@"<!DOCTYPE html>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'></head>
+<body style='margin:0;padding:0;background-color:#ffffff;font-family:Arial,Helvetica,sans-serif;'>
+<div style='max-width:600px;margin:0 auto;padding:20px;'>
+
+<!-- Header con logo -->
+<div style='text-align:center;padding:30px 20px;border-bottom:3px solid #4682B4;'>
+<img src='{logoUrl}' alt='Lado' style='height:60px;margin-bottom:15px;' onerror=""this.outerHTML='<div style=\\'font-size:42px;color:#4682B4;font-weight:bold;\\'>LADO</div>'"">
+<div style='display:inline-block;background:#4682B4;padding:6px 18px;border-radius:20px;'>
+<span style='color:#fff;font-size:12px;font-weight:600;letter-spacing:1px;'>BETA</span>
+</div>
+</div>
+
+<!-- Contenido principal -->
+<div style='padding:35px 25px;'>
+
+<h1 style='color:#333;margin:0 0 25px 0;font-size:24px;font-weight:700;text-align:center;'>Te invitamos a probar Lado</h1>
+
+<p style='color:#333;font-size:16px;margin:0 0 20px 0;line-height:1.7;'>Hola <strong style='color:#4682B4;'>{{{{nombre}}}}</strong>,</p>
+
+<p style='color:#555;font-size:15px;line-height:1.8;margin:0 0 25px 0;'>
+Estamos desarrollando una nueva version de <strong>Lado</strong> y nos encantaria que fueras parte del proceso. Tu experiencia y opiniones son fundamentales para crear algo mejor.
+</p>
+
+<!-- Seccion: Como ayudar -->
+<div style='background:#f8f9fa;border-radius:12px;padding:25px;margin:25px 0;'>
+<h3 style='color:#4682B4;margin:0 0 20px 0;font-size:16px;font-weight:700;text-align:center;'>Como puedes ayudarnos</h3>
+
+<table style='width:100%;border-collapse:collapse;'>
+<tr>
+<td style='padding:10px 0;vertical-align:top;width:35px;'>
+<div style='background:#4682B4;color:#fff;width:26px;height:26px;border-radius:50%;text-align:center;line-height:26px;font-weight:bold;font-size:13px;'>1</div>
+</td>
+<td style='padding:10px 0 10px 12px;'>
+<p style='margin:0 0 3px 0;color:#333;font-weight:600;font-size:14px;'>Explora la plataforma</p>
+<p style='margin:0;color:#666;font-size:13px;'>Navega por las secciones y prueba las funciones</p>
+</td>
+</tr>
+<tr>
+<td style='padding:10px 0;vertical-align:top;'>
+<div style='background:#5a9bd4;color:#fff;width:26px;height:26px;border-radius:50%;text-align:center;line-height:26px;font-weight:bold;font-size:13px;'>2</div>
+</td>
+<td style='padding:10px 0 10px 12px;'>
+<p style='margin:0 0 3px 0;color:#333;font-weight:600;font-size:14px;'>Reporta errores</p>
+<p style='margin:0;color:#666;font-size:13px;'>Si encuentras algo que no funciona, cuentanos</p>
+</td>
+</tr>
+<tr>
+<td style='padding:10px 0;vertical-align:top;'>
+<div style='background:#7ab8e8;color:#fff;width:26px;height:26px;border-radius:50%;text-align:center;line-height:26px;font-weight:bold;font-size:13px;'>3</div>
+</td>
+<td style='padding:10px 0 10px 12px;'>
+<p style='margin:0 0 3px 0;color:#333;font-weight:600;font-size:14px;'>Sugiere mejoras</p>
+<p style='margin:0;color:#666;font-size:13px;'>Tus ideas nos ayudan a mejorar</p>
+</td>
+</tr>
+</table>
+</div>
+
+<p style='color:#555;font-size:15px;line-height:1.8;margin:0 0 30px 0;text-align:center;'>
+No necesitas ser experto. Solo queremos saber tu opinion honesta sobre la plataforma.
+</p>
+
+<!-- CTA Button -->
+<div style='text-align:center;margin:30px 0;'>
+<a href='{baseUrl}' style='display:inline-block;background:#4682B4;color:#ffffff;padding:14px 40px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;'>
+Explorar Lado Beta
+</a>
+</div>
+
+<div style='text-align:center;margin:25px 0;'>
+<a href='{baseUrl}/Ayuda' style='color:#4682B4;text-decoration:none;font-size:13px;'>Ayuda</a>
+<span style='color:#ddd;margin:0 12px;'>|</span>
+<a href='{baseUrl}/Ayuda/FAQ' style='color:#4682B4;text-decoration:none;font-size:13px;'>FAQ</a>
+</div>
+
+<!-- Contacto -->
+<div style='border-top:1px solid #eee;padding-top:20px;margin-top:25px;text-align:center;'>
+<p style='color:#888;font-size:13px;margin:0 0 5px 0;'>Dudas o sugerencias:</p>
+<p style='color:#4682B4;font-size:14px;font-weight:600;margin:0;'>soporte@ladoapp.com</p>
+</div>
+
+</div>
+
+<!-- Footer -->
+<div style='background:#f8f9fa;padding:20px;text-align:center;border-top:1px solid #eee;'>
+<p style='color:#888;font-size:12px;margin:0 0 5px 0;'>Gracias por ser parte de este proceso</p>
+<p style='color:#aaa;font-size:11px;margin:0;'>&copy; {year} Lado. Todos los derechos reservados.</p>
+</div>
+
+<!-- Nota al pie -->
+<p style='text-align:center;color:#bbb;font-size:10px;margin:15px 0 0 0;'>
+Este email fue enviado a {{{{email}}}}
+</p>
+
+</div>
+</body>
+</html>"
+                }
+            };
+
+            // Filtrar solo las que no existen
+            foreach (var plantilla in todasLasPlantillas)
+            {
+                if (!plantillasExistentes.Contains(plantilla.Nombre))
+                {
+                    plantillasNuevas.Add(plantilla);
+                }
+            }
+
+            // Agregar solo las nuevas
+            if (plantillasNuevas.Any())
+            {
+                _context.PlantillasEmail.AddRange(plantillasNuevas);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        // ========================================
+        // PLANTILLAS
+        // ========================================
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RegenerarPlantillasPredeterminadas()
+        {
+            try
+            {
+                // Eliminar plantillas predeterminadas existentes
+                var nombresPredeterminados = new[] {
+                    "Comunicado General", "Promocion Especial", "Bienvenida Marketing",
+                    "Newsletter Semanal", "Alerta Simple", "Invitacion Beta Exclusiva"
+                };
+
+                var plantillasAEliminar = await _context.PlantillasEmail
+                    .Where(p => nombresPredeterminados.Contains(p.Nombre))
+                    .ToListAsync();
+
+                _context.PlantillasEmail.RemoveRange(plantillasAEliminar);
+                await _context.SaveChangesAsync();
+
+                // Crear nuevas
+                await CrearPlantillasPredeterminadasAsync();
+
+                TempData["Success"] = $"Plantillas predeterminadas regeneradas ({nombresPredeterminados.Length} plantillas).";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error al regenerar plantillas: {ex.Message}";
+            }
+
+            return RedirectToAction("EmailMasivo");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CrearPlantilla(string nombre, string descripcion, string asunto,
+            string contenidoHtml, string categoria)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(nombre) || string.IsNullOrWhiteSpace(asunto) ||
+                    string.IsNullOrWhiteSpace(contenidoHtml))
+                {
+                    TempData["Error"] = "Nombre, asunto y contenido son obligatorios.";
+                    return RedirectToAction("EmailMasivo");
+                }
+
+                var plantilla = new PlantillaEmail
+                {
+                    Nombre = nombre,
+                    Descripcion = descripcion,
+                    Asunto = asunto,
+                    ContenidoHtml = contenidoHtml,
+                    Categoria = categoria ?? "Marketing",
+                    EstaActiva = true,
+                    FechaCreacion = DateTime.Now
+                };
+
+                _context.PlantillasEmail.Add(plantilla);
+                await _context.SaveChangesAsync();
+
+                await _logEventoService.RegistrarEventoAsync(
+                    $"Plantilla de email '{nombre}' creada",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Evento,
+                    User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                    User.Identity?.Name);
+
+                TempData["Success"] = $"Plantilla '{nombre}' creada exitosamente.";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error al crear plantilla: {ex.Message}";
+            }
+
+            return RedirectToAction("EmailMasivo");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditarPlantilla(int id, string nombre, string descripcion,
+            string asunto, string contenidoHtml, string categoria)
+        {
+            try
+            {
+                var plantilla = await _context.PlantillasEmail.FindAsync(id);
+                if (plantilla == null)
+                {
+                    TempData["Error"] = "Plantilla no encontrada.";
+                    return RedirectToAction("EmailMasivo");
+                }
+
+                plantilla.Nombre = nombre;
+                plantilla.Descripcion = descripcion;
+                plantilla.Asunto = asunto;
+                plantilla.ContenidoHtml = contenidoHtml;
+                plantilla.Categoria = categoria ?? "Marketing";
+                plantilla.UltimaModificacion = DateTime.Now;
+
+                await _context.SaveChangesAsync();
+
+                TempData["Success"] = $"Plantilla '{nombre}' actualizada.";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error al editar plantilla: {ex.Message}";
+            }
+
+            return RedirectToAction("EmailMasivo");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarPlantilla(int id)
+        {
+            try
+            {
+                var plantilla = await _context.PlantillasEmail.FindAsync(id);
+                if (plantilla != null)
+                {
+                    // Soft delete - solo desactivar
+                    plantilla.EstaActiva = false;
+                    await _context.SaveChangesAsync();
+                    TempData["Success"] = $"Plantilla '{plantilla.Nombre}' eliminada.";
+                }
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error al eliminar plantilla: {ex.Message}";
+            }
+
+            return RedirectToAction("EmailMasivo");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ObtenerPlantilla(int id)
+        {
+            var plantilla = await _context.PlantillasEmail.FindAsync(id);
+            if (plantilla == null)
+                return NotFound();
+
+            return Json(new
+            {
+                plantilla.Id,
+                plantilla.Nombre,
+                plantilla.Descripcion,
+                plantilla.Asunto,
+                plantilla.ContenidoHtml,
+                plantilla.Categoria
+            });
+        }
+
+        // ========================================
+        // CAMPAÑAS
+        // ========================================
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CrearCampana(string nombre, int? plantillaId, string asunto,
+            string contenidoHtml, TipoDestinatarioEmail tipoDestinatario, string? emailsEspecificos)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(nombre))
+                {
+                    TempData["Error"] = "El nombre de la campaña es obligatorio.";
+                    return RedirectToAction("EmailMasivo");
+                }
+
+                // Si hay plantilla, cargar su contenido
+                if (plantillaId.HasValue && plantillaId > 0)
+                {
+                    var plantilla = await _context.PlantillasEmail.FindAsync(plantillaId.Value);
+                    if (plantilla != null)
+                    {
+                        asunto = plantilla.Asunto;
+                        contenidoHtml = plantilla.ContenidoHtml;
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(asunto) || string.IsNullOrWhiteSpace(contenidoHtml))
+                {
+                    TempData["Error"] = "Asunto y contenido son obligatorios.";
+                    return RedirectToAction("EmailMasivo");
+                }
+
+                var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+                var campana = new CampanaEmail
+                {
+                    Nombre = nombre,
+                    PlantillaId = plantillaId > 0 ? plantillaId : null,
+                    Asunto = asunto,
+                    ContenidoHtml = contenidoHtml,
+                    TipoDestinatario = tipoDestinatario,
+                    EmailsEspecificos = tipoDestinatario == TipoDestinatarioEmail.EmailsEspecificos
+                        ? emailsEspecificos : null,
+                    Estado = EstadoCampanaEmail.Borrador,
+                    FechaCreacion = DateTime.Now,
+                    CreadoPorId = userId
+                };
+
+                // Contar destinatarios
+                campana.TotalDestinatarios = await _bulkEmailService.ContarDestinatariosAsync(
+                    tipoDestinatario, campana.EmailsEspecificos);
+
+                _context.CampanasEmail.Add(campana);
+                await _context.SaveChangesAsync();
+
+                await _logEventoService.RegistrarEventoAsync(
+                    $"Campaña de email '{nombre}' creada con {campana.TotalDestinatarios} destinatarios",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Evento,
+                    userId,
+                    User.Identity?.Name);
+
+                TempData["Success"] = $"Campaña '{nombre}' creada. {campana.TotalDestinatarios} destinatarios.";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error al crear campaña: {ex.Message}";
+            }
+
+            return RedirectToAction("EmailMasivo");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EnviarCampana(int id)
+        {
+            try
+            {
+                var campana = await _context.CampanasEmail.FindAsync(id);
+                if (campana == null)
+                {
+                    TempData["Error"] = "Campaña no encontrada.";
+                    return RedirectToAction("EmailMasivo");
+                }
+
+                if (campana.Estado != EstadoCampanaEmail.Borrador)
+                {
+                    TempData["Error"] = "Solo se pueden enviar campañas en estado borrador.";
+                    return RedirectToAction("EmailMasivo");
+                }
+
+                // Enviar la campaña (esto puede tomar tiempo para campañas grandes)
+                var resultado = await _bulkEmailService.EnviarCampanaAsync(id);
+
+                if (resultado.Success)
+                {
+                    TempData["Success"] = $"Campaña enviada: {resultado.TotalEnviados} emails enviados.";
+                }
+                else
+                {
+                    TempData["Warning"] = $"Campaña completada con errores: {resultado.TotalEnviados} enviados, {resultado.TotalFallidos} fallidos.";
+                }
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error al enviar campaña: {ex.Message}";
+            }
+
+            return RedirectToAction("EmailMasivo");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CancelarCampana(int id)
+        {
+            try
+            {
+                var campana = await _context.CampanasEmail.FindAsync(id);
+                if (campana != null && campana.Estado == EstadoCampanaEmail.EnProgreso)
+                {
+                    campana.Estado = EstadoCampanaEmail.Cancelada;
+                    await _context.SaveChangesAsync();
+                    TempData["Success"] = "Campaña marcada para cancelación.";
+                }
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error al cancelar campaña: {ex.Message}";
+            }
+
+            return RedirectToAction("EmailMasivo");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarCampana(int id)
+        {
+            try
+            {
+                var campana = await _context.CampanasEmail.FindAsync(id);
+                if (campana != null)
+                {
+                    if (campana.Estado == EstadoCampanaEmail.EnProgreso)
+                    {
+                        TempData["Error"] = "No se puede eliminar una campaña en progreso.";
+                        return RedirectToAction("EmailMasivo");
+                    }
+
+                    _context.CampanasEmail.Remove(campana);
+                    await _context.SaveChangesAsync();
+                    TempData["Success"] = $"Campaña '{campana.Nombre}' eliminada.";
+                }
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error al eliminar campaña: {ex.Message}";
+            }
+
+            return RedirectToAction("EmailMasivo");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ContarDestinatarios(TipoDestinatarioEmail tipo, string? emails = null)
+        {
+            var count = await _bulkEmailService.ContarDestinatariosAsync(tipo, emails);
+            return Json(new { count });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ObtenerCampana(int id)
+        {
+            var campana = await _context.CampanasEmail
+                .Include(c => c.Plantilla)
+                .FirstOrDefaultAsync(c => c.Id == id);
+
+            if (campana == null)
+                return NotFound();
+
+            return Json(new
+            {
+                campana.Id,
+                campana.Nombre,
+                campana.Asunto,
+                campana.ContenidoHtml,
+                campana.TipoDestinatario,
+                TipoDestinatarioNombre = campana.TipoDestinatarioDescripcion,
+                campana.EmailsEspecificos,
+                campana.Estado,
+                EstadoNombre = campana.Estado.ToString(),
+                campana.TotalDestinatarios,
+                campana.Enviados,
+                campana.Fallidos,
+                campana.PorcentajeProgreso,
+                campana.TasaExito,
+                campana.DetalleErrores
+            });
+        }
+
+        [HttpGet]
+        public IActionResult PreviewEmail(string asunto, string contenido)
+        {
+            // Preview con datos de ejemplo
+            var asuntoPreview = _bulkEmailService.ReemplazarPlaceholders(
+                asunto, "Usuario Demo", "demo@ejemplo.com", "usuario_demo");
+            var contenidoPreview = _bulkEmailService.ReemplazarPlaceholders(
+                contenido, "Usuario Demo", "demo@ejemplo.com", "usuario_demo");
+
+            return Json(new { asunto = asuntoPreview, contenido = contenidoPreview });
         }
     }
 
