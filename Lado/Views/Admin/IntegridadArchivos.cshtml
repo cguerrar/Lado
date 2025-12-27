@@ -1,0 +1,246 @@
+@model Lado.Services.MediaIntegrityStats
+@{
+    ViewData["Title"] = "Integridad de Archivos";
+}
+
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2><i class="fas fa-hdd me-2"></i>Integridad de Archivos Multimedia</h2>
+            <p class="text-muted">Verifica que los archivos referenciados en la base de datos existan en el servidor</p>
+        </div>
+    </div>
+
+    <!-- Estadisticas -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 opacity-75">Total Contenidos</h6>
+                    <h2 class="card-title mb-0">@Model.TotalContenidos.ToString("N0")</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 opacity-75">Con Archivo</h6>
+                    <h2 class="card-title mb-0">@Model.ContenidosConArchivo.ToString("N0")</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 opacity-75">Sin Archivo</h6>
+                    <h2 class="card-title mb-0">@Model.ContenidosSinArchivo.ToString("N0")</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 opacity-75">Archivos Faltantes</h6>
+                    <h2 class="card-title mb-0">@Model.ArchivosFaltantes.ToString("N0")</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de progreso de integridad -->
+    @{
+        var porcentajeIntegridad = Model.ContenidosConArchivo > 0
+            ? Math.Round((1 - (double)Model.ArchivosFaltantes / Model.ContenidosConArchivo) * 100, 1)
+            : 100;
+        var colorBarra = porcentajeIntegridad >= 95 ? "success" : porcentajeIntegridad >= 80 ? "warning" : "danger";
+    }
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Integridad del Sistema</h5>
+                <span class="badge bg-@colorBarra fs-6">@porcentajeIntegridad%</span>
+            </div>
+            <div class="progress" style="height: 25px;">
+                <div class="progress-bar bg-@colorBarra" role="progressbar"
+                     style="width: @porcentajeIntegridad%"
+                     aria-valuenow="@porcentajeIntegridad" aria-valuemin="0" aria-valuemax="100">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Acciones -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-tools me-2"></i>Acciones de Mantenimiento</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="d-grid">
+                        <button class="btn btn-outline-primary btn-lg" onclick="actualizarEstadisticas()">
+                            <i class="fas fa-sync-alt me-2"></i>Actualizar Estadisticas
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-grid">
+                        <button class="btn btn-outline-warning btn-lg" onclick="simularLimpieza()">
+                            <i class="fas fa-search me-2"></i>Simular Limpieza
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-grid">
+                        <button class="btn btn-danger btn-lg" onclick="ejecutarLimpieza()">
+                            <i class="fas fa-trash-alt me-2"></i>Ejecutar Limpieza
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3">
+                <small class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    <strong>Simular:</strong> Muestra cuantos contenidos se desactivarian sin hacer cambios.
+                    <strong>Ejecutar:</strong> Desactiva permanentemente los contenidos con archivos faltantes.
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Archivos Faltantes -->
+    @if (Model.RutasFaltantes.Any())
+    {
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-exclamation-triangle text-warning me-2"></i>Archivos Faltantes (primeros 100)</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="limpiarCache()">
+                    <i class="fas fa-broom me-1"></i>Limpiar Cache
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>#</th>
+                                <th>Ruta del Archivo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{
+                                var index = 1;
+                            }
+                            @foreach (var ruta in Model.RutasFaltantes)
+                            {
+                                <tr>
+                                    <td class="text-muted">@index</td>
+                                    <td><code class="text-danger">@ruta</code></td>
+                                </tr>
+                                index++;
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle me-2"></i>
+            Todos los archivos referenciados existen en el servidor.
+        </div>
+    }
+</div>
+
+<!-- Mensaje de resultado -->
+<div id="resultadoContainer" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050; display: none;">
+    <div id="resultadoToast" class="toast" role="alert">
+        <div class="toast-header">
+            <i id="resultadoIcon" class="fas fa-info-circle me-2"></i>
+            <strong class="me-auto" id="resultadoTitulo">Resultado</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="resultadoMensaje"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function mostrarResultado(mensaje, tipo = 'info') {
+            const container = document.getElementById('resultadoContainer');
+            const toast = document.getElementById('resultadoToast');
+            const icon = document.getElementById('resultadoIcon');
+            const titulo = document.getElementById('resultadoTitulo');
+            const mensajeEl = document.getElementById('resultadoMensaje');
+
+            icon.className = tipo === 'success' ? 'fas fa-check-circle text-success me-2' :
+                            tipo === 'error' ? 'fas fa-times-circle text-danger me-2' :
+                            tipo === 'warning' ? 'fas fa-exclamation-triangle text-warning me-2' :
+                            'fas fa-info-circle text-primary me-2';
+            titulo.textContent = tipo === 'success' ? 'Exito' :
+                                tipo === 'error' ? 'Error' :
+                                tipo === 'warning' ? 'Advertencia' : 'Informacion';
+            mensajeEl.textContent = mensaje;
+
+            container.style.display = 'block';
+            const bsToast = new bootstrap.Toast(toast, { autohide: true, delay: 5000 });
+            bsToast.show();
+        }
+
+        async function actualizarEstadisticas() {
+            try {
+                const response = await fetch('/Admin/ObtenerEstadisticasIntegridad');
+                const data = await response.json();
+                if (data.success) {
+                    mostrarResultado(`Integridad: ${data.porcentajeIntegridad}% - ${data.archivosFaltantes} archivos faltantes`, 'info');
+                    setTimeout(() => location.reload(), 2000);
+                }
+            } catch (error) {
+                mostrarResultado('Error al obtener estadisticas', 'error');
+            }
+        }
+
+        async function simularLimpieza() {
+            try {
+                const response = await fetch('/Admin/SimularLimpiezaArchivos', { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    mostrarResultado(data.mensaje, 'warning');
+                }
+            } catch (error) {
+                mostrarResultado('Error al simular limpieza', 'error');
+            }
+        }
+
+        async function ejecutarLimpieza() {
+            if (!confirm('¿Estas seguro de desactivar permanentemente los contenidos con archivos faltantes?\n\nEsta accion no se puede deshacer.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/Admin/EjecutarLimpiezaArchivos', { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    mostrarResultado(data.mensaje, 'success');
+                    setTimeout(() => location.reload(), 2000);
+                }
+            } catch (error) {
+                mostrarResultado('Error al ejecutar limpieza', 'error');
+            }
+        }
+
+        async function limpiarCache() {
+            try {
+                const response = await fetch('/Admin/LimpiarCacheIntegridad', { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    mostrarResultado(data.mensaje, 'success');
+                }
+            } catch (error) {
+                mostrarResultado('Error al limpiar cache', 'error');
+            }
+        }
+    </script>
+}

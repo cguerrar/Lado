@@ -17,17 +17,20 @@ namespace Lado.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILogger<FeedPublicoController> _logger;
         private readonly IAdService _adService;
+        private readonly IMediaIntegrityService _mediaIntegrity;
 
         public FeedPublicoController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             ILogger<FeedPublicoController> logger,
-            IAdService adService)
+            IAdService adService,
+            IMediaIntegrityService mediaIntegrity)
         {
             _context = context;
             _userManager = userManager;
             _logger = logger;
             _adService = adService;
+            _mediaIntegrity = mediaIntegrity;
         }
 
         // GET: /FeedPublico o /FeedPublico/Index
@@ -48,7 +51,8 @@ namespace Lado.Controllers
 
                 // 1. CONTENIDO PÚBLICO para el mosaico - obtener mas contenido
                 // IMPORTANTE: Solo LadoA (público) - NO mostrar LadoB en feed público
-                var contenidoPublico = await _context.Contenidos
+                // Priorizar contenido con thumbnail (videos) o imágenes sobre videos sin thumbnail
+                var contenidoPublicoRaw = await _context.Contenidos
                     .Include(c => c.Usuario)
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
@@ -62,11 +66,16 @@ namespace Lado.Controllers
                             && !usuariosOcultos.Contains(c.UsuarioId))  // Respetar privacidad del usuario
                     .OrderByDescending(c => c.NumeroLikes + c.NumeroVistas)
                     .ThenByDescending(c => c.FechaPublicacion)
-                    .Take(300)  // Obtener suficiente contenido para llenar toda la pantalla
+                    .Take(400)  // Obtener más para compensar los que se filtren
                     .ToListAsync();
 
+                // Filtrar contenido cuyos archivos no existen en disco
+                var contenidoPublico = _mediaIntegrity.FiltrarContenidoValido(contenidoPublicoRaw)
+                    .Take(300)
+                    .ToList();
+
                 // 2. CONTENIDO PREMIUM (LadoB) para mostrar difuminado
-                var contenidoPremium = await _context.Contenidos
+                var contenidoPremiumRaw = await _context.Contenidos
                     .Include(c => c.Usuario)
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
@@ -78,8 +87,13 @@ namespace Lado.Controllers
                             && !usuariosOcultos.Contains(c.UsuarioId))  // Respetar privacidad del usuario
                     .OrderByDescending(c => c.NumeroLikes)
                     .ThenByDescending(c => c.FechaPublicacion)
-                    .Take(10)
+                    .Take(20)  // Obtener más para compensar filtrados
                     .ToListAsync();
+
+                // Filtrar contenido premium cuyos archivos no existen
+                var contenidoPremium = _mediaIntegrity.FiltrarContenidoValido(contenidoPremiumRaw)
+                    .Take(10)
+                    .ToList();
 
                 ViewBag.ContenidoPremium = contenidoPremium;
                 ViewBag.ContenidoPremiumIds = contenidoPremium.Select(c => c.Id).ToList();

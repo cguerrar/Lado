@@ -257,6 +257,11 @@ builder.Services.AddScoped<Lado.Services.IJwtService, Lado.Services.JwtService>(
 builder.Services.AddScoped<Lado.Services.IFileValidationService, Lado.Services.FileValidationService>();
 
 // ========================================
+// SERVICIO DE INTEGRIDAD DE ARCHIVOS (Verificación de existencia)
+// ========================================
+builder.Services.AddSingleton<Lado.Services.IMediaIntegrityService, Lado.Services.MediaIntegrityService>();
+
+// ========================================
 // CONFIGURACIÓN DE CLAUDE API (Clasificación de contenido)
 // ========================================
 builder.Services.AddHttpClient("Claude", client =>

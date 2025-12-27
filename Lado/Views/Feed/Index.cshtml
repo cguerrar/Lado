@@ -678,6 +678,8 @@
     .story-overlay-item {
         position: absolute;
         pointer-events: none;
+        /* Centrar porque las coordenadas del editor son el centro del objeto */
+        transform: translate(-50%, -50%);
     }
 
     .story-overlay-text {
@@ -703,6 +705,26 @@
     .story-overlay-drawing {
         width: 100%;
         height: 100%;
+    }
+
+    .story-overlay-link {
+        pointer-events: auto !important;
+        cursor: pointer;
+        color: white;
+        font-weight: 600;
+        font-size: 15px;
+        text-decoration: none;
+        display: inline-block;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        transition: transform 0.2s, box-shadow 0.2s;
+        z-index: 10;
+        /* Centrar el elemento porque las coordenadas representan el centro */
+        transform: translate(-50%, -50%);
+    }
+
+    .story-overlay-link:hover {
+        transform: translate(-50%, -50%) scale(1.05);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
     }
 
     /* Indicador de música */
@@ -13867,9 +13889,12 @@
                     if (texto.backgroundColor) {
                         el.style.backgroundColor = texto.backgroundColor;
                     }
+                    // Siempre incluir translate para centrar
+                    let transforms = ['translate(-50%, -50%)'];
                     if (texto.rotation) {
-                        el.style.transform = `rotate(${texto.rotation}deg)`;
+                        transforms.push(`rotate(${texto.rotation}deg)`);
                     }
+                    el.style.transform = transforms.join(' ');
                     container.appendChild(el);
                 });
             }
@@ -13882,12 +13907,15 @@
                     el.textContent = sticker.valor;
                     el.style.left = `${sticker.x}%`;
                     el.style.top = `${sticker.y}%`;
+                    // Siempre incluir translate para centrar
+                    let transforms = ['translate(-50%, -50%)'];
                     if (sticker.scale) {
-                        el.style.transform = `scale(${sticker.scale})`;
+                        transforms.push(`scale(${sticker.scale})`);
                     }
                     if (sticker.rotation) {
-                        el.style.transform += ` rotate(${sticker.rotation}deg)`;
+                        transforms.push(`rotate(${sticker.rotation}deg)`);
                     }
+                    el.style.transform = transforms.join(' ');
                     container.appendChild(el);
                 });
             }
@@ -13928,6 +13956,94 @@
                 container.appendChild(svg);
             }
 
+            // Renderizar link si existe
+            if (elementos.link) {
+                const link = elementos.link;
+                const linkEl = document.createElement('a');
+                linkEl.href = link.url;
+                linkEl.target = '_blank';
+                linkEl.rel = 'noopener noreferrer';
+                linkEl.className = 'story-overlay-item story-overlay-link';
+                linkEl.textContent = link.text || 'Ver mas';
+                linkEl.style.left = `${link.x}%`;
+                linkEl.style.top = `${link.y}%`;
+                linkEl.style.fontFamily = link.font || 'Poppins';
+
+                // Aplicar estilo segun tipo
+                const style = link.style || 'pill';
+                const color = link.color || '#4682B4';
+
+                switch (style) {
+                    case 'pill':
+                        linkEl.style.background = color;
+                        linkEl.style.borderRadius = '20px';
+                        linkEl.style.padding = '10px 24px';
+                        break;
+                    case 'rounded':
+                        linkEl.style.background = color;
+                        linkEl.style.borderRadius = '8px';
+                        linkEl.style.padding = '10px 24px';
+                        break;
+                    case 'square':
+                        linkEl.style.background = color;
+                        linkEl.style.borderRadius = '3px';
+                        linkEl.style.padding = '10px 24px';
+                        break;
+                    case 'outline-pill':
+                        linkEl.style.background = 'transparent';
+                        linkEl.style.border = `2px solid ${color}`;
+                        linkEl.style.borderRadius = '20px';
+                        linkEl.style.padding = '8px 22px';
+                        linkEl.style.color = color;
+                        break;
+                    case 'outline-square':
+                        linkEl.style.background = 'transparent';
+                        linkEl.style.border = `2px solid ${color}`;
+                        linkEl.style.borderRadius = '3px';
+                        linkEl.style.padding = '8px 22px';
+                        linkEl.style.color = color;
+                        break;
+                    case 'glass':
+                        linkEl.style.background = 'rgba(255,255,255,0.2)';
+                        linkEl.style.backdropFilter = 'blur(8px)';
+                        linkEl.style.borderRadius = '20px';
+                        linkEl.style.padding = '10px 24px';
+                        break;
+                    case 'gradient':
+                        linkEl.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                        linkEl.style.borderRadius = '20px';
+                        linkEl.style.padding = '10px 24px';
+                        break;
+                    case 'swipe':
+                        linkEl.style.background = 'rgba(0,0,0,0.7)';
+                        linkEl.style.borderRadius = '20px';
+                        linkEl.style.padding = '10px 24px';
+                        linkEl.innerHTML = '<span style="margin-right:6px;">↑</span>' + (link.text || 'Ver mas');
+                        break;
+                    case 'minimal':
+                        linkEl.style.background = 'transparent';
+                        linkEl.style.textDecoration = 'underline';
+                        linkEl.style.padding = '8px 16px';
+                        break;
+                    default:
+                        linkEl.style.background = color;
+                        linkEl.style.borderRadius = '20px';
+                        linkEl.style.padding = '10px 24px';
+                }
+
+                // Construir transform combinado (siempre incluye translate para centrar)
+                let transforms = ['translate(-50%, -50%)'];
+                if (link.rotation) {
+                    transforms.push(`rotate(${link.rotation}deg)`);
+                }
+                if (link.scale && link.scale !== 1) {
+                    transforms.push(`scale(${link.scale})`);
+                }
+                linkEl.style.transform = transforms.join(' ');
+
+                container.appendChild(linkEl);
+            }
+
         } catch (error) {
             console.error('Error al renderizar overlays:', error);
         }
@@ -13946,6 +14062,7 @@
         if (story.musica && story.musica.audioUrl) {
             audioEl.src = story.musica.audioUrl;
             audioEl.currentTime = story.musica.inicioSegundos || 0;
+            audioEl.volume = (story.musica.volumen || 70) / 100;
 
             // Mostrar indicador
             document.getElementById('storyMusicTitle').textContent = story.musica.titulo;

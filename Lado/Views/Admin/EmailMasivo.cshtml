@@ -159,6 +159,10 @@
                                         <td>
                                             @if (campana.Estado == Lado.Models.EstadoCampanaEmail.Borrador)
                                             {
+                                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                                        onclick="editarCampana(@campana.Id)" title="Editar">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
                                                 <form method="post" action="@Url.Action("EnviarCampana")" class="d-inline"
                                                       onsubmit="return confirm('Enviar esta campana a @campana.TotalDestinatarios usuarios?')">
                                                     @Html.AntiForgeryToken()
@@ -178,6 +182,10 @@
                                                     </button>
                                                 </form>
                                             }
+                                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                    onclick="duplicarCampana(@campana.Id)" title="Duplicar">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
                                             <button type="button" class="btn btn-sm btn-outline-info"
                                                     onclick="verDetalleCampana(@campana.Id)" title="Ver Detalle">
                                                 <i class="fas fa-eye"></i>
@@ -802,6 +810,101 @@ Mas texto si es necesario.
             new bootstrap.Modal(document.getElementById('modalDetalleCampana')).show();
         } catch (e) {
             alert('Error al cargar detalle');
+        }
+    }
+
+    // Editar campana (solo borradores)
+    async function editarCampana(id) {
+        try {
+            const response = await fetch(`/Admin/ObtenerCampana?id=${id}`);
+            const c = await response.json();
+
+            // Ir a tab Nueva Campana
+            const tabNueva = document.querySelector('a[href="#tabNuevaCampana"]');
+            const tabEl = new bootstrap.Tab(tabNueva);
+            tabEl.show();
+
+            // Rellenar formulario
+            document.querySelector('input[name="nombre"]').value = c.nombre + ' (Editado)';
+            document.getElementById('inputAsunto').value = c.asunto;
+            document.getElementById('textareaContenido').value = c.contenidoHtml;
+            document.getElementById('selectTipoDestinatario').value = c.tipoDestinatario;
+
+            // Mostrar contenido personalizado si no usa plantilla
+            document.getElementById('selectPlantilla').value = '';
+            document.getElementById('divContenidoPersonalizado').style.display = 'block';
+            document.getElementById('inputAsunto').setAttribute('required', 'required');
+            document.getElementById('textareaContenido').setAttribute('required', 'required');
+
+            // Si es emails especificos
+            if (c.tipoDestinatario === 4 && c.emailsEspecificos) {
+                document.getElementById('divEmailsEspecificos').style.display = 'block';
+                document.getElementById('textareaEmailsEspecificos').value = c.emailsEspecificos;
+            }
+
+            // Cambiar accion del formulario para editar
+            const form = document.getElementById('formCampana');
+            form.action = '/Admin/EditarCampana';
+
+            // Agregar campo oculto con ID
+            let hiddenId = form.querySelector('input[name="id"]');
+            if (!hiddenId) {
+                hiddenId = document.createElement('input');
+                hiddenId.type = 'hidden';
+                hiddenId.name = 'id';
+                form.appendChild(hiddenId);
+            }
+            hiddenId.value = id;
+
+            // Cambiar texto del boton
+            form.querySelector('button[type="submit"]').innerHTML = '<i class="fas fa-save"></i> Guardar Cambios';
+
+        } catch (e) {
+            alert('Error al cargar campana para editar');
+        }
+    }
+
+    // Duplicar campana
+    async function duplicarCampana(id) {
+        try {
+            const response = await fetch(`/Admin/ObtenerCampana?id=${id}`);
+            const c = await response.json();
+
+            // Ir a tab Nueva Campana
+            const tabNueva = document.querySelector('a[href="#tabNuevaCampana"]');
+            const tabEl = new bootstrap.Tab(tabNueva);
+            tabEl.show();
+
+            // Rellenar formulario con datos de la campana original
+            document.querySelector('input[name="nombre"]').value = c.nombre + ' (Copia)';
+            document.getElementById('inputAsunto').value = c.asunto;
+            document.getElementById('textareaContenido').value = c.contenidoHtml;
+            document.getElementById('selectTipoDestinatario').value = c.tipoDestinatario;
+
+            // Mostrar contenido personalizado
+            document.getElementById('selectPlantilla').value = '';
+            document.getElementById('divContenidoPersonalizado').style.display = 'block';
+            document.getElementById('inputAsunto').setAttribute('required', 'required');
+            document.getElementById('textareaContenido').setAttribute('required', 'required');
+
+            // Si es emails especificos
+            if (c.tipoDestinatario === 4 && c.emailsEspecificos) {
+                document.getElementById('divEmailsEspecificos').style.display = 'block';
+                document.getElementById('textareaEmailsEspecificos').value = c.emailsEspecificos;
+            }
+
+            // Asegurar que el formulario crea una nueva campana
+            const form = document.getElementById('formCampana');
+            form.action = '/Admin/CrearCampana';
+            const hiddenId = form.querySelector('input[name="id"]');
+            if (hiddenId) hiddenId.remove();
+            form.querySelector('button[type="submit"]').innerHTML = '<i class="fas fa-save"></i> Crear Campana (Borrador)';
+
+            // Contar destinatarios
+            setTimeout(() => contarDestinatarios(), 500);
+
+        } catch (e) {
+            alert('Error al duplicar campana');
         }
     }
 

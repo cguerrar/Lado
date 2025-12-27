@@ -74,6 +74,11 @@ namespace Lado.Models
         /// </summary>
         public int? MusicaInicioSegundos { get; set; }
 
+        /// <summary>
+        /// Volumen de la música (0-100)
+        /// </summary>
+        public int? MusicaVolumen { get; set; }
+
         // Navegación
         [ForeignKey("CreadorId")]
         public virtual ApplicationUser Creador { get; set; }

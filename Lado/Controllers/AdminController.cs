@@ -23,6 +23,7 @@ namespace Lado.Controllers
         private readonly IWebHostEnvironment _hostEnvironment;
         private readonly IRateLimitService _rateLimitService;
         private readonly IBulkEmailService _bulkEmailService;
+        private readonly IMediaIntegrityService _mediaIntegrity;
 
         // Lista de IDs de contenidos que fallaron durante la clasificación por lotes
         // Se limpia cuando se inicia una nueva reclasificación masiva
@@ -40,7 +41,8 @@ namespace Lado.Controllers
             ILogEventoService logEventoService,
             IWebHostEnvironment hostEnvironment,
             IRateLimitService rateLimitService,
-            IBulkEmailService bulkEmailService)
+            IBulkEmailService bulkEmailService,
+            IMediaIntegrityService mediaIntegrity)
         {
             _context = context;
             _userManager = userManager;
@@ -53,6 +55,7 @@ namespace Lado.Controllers
             _hostEnvironment = hostEnvironment;
             _rateLimitService = rateLimitService;
             _bulkEmailService = bulkEmailService;
+            _mediaIntegrity = mediaIntegrity;
         }
 
         public override void OnActionExecuting(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext context)
@@ -6307,6 +6310,55 @@ Este email fue enviado a {{{{email}}}}
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditarCampana(int id, string nombre, string asunto,
+            string contenidoHtml, TipoDestinatarioEmail tipoDestinatario, string? emailsEspecificos)
+        {
+            try
+            {
+                var campana = await _context.CampanasEmail.FindAsync(id);
+                if (campana == null)
+                {
+                    TempData["Error"] = "Campaña no encontrada.";
+                    return RedirectToAction("EmailMasivo");
+                }
+
+                if (campana.Estado != EstadoCampanaEmail.Borrador)
+                {
+                    TempData["Error"] = "Solo se pueden editar campañas en estado borrador.";
+                    return RedirectToAction("EmailMasivo");
+                }
+
+                if (string.IsNullOrWhiteSpace(nombre) || string.IsNullOrWhiteSpace(asunto) || string.IsNullOrWhiteSpace(contenidoHtml))
+                {
+                    TempData["Error"] = "Nombre, asunto y contenido son obligatorios.";
+                    return RedirectToAction("EmailMasivo");
+                }
+
+                campana.Nombre = nombre;
+                campana.Asunto = asunto;
+                campana.ContenidoHtml = contenidoHtml;
+                campana.TipoDestinatario = tipoDestinatario;
+                campana.EmailsEspecificos = tipoDestinatario == TipoDestinatarioEmail.EmailsEspecificos
+                    ? emailsEspecificos : null;
+
+                // Recontear destinatarios
+                campana.TotalDestinatarios = await _bulkEmailService.ContarDestinatariosAsync(
+                    tipoDestinatario, campana.EmailsEspecificos);
+
+                await _context.SaveChangesAsync();
+
+                TempData["Success"] = $"Campaña '{nombre}' actualizada. {campana.TotalDestinatarios} destinatarios.";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error al editar campaña: {ex.Message}";
+            }
+
+            return RedirectToAction("EmailMasivo");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> EnviarCampana(int id)
         {
             try
@@ -6441,6 +6493,82 @@ Este email fue enviado a {{{{email}}}}
                 contenido, "Usuario Demo", "demo@ejemplo.com", "usuario_demo");
 
             return Json(new { asunto = asuntoPreview, contenido = contenidoPreview });
+        }
+
+        // ========================================
+        // INTEGRIDAD DE ARCHIVOS MULTIMEDIA
+        // ========================================
+
+        /// <summary>
+        /// Muestra estadísticas de integridad de archivos multimedia
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> IntegridadArchivos()
+        {
+            var stats = await _mediaIntegrity.ObtenerEstadisticasAsync();
+            return View(stats);
+        }
+
+        /// <summary>
+        /// API para obtener estadísticas de integridad
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ObtenerEstadisticasIntegridad()
+        {
+            var stats = await _mediaIntegrity.ObtenerEstadisticasAsync();
+            return Json(new
+            {
+                success = true,
+                totalContenidos = stats.TotalContenidos,
+                contenidosConArchivo = stats.ContenidosConArchivo,
+                contenidosSinArchivo = stats.ContenidosSinArchivo,
+                archivosVerificados = stats.ArchivosVerificados,
+                archivosFaltantes = stats.ArchivosFaltantes,
+                porcentajeIntegridad = stats.ContenidosConArchivo > 0
+                    ? Math.Round((1 - (double)stats.ArchivosFaltantes / stats.ContenidosConArchivo) * 100, 2)
+                    : 100,
+                rutasFaltantes = stats.RutasFaltantes.Take(20)
+            });
+        }
+
+        /// <summary>
+        /// Simula la limpieza de contenido con archivos faltantes
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> SimularLimpiezaArchivos()
+        {
+            var afectados = await _mediaIntegrity.LimpiarContenidoSinArchivosAsync(soloSimular: true);
+            return Json(new
+            {
+                success = true,
+                mensaje = $"Simulación completada: {afectados} contenidos serían desactivados",
+                afectados = afectados
+            });
+        }
+
+        /// <summary>
+        /// Ejecuta la limpieza de contenido con archivos faltantes
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> EjecutarLimpiezaArchivos()
+        {
+            var afectados = await _mediaIntegrity.LimpiarContenidoSinArchivosAsync(soloSimular: false);
+            return Json(new
+            {
+                success = true,
+                mensaje = $"Limpieza completada: {afectados} contenidos desactivados",
+                afectados = afectados
+            });
+        }
+
+        /// <summary>
+        /// Limpia la caché de verificación de archivos
+        /// </summary>
+        [HttpPost]
+        public IActionResult LimpiarCacheIntegridad()
+        {
+            _mediaIntegrity.LimpiarCache();
+            return Json(new { success = true, mensaje = "Caché limpiada correctamente" });
         }
     }
 

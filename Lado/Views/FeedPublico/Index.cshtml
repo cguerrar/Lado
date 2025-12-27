@@ -87,26 +87,45 @@
         opacity: 1;
     }
 
-    /* Skeleton/placeholder mientras carga */
+    /* Skeleton/placeholder mientras carga - efecto shimmer visible */
     .mosaic-item {
         background: linear-gradient(
             110deg,
-            #1a1a1a 8%,
-            #2a2a2a 18%,
-            #1a1a1a 33%
+            #0d0d0d 0%,
+            #1a1a1a 20%,
+            #2d2d2d 40%,
+            #1a1a1a 60%,
+            #0d0d0d 100%
         );
-        background-size: 200% 100%;
-        animation: shimmer 1.5s linear infinite;
+        background-size: 300% 100%;
+        animation: shimmer 1.2s ease-in-out infinite;
     }
 
     .mosaic-item.media-loaded {
-        background: none;
+        background: #111;
         animation: none;
     }
 
     @@keyframes shimmer {
-        0% { background-position: 200% 0; }
-        100% { background-position: -200% 0; }
+        0% { background-position: 100% 0; }
+        100% { background-position: -100% 0; }
+    }
+
+    /* Animación de aparición suave cuando carga */
+    .mosaic-item img.loaded,
+    .mosaic-item video.loaded {
+        animation: fadeInScale 0.3s ease-out forwards;
+    }
+
+    @@keyframes fadeInScale {
+        from {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
     }
 
     /* Placeholder para videos con error */
@@ -123,6 +142,12 @@
         width: 40%;
         height: 40%;
         opacity: 0.5;
+    }
+
+    /* Video placeholder mientras carga */
+    .video-placeholder {
+        opacity: 0;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
     }
 
     .mosaic-item:hover img,
@@ -612,8 +637,8 @@
         {
             var contador = 0;
             var contadorVideos = 0;
-            var cargarDirecto = 50; // Primeras 50 imágenes cargan directo sin lazy loading
-            var videosConAutoplay = 10; // Solo los primeros 10 videos tendrán autoplay
+            var cargarDirecto = 6; // Solo 6 imágenes cargan directo (feedback inmediato)
+            var videosConAutoplay = 15; // Videos con autoplay para dar vida al mosaico
 
             // Función para limpiar comillas de rutas (datos legacy)
             string LimpiarRuta(string ruta) {
@@ -646,22 +671,36 @@
                 <div class="mosaic-item @(usarLazy ? "" : "media-loaded")" data-tipo="@(esVideo ? "video" : "image")" onclick="window.location.href='@Url.Action("Login", "Account")'">
                     @if (esVideo)
                     {
-                        // Videos: cargar video real, autoplay solo para los primeros N
+                        // Videos: usar thumbnail como imagen si existe, evitar cargar video innecesariamente
                         var posterUrl = !string.IsNullOrEmpty(thumbnailUrl) ? thumbnailUrl : "";
-                        <video src="@rutaArchivo"
-                               @(string.IsNullOrEmpty(posterUrl) ? "" : $"poster=\"{posterUrl}\"")
-                               @(videoAutoplay ? "autoplay" : "")
-                               muted
-                               loop
-                               playsinline
-                               webkit-playsinline
-                               preload="@(videoAutoplay ? "auto" : "metadata")"
-                               class="loaded"
-                               onerror="this.parentElement.innerHTML='<div class=\'video-error-placeholder\'><svg viewBox=\'0 0 24 24\' fill=\'rgba(255,255,255,0.3)\'><path d=\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\'/></svg></div>';">
-                        </video>
-                        <div class="video-badge">
-                            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                        </div>
+                        if (!string.IsNullOrEmpty(posterUrl))
+                        {
+                            // Si hay thumbnail, mostrar imagen con badge de video (más eficiente)
+                            <img src="@posterUrl"
+                                 alt=""
+                                 class="loaded"
+                                 loading="eager"
+                                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E'">
+                            <div class="video-badge">
+                                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                        }
+                        else
+                        {
+                            // Sin thumbnail: intentar cargar video, pero con manejo de errores robusto
+                            <video data-video-src="@rutaArchivo"
+                                   @(videoAutoplay ? "autoplay" : "")
+                                   muted
+                                   loop
+                                   playsinline
+                                   webkit-playsinline
+                                   preload="none"
+                                   class="video-placeholder">
+                            </video>
+                            <div class="video-badge">
+                                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                        }
                     }
                     else
                     {
@@ -757,6 +796,20 @@
 @section Scripts {
     <script>
         (function() {
+            // ========================================
+            // MANEJO SILENCIOSO DE ERRORES DE RECURSOS
+            // ========================================
+            // Capturar errores de carga de recursos (img, video) para evitar spam en consola
+            window.addEventListener('error', function(e) {
+                if (e.target && (e.target.tagName === 'IMG' || e.target.tagName === 'VIDEO')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    // Marcar el elemento como con error para manejo posterior
+                    e.target.dataset.loadError = 'true';
+                    return false;
+                }
+            }, true);
+
             const grid = document.getElementById('mosaicGrid');
             if (!grid) return;
 
@@ -812,25 +865,45 @@
                     img.src = src;
                 }
 
-                if (video && video.hasAttribute('data-src')) {
-                    const src = video.getAttribute('data-src');
-
+                // Videos con data-video-src (carga lazy de videos)
+                if (video && video.hasAttribute('data-video-src')) {
+                    const src = video.getAttribute('data-video-src');
                     loadedItems.add(item);
 
+                    // Reemplazar con imagen placeholder inmediatamente
+                    const showPlaceholder = () => {
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'video-error-placeholder';
+                        placeholder.innerHTML = '<svg viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)"><path d="M8 5v14l11-7z"/></svg>';
+                        video.replaceWith(placeholder);
+                        item.classList.add('media-loaded');
+                    };
+
+                    // Timeout de 5 segundos para videos que no cargan
+                    const timeout = setTimeout(() => {
+                        if (!video.classList.contains('loaded')) {
+                            showPlaceholder();
+                        }
+                    }, 5000);
+
                     video.onloadeddata = function() {
+                        clearTimeout(timeout);
+                        video.classList.remove('video-placeholder');
                         video.classList.add('loaded');
                         item.classList.add('media-loaded');
+                        // Reproducir automáticamente (silenciado)
+                        video.muted = true;
+                        video.loop = true;
+                        video.play().catch(() => {});
                     };
 
                     video.onerror = function() {
-                        item.classList.add('media-loaded');
-                        // Ocultar el badge de video si falla
-                        const badge = item.querySelector('.video-badge');
-                        if (badge) badge.style.display = 'none';
+                        clearTimeout(timeout);
+                        showPlaceholder();
                     };
 
                     video.src = src;
-                    video.removeAttribute('data-src');
+                    video.removeAttribute('data-video-src');
                 }
             }
 
@@ -857,48 +930,77 @@
                 imageObserver.observe(item);
             });
 
-            // Cargar items visibles inmediatamente (los del centro)
-            function loadVisibleItems() {
-                const viewportWidth = window.innerWidth;
-                const viewportHeight = window.innerHeight;
-                const centerX = viewportWidth / 2;
-                const centerY = viewportHeight / 2;
+            // Cola de carga progresiva - una imagen a la vez
+            let loadQueue = [];
+            let isProcessingQueue = false;
+            const LOAD_DELAY = 30; // ms entre cada imagen (rápido pero visible)
+
+            // Ordenar y encolar items desde el centro hacia afuera
+            function buildLoadQueue() {
+                const centerX = window.innerWidth / 2;
+                const centerY = window.innerHeight / 2;
 
                 // Ordenar por distancia al centro
-                const sortedItems = Array.from(items).map(item => {
-                    const rect = item.getBoundingClientRect();
-                    const itemCenterX = rect.left + rect.width / 2;
-                    const itemCenterY = rect.top + rect.height / 2;
-                    const distance = Math.sqrt(
-                        Math.pow(itemCenterX - centerX, 2) +
-                        Math.pow(itemCenterY - centerY, 2)
-                    );
-                    return { item, distance, visible: item.style.display !== 'none' };
-                })
-                .filter(i => i.visible)
-                .sort((a, b) => a.distance - b.distance);
+                const sortedItems = Array.from(items)
+                    .map(item => {
+                        const rect = item.getBoundingClientRect();
+                        const itemCenterX = rect.left + rect.width / 2;
+                        const itemCenterY = rect.top + rect.height / 2;
+                        const distance = Math.sqrt(
+                            Math.pow(itemCenterX - centerX, 2) +
+                            Math.pow(itemCenterY - centerY, 2)
+                        );
+                        return { item, distance, visible: item.style.display !== 'none' };
+                    })
+                    .filter(i => i.visible && !loadedItems.has(i.item))
+                    .sort((a, b) => a.distance - b.distance);
 
-                // Cargar primero los 20 más cercanos al centro
-                const priorityItems = sortedItems.slice(0, 20);
-
-                priorityItems.forEach(({ item }, index) => {
-                    setTimeout(() => loadMedia(item), index * 20);
-                });
+                // Agregar a la cola
+                loadQueue = sortedItems.map(s => s.item);
             }
 
-            // Cargar todos los items restantes después de un delay
-            function loadRemainingItems() {
-                let delay = 0;
+            // Procesar cola uno por uno (efecto visual progresivo)
+            function processQueue() {
+                if (isProcessingQueue || loadQueue.length === 0) return;
+                isProcessingQueue = true;
+
+                function loadNext() {
+                    if (loadQueue.length === 0) {
+                        isProcessingQueue = false;
+                        return;
+                    }
+
+                    const item = loadQueue.shift();
+                    if (item && !loadedItems.has(item)) {
+                        loadMedia(item);
+                    }
+
+                    // Siguiente imagen con delay visible
+                    requestAnimationFrame(() => {
+                        setTimeout(loadNext, LOAD_DELAY);
+                    });
+                }
+
+                loadNext();
+            }
+
+            // Cargar items visibles inmediatamente (los del centro)
+            function loadVisibleItems() {
+                buildLoadQueue();
+                processQueue();
+            }
+
+            // Agregar items restantes a la cola
+            function queueRemainingItems() {
                 items.forEach(item => {
-                    if (!loadedItems.has(item)) {
-                        // Cargar todos los items, incluso los ocultos (por si se muestran después)
-                        setTimeout(() => loadMedia(item), delay);
-                        delay += 15; // Reducido de 30 a 15ms para carga más rápida
+                    if (!loadedItems.has(item) && !loadQueue.includes(item)) {
+                        loadQueue.push(item);
                     }
                 });
+                processQueue();
             }
 
-            // Forzar carga de TODOS los items después de 3 segundos
+            // Forzar carga de TODOS los items (fallback)
             function forceLoadAll() {
                 items.forEach(item => {
                     if (!loadedItems.has(item)) {
@@ -907,17 +1009,17 @@
                 });
             }
 
-            // Iniciar carga
+            // Iniciar carga progresiva
             function initLoading() {
                 requestAnimationFrame(() => {
-                    // Primero cargar items visibles/cercanos al centro
+                    // Cargar desde el centro hacia afuera, uno por uno
                     loadVisibleItems();
 
-                    // Después de 500ms, cargar el resto progresivamente
-                    setTimeout(loadRemainingItems, 500);
+                    // Agregar resto a la cola después de 800ms
+                    setTimeout(queueRemainingItems, 800);
 
-                    // Forzar carga de todos los items restantes después de 3 segundos
-                    setTimeout(forceLoadAll, 3000);
+                    // Fallback: forzar carga de todo después de 6 segundos
+                    setTimeout(forceLoadAll, 6000);
                 });
             }
 
@@ -986,47 +1088,52 @@
                 setTimeout(setupGrid, 100);
             });
 
-            // Forzar que todos los videos muestren su primer frame
-            function showVideoFirstFrame(video) {
-                if (!video.src) return;
+            // Reproducir videos automáticamente (silenciados, en loop)
+            function playVideoAutomatically(video) {
+                if (!video.src || video.classList.contains('video-placeholder')) return;
 
                 video.muted = true;
+                video.loop = true;
                 video.playsInline = true;
 
-                // Cuando los metadatos estén listos, ir al primer frame
-                const showFrame = () => {
-                    video.currentTime = 0.001; // Ir al primer frame
+                // Cuando esté listo, reproducir
+                const startPlayback = () => {
                     video.classList.add('loaded');
                     video.closest('.mosaic-item')?.classList.add('media-loaded');
+                    video.play().catch(() => {
+                        // Si falla, al menos mostrar el primer frame
+                        video.currentTime = 0.001;
+                    });
                 };
 
-                if (video.readyState >= 1) {
-                    showFrame();
+                if (video.readyState >= 2) {
+                    startPlayback();
                 } else {
-                    video.addEventListener('loadedmetadata', showFrame, { once: true });
+                    video.addEventListener('canplay', startPlayback, { once: true });
                 }
             }
 
-            // Inicializar todos los videos
-            const allVideos = grid.querySelectorAll('video');
-            allVideos.forEach(showVideoFirstFrame);
+            // Inicializar videos que ya tienen src (reproducir automáticamente)
+            const preloadedVideos = grid.querySelectorAll('video[src]:not(.video-placeholder)');
+            preloadedVideos.forEach(playVideoAutomatically);
 
-            // Manejo de videos - interacción
+            // Manejo de videos - interacción en hover (pausar/reanudar)
             if (!isTouchDevice) {
-                // Desktop: hover para reproducir
+                // Desktop: pausar en hover para ver mejor, reanudar al salir
                 items.forEach(item => {
-                    const video = item.querySelector('video');
-                    if (video) {
-                        item.addEventListener('mouseenter', () => {
-                            if (video.src && video.readyState >= 2) {
-                                video.play().catch(() => {});
-                            }
-                        });
-                        item.addEventListener('mouseleave', () => {
-                            video.pause();
+                    item.addEventListener('mouseenter', () => {
+                        const video = item.querySelector('video');
+                        if (video && video.src && video.readyState >= 2) {
+                            // Ya está reproduciéndose, no hacer nada
+                        }
+                    });
+                    item.addEventListener('mouseleave', () => {
+                        const video = item.querySelector('video');
+                        if (video && video.src && video.paused) {
+                            video.play().catch(() => {});
                             video.currentTime = 0.001;
-                        });
-                    }
+                        }
+                    });
                 });
             }
 

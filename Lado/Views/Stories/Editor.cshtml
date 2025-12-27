@@ -13,8 +13,13 @@
     <title>@ViewData["Title"] - Lado</title>
     <link rel="icon" type="image/png" href="/images/favicon.png" />
 
+    <!-- Google Fonts para variedad de tipografías -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Dancing+Script:wght@700&family=Lobster&family=Montserrat:wght@600;800&family=Oswald:wght@600&family=Pacifico&family=Permanent+Marker&family=Playfair+Display:wght@700&family=Poppins:wght@600;700&family=Roboto:wght@500;700&family=Satisfy&family=Anton&display=swap" rel="stylesheet">
+
     <!-- Fabric.js para canvas interactivo -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
 
     <style>
         /* ========================================
@@ -177,8 +182,23 @@
             margin: 8px 4px;
         }
 
+        /* Botón de salir del editor */
+        .close-editor-btn {
+            background: rgba(220, 53, 69, 0.1) !important;
+            color: var(--danger) !important;
+        }
+
+        .close-editor-btn:hover {
+            background: var(--danger) !important;
+            color: white !important;
+        }
+
+        .desktop-only {
+            display: block;
+        }
+
         /* Panel central - Canvas */
-        .canvas-container {
+        .canvas-area {
             flex: 1;
             display: flex;
             align-items: center;
@@ -205,9 +225,47 @@
             box-shadow: 0 25px 70px var(--shadow-strong), 0 0 0 1px var(--primary);
         }
 
+        /* Video de fondo */
+        #videoBackground {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            display: none;
+            transform-origin: center center;
+            transition: filter 0.3s ease, transform 0.3s ease;
+        }
+
+        #videoBackground.active {
+            display: block;
+        }
+
+        /* Canvas de Fabric.js */
         #storyCanvas {
+            position: absolute !important;
+            top: 0;
+            left: 0;
             width: 100% !important;
             height: 100% !important;
+            z-index: 2;
+        }
+
+        /* El contenedor que Fabric.js genera automaticamente */
+        .canvas-wrapper > .canvas-container {
+            position: absolute !important;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+            z-index: 2;
+        }
+
+        /* Upper canvas de Fabric (el que maneja interacciones) */
+        .canvas-wrapper .upper-canvas {
+            z-index: 3 !important;
         }
 
         /* Panel derecho - Opciones (Desktop) */
@@ -505,17 +563,28 @@
             background: var(--primary);
         }
 
-        /* Selector de música */
+        /* ========================================
+           MÚSICA - Estilos mejorados
+           ======================================== */
+        .music-list-container {
+            max-height: 220px;
+            overflow-y: auto;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 4px;
+        }
+
         .music-item {
-            padding: 12px;
+            padding: 10px;
             background: var(--bg);
             border-radius: 8px;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             cursor: pointer;
             transition: all 0.2s;
+            border: 2px solid transparent;
         }
 
         .music-item:hover {
@@ -523,29 +592,399 @@
         }
 
         .music-item.selected {
-            border: 2px solid var(--primary);
+            border-color: var(--primary);
+            background: rgba(70, 130, 180, 0.1);
+        }
+
+        .music-item.playing {
+            background: rgba(70, 130, 180, 0.15);
         }
 
         .music-cover {
-            width: 48px;
-            height: 48px;
+            width: 44px;
+            height: 44px;
             border-radius: 6px;
             background: var(--line);
             object-fit: cover;
+            flex-shrink: 0;
         }
 
         .music-info {
             flex: 1;
+            min-width: 0;
         }
 
         .music-title {
             font-weight: 600;
-            font-size: 14px;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .music-artist {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .music-duration {
+            font-size: 10px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        .music-play-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--primary);
+            border: none;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+
+        .music-play-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .music-play-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* =============================================
+           AUDIO CUTTER - Waveform Editor
+           ============================================= */
+        .audio-cutter {
+            background: linear-gradient(135deg, #1a9be6 0%, #0d7bc5 100%);
+            border-radius: 12px;
+            padding: 14px;
+            color: white;
+        }
+
+        .audio-cutter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .audio-cutter-filename {
+            font-weight: 600;
+            max-width: 70%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .audio-cutter-info {
+            opacity: 0.8;
+            font-size: 11px;
+        }
+
+        .btn-remove-music {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            margin-left: 8px;
+        }
+
+        .btn-remove-music:hover {
+            background: rgba(239, 68, 68, 0.8);
+        }
+
+        .btn-remove-music svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* Waveform container */
+        .waveform-container {
+            position: relative;
+            height: 70px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .waveform-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Selection overlay */
+        .waveform-selection {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            background: rgba(45, 212, 191, 0.4);
+            border-left: 3px solid #2dd4bf;
+            border-right: 3px solid #2dd4bf;
+        }
+
+        /* Selection handles */
+        .selection-handle {
+            position: absolute;
+            top: 0;
+            width: 18px;
+            height: 100%;
+            cursor: ew-resize;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+        }
+
+        .selection-handle .handle-bar {
+            width: 5px;
+            height: 40px;
+            background: white;
+            border-radius: 3px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            pointer-events: none;
+        }
+
+        .selection-handle:hover .handle-bar,
+        .selection-handle.dragging .handle-bar {
+            background: #2dd4bf;
+            transform: scaleY(1.1);
+        }
+
+        .selection-handle.dragging {
+            z-index: 30;
+        }
+
+        .selection-handle.handle-left {
+            left: 0;
+            transform: translateX(-50%);
+        }
+
+        .selection-handle.handle-right {
+            right: 0;
+            transform: translateX(50%);
+        }
+
+        /* Playhead */
+        .waveform-playhead {
+            position: absolute;
+            top: 0;
+            width: 2px;
+            height: 100%;
+            background: white;
+            pointer-events: none;
+            display: none;
+            z-index: 5;
+        }
+
+        /* Waveform time display */
+        .waveform-time {
+            position: absolute;
+            top: 5px;
+            left: 6px;
+            background: rgba(0,0,0,0.6);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            z-index: 10;
+        }
+
+        /* Controls row */
+        .audio-cutter-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .cutter-play-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: transform 0.15s;
+        }
+
+        .cutter-play-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .cutter-play-btn:active {
+            transform: scale(0.95);
+        }
+
+        .cutter-play-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: #1a9be6;
+        }
+
+        .cutter-play-btn .pause-icon {
+            display: none;
+        }
+
+        .cutter-play-btn.playing .play-icon {
+            display: none;
+        }
+
+        .cutter-play-btn.playing .pause-icon {
+            display: block;
+        }
+
+        /* Time inputs */
+        .cutter-time-inputs {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+        .time-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .time-input-group label {
+            font-size: 9px;
+            opacity: 0.8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .time-input {
+            width: 58px;
+            padding: 5px 6px;
+            border: none;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.15);
+            color: white;
+            font-size: 11px;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            text-align: center;
+        }
+
+        .time-input:focus {
+            outline: none;
+            background: rgba(255,255,255,0.25);
+        }
+
+        .duration-group .selection-duration {
+            font-size: 13px;
+            font-weight: 600;
+            color: #2dd4bf;
+        }
+
+        /* Volume control */
+        .cutter-volume {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: auto;
+        }
+
+        .cutter-volume svg {
+            width: 16px;
+            height: 16px;
+            opacity: 0.8;
+        }
+
+        .cutter-volume .volume-slider {
+            width: 60px;
+            height: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: rgba(255,255,255,0.3);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        .cutter-volume .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+        }
+
+        .cutter-volume .volume-slider::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            border: none;
+        }
+
+        .cutter-volume .volume-value {
+            font-size: 11px;
+            opacity: 0.8;
+            min-width: 30px;
+        }
+
+        /* Cutter hint */
+        .cutter-hint {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        .cutter-hint svg {
+            flex-shrink: 0;
+            width: 14px;
+            height: 14px;
+        }
+
+        /* Loading state */
+        .audio-cutter.loading .waveform-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .audio-cutter.loading .waveform-container::after {
+            content: 'Cargando audio...';
+            color: rgba(255,255,255,0.7);
+            font-size: 12px;
+        }
+
+        .audio-cutter.loading .waveform-canvas,
+        .audio-cutter.loading .waveform-selection,
+        .audio-cutter.loading .selection-handle {
+            display: none;
         }
 
         /* Herramientas de dibujo */
@@ -578,6 +1017,264 @@
         .brush-size-dot {
             border-radius: 50%;
             background: var(--fg);
+        }
+
+        /* Grid de estilos de Link */
+        .link-styles-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .link-style-option {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 10px 6px;
+            background: var(--bg);
+            border: 2px solid var(--line);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .link-style-option:hover {
+            border-color: var(--muted);
+            background: var(--surface-hover);
+        }
+
+        .link-style-option.selected {
+            border-color: var(--primary);
+            background: rgba(70, 130, 180, 0.1);
+        }
+
+        .link-style-option span {
+            font-size: 10px;
+            color: var(--muted);
+        }
+
+        /* Previews de estilos de link */
+        .link-preview-pill {
+            background: var(--primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 14px;
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .link-preview-rounded {
+            background: var(--primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .link-preview-square {
+            background: var(--primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 2px;
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .link-preview-outline-pill {
+            background: transparent;
+            color: white;
+            padding: 3px 9px;
+            border: 1.5px solid white;
+            border-radius: 14px;
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .link-preview-outline-square {
+            background: transparent;
+            color: white;
+            padding: 3px 9px;
+            border: 1.5px solid white;
+            border-radius: 2px;
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .link-preview-glass {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(4px);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 14px;
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .link-preview-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 14px;
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .link-preview-swipe {
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 14px;
+            font-size: 9px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .link-preview-swipe svg {
+            transform: rotate(-90deg);
+        }
+
+        .link-preview-minimal {
+            color: white;
+            font-size: 9px;
+            font-weight: 600;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        /* Grid de fuentes para Link */
+        .link-fonts-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            max-height: 180px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .link-font-option {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 4px;
+            background: var(--bg);
+            border: 2px solid var(--line);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 36px;
+        }
+
+        .link-font-option:hover {
+            border-color: var(--muted);
+            background: var(--surface-hover);
+        }
+
+        .link-font-option.selected {
+            border-color: var(--primary);
+            background: rgba(70, 130, 180, 0.15);
+        }
+
+        .link-font-option span {
+            font-size: 11px;
+            color: var(--fg);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* ========================================
+           HERRAMIENTAS DE AJUSTE (Voltear, Rotar, Filtros)
+           ======================================== */
+        .adjust-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .adjust-btn {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 12px 8px;
+            background: var(--bg);
+            border: 2px solid var(--line);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--fg);
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .adjust-btn:hover {
+            border-color: var(--primary);
+            background: rgba(70, 130, 180, 0.1);
+        }
+
+        .adjust-btn:active {
+            transform: scale(0.95);
+        }
+
+        .adjust-btn svg {
+            color: var(--muted);
+            transition: color 0.2s;
+        }
+
+        .adjust-btn:hover svg {
+            color: var(--primary);
+        }
+
+        /* Grid de filtros */
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .filter-option {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 4px;
+            background: var(--bg);
+            border: 2px solid var(--line);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-option:hover {
+            border-color: var(--muted);
+        }
+
+        .filter-option.selected {
+            border-color: var(--primary);
+            background: rgba(70, 130, 180, 0.15);
+        }
+
+        .filter-preview {
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            background: var(--line);
+        }
+
+        .filter-option span {
+            font-size: 10px;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        .filter-option.selected span {
+            color: var(--primary);
+            font-weight: 600;
         }
 
         /* Selector Lado A/B */
@@ -743,8 +1440,13 @@
                 z-index: 100;
             }
 
-            .tools-panel .tools-divider {
+            .tools-panel .tools-divider,
+            .tools-panel .desktop-only {
                 display: none;
+            }
+
+            .close-editor-btn {
+                display: none !important;
             }
 
             .tool-btn {
@@ -758,7 +1460,7 @@
             }
 
             /* Canvas centrado con espacio para paneles */
-            .canvas-container {
+            .canvas-area {
                 padding: 0;
                 padding-top: 60px;
                 padding-bottom: 72px;
@@ -975,6 +1677,15 @@
 
         <!-- Panel de herramientas -->
         <div class="tools-panel">
+            <!-- Botón de salir (visible en desktop) -->
+            <button class="tool-btn close-editor-btn" title="Salir" onclick="cancelarEditor()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+            </button>
+            <div class="tools-divider desktop-only"></div>
             <button class="tool-btn active" data-tool="text" title="Texto" onclick="seleccionarHerramienta('text')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M4 7V4h16v3M9 20h6M12 4v16"/>
@@ -1009,6 +1720,18 @@
                     <circle cx="18" cy="16" r="3"/>
                 </svg>
             </button>
+            <button class="tool-btn" data-tool="link" title="Enlace" onclick="seleccionarHerramienta('link')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+            </button>
+            <button class="tool-btn" data-tool="adjust" title="Ajustes" onclick="seleccionarHerramienta('adjust')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            </button>
 
             <div class="tools-divider"></div>
 
@@ -1027,7 +1750,7 @@
         </div>
 
         <!-- Canvas central -->
-        <div class="canvas-container">
+        <div class="canvas-area">
             <div class="canvas-wrapper" id="canvasWrapper">
                 <!-- Overlay de upload inicial -->
                 <div class="upload-overlay" id="uploadOverlay" onclick="document.getElementById('fileInput').click()">
@@ -1040,6 +1763,10 @@
                 </div>
                 <input type="file" id="fileInput" accept="image/*,video/*" style="display:none;" onchange="cargarMedia(this)">
 
+                <!-- Video de fondo (para cuando se sube un video) -->
+                <video id="videoBackground" muted loop playsinline></video>
+
+                <!-- Canvas de Fabric.js (superpuesto) -->
                 <canvas id="storyCanvas"></canvas>
             </div>
         </div>
@@ -1065,11 +1792,43 @@
                     </div>
                     <div class="option-group">
                         <label class="option-label">Fuente</label>
-                        <div class="font-selector">
-                            <div class="font-option selected" data-font="Arial" onclick="cambiarFuente('Arial', this)" style="font-family: Arial;">Arial</div>
-                            <div class="font-option" data-font="Georgia" onclick="cambiarFuente('Georgia', this)" style="font-family: Georgia;">Georgia</div>
-                            <div class="font-option" data-font="Impact" onclick="cambiarFuente('Impact', this)" style="font-family: Impact;">Impact</div>
-                            <div class="font-option" data-font="Comic Sans MS" onclick="cambiarFuente('Comic Sans MS', this)" style="font-family: 'Comic Sans MS';">Comic</div>
+                        <div class="link-fonts-grid" style="grid-template-columns: repeat(4, 1fr);">
+                            <div class="link-font-option selected" data-font="Poppins" onclick="cambiarFuente('Poppins', this)">
+                                <span style="font-family: 'Poppins';">Poppins</span>
+                            </div>
+                            <div class="link-font-option" data-font="Montserrat" onclick="cambiarFuente('Montserrat', this)">
+                                <span style="font-family: 'Montserrat';">Montserrat</span>
+                            </div>
+                            <div class="link-font-option" data-font="Roboto" onclick="cambiarFuente('Roboto', this)">
+                                <span style="font-family: 'Roboto';">Roboto</span>
+                            </div>
+                            <div class="link-font-option" data-font="Oswald" onclick="cambiarFuente('Oswald', this)">
+                                <span style="font-family: 'Oswald';">Oswald</span>
+                            </div>
+                            <div class="link-font-option" data-font="Bebas Neue" onclick="cambiarFuente('Bebas Neue', this)">
+                                <span style="font-family: 'Bebas Neue';">BEBAS</span>
+                            </div>
+                            <div class="link-font-option" data-font="Anton" onclick="cambiarFuente('Anton', this)">
+                                <span style="font-family: 'Anton';">ANTON</span>
+                            </div>
+                            <div class="link-font-option" data-font="Playfair Display" onclick="cambiarFuente('Playfair Display', this)">
+                                <span style="font-family: 'Playfair Display';">Playfair</span>
+                            </div>
+                            <div class="link-font-option" data-font="Lobster" onclick="cambiarFuente('Lobster', this)">
+                                <span style="font-family: 'Lobster';">Lobster</span>
+                            </div>
+                            <div class="link-font-option" data-font="Pacifico" onclick="cambiarFuente('Pacifico', this)">
+                                <span style="font-family: 'Pacifico';">Pacifico</span>
+                            </div>
+                            <div class="link-font-option" data-font="Dancing Script" onclick="cambiarFuente('Dancing Script', this)">
+                                <span style="font-family: 'Dancing Script';">Dancing</span>
+                            </div>
+                            <div class="link-font-option" data-font="Permanent Marker" onclick="cambiarFuente('Permanent Marker', this)">
+                                <span style="font-family: 'Permanent Marker';">Marker</span>
+                            </div>
+                            <div class="link-font-option" data-font="Satisfy" onclick="cambiarFuente('Satisfy', this)">
+                                <span style="font-family: 'Satisfy';">Satisfy</span>
+                            </div>
                         </div>
                     </div>
                     <div class="option-group">
@@ -1165,16 +1924,328 @@
 
                 <!-- MÚSICA -->
                 <div class="option-section" id="musicOptions">
-                    <div class="option-group">
-                        <label class="option-label">Buscar canción</label>
-                        <input type="text" class="text-input" id="musicSearch" placeholder="Buscar música..." oninput="buscarMusica(this.value)">
-                    </div>
-                    <div class="option-group">
-                        <label class="option-label">Canciones disponibles</label>
-                        <div id="musicList">
-                            <p style="color: var(--muted); font-size: 13px;">Escribe para buscar canciones...</p>
+                    <!-- Audio Cutter - Canción seleccionada -->
+                    <div class="option-group" id="selectedMusicContainer" style="display: none;">
+                        <div class="audio-cutter" id="audioCutterContainer">
+                            <div class="audio-cutter-header">
+                                <div class="audio-cutter-filename" id="selectedMusicTitle">-</div>
+                                <div style="display: flex; align-items: center;">
+                                    <div class="audio-cutter-info">
+                                        <span id="cutterDuration">00:00</span>
+                                    </div>
+                                    <button type="button" class="btn-remove-music" onclick="quitarMusica()" title="Quitar musica">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Contenedor de forma de onda -->
+                            <div class="waveform-container" id="waveformContainer">
+                                <canvas class="waveform-canvas" id="waveformCanvas"></canvas>
+                                <div class="waveform-selection" id="waveformSelection">
+                                    <div class="selection-handle handle-left" id="handleLeft">
+                                        <div class="handle-bar"></div>
+                                    </div>
+                                    <div class="selection-handle handle-right" id="handleRight">
+                                        <div class="handle-bar"></div>
+                                    </div>
+                                </div>
+                                <div class="waveform-playhead" id="waveformPlayhead"></div>
+                                <div class="waveform-time" id="waveformTime">00:00.0</div>
+                            </div>
+
+                            <!-- Controles del cutter -->
+                            <div class="audio-cutter-controls">
+                                <button type="button" class="cutter-play-btn" id="cutterPlayBtn">
+                                    <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M8 5v14l11-7z"/>
+                                    </svg>
+                                    <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                                    </svg>
+                                </button>
+
+                                <div class="cutter-time-inputs">
+                                    <div class="time-input-group">
+                                        <label>Desde</label>
+                                        <input type="text" class="time-input" id="cutStartInput" value="00:00.0" readonly>
+                                    </div>
+                                    <div class="time-input-group">
+                                        <label>Hasta</label>
+                                        <input type="text" class="time-input" id="cutEndInput" value="00:15.0" readonly>
+                                    </div>
+                                    <div class="time-input-group duration-group">
+                                        <label>Duracion</label>
+                                        <span class="selection-duration" id="selectionDuration">15.0s</span>
+                                    </div>
+                                </div>
+
+                                <div class="cutter-volume">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                                    </svg>
+                                    <input type="range" class="volume-slider" id="cutterVolumeSlider" min="0" max="100" value="70">
+                                    <span class="volume-value" id="cutterVolumeValue">70%</span>
+                                </div>
+                            </div>
+
+                            <div class="cutter-hint">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                                </svg>
+                                Arrastra los controles para seleccionar el fragmento
+                            </div>
                         </div>
                     </div>
+
+                    <!-- Buscar música -->
+                    <div class="option-group">
+                        <label class="option-label">Buscar cancion</label>
+                        <input type="text" class="text-input" id="musicSearch" placeholder="Buscar por titulo o artista..." oninput="buscarMusica(this.value)">
+                    </div>
+
+                    <!-- Lista de canciones -->
+                    <div class="option-group">
+                        <label class="option-label">Canciones disponibles</label>
+                        <div id="musicList" class="music-list-container">
+                            <p style="color: var(--muted); font-size: 13px;">Cargando musica...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LINK -->
+                <div class="option-section" id="linkOptions">
+                    <div class="option-group">
+                        <label class="option-label">URL del enlace</label>
+                        <input type="url" class="text-input" id="linkUrl" placeholder="https://ejemplo.com" />
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">Texto del boton</label>
+                        <input type="text" class="text-input" id="linkText" placeholder="Ver mas" maxlength="25" value="Ver mas" />
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">Estilo del boton</label>
+                        <div class="link-styles-grid">
+                            <!-- Fila 1: Botones solidos -->
+                            <div class="link-style-option selected" data-style="pill" onclick="cambiarEstiloLink('pill', this)">
+                                <div class="link-preview-pill">Ver mas</div>
+                                <span>Pill</span>
+                            </div>
+                            <div class="link-style-option" data-style="rounded" onclick="cambiarEstiloLink('rounded', this)">
+                                <div class="link-preview-rounded">Ver mas</div>
+                                <span>Rounded</span>
+                            </div>
+                            <div class="link-style-option" data-style="square" onclick="cambiarEstiloLink('square', this)">
+                                <div class="link-preview-square">Ver mas</div>
+                                <span>Square</span>
+                            </div>
+                            <!-- Fila 2: Botones con borde -->
+                            <div class="link-style-option" data-style="outline-pill" onclick="cambiarEstiloLink('outline-pill', this)">
+                                <div class="link-preview-outline-pill">Ver mas</div>
+                                <span>Outline</span>
+                            </div>
+                            <div class="link-style-option" data-style="outline-square" onclick="cambiarEstiloLink('outline-square', this)">
+                                <div class="link-preview-outline-square">Ver mas</div>
+                                <span>Border</span>
+                            </div>
+                            <div class="link-style-option" data-style="glass" onclick="cambiarEstiloLink('glass', this)">
+                                <div class="link-preview-glass">Ver mas</div>
+                                <span>Glass</span>
+                            </div>
+                            <!-- Fila 3: Estilos especiales -->
+                            <div class="link-style-option" data-style="gradient" onclick="cambiarEstiloLink('gradient', this)">
+                                <div class="link-preview-gradient">Ver mas</div>
+                                <span>Gradient</span>
+                            </div>
+                            <div class="link-style-option" data-style="swipe" onclick="cambiarEstiloLink('swipe', this)">
+                                <div class="link-preview-swipe">
+                                    <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+                                    Desliza
+                                </div>
+                                <span>Swipe</span>
+                            </div>
+                            <div class="link-style-option" data-style="minimal" onclick="cambiarEstiloLink('minimal', this)">
+                                <div class="link-preview-minimal">Ver mas →</div>
+                                <span>Minimal</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">Color del boton</label>
+                        <div class="color-picker" id="linkColorPicker">
+                            <div class="color-option selected" style="background: #4682B4;" onclick="cambiarColorLink('#4682B4', this)"></div>
+                            <div class="color-option" style="background: #000000;" onclick="cambiarColorLink('#000000', this)"></div>
+                            <div class="color-option" style="background: #ffffff;" onclick="cambiarColorLink('#ffffff', this)"></div>
+                            <div class="color-option" style="background: #ff3b5c;" onclick="cambiarColorLink('#ff3b5c', this)"></div>
+                            <div class="color-option" style="background: #00d4ff;" onclick="cambiarColorLink('#00d4ff', this)"></div>
+                            <div class="color-option" style="background: #ffdd00;" onclick="cambiarColorLink('#ffdd00', this)"></div>
+                            <div class="color-option" style="background: #00ff88;" onclick="cambiarColorLink('#00ff88', this)"></div>
+                            <div class="color-option" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);" onclick="cambiarColorLink('gradient-purple', this)"></div>
+                        </div>
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">Tipografia</label>
+                        <div class="link-fonts-grid">
+                            <div class="link-font-option selected" data-font="Poppins" onclick="cambiarFuenteLink('Poppins', this)">
+                                <span style="font-family: 'Poppins', sans-serif; font-weight: 600;">Poppins</span>
+                            </div>
+                            <div class="link-font-option" data-font="Montserrat" onclick="cambiarFuenteLink('Montserrat', this)">
+                                <span style="font-family: 'Montserrat', sans-serif; font-weight: 700;">Montserrat</span>
+                            </div>
+                            <div class="link-font-option" data-font="Roboto" onclick="cambiarFuenteLink('Roboto', this)">
+                                <span style="font-family: 'Roboto', sans-serif; font-weight: 700;">Roboto</span>
+                            </div>
+                            <div class="link-font-option" data-font="Oswald" onclick="cambiarFuenteLink('Oswald', this)">
+                                <span style="font-family: 'Oswald', sans-serif; font-weight: 600;">Oswald</span>
+                            </div>
+                            <div class="link-font-option" data-font="Bebas Neue" onclick="cambiarFuenteLink('Bebas Neue', this)">
+                                <span style="font-family: 'Bebas Neue', sans-serif;">BEBAS</span>
+                            </div>
+                            <div class="link-font-option" data-font="Anton" onclick="cambiarFuenteLink('Anton', this)">
+                                <span style="font-family: 'Anton', sans-serif;">ANTON</span>
+                            </div>
+                            <div class="link-font-option" data-font="Playfair Display" onclick="cambiarFuenteLink('Playfair Display', this)">
+                                <span style="font-family: 'Playfair Display', serif; font-weight: 700;">Playfair</span>
+                            </div>
+                            <div class="link-font-option" data-font="Lobster" onclick="cambiarFuenteLink('Lobster', this)">
+                                <span style="font-family: 'Lobster', cursive;">Lobster</span>
+                            </div>
+                            <div class="link-font-option" data-font="Pacifico" onclick="cambiarFuenteLink('Pacifico', this)">
+                                <span style="font-family: 'Pacifico', cursive;">Pacifico</span>
+                            </div>
+                            <div class="link-font-option" data-font="Dancing Script" onclick="cambiarFuenteLink('Dancing Script', this)">
+                                <span style="font-family: 'Dancing Script', cursive; font-weight: 700;">Dancing</span>
+                            </div>
+                            <div class="link-font-option" data-font="Permanent Marker" onclick="cambiarFuenteLink('Permanent Marker', this)">
+                                <span style="font-family: 'Permanent Marker', cursive;">Marker</span>
+                            </div>
+                            <div class="link-font-option" data-font="Satisfy" onclick="cambiarFuenteLink('Satisfy', this)">
+                                <span style="font-family: 'Satisfy', cursive;">Satisfy</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" style="width: 100%; margin-top: 12px;" onclick="agregarLink()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                        </svg>
+                        Agregar enlace
+                    </button>
+                    <div id="linkAddedIndicator" style="display: none; margin-top: 12px; padding: 10px; background: rgba(0,255,136,0.1); border: 1px solid #00ff88; border-radius: 8px; text-align: center;">
+                        <span style="color: #00ff88; font-size: 13px;">
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" style="vertical-align: middle; margin-right: 4px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                            Enlace agregado - puedes moverlo
+                        </span>
+                        <button onclick="eliminarLinkActual()" style="display: block; margin: 8px auto 0; padding: 4px 12px; background: transparent; border: 1px solid #ff3b5c; color: #ff3b5c; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                            Eliminar enlace
+                        </button>
+                    </div>
+                </div>
+
+                <!-- AJUSTES DE IMAGEN/VIDEO -->
+                <div class="option-section" id="adjustOptions">
+                    <!-- Voltear -->
+                    <div class="option-group">
+                        <label class="option-label">Voltear</label>
+                        <div class="adjust-buttons">
+                            <button class="adjust-btn" onclick="voltearHorizontal()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                                    <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>
+                                </svg>
+                                Horizontal
+                            </button>
+                            <button class="adjust-btn" onclick="voltearVertical()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                                    <path d="M21 8V3h-5M3 16l18-13M3 8V3h5M9 9L3 3M21 16v5h-5M15 15l6 6"/>
+                                </svg>
+                                Vertical
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Rotar -->
+                    <div class="option-group">
+                        <label class="option-label">Rotar</label>
+                        <div class="adjust-buttons">
+                            <button class="adjust-btn" onclick="rotarImagen(-90)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                                    <path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/>
+                                </svg>
+                                -90°
+                            </button>
+                            <button class="adjust-btn" onclick="rotarImagen(90)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/>
+                                </svg>
+                                +90°
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filtros -->
+                    <div class="option-group">
+                        <label class="option-label">Filtros</label>
+                        <div class="filters-grid">
+                            <div class="filter-option selected" onclick="aplicarFiltro('none', this)">
+                                <div class="filter-preview" style="background: linear-gradient(135deg, #667eea, #764ba2);"></div>
+                                <span>Original</span>
+                            </div>
+                            <div class="filter-option" onclick="aplicarFiltro('grayscale', this)">
+                                <div class="filter-preview" style="background: linear-gradient(135deg, #555, #999); filter: grayscale(100%);"></div>
+                                <span>B&N</span>
+                            </div>
+                            <div class="filter-option" onclick="aplicarFiltro('sepia', this)">
+                                <div class="filter-preview" style="background: linear-gradient(135deg, #704214, #c4a35a);"></div>
+                                <span>Sepia</span>
+                            </div>
+                            <div class="filter-option" onclick="aplicarFiltro('vintage', this)">
+                                <div class="filter-preview" style="background: linear-gradient(135deg, #8b7355, #d4a574);"></div>
+                                <span>Vintage</span>
+                            </div>
+                            <div class="filter-option" onclick="aplicarFiltro('cold', this)">
+                                <div class="filter-preview" style="background: linear-gradient(135deg, #1e3c72, #2a5298);"></div>
+                                <span>Frio</span>
+                            </div>
+                            <div class="filter-option" onclick="aplicarFiltro('warm', this)">
+                                <div class="filter-preview" style="background: linear-gradient(135deg, #f12711, #f5af19);"></div>
+                                <span>Calido</span>
+                            </div>
+                            <div class="filter-option" onclick="aplicarFiltro('contrast', this)">
+                                <div class="filter-preview" style="background: linear-gradient(135deg, #000, #fff);"></div>
+                                <span>Contraste</span>
+                            </div>
+                            <div class="filter-option" onclick="aplicarFiltro('brightness', this)">
+                                <div class="filter-preview" style="background: linear-gradient(135deg, #ffecd2, #fcb69f);"></div>
+                                <span>Brillo</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ajustes manuales -->
+                    <div class="option-group">
+                        <label class="option-label">Brillo: <span id="brightnessLabel">0</span></label>
+                        <input type="range" class="size-slider" id="brightnessSlider" min="-100" max="100" value="0" oninput="ajustarBrillo(this.value)">
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">Contraste: <span id="contrastLabel">0</span></label>
+                        <input type="range" class="size-slider" id="contrastSlider" min="-100" max="100" value="0" oninput="ajustarContraste(this.value)">
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">Saturacion: <span id="saturationLabel">0</span></label>
+                        <input type="range" class="size-slider" id="saturationSlider" min="-100" max="100" value="0" oninput="ajustarSaturacion(this.value)">
+                    </div>
+
+                    <!-- Resetear -->
+                    <button class="btn btn-secondary" style="width: 100%; margin-top: 12px;" onclick="resetearAjustes()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                            <path d="M3 3v5h5"/>
+                        </svg>
+                        Resetear ajustes
+                    </button>
                 </div>
 
                 <!-- PUBLICAR -->
@@ -1232,6 +2303,11 @@
         let currentTool = 'text';
         let selectedLado = 'LadoA';
         let selectedMusic = null;
+        let musicDuration = 0;
+        let musicTrimStart = 0;
+        let musicVolume = 70;
+        let previewAudio = null;
+        let listPreviewAudio = null;
         let mediaFile = null;
         let mediaUrl = null;
         let canvasHistory = [];
@@ -1239,7 +2315,7 @@
 
         // Configuración de texto
         let textConfig = {
-            font: 'Arial',
+            font: 'Poppins',
             size: 32,
             color: '#ffffff',
             backgroundColor: 'transparent'
@@ -1250,6 +2326,16 @@
             color: '#ff3b5c',
             width: 3
         };
+
+        // Configuración de link
+        let linkConfig = {
+            url: '',
+            text: 'Ver mas',
+            style: 'pill',
+            color: '#4682B4',
+            font: 'Poppins'
+        };
+        let storyLinkObject = null; // El objeto fabric del link en canvas
 
         // Emojis populares
         const emojis = [
@@ -1276,16 +2362,25 @@
 
         function initCanvas() {
             const wrapper = document.getElementById('canvasWrapper');
-            const width = wrapper.clientWidth;
-            const height = wrapper.clientHeight;
+            const width = wrapper.clientWidth || 380;
+            const height = wrapper.clientHeight || 675;
 
             canvas = new fabric.Canvas('storyCanvas', {
                 width: width,
                 height: height,
                 backgroundColor: '#000',
                 selection: true,
-                preserveObjectStacking: true
+                preserveObjectStacking: true,
+                allowTouchScrolling: false,
+                stopContextMenu: true,
+                fireRightClick: true
             });
+
+            // Inicializar brush de dibujo
+            canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+            canvas.freeDrawingBrush.color = drawConfig.color;
+            canvas.freeDrawingBrush.width = drawConfig.width;
+            canvas.freeDrawingBrush.decimate = 5;
 
             // Guardar estado inicial
             saveHistory();
@@ -1294,6 +2389,9 @@
             canvas.on('selection:created', onObjectSelected);
             canvas.on('selection:updated', onObjectSelected);
             canvas.on('selection:cleared', onSelectionCleared);
+
+            // Debug: verificar que el canvas se inicializó correctamente
+            console.log('Canvas inicializado:', canvas.width, 'x', canvas.height);
         }
 
         function initEmojis() {
@@ -1310,6 +2408,8 @@
         // ========================================
         // CARGAR MEDIA
         // ========================================
+        let isVideoMedia = false; // Para saber si el media actual es video
+
         function cargarMedia(input) {
             if (input.files && input.files[0]) {
                 const file = input.files[0];
@@ -1318,8 +2418,15 @@
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     mediaUrl = e.target.result;
+                    const videoElement = document.getElementById('videoBackground');
 
                     if (file.type.startsWith('image/')) {
+                        // Es una imagen
+                        isVideoMedia = false;
+                        videoElement.classList.remove('active');
+                        videoElement.pause();
+                        videoElement.src = '';
+
                         fabric.Image.fromURL(mediaUrl, function(img) {
                             // Escalar para cubrir todo el canvas
                             const scale = Math.max(
@@ -1340,6 +2447,38 @@
                             canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
                             saveHistory();
                         });
+                    } else if (file.type.startsWith('video/')) {
+                        // Es un video
+                        isVideoMedia = true;
+
+                        // Limpiar fondo del canvas (hacerlo transparente)
+                        canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas));
+                        canvas.backgroundColor = 'transparent';
+                        canvas.renderAll();
+
+                        // Configurar el video
+                        videoElement.src = mediaUrl;
+                        videoElement.classList.add('active');
+
+                        // Esperar a que el video cargue para mostrar el primer frame
+                        videoElement.onloadeddata = function() {
+                            // Ir a un frame visible (0.1 segundos)
+                            videoElement.currentTime = 0.1;
+                        };
+
+                        // Cuando esté listo para reproducir
+                        videoElement.oncanplay = function() {
+                            // Reproducir automáticamente
+                            videoElement.play().catch(err => {
+                                console.log('Autoplay prevented, showing first frame');
+                                // Si no puede reproducir, al menos mostrar el frame
+                                videoElement.currentTime = 0.1;
+                            });
+                        };
+
+                        // Cargar el video
+                        videoElement.load();
+                        saveHistory();
                     }
 
                     // Ocultar overlay de upload
@@ -1373,15 +2512,24 @@
                 'sticker': 'Stickers',
                 'mention': 'Mencionar',
                 'draw': 'Dibujar',
-                'music': 'Música'
+                'music': 'Música',
+                'link': 'Enlace',
+                'adjust': 'Ajustes'
             };
             document.getElementById('optionsTitle').textContent = titles[tool] || 'Opciones';
 
             // Modo dibujo
             canvas.isDrawingMode = (tool === 'draw');
             if (tool === 'draw') {
+                canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
                 canvas.freeDrawingBrush.color = drawConfig.color;
                 canvas.freeDrawingBrush.width = drawConfig.width;
+                canvas.freeDrawingBrush.decimate = 5;
+            }
+
+            // Cargar música cuando se selecciona esa herramienta
+            if (tool === 'music') {
+                cargarMusicaPopular();
             }
 
             // Abrir panel en móvil
@@ -1419,11 +2567,22 @@
                 fill: textConfig.color,
                 textBackgroundColor: textConfig.backgroundColor === 'transparent' ? '' : textConfig.backgroundColor,
                 padding: 8,
-                borderRadius: 4
+                borderRadius: 4,
+                // Propiedades de interaccion
+                selectable: true,
+                evented: true,
+                hasControls: true,
+                hasBorders: true,
+                cornerColor: '#4682B4',
+                cornerStyle: 'circle',
+                borderColor: '#4682B4',
+                transparentCorners: false,
+                cornerSize: 10
             });
 
             canvas.add(textObj);
             canvas.setActiveObject(textObj);
+            canvas.bringToFront(textObj);
             canvas.renderAll();
             saveHistory();
 
@@ -1441,7 +2600,8 @@
 
         function cambiarFuente(font, el) {
             textConfig.font = font;
-            document.querySelectorAll('.font-option').forEach(opt => opt.classList.remove('selected'));
+            // Deseleccionar en el grupo de fuentes de texto
+            el.closest('.link-fonts-grid').querySelectorAll('.link-font-option').forEach(opt => opt.classList.remove('selected'));
             el.classList.add('selected');
 
             const obj = canvas.getActiveObject();
@@ -1496,11 +2656,20 @@
                 originX: 'center',
                 originY: 'center',
                 fontSize: 64,
-                selectable: true
+                selectable: true,
+                evented: true,
+                hasControls: true,
+                hasBorders: true,
+                cornerColor: '#4682B4',
+                cornerStyle: 'circle',
+                borderColor: '#4682B4',
+                transparentCorners: false,
+                cornerSize: 10
             });
 
             canvas.add(text);
             canvas.setActiveObject(text);
+            canvas.bringToFront(text);
             canvas.renderAll();
             saveHistory();
         }
@@ -1605,36 +2774,910 @@
             const listDiv = document.getElementById('musicList');
 
             if (query.length < 2) {
-                listDiv.innerHTML = '<p style="color: var(--muted); font-size: 13px;">Escribe para buscar canciones...</p>';
+                // Si no hay búsqueda, mostrar música popular
+                cargarMusicaPopular();
                 return;
             }
+
+            listDiv.innerHTML = '<p style="color: var(--muted); font-size: 13px;">Buscando...</p>';
 
             try {
                 const response = await fetch(`/Stories/BuscarMusica?query=${encodeURIComponent(query)}`);
                 const data = await response.json();
 
                 if (data.success && data.pistas && data.pistas.length > 0) {
-                    listDiv.innerHTML = data.pistas.map(p => `
-                        <div class="music-item ${selectedMusic?.id === p.id ? 'selected' : ''}" onclick="seleccionarMusica(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-                            <img src="${escapeHtml(p.portada) || '/images/music-placeholder.png'}" class="music-cover" onerror="this.src='/images/music-placeholder.png'" />
-                            <div class="music-info">
-                                <div class="music-title">${escapeHtml(p.titulo)}</div>
-                                <div class="music-artist">${escapeHtml(p.artista)}</div>
-                            </div>
-                        </div>
-                    `).join('');
+                    mostrarListaMusica(data.pistas);
                 } else {
                     listDiv.innerHTML = '<p style="color: var(--muted); font-size: 13px;">No se encontraron canciones</p>';
                 }
             } catch (error) {
                 console.error('Error buscando música:', error);
+                listDiv.innerHTML = '<p style="color: var(--muted); font-size: 13px;">Error al buscar</p>';
             }
         }
 
+        async function cargarMusicaPopular() {
+            const listDiv = document.getElementById('musicList');
+            listDiv.innerHTML = '<p style="color: var(--muted); font-size: 13px;">Cargando música...</p>';
+
+            try {
+                // Intentar cargar música popular o reciente
+                const response = await fetch('/Stories/BuscarMusica?query=popular');
+                const data = await response.json();
+
+                if (data.success && data.pistas && data.pistas.length > 0) {
+                    mostrarListaMusica(data.pistas);
+                } else {
+                    listDiv.innerHTML = '<p style="color: var(--muted); font-size: 13px;">Escribe para buscar canciones</p>';
+                }
+            } catch (error) {
+                listDiv.innerHTML = '<p style="color: var(--muted); font-size: 13px;">Escribe para buscar canciones</p>';
+            }
+        }
+
+        function mostrarListaMusica(pistas) {
+            const listDiv = document.getElementById('musicList');
+            listDiv.innerHTML = pistas.map(p => `
+                <div class="music-item ${selectedMusic?.id === p.id ? 'selected' : ''}" data-music-id="${p.id}">
+                    <button type="button" class="music-play-btn" onclick="event.stopPropagation(); toggleMusicPreview('${escapeHtml(p.audioUrl || '')}', this)" title="Escuchar preview">
+                        <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 5v14l11-7z"/>
+                        </svg>
+                        <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+                            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                        </svg>
+                    </button>
+                    <img src="${escapeHtml(p.portada) || '/images/music-placeholder.svg'}" class="music-cover" onerror="this.src='/images/music-placeholder.svg'" onclick="seleccionarMusica(${JSON.stringify(p).replace(/"/g, '&quot;')})" />
+                    <div class="music-info" onclick="seleccionarMusica(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                        <div class="music-title">${escapeHtml(p.titulo)}</div>
+                        <div class="music-artist">${escapeHtml(p.artista)}</div>
+                        <div class="music-duration">${formatDuration(p.duracion || 0)}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatDuration(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // ========================================
+        // AUDIO CUTTER - Waveform Editor
+        // ========================================
+        const audioCutter = document.getElementById('audioCutterContainer');
+        const waveformCanvas = document.getElementById('waveformCanvas');
+        const waveformContainer = document.getElementById('waveformContainer');
+        const waveformSelection = document.getElementById('waveformSelection');
+        const handleLeft = document.getElementById('handleLeft');
+        const handleRight = document.getElementById('handleRight');
+        const waveformPlayhead = document.getElementById('waveformPlayhead');
+        const waveformTime = document.getElementById('waveformTime');
+        const cutStartInput = document.getElementById('cutStartInput');
+        const cutEndInput = document.getElementById('cutEndInput');
+        const selectionDurationSpan = document.getElementById('selectionDuration');
+        const cutterPlayBtn = document.getElementById('cutterPlayBtn');
+        const cutterVolumeSlider = document.getElementById('cutterVolumeSlider');
+        const cutterVolumeValue = document.getElementById('cutterVolumeValue');
+        const cutterDuration = document.getElementById('cutterDuration');
+
+        let audioContext = null;
+        let audioBuffer = null;
+        let audioDuration = 0;
+        let selectionStart = 0;
+        let selectionEnd = 15;
+        let isPlaying = false;
+        let playbackSource = null;
+        let playbackStartTime = 0;
+        let playbackAnimationId = null;
+        let isDragging = false;
+        let dragHandle = null;
+
         function seleccionarMusica(pista) {
+            // Detener cualquier preview en reproducción
+            stopAllPreviews();
+
             selectedMusic = pista;
+            musicDuration = pista.duracion || 180;
+            musicTrimStart = 0;
+            musicVolume = 70;
+            selectionStart = 0;
+            selectionEnd = Math.min(15, musicDuration);
+
+            // Marcar como seleccionada en la lista
             document.querySelectorAll('.music-item').forEach(item => item.classList.remove('selected'));
-            event.currentTarget.classList.add('selected');
+            const musicItem = document.querySelector(`.music-item[data-music-id="${pista.id}"]`);
+            if (musicItem) musicItem.classList.add('selected');
+
+            // Mostrar el panel de música seleccionada
+            const container = document.getElementById('selectedMusicContainer');
+            container.style.display = 'block';
+
+            // Actualizar info de la canción
+            document.getElementById('selectedMusicTitle').textContent = `${pista.titulo} - ${pista.artista}`;
+
+            // Inicializar audio cutter
+            if (pista.audioUrl) {
+                initAudioCutter(pista.audioUrl);
+            }
+        }
+
+        async function initAudioCutter(url) {
+            if (!waveformCanvas || !url) return;
+
+            audioCutter.classList.add('loading');
+
+            try {
+                // Crear AudioContext
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+
+                // Cargar audio
+                const response = await fetch(url);
+                const arrayBuffer = await response.arrayBuffer();
+                audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                audioDuration = audioBuffer.duration;
+
+                // Actualizar UI
+                if (cutterDuration) cutterDuration.textContent = formatTime(audioDuration);
+                selectionEnd = Math.min(15, audioDuration);
+
+                // Dibujar forma de onda
+                drawWaveform();
+                updateSelection();
+                setupDragHandles();
+
+                audioCutter.classList.remove('loading');
+            } catch (error) {
+                console.error('Error cargando audio:', error);
+                audioCutter.classList.remove('loading');
+            }
+        }
+
+        function drawWaveform() {
+            if (!audioBuffer || !waveformCanvas) return;
+
+            const ctx = waveformCanvas.getContext('2d');
+            const width = waveformContainer.offsetWidth;
+            const height = waveformContainer.offsetHeight;
+
+            waveformCanvas.width = width * window.devicePixelRatio;
+            waveformCanvas.height = height * window.devicePixelRatio;
+            waveformCanvas.style.width = width + 'px';
+            waveformCanvas.style.height = height + 'px';
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+            // Combinar canales si es stereo
+            const channelData = audioBuffer.getChannelData(0);
+            const data = audioBuffer.numberOfChannels > 1
+                ? mergeChannels(channelData, audioBuffer.getChannelData(1))
+                : channelData;
+
+            // Calcular pico máximo para normalizar
+            let maxPeak = 0;
+            for (let i = 0; i < data.length; i++) {
+                const absVal = Math.abs(data[i]);
+                if (absVal > maxPeak) maxPeak = absVal;
+            }
+            maxPeak = maxPeak || 1;
+
+            // Configuración de barras
+            const barWidth = 3;
+            const barGap = 1;
+            const barCount = Math.floor(width / (barWidth + barGap));
+            const samplesPerBar = Math.floor(data.length / barCount);
+            const centerY = height / 2;
+
+            ctx.clearRect(0, 0, width, height);
+
+            for (let i = 0; i < barCount; i++) {
+                const startSample = i * samplesPerBar;
+                const endSample = startSample + samplesPerBar;
+
+                let sumSquares = 0;
+                let peakInBar = 0;
+                for (let j = startSample; j < endSample && j < data.length; j++) {
+                    const val = Math.abs(data[j]);
+                    sumSquares += val * val;
+                    if (val > peakInBar) peakInBar = val;
+                }
+                const rms = Math.sqrt(sumSquares / samplesPerBar);
+                const normalizedValue = ((rms * 0.7) + (peakInBar * 0.3)) / maxPeak;
+                const barHeight = Math.max(2, normalizedValue * height * 0.9);
+
+                const x = i * (barWidth + barGap);
+                const y = centerY - (barHeight / 2);
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.beginPath();
+                ctx.roundRect(x, y, barWidth, barHeight, 1);
+                ctx.fill();
+            }
+        }
+
+        function mergeChannels(ch1, ch2) {
+            const merged = new Float32Array(ch1.length);
+            for (let i = 0; i < ch1.length; i++) {
+                merged[i] = (ch1[i] + ch2[i]) / 2;
+            }
+            return merged;
+        }
+
+        function updateSelection() {
+            if (!waveformContainer || !waveformSelection || !audioDuration) return;
+
+            const startPercent = (selectionStart / audioDuration) * 100;
+            const endPercent = (selectionEnd / audioDuration) * 100;
+
+            waveformSelection.style.left = startPercent + '%';
+            waveformSelection.style.width = (endPercent - startPercent) + '%';
+
+            // Actualizar inputs de tiempo
+            if (cutStartInput) cutStartInput.value = formatTimeMs(selectionStart);
+            if (cutEndInput) cutEndInput.value = formatTimeMs(selectionEnd);
+            if (selectionDurationSpan) {
+                selectionDurationSpan.textContent = (selectionEnd - selectionStart).toFixed(1) + 's';
+            }
+
+            // Guardar valores
+            musicTrimStart = Math.round(selectionStart);
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function formatTimeMs(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = (seconds % 60).toFixed(1);
+            return `${mins.toString().padStart(2, '0')}:${secs.padStart(4, '0')}`;
+        }
+
+        // Drag handles para selección
+        function setupDragHandles() {
+            if (!handleLeft || !handleRight || !waveformContainer) return;
+
+            const startDrag = (e, handle) => {
+                e.preventDefault();
+                e.stopPropagation();
+                isDragging = true;
+                dragHandle = handle;
+
+                document.body.style.cursor = 'ew-resize';
+                if (handle === 'left') {
+                    handleLeft.classList.add('dragging');
+                } else {
+                    handleRight.classList.add('dragging');
+                }
+
+                document.addEventListener('mousemove', onDrag);
+                document.addEventListener('mouseup', stopDrag);
+                document.addEventListener('touchmove', onDrag, { passive: false });
+                document.addEventListener('touchend', stopDrag);
+            };
+
+            handleLeft.addEventListener('mousedown', (e) => startDrag(e, 'left'));
+            handleRight.addEventListener('mousedown', (e) => startDrag(e, 'right'));
+            handleLeft.addEventListener('touchstart', (e) => startDrag(e, 'left'), { passive: false });
+            handleRight.addEventListener('touchstart', (e) => startDrag(e, 'right'), { passive: false });
+        }
+
+        function onDrag(e) {
+            if (!isDragging || !waveformContainer || !audioDuration) return;
+            e.preventDefault();
+
+            const rect = waveformContainer.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            let x = clientX - rect.left;
+            x = Math.max(0, Math.min(x, rect.width));
+
+            const time = (x / rect.width) * audioDuration;
+
+            if (dragHandle === 'left') {
+                selectionStart = Math.min(time, selectionEnd - 1);
+                selectionStart = Math.max(0, selectionStart);
+            } else {
+                selectionEnd = Math.max(time, selectionStart + 1);
+                selectionEnd = Math.min(audioDuration, selectionEnd);
+            }
+
+            updateSelection();
+        }
+
+        function stopDrag() {
+            isDragging = false;
+            document.body.style.cursor = '';
+
+            if (handleLeft) handleLeft.classList.remove('dragging');
+            if (handleRight) handleRight.classList.remove('dragging');
+
+            dragHandle = null;
+            document.removeEventListener('mousemove', onDrag);
+            document.removeEventListener('mouseup', stopDrag);
+            document.removeEventListener('touchmove', onDrag);
+            document.removeEventListener('touchend', stopDrag);
+        }
+
+        // Click en waveform para mover selección
+        if (waveformContainer) {
+            waveformContainer.addEventListener('click', function(e) {
+                if (isDragging) return;
+                if (e.target.closest('.selection-handle')) return;
+                if (!audioDuration) return;
+
+                const rect = waveformContainer.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const clickTime = (x / rect.width) * audioDuration;
+
+                const duration = selectionEnd - selectionStart;
+                let newStart = clickTime - (duration / 2);
+                newStart = Math.max(0, Math.min(newStart, audioDuration - duration));
+
+                selectionStart = newStart;
+                selectionEnd = newStart + duration;
+                updateSelection();
+            });
+        }
+
+        // Reproducir selección
+        if (cutterPlayBtn) {
+            cutterPlayBtn.addEventListener('click', function() {
+                if (isPlaying) {
+                    stopPlayback();
+                } else {
+                    playSelection();
+                }
+            });
+        }
+
+        function playSelection() {
+            if (!audioBuffer || !audioContext) return;
+
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+
+            const volume = (cutterVolumeSlider?.value || 70) / 100;
+
+            playbackSource = audioContext.createBufferSource();
+            playbackSource.buffer = audioBuffer;
+
+            const gainNode = audioContext.createGain();
+            gainNode.gain.value = volume;
+
+            playbackSource.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            const duration = selectionEnd - selectionStart;
+            playbackStartTime = audioContext.currentTime;
+            playbackSource.start(0, selectionStart, duration);
+
+            playbackSource.onended = () => {
+                stopPlayback();
+            };
+
+            isPlaying = true;
+            updatePlayButton(true);
+            animatePlayhead();
+        }
+
+        function stopPlayback() {
+            if (playbackSource) {
+                try { playbackSource.stop(); } catch(e) {}
+                playbackSource = null;
+            }
+            if (playbackAnimationId) {
+                cancelAnimationFrame(playbackAnimationId);
+                playbackAnimationId = null;
+            }
+            isPlaying = false;
+            updatePlayButton(false);
+            if (waveformPlayhead) {
+                waveformPlayhead.style.display = 'none';
+            }
+        }
+
+        function animatePlayhead() {
+            if (!isPlaying || !waveformPlayhead || !audioContext) return;
+
+            const elapsed = audioContext.currentTime - playbackStartTime;
+            const currentTime = selectionStart + elapsed;
+
+            if (currentTime >= selectionEnd) {
+                stopPlayback();
+                return;
+            }
+
+            const percent = (currentTime / audioDuration) * 100;
+            waveformPlayhead.style.display = 'block';
+            waveformPlayhead.style.left = percent + '%';
+
+            if (waveformTime) {
+                waveformTime.textContent = formatTimeMs(currentTime);
+            }
+
+            playbackAnimationId = requestAnimationFrame(animatePlayhead);
+        }
+
+        function updatePlayButton(playing) {
+            if (!cutterPlayBtn) return;
+            const playIcon = cutterPlayBtn.querySelector('.play-icon');
+            const pauseIcon = cutterPlayBtn.querySelector('.pause-icon');
+
+            if (playing) {
+                cutterPlayBtn.classList.add('playing');
+                if (playIcon) playIcon.style.display = 'none';
+                if (pauseIcon) pauseIcon.style.display = 'block';
+            } else {
+                cutterPlayBtn.classList.remove('playing');
+                if (playIcon) playIcon.style.display = 'block';
+                if (pauseIcon) pauseIcon.style.display = 'none';
+            }
+        }
+
+        // Control de volumen
+        if (cutterVolumeSlider) {
+            cutterVolumeSlider.addEventListener('input', function() {
+                const value = parseInt(this.value);
+                musicVolume = value;
+                if (cutterVolumeValue) {
+                    cutterVolumeValue.textContent = value + '%';
+                }
+            });
+        }
+
+        function stopAllPreviews() {
+            stopPlayback();
+            if (listPreviewAudio) {
+                listPreviewAudio.pause();
+                listPreviewAudio = null;
+            }
+            // Resetear iconos de play en la lista
+            document.querySelectorAll('.music-play-btn').forEach(btn => {
+                const playIcon = btn.querySelector('.play-icon');
+                const pauseIcon = btn.querySelector('.pause-icon');
+                if (playIcon) playIcon.style.display = 'block';
+                if (pauseIcon) pauseIcon.style.display = 'none';
+            });
+            document.querySelectorAll('.music-item').forEach(item => item.classList.remove('playing'));
+        }
+
+        function quitarMusica() {
+            stopAllPreviews();
+            selectedMusic = null;
+            musicDuration = 0;
+            musicTrimStart = 0;
+            musicVolume = 70;
+            audioDuration = 0;
+            selectionStart = 0;
+            selectionEnd = 15;
+            audioBuffer = null;
+
+            document.getElementById('selectedMusicContainer').style.display = 'none';
+            document.querySelectorAll('.music-item').forEach(item => item.classList.remove('selected'));
+        }
+
+        function toggleMusicPreview(url, btn) {
+            if (!url) {
+                console.warn('URL de audio no disponible');
+                return;
+            }
+
+            const musicItem = btn.closest('.music-item');
+            const playIcon = btn.querySelector('.play-icon');
+            const pauseIcon = btn.querySelector('.pause-icon');
+
+            if (listPreviewAudio && !listPreviewAudio.paused) {
+                const wasPlaying = musicItem.classList.contains('playing');
+                stopAllPreviews();
+                if (wasPlaying) return;
+            }
+
+            stopAllPreviews();
+
+            listPreviewAudio = new Audio(url);
+            listPreviewAudio.volume = 0.7;
+
+            listPreviewAudio.addEventListener('error', function(e) {
+                console.warn('Error cargando audio:', e);
+                if (playIcon) playIcon.style.display = 'block';
+                if (pauseIcon) pauseIcon.style.display = 'none';
+                musicItem.classList.remove('playing');
+            });
+
+            listPreviewAudio.addEventListener('ended', function() {
+                if (playIcon) playIcon.style.display = 'block';
+                if (pauseIcon) pauseIcon.style.display = 'none';
+                musicItem.classList.remove('playing');
+            });
+
+            listPreviewAudio.play().then(() => {
+                if (playIcon) playIcon.style.display = 'none';
+                if (pauseIcon) pauseIcon.style.display = 'block';
+                musicItem.classList.add('playing');
+            }).catch(err => {
+                console.warn('No se pudo reproducir:', err.message);
+                if (playIcon) playIcon.style.display = 'block';
+                if (pauseIcon) pauseIcon.style.display = 'none';
+                musicItem.classList.remove('playing');
+            });
+        }
+
+        // ========================================
+        // LINK
+        // ========================================
+        function cambiarEstiloLink(style, el) {
+            linkConfig.style = style;
+            document.querySelectorAll('.link-style-option').forEach(opt => opt.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        function cambiarColorLink(color, el) {
+            linkConfig.color = color;
+            document.querySelectorAll('#linkColorPicker .color-option').forEach(opt => opt.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        function cambiarFuenteLink(font, el) {
+            linkConfig.font = font;
+            document.querySelectorAll('.link-font-option').forEach(opt => opt.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        function getTextColorForBg(bgColor) {
+            // Devuelve blanco o negro según el color de fondo
+            if (bgColor === '#ffffff' || bgColor === '#ffdd00') return '#000000';
+            return '#ffffff';
+        }
+
+        function getLinkFillColor() {
+            if (linkConfig.color === 'gradient-purple') {
+                // Fabric.js no soporta gradientes CSS, usar color sólido
+                return '#764ba2';
+            }
+            return linkConfig.color;
+        }
+
+        function eliminarLinkActual() {
+            if (storyLinkObject) {
+                canvas.remove(storyLinkObject);
+                storyLinkObject = null;
+                canvas.renderAll();
+                saveHistory();
+                document.getElementById('linkAddedIndicator').style.display = 'none';
+            }
+        }
+
+        function agregarLink() {
+            const url = document.getElementById('linkUrl').value.trim();
+            const text = document.getElementById('linkText').value.trim() || 'Ver mas';
+
+            if (!url) {
+                alert('Por favor ingresa una URL');
+                return;
+            }
+
+            // Validar URL
+            let validUrl = url;
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                validUrl = 'https://' + url;
+            }
+
+            try {
+                new URL(validUrl);
+            } catch (e) {
+                alert('La URL no es valida');
+                return;
+            }
+
+            // Guardar configuración del link
+            linkConfig.url = validUrl;
+            linkConfig.text = text;
+
+            // Eliminar link anterior si existe
+            if (storyLinkObject) {
+                canvas.remove(storyLinkObject);
+                storyLinkObject = null;
+            }
+
+            // Calcular dimensiones
+            const btnWidth = Math.max(text.length * 10 + 50, 100);
+            const btnHeight = 40;
+            const posX = canvas.width / 2;
+            const posY = canvas.height - 100;
+            const fillColor = getLinkFillColor();
+            const textColor = getTextColorForBg(linkConfig.color);
+            const style = linkConfig.style;
+            const fontFamily = linkConfig.font;
+
+            // Crear un Textbox con fondo simulado usando fabric.Rect + Text como objetos separados
+            // pero agrupados visualmente. Para mejor interaccion, usamos un solo objeto Rect
+            // y lo decoramos con texto encima usando toObject override
+
+            // Enfoque simplificado: crear el boton como un Textbox con backgroundColor
+            let linkObj;
+
+            if (style === 'minimal') {
+                // Estilo minimal: solo texto subrayado
+                linkObj = new fabric.IText(text + ' →', {
+                    left: posX,
+                    top: posY,
+                    originX: 'center',
+                    originY: 'center',
+                    fontSize: 16,
+                    fontFamily: fontFamily,
+                    fontWeight: 'bold',
+                    fill: fillColor,
+                    underline: true,
+                    shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 4, offsetX: 0, offsetY: 2 }),
+                    editable: false
+                });
+            } else {
+                // Para otros estilos, crear Group pero con configuracion correcta
+                const rx = style === 'pill' || style === 'glass' || style === 'swipe' ? btnHeight / 2 :
+                           style === 'rounded' ? 10 :
+                           style === 'outline-pill' ? btnHeight / 2 : 3;
+
+                let bgFill, bgStroke = null, bgStrokeWidth = 0, labelColor = textColor;
+
+                switch (style) {
+                    case 'outline-pill':
+                    case 'outline-square':
+                        bgFill = 'transparent';
+                        bgStroke = fillColor;
+                        bgStrokeWidth = 3;
+                        labelColor = fillColor;
+                        break;
+                    case 'glass':
+                        bgFill = 'rgba(255, 255, 255, 0.25)';
+                        bgStroke = 'rgba(255, 255, 255, 0.4)';
+                        bgStrokeWidth = 1;
+                        labelColor = '#ffffff';
+                        break;
+                    case 'swipe':
+                        bgFill = 'rgba(0, 0, 0, 0.7)';
+                        labelColor = '#ffffff';
+                        break;
+                    case 'gradient':
+                        bgFill = fillColor; // Se vera como color solido en canvas
+                        break;
+                    default:
+                        bgFill = fillColor;
+                }
+
+                const rect = new fabric.Rect({
+                    width: btnWidth,
+                    height: btnHeight,
+                    rx: rx,
+                    ry: rx,
+                    fill: bgFill,
+                    stroke: bgStroke,
+                    strokeWidth: bgStrokeWidth,
+                    originX: 'center',
+                    originY: 'center',
+                    shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.3)', blur: 8, offsetX: 0, offsetY: 4 })
+                });
+
+                const displayText = style === 'swipe' ? '↑ ' + text : text;
+                const label = new fabric.Text(displayText, {
+                    fontSize: style === 'swipe' ? 14 : 15,
+                    fontFamily: fontFamily,
+                    fontWeight: 'bold',
+                    fill: labelColor,
+                    originX: 'center',
+                    originY: 'center'
+                });
+
+                // Crear grupo con configuracion para interaccion
+                linkObj = new fabric.Group([rect, label], {
+                    left: posX,
+                    top: posY,
+                    originX: 'center',
+                    originY: 'center',
+                    // Propiedades criticas para movimiento
+                    subTargetCheck: false,
+                    interactive: false
+                });
+            }
+
+            // Propiedades importantes para visibilidad y movimiento
+            linkObj.set({
+                selectable: true,
+                evented: true,
+                hasControls: true,
+                hasBorders: true,
+                lockScalingFlip: true,
+                cornerColor: '#4682B4',
+                cornerStyle: 'circle',
+                borderColor: '#4682B4',
+                borderScaleFactor: 2,
+                transparentCorners: false,
+                cornerSize: 12,
+                padding: 10,
+                // Asegurar que el objeto responda a eventos
+                hoverCursor: 'move',
+                moveCursor: 'move'
+            });
+
+            // Marcar como link para identificarlo
+            linkObj.isStoryLink = true;
+            linkObj.linkUrl = validUrl;
+            linkObj.linkText = text;
+            linkObj.linkStyle = style;
+            linkObj.linkColor = linkConfig.color;
+            linkObj.linkFont = fontFamily;
+
+            // Agregar al canvas
+            canvas.add(linkObj);
+
+            // Forzar la seleccion del objeto
+            canvas.discardActiveObject();
+            canvas.setActiveObject(linkObj);
+            canvas.bringToFront(linkObj);
+            canvas.requestRenderAll();
+
+            // Guardar referencia
+            storyLinkObject = linkObj;
+            saveHistory();
+
+            // Mostrar indicador
+            document.getElementById('linkAddedIndicator').style.display = 'block';
+        }
+
+        // ========================================
+        // AJUSTES DE IMAGEN/VIDEO (Voltear, Rotar, Filtros)
+        // ========================================
+
+        // Estado de ajustes
+        let adjustState = {
+            flipX: false,
+            flipY: false,
+            rotation: 0,
+            filter: 'none',
+            brightness: 0,
+            contrast: 0,
+            saturation: 0
+        };
+
+        function voltearHorizontal() {
+            adjustState.flipX = !adjustState.flipX;
+            aplicarTransformaciones();
+        }
+
+        function voltearVertical() {
+            adjustState.flipY = !adjustState.flipY;
+            aplicarTransformaciones();
+        }
+
+        function rotarImagen(grados) {
+            adjustState.rotation = (adjustState.rotation + grados) % 360;
+            aplicarTransformaciones();
+        }
+
+        function aplicarFiltro(filtro, elemento) {
+            adjustState.filter = filtro;
+
+            // Actualizar seleccion visual
+            document.querySelectorAll('.filter-option').forEach(opt => opt.classList.remove('selected'));
+            if (elemento) elemento.classList.add('selected');
+
+            aplicarTransformaciones();
+        }
+
+        function ajustarBrillo(valor) {
+            adjustState.brightness = parseInt(valor);
+            document.getElementById('brightnessLabel').textContent = valor;
+            aplicarTransformaciones();
+        }
+
+        function ajustarContraste(valor) {
+            adjustState.contrast = parseInt(valor);
+            document.getElementById('contrastLabel').textContent = valor;
+            aplicarTransformaciones();
+        }
+
+        function ajustarSaturacion(valor) {
+            adjustState.saturation = parseInt(valor);
+            document.getElementById('saturationLabel').textContent = valor;
+            aplicarTransformaciones();
+        }
+
+        function resetearAjustes() {
+            adjustState = {
+                flipX: false,
+                flipY: false,
+                rotation: 0,
+                filter: 'none',
+                brightness: 0,
+                contrast: 0,
+                saturation: 0
+            };
+
+            // Resetear sliders
+            document.getElementById('brightnessSlider').value = 0;
+            document.getElementById('contrastSlider').value = 0;
+            document.getElementById('saturationSlider').value = 0;
+            document.getElementById('brightnessLabel').textContent = '0';
+            document.getElementById('contrastLabel').textContent = '0';
+            document.getElementById('saturationLabel').textContent = '0';
+
+            // Resetear seleccion de filtro
+            document.querySelectorAll('.filter-option').forEach(opt => opt.classList.remove('selected'));
+            document.querySelector('.filter-option')?.classList.add('selected');
+
+            aplicarTransformaciones();
+        }
+
+        function aplicarTransformaciones() {
+            const videoElement = document.getElementById('videoBackground');
+            const bgImage = canvas.backgroundImage;
+
+            // Construir filtro CSS
+            let cssFilter = '';
+
+            // Filtros predefinidos
+            switch (adjustState.filter) {
+                case 'grayscale':
+                    cssFilter += 'grayscale(100%) ';
+                    break;
+                case 'sepia':
+                    cssFilter += 'sepia(80%) ';
+                    break;
+                case 'vintage':
+                    cssFilter += 'sepia(30%) contrast(90%) saturate(85%) ';
+                    break;
+                case 'cold':
+                    cssFilter += 'saturate(80%) hue-rotate(180deg) brightness(95%) ';
+                    break;
+                case 'warm':
+                    cssFilter += 'saturate(130%) sepia(20%) brightness(105%) ';
+                    break;
+                case 'contrast':
+                    cssFilter += 'contrast(140%) ';
+                    break;
+                case 'brightness':
+                    cssFilter += 'brightness(120%) contrast(95%) ';
+                    break;
+            }
+
+            // Ajustes manuales
+            if (adjustState.brightness !== 0) {
+                cssFilter += `brightness(${100 + adjustState.brightness}%) `;
+            }
+            if (adjustState.contrast !== 0) {
+                cssFilter += `contrast(${100 + adjustState.contrast}%) `;
+            }
+            if (adjustState.saturation !== 0) {
+                cssFilter += `saturate(${100 + adjustState.saturation}%) `;
+            }
+
+            // Construir transformacion
+            let transform = '';
+            if (adjustState.flipX) transform += 'scaleX(-1) ';
+            if (adjustState.flipY) transform += 'scaleY(-1) ';
+            if (adjustState.rotation !== 0) transform += `rotate(${adjustState.rotation}deg) `;
+
+            // Aplicar a video si esta activo
+            if (isVideoMedia && videoElement) {
+                videoElement.style.filter = cssFilter.trim() || 'none';
+                videoElement.style.transform = transform.trim() || 'none';
+            }
+
+            // Aplicar a imagen de fondo del canvas si existe
+            // IMPORTANTE: No aplicar transforms al contenedor de Fabric porque rompe la interactividad
+            // En su lugar, aplicamos al lower-canvas que contiene la imagen de fondo
+            if (bgImage && !isVideoMedia) {
+                const lowerCanvas = document.querySelector('.canvas-wrapper .lower-canvas');
+                if (lowerCanvas) {
+                    lowerCanvas.style.filter = cssFilter.trim() || 'none';
+                    lowerCanvas.style.transform = transform.trim() || 'none';
+                    lowerCanvas.style.transformOrigin = 'center center';
+                }
+            }
         }
 
         // ========================================
@@ -1708,6 +3751,7 @@
                     stickers: [],
                     dibujos: [],
                     menciones: [],
+                    link: null,
                     canvasWidth: canvas.width,
                     canvasHeight: canvas.height
                 };
@@ -1779,6 +3823,19 @@
                             color: obj.stroke,
                             strokeWidth: obj.strokeWidth
                         });
+                    } else if (obj.isStoryLink) {
+                        // Es un link
+                        elementos.link = {
+                            url: obj.linkUrl,
+                            text: obj.linkText,
+                            style: obj.linkStyle,
+                            color: obj.linkColor || '#4682B4',
+                            font: obj.linkFont || 'Poppins',
+                            x: xPercent,
+                            y: yPercent,
+                            scale: obj.scaleX || 1,
+                            rotation: obj.angle || 0
+                        };
                     }
                 });
 
@@ -1791,6 +3848,8 @@
 
                 if (selectedMusic) {
                     formData.append('pistaMusicalId', selectedMusic.id);
+                    formData.append('musicaTrimStart', musicTrimStart);
+                    formData.append('musicaVolumen', musicVolume);
                 }
 
                 // Obtener token

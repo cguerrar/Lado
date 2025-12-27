@@ -138,7 +138,8 @@ namespace Lado.Controllers
                                 titulo = s.PistaMusical.Titulo,
                                 artista = s.PistaMusical.Artista,
                                 audioUrl = s.PistaMusical.RutaArchivo,
-                                inicioSegundos = s.MusicaInicioSegundos ?? 0
+                                inicioSegundos = s.MusicaInicioSegundos ?? 0,
+                                volumen = s.MusicaVolumen ?? 70
                             } : null,
                             // Likes
                             likes = s.NumeroLikes,
@@ -243,7 +244,8 @@ namespace Lado.Controllers
             string? elementosJson,
             string? mencionesIds,
             int? pistaMusicalId,
-            int? musicaInicioSegundos)
+            int? musicaTrimStart,
+            int? musicaVolumen)
         {
             try
             {
@@ -322,7 +324,8 @@ namespace Lado.Controllers
                     ElementosJson = elementosJson,
                     MencionesIds = mencionesIds,
                     PistaMusicalId = pistaMusicalId,
-                    MusicaInicioSegundos = musicaInicioSegundos
+                    MusicaInicioSegundos = musicaTrimStart,
+                    MusicaVolumen = musicaVolumen
                 };
 
                 _context.Stories.Add(story);
