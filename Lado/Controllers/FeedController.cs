@@ -2090,7 +2090,10 @@ namespace Lado.Controllers
         {
             try
             {
-                var contenido = await _context.Contenidos.FindAsync(id);
+                var usuarioActualId = _userManager.GetUserId(User);
+                var contenido = await _context.Contenidos
+                    .Include(c => c.Usuario)
+                    .FirstOrDefaultAsync(c => c.Id == id);
 
                 if (contenido == null || !contenido.EstaActivo)
                 {
@@ -2103,11 +2106,23 @@ namespace Lado.Controllers
                 // Generar URL que abre el post dentro del feed normal
                 var feedUrl = Url.Action("Index", "Feed", null, Request.Scheme) + "?post=" + id;
 
+                // Determinar si es post propio (puede compartir a historia)
+                var esPostPropio = contenido.UsuarioId == usuarioActualId;
+
                 return Json(new
                 {
                     success = true,
                     url = feedUrl,
-                    totalCompartidos = contenido.NumeroCompartidos
+                    totalCompartidos = contenido.NumeroCompartidos,
+                    esPostPropio,
+                    preview = new {
+                        imagen = contenido.RutaArchivo,
+                        tieneMedia = !string.IsNullOrEmpty(contenido.RutaArchivo),
+                        creador = contenido.Usuario?.NombreCompleto ?? contenido.Usuario?.UserName,
+                        descripcion = contenido.Descripcion?.Length > 50
+                            ? contenido.Descripcion.Substring(0, 50) + "..."
+                            : contenido.Descripcion
+                    }
                 });
             }
             catch (Exception ex)

@@ -61,10 +61,27 @@ namespace Lado.Models
         public DateTime? FechaLectura { get; set; }
 
         // ========================================
+        // RESPUESTA A STORY
+        // ========================================
+
+        /// <summary>
+        /// ID de la historia a la que se responde (null si no es respuesta a story)
+        /// </summary>
+        public int? StoryReferenciaId { get; set; }
+
+        /// <summary>
+        /// Tipo de respuesta a story (texto normal, reacción rápida)
+        /// </summary>
+        public TipoRespuestaStory? TipoRespuestaStory { get; set; }
+
+        // ========================================
         // RELACIONES
         // ========================================
 
         public ApplicationUser? Remitente { get; set; }
         public ApplicationUser? Destinatario { get; set; }
+
+        [ForeignKey("StoryReferenciaId")]
+        public virtual Story? StoryReferencia { get; set; }
     }
 }

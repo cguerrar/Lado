@@ -4,6 +4,7 @@ using Lado.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Lado.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251227142714_AgregarRespuestaStoryEnMensajes")]
+    partial class AgregarRespuestaStoryEnMensajes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1299,7 +1302,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "ComisionBilleteraElectronica",
                             Descripcion = "Comision por usar billetera electronica (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 27, 12, 30, 23, 712, DateTimeKind.Local).AddTicks(2776),
+                            UltimaModificacion = new DateTime(2025, 12, 27, 11, 27, 13, 713, DateTimeKind.Local).AddTicks(5587),
                             Valor = "2.5"
                         },
                         new
@@ -1308,7 +1311,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "TiempoProcesoRetiro",
                             Descripcion = "Tiempo estimado para procesar retiros",
-                            UltimaModificacion = new DateTime(2025, 12, 27, 12, 30, 23, 712, DateTimeKind.Local).AddTicks(2844),
+                            UltimaModificacion = new DateTime(2025, 12, 27, 11, 27, 13, 713, DateTimeKind.Local).AddTicks(5658),
                             Valor = "3-5 dias habiles"
                         },
                         new
@@ -1317,7 +1320,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMinimoRecarga",
                             Descripcion = "Monto minimo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 27, 12, 30, 23, 712, DateTimeKind.Local).AddTicks(2845),
+                            UltimaModificacion = new DateTime(2025, 12, 27, 11, 27, 13, 713, DateTimeKind.Local).AddTicks(5661),
                             Valor = "5"
                         },
                         new
@@ -1326,7 +1329,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMaximoRecarga",
                             Descripcion = "Monto maximo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 27, 12, 30, 23, 712, DateTimeKind.Local).AddTicks(2847),
+                            UltimaModificacion = new DateTime(2025, 12, 27, 11, 27, 13, 713, DateTimeKind.Local).AddTicks(5663),
                             Valor = "1000"
                         },
                         new
@@ -1335,7 +1338,7 @@ namespace Lado.Migrations
                             Categoria = "General",
                             Clave = "ComisionPlataforma",
                             Descripcion = "Comision general de la plataforma (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 27, 12, 30, 23, 712, DateTimeKind.Local).AddTicks(2848),
+                            UltimaModificacion = new DateTime(2025, 12, 27, 11, 27, 13, 713, DateTimeKind.Local).AddTicks(5665),
                             Valor = "20"
                         });
                 });
@@ -1808,40 +1811,6 @@ namespace Lado.Migrations
                     b.HasIndex("UsuarioId");
 
                     b.ToTable("Feedbacks");
-                });
-
-            modelBuilder.Entity("Lado.Models.HistoriaSilenciada", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("FechaSilenciado")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SilenciadoId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("UsuarioId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SilenciadoId")
-                        .HasDatabaseName("IX_HistoriasSilenciadas_SilenciadoId");
-
-                    b.HasIndex("UsuarioId")
-                        .HasDatabaseName("IX_HistoriasSilenciadas_UsuarioId");
-
-                    b.HasIndex("UsuarioId", "SilenciadoId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_HistoriasSilenciadas_Usuario_Silenciado_Unique");
-
-                    b.ToTable("HistoriasSilenciadas");
                 });
 
             modelBuilder.Entity("Lado.Models.ImpresionAnuncio", b =>
@@ -3768,25 +3737,6 @@ namespace Lado.Migrations
                         .HasForeignKey("UsuarioId");
 
                     b.Navigation("Admin");
-
-                    b.Navigation("Usuario");
-                });
-
-            modelBuilder.Entity("Lado.Models.HistoriaSilenciada", b =>
-                {
-                    b.HasOne("Lado.Models.ApplicationUser", "Silenciado")
-                        .WithMany()
-                        .HasForeignKey("SilenciadoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Lado.Models.ApplicationUser", "Usuario")
-                        .WithMany()
-                        .HasForeignKey("UsuarioId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Silenciado");
 
                     b.Navigation("Usuario");
                 });

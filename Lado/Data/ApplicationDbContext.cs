@@ -63,6 +63,7 @@ namespace Lado.Data
         // ⭐ DbSets NUEVOS - SISTEMA DE BLOQUEOS Y SEGURIDAD
         // ========================================
         public DbSet<BloqueoUsuario> BloqueosUsuarios { get; set; }
+        public DbSet<HistoriaSilenciada> HistoriasSilenciadas { get; set; }
         public DbSet<IpBloqueada> IpsBloqueadas { get; set; }
         public DbSet<IntentoAtaque> IntentosAtaque { get; set; }
 
@@ -1072,6 +1073,36 @@ namespace Lado.Data
                 entity.HasIndex(b => new { b.BloqueadorId, b.BloqueadoId })
                     .IsUnique()
                     .HasDatabaseName("IX_BloqueosUsuarios_Bloqueador_Bloqueado_Unique");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE HISTORIAS SILENCIADAS
+            // ========================================
+            modelBuilder.Entity<HistoriaSilenciada>(entity =>
+            {
+                entity.HasKey(h => h.Id);
+
+                entity.HasOne(h => h.Usuario)
+                    .WithMany()
+                    .HasForeignKey(h => h.UsuarioId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(h => h.Silenciado)
+                    .WithMany()
+                    .HasForeignKey(h => h.SilenciadoId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // Índices
+                entity.HasIndex(h => h.UsuarioId)
+                    .HasDatabaseName("IX_HistoriasSilenciadas_UsuarioId");
+
+                entity.HasIndex(h => h.SilenciadoId)
+                    .HasDatabaseName("IX_HistoriasSilenciadas_SilenciadoId");
+
+                // Un usuario solo puede silenciar a otro una vez
+                entity.HasIndex(h => new { h.UsuarioId, h.SilenciadoId })
+                    .IsUnique()
+                    .HasDatabaseName("IX_HistoriasSilenciadas_Usuario_Silenciado_Unique");
             });
 
             // ========================================

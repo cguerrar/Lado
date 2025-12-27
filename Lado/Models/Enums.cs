@@ -171,4 +171,18 @@
         Imagen = 1,
         Video = 2
     }
+
+    // ====================================
+    // ENUMS PARA RESPUESTAS A STORIES
+    // ====================================
+
+    public enum TipoRespuestaStory
+    {
+        Texto = 0,          // Mensaje de texto normal
+        ReaccionFuego = 1,  // 🔥
+        ReaccionCorazon = 2,// ❤️
+        ReaccionRisa = 3,   // 😂
+        ReaccionSorpresa = 4,// 😮
+        ReaccionAplauso = 5 // 👏
+    }
 }

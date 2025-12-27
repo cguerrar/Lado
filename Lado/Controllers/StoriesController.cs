@@ -1,9 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Lado.Data;
+using Lado.Hubs;
 using Lado.Models;
 using Lado.Services;
 
@@ -18,19 +20,22 @@ namespace Lado.Controllers
         private readonly ILogger<StoriesController> _logger;
         private readonly IRateLimitService _rateLimitService;
         private readonly IFileValidationService _fileValidationService;
+        private readonly IHubContext<ChatHub> _hubContext;
 
         public StoriesController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             ILogger<StoriesController> logger,
             IRateLimitService rateLimitService,
-            IFileValidationService fileValidationService)
+            IFileValidationService fileValidationService,
+            IHubContext<ChatHub> hubContext)
         {
             _context = context;
             _userManager = userManager;
             _logger = logger;
             _rateLimitService = rateLimitService;
             _fileValidationService = fileValidationService;
+            _hubContext = hubContext;
         }
 
         /// <summary>
@@ -77,6 +82,18 @@ namespace Lado.Controllers
                 if (bloquearLadoB)
                 {
                     storiesQuery = storiesQuery.Where(s => s.TipoLado != TipoLado.LadoB);
+                }
+
+                // Obtener IDs de usuarios cuyas historias están silenciadas
+                var usuariosSilenciados = await _context.HistoriasSilenciadas
+                    .Where(h => h.UsuarioId == usuarioId)
+                    .Select(h => h.SilenciadoId)
+                    .ToListAsync();
+
+                // Filtrar stories de usuarios silenciados
+                if (usuariosSilenciados.Any())
+                {
+                    storiesQuery = storiesQuery.Where(s => !usuariosSilenciados.Contains(s.CreadorId));
                 }
 
                 var stories = await storiesQuery
@@ -456,8 +473,9 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "Has creado demasiadas stories en poco tiempo. Espera unos minutos." });
                 }
 
-                // Obtener el post original
+                // Obtener el post original con sus archivos (para carruseles)
                 var post = await _context.Contenidos
+                    .Include(c => c.Archivos)
                     .FirstOrDefaultAsync(c => c.Id == postId && c.EstaActivo);
 
                 if (post == null)
@@ -465,31 +483,29 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "Post no encontrado" });
                 }
 
-                // Verificar que el usuario tiene acceso al post
-                var tieneAcceso = post.UsuarioId == usuarioId;
-                if (!tieneAcceso)
+                // REGLA: Solo puedes compartir TUS PROPIOS posts como historia
+                // No se permite compartir posts de otros usuarios a tu historia
+                if (post.UsuarioId != usuarioId)
                 {
-                    var suscripcion = await _context.Suscripciones
-                        .AnyAsync(s => s.FanId == usuarioId && s.CreadorId == post.UsuarioId && s.EstaActiva);
-                    tieneAcceso = suscripcion || post.TipoLado == TipoLado.LadoA;
+                    return Json(new {
+                        success = false,
+                        message = "Solo puedes compartir tus propios posts a tu historia",
+                        esPostAjeno = true
+                    });
                 }
 
-                if (!tieneAcceso)
-                {
-                    return Json(new { success = false, message = "No tienes acceso a este contenido" });
-                }
-
-                // Verificar que el post tiene media
-                if (string.IsNullOrEmpty(post.RutaArchivo))
+                // Verificar que el post tiene media (incluyendo carruseles)
+                var mediaUrl = post.PrimerArchivo;
+                if (string.IsNullOrEmpty(mediaUrl))
                 {
                     return Json(new { success = false, message = "El post no tiene imagen o video" });
                 }
 
-                // Crear story usando el mismo archivo del post
+                // Crear story usando el primer archivo del post
                 var story = new Story
                 {
                     CreadorId = usuarioId,
-                    RutaArchivo = post.RutaArchivo,
+                    RutaArchivo = mediaUrl,
                     TipoContenido = post.TipoContenido,
                     Texto = texto ?? "",
                     TipoLado = post.TipoLado,
@@ -995,5 +1011,524 @@ namespace Lado.Controllers
                 return Json(new { success = false, message = "Error al procesar" });
             }
         }
+
+        // ========================================
+        // RESPONDER A STORY (Mensaje o Reacción)
+        // ========================================
+
+        /// <summary>
+        /// Enviar mensaje o reacción a una story sin salir del visor
+        /// </summary>
+        [HttpPost("ResponderStory")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResponderStory([FromForm] ResponderStoryRequest request)
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(usuarioId))
+                {
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                var usuario = await _userManager.FindByIdAsync(usuarioId);
+                if (usuario == null)
+                {
+                    return Json(new { success = false, message = "Usuario no encontrado" });
+                }
+
+                // Rate limiting
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rateLimitKey = $"story_response_{usuarioId}";
+                if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKey, 30, TimeSpan.FromMinutes(1),
+                    TipoAtaque.SpamMensajes, "/Stories/ResponderStory", usuarioId))
+                {
+                    return Json(new { success = false, message = "Demasiadas respuestas. Espera un momento." });
+                }
+
+                // Validar story
+                var story = await _context.Stories
+                    .Include(s => s.Creador)
+                    .FirstOrDefaultAsync(s => s.Id == request.StoryId && s.EstaActivo);
+
+                if (story == null)
+                {
+                    return Json(new { success = false, message = "Historia no encontrada" });
+                }
+
+                // No puede responderse a sí mismo
+                if (story.CreadorId == usuarioId)
+                {
+                    return Json(new { success = false, message = "No puedes responder a tu propia historia" });
+                }
+
+                // Verificar bloqueo
+                var existeBloqueo = await _context.BloqueosUsuarios
+                    .AnyAsync(b => (b.BloqueadorId == usuarioId && b.BloqueadoId == story.CreadorId) ||
+                                  (b.BloqueadorId == story.CreadorId && b.BloqueadoId == usuarioId));
+
+                if (existeBloqueo)
+                {
+                    return Json(new { success = false, message = "No puedes enviar mensajes a este usuario" });
+                }
+
+                // Verificar relación de suscripción o conversación previa
+                var existeRelacion = await _context.Suscripciones
+                    .AnyAsync(s => (s.FanId == usuarioId && s.CreadorId == story.CreadorId && s.EstaActiva) ||
+                                  (s.FanId == story.CreadorId && s.CreadorId == usuarioId && s.EstaActiva));
+
+                var tieneConversacion = await _context.MensajesPrivados
+                    .AnyAsync(m => (m.RemitenteId == usuarioId && m.DestinatarioId == story.CreadorId) ||
+                                  (m.RemitenteId == story.CreadorId && m.DestinatarioId == usuarioId));
+
+                if (!existeRelacion && !tieneConversacion)
+                {
+                    return Json(new { success = false, message = "Debes estar suscrito para responder historias" });
+                }
+
+                // Determinar contenido del mensaje
+                string contenidoMensaje;
+                if (request.TipoRespuesta.HasValue && request.TipoRespuesta != TipoRespuestaStory.Texto)
+                {
+                    // Reacción rápida
+                    contenidoMensaje = request.TipoRespuesta switch
+                    {
+                        TipoRespuestaStory.ReaccionFuego => "🔥",
+                        TipoRespuestaStory.ReaccionCorazon => "❤️",
+                        TipoRespuestaStory.ReaccionRisa => "😂",
+                        TipoRespuestaStory.ReaccionSorpresa => "😮",
+                        TipoRespuestaStory.ReaccionAplauso => "👏",
+                        _ => request.Mensaje?.Trim() ?? ""
+                    };
+                }
+                else
+                {
+                    contenidoMensaje = request.Mensaje?.Trim() ?? "";
+                }
+
+                if (string.IsNullOrWhiteSpace(contenidoMensaje))
+                {
+                    return Json(new { success = false, message = "El mensaje no puede estar vacío" });
+                }
+
+                // Crear mensaje
+                var mensaje = new MensajePrivado
+                {
+                    RemitenteId = usuarioId,
+                    DestinatarioId = story.CreadorId,
+                    Contenido = contenidoMensaje,
+                    FechaEnvio = DateTime.Now,
+                    Leido = false,
+                    TipoMensaje = TipoMensaje.Texto,
+                    StoryReferenciaId = story.Id,
+                    TipoRespuestaStory = request.TipoRespuesta ?? TipoRespuestaStory.Texto
+                };
+
+                _context.MensajesPrivados.Add(mensaje);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("✅ Respuesta a story enviada. StoryId: {StoryId}, MensajeId: {MensajeId}, Tipo: {Tipo}",
+                    story.Id, mensaje.Id, request.TipoRespuesta);
+
+                // Preparar DTO para SignalR
+                var fechaUtc = DateTime.SpecifyKind(mensaje.FechaEnvio, DateTimeKind.Local).ToUniversalTime();
+                var timestamp = new DateTimeOffset(fechaUtc).ToUnixTimeMilliseconds();
+
+                var mensajeDto = new
+                {
+                    id = mensaje.Id,
+                    contenido = mensaje.Contenido,
+                    fechaEnvioTimestamp = timestamp,
+                    remitenteId = usuarioId,
+                    remitenteNombre = usuario.NombreCompleto ?? usuario.UserName,
+                    remitenteFoto = usuario.FotoPerfil,
+                    tipoMensaje = (int)TipoMensaje.Texto,
+                    leido = false,
+                    storyReferencia = new
+                    {
+                        id = story.Id,
+                        rutaArchivo = story.RutaArchivo,
+                        tipoContenido = (int)story.TipoContenido,
+                        creadorNombre = story.Creador?.NombreCompleto ?? story.Creador?.UserName ?? "Usuario"
+                    },
+                    tipoRespuestaStory = (int)(request.TipoRespuesta ?? TipoRespuestaStory.Texto)
+                };
+
+                // Notificar via SignalR al creador de la story
+                await _hubContext.Clients.Group($"user_{story.CreadorId}").SendAsync("RecibirMensaje", mensajeDto);
+
+                return Json(new { success = true, mensaje = mensajeDto });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al responder story {StoryId}", request?.StoryId);
+                return Json(new { success = false, message = "Error al enviar respuesta" });
+            }
+        }
+
+        // ========================================
+        // SILENCIAR/DESILENCIAR HISTORIAS
+        // ========================================
+
+        /// <summary>
+        /// Silenciar las historias de un usuario
+        /// </summary>
+        [HttpPost("SilenciarHistorias")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SilenciarHistorias([FromForm] string usuarioId)
+        {
+            try
+            {
+                var usuarioActualId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrEmpty(usuarioActualId))
+                {
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                if (string.IsNullOrEmpty(usuarioId))
+                {
+                    return Json(new { success = false, message = "Usuario no especificado" });
+                }
+
+                if (usuarioActualId == usuarioId)
+                {
+                    return Json(new { success = false, message = "No puedes silenciar tus propias historias" });
+                }
+
+                // Verificar si ya está silenciado
+                var yaExiste = await _context.HistoriasSilenciadas
+                    .AnyAsync(h => h.UsuarioId == usuarioActualId && h.SilenciadoId == usuarioId);
+
+                if (yaExiste)
+                {
+                    return Json(new { success = true, message = "Ya estaba silenciado" });
+                }
+
+                // Crear registro de silencio
+                var silencio = new HistoriaSilenciada
+                {
+                    UsuarioId = usuarioActualId,
+                    SilenciadoId = usuarioId,
+                    FechaSilenciado = DateTime.Now
+                };
+
+                _context.HistoriasSilenciadas.Add(silencio);
+                await _context.SaveChangesAsync();
+
+                // Obtener nombre del usuario silenciado
+                var usuarioSilenciado = await _userManager.FindByIdAsync(usuarioId);
+                var nombre = usuarioSilenciado?.NombreCompleto ?? usuarioSilenciado?.UserName ?? "Usuario";
+
+                return Json(new { success = true, message = $"Historias de {nombre} silenciadas" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al silenciar historias del usuario {UsuarioId}", usuarioId);
+                return Json(new { success = false, message = "Error al silenciar historias" });
+            }
+        }
+
+        /// <summary>
+        /// Dejar de silenciar las historias de un usuario
+        /// </summary>
+        [HttpPost("DesilenciarHistorias")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DesilenciarHistorias([FromForm] string usuarioId)
+        {
+            try
+            {
+                var usuarioActualId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrEmpty(usuarioActualId))
+                {
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                var silencio = await _context.HistoriasSilenciadas
+                    .FirstOrDefaultAsync(h => h.UsuarioId == usuarioActualId && h.SilenciadoId == usuarioId);
+
+                if (silencio == null)
+                {
+                    return Json(new { success = true, message = "No estaba silenciado" });
+                }
+
+                _context.HistoriasSilenciadas.Remove(silencio);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Historias desilenciadas" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al desilenciar historias del usuario {UsuarioId}", usuarioId);
+                return Json(new { success = false, message = "Error al desilenciar historias" });
+            }
+        }
+
+        /// <summary>
+        /// Obtener lista de usuarios cuyas historias han sido silenciadas
+        /// </summary>
+        [HttpGet("ObtenerSilenciados")]
+        public async Task<IActionResult> ObtenerSilenciados()
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrEmpty(usuarioId))
+                {
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                var silenciados = await _context.HistoriasSilenciadas
+                    .Where(h => h.UsuarioId == usuarioId)
+                    .Include(h => h.Silenciado)
+                    .Select(h => new
+                    {
+                        id = h.SilenciadoId,
+                        nombre = h.Silenciado!.NombreCompleto ?? h.Silenciado.UserName,
+                        username = h.Silenciado.UserName,
+                        avatar = h.Silenciado.FotoPerfil,
+                        fechaSilenciado = h.FechaSilenciado
+                    })
+                    .ToListAsync();
+
+                return Json(new { success = true, silenciados });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener usuarios silenciados");
+                return Json(new { success = false, message = "Error al cargar usuarios silenciados" });
+            }
+        }
+
+        /// <summary>
+        /// Verificar si las historias de un usuario están silenciadas
+        /// </summary>
+        [HttpGet("EstaSilenciado/{usuarioId}")]
+        public async Task<IActionResult> EstaSilenciado(string usuarioId)
+        {
+            try
+            {
+                var usuarioActualId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrEmpty(usuarioActualId))
+                {
+                    return Json(new { success = false, silenciado = false });
+                }
+
+                var silenciado = await _context.HistoriasSilenciadas
+                    .AnyAsync(h => h.UsuarioId == usuarioActualId && h.SilenciadoId == usuarioId);
+
+                return Json(new { success = true, silenciado });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al verificar si usuario está silenciado {UsuarioId}", usuarioId);
+                return Json(new { success = false, silenciado = false });
+            }
+        }
+
+        /// <summary>
+        /// Obtener historias de usuarios silenciados (para ver en sección aparte)
+        /// </summary>
+        [HttpGet("ObtenerStoriesSilenciados")]
+        public async Task<IActionResult> ObtenerStoriesSilenciados()
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrEmpty(usuarioId))
+                {
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
+                // Obtener IDs de usuarios silenciados
+                var usuariosSilenciados = await _context.HistoriasSilenciadas
+                    .Where(h => h.UsuarioId == usuarioId)
+                    .Select(h => h.SilenciadoId)
+                    .ToListAsync();
+
+                if (!usuariosSilenciados.Any())
+                {
+                    return Json(new { success = true, grupos = new List<object>() });
+                }
+
+                var ahora = DateTime.Now;
+
+                // Obtener stories de usuarios silenciados que sigo
+                var creadoresIds = await _context.Suscripciones
+                    .Where(s => s.FanId == usuarioId && s.EstaActiva)
+                    .Select(s => s.CreadorId)
+                    .ToListAsync();
+
+                var stories = await _context.Stories
+                    .Include(s => s.Creador)
+                    .Where(s => creadoresIds.Contains(s.CreadorId)
+                            && usuariosSilenciados.Contains(s.CreadorId)
+                            && s.FechaExpiracion > ahora
+                            && s.EstaActivo)
+                    .OrderByDescending(s => s.FechaPublicacion)
+                    .ToListAsync();
+
+                var storiesVistos = await _context.StoryVistas
+                    .Where(sv => sv.UsuarioId == usuarioId)
+                    .Select(sv => sv.StoryId)
+                    .ToListAsync();
+
+                var grupos = stories
+                    .GroupBy(s => s.CreadorId)
+                    .Select(g => new
+                    {
+                        creadorId = g.Key,
+                        nombre = g.First().Creador?.NombreCompleto ?? g.First().Creador?.UserName,
+                        avatar = g.First().Creador?.FotoPerfil,
+                        totalStories = g.Count(),
+                        sinVer = g.Count(s => !storiesVistos.Contains(s.Id))
+                    })
+                    .ToList();
+
+                return Json(new { success = true, grupos });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener stories silenciados");
+                return Json(new { success = false, message = "Error al cargar stories silenciados" });
+            }
+        }
+
+        // ========================================
+        // ANUNCIOS EN STORIES
+        // ========================================
+
+        /// <summary>
+        /// Obtener un anuncio para mostrar entre grupos de historias
+        /// </summary>
+        [HttpGet("ObtenerAnuncioStory")]
+        public async Task<IActionResult> ObtenerAnuncioStory()
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                // Obtener anuncios activos con tipo imagen o video
+                var ahora = DateTime.Now;
+                var anunciosActivos = await _context.Anuncios
+                    .Include(a => a.Agencia)
+                    .Where(a => a.Estado == EstadoAnuncio.Activo
+                            && (a.FechaInicio == null || a.FechaInicio <= ahora)
+                            && (a.FechaFin == null || a.FechaFin >= ahora)
+                            && (a.TipoCreativo == TipoCreativo.Imagen || a.TipoCreativo == TipoCreativo.Video)
+                            && !string.IsNullOrEmpty(a.UrlCreativo)
+                            && (a.PresupuestoTotal == 0 || a.GastoTotal < a.PresupuestoTotal)
+                            && (a.PresupuestoDiario == 0 || a.GastoHoy < a.PresupuestoDiario))
+                    .OrderByDescending(a => a.Prioridad)
+                    .ThenBy(a => Guid.NewGuid()) // Random entre anuncios de misma prioridad
+                    .Take(1)
+                    .FirstOrDefaultAsync();
+
+                if (anunciosActivos == null)
+                {
+                    return Json(new { success = false, message = "No hay anuncios disponibles" });
+                }
+
+                // Registrar impresión
+                var impresion = new ImpresionAnuncio
+                {
+                    AnuncioId = anunciosActivos.Id,
+                    UsuarioId = usuarioId,
+                    FechaImpresion = DateTime.Now,
+                    IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                };
+
+                _context.ImpresionesAnuncios.Add(impresion);
+                anunciosActivos.Impresiones++;
+                await _context.SaveChangesAsync();
+
+                // Devolver anuncio formateado como story
+                return Json(new
+                {
+                    success = true,
+                    anuncio = new
+                    {
+                        id = anunciosActivos.Id,
+                        rutaArchivo = anunciosActivos.UrlCreativo,
+                        tipo = anunciosActivos.TipoCreativo == TipoCreativo.Video ? "Video" : "Imagen",
+                        titulo = anunciosActivos.Titulo,
+                        descripcion = anunciosActivos.Descripcion,
+                        urlDestino = anunciosActivos.UrlDestino,
+                        textoBoton = anunciosActivos.TextoBotonDisplay,
+                        esAnuncio = true,
+                        nombreAnunciante = anunciosActivos.EsAnuncioLado ? "Lado" :
+                            (anunciosActivos.Agencia?.NombreEmpresa ?? "Publicidad"),
+                        avatarAnunciante = anunciosActivos.EsAnuncioLado ? "/images/logo-icon.png" :
+                            (anunciosActivos.Agencia?.LogoUrl ?? "/images/ad-placeholder.png")
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener anuncio para story");
+                return Json(new { success = false, message = "Error al cargar anuncio" });
+            }
+        }
+
+        /// <summary>
+        /// Registrar clic en anuncio de story
+        /// </summary>
+        [HttpPost("RegistrarClicAnuncio")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RegistrarClicAnuncio([FromForm] int anuncioId)
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                var anuncio = await _context.Anuncios.FindAsync(anuncioId);
+                if (anuncio == null)
+                {
+                    return Json(new { success = false });
+                }
+
+                var clic = new ClicAnuncio
+                {
+                    AnuncioId = anuncioId,
+                    UsuarioId = usuarioId,
+                    FechaClic = DateTime.Now,
+                    IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                };
+
+                _context.ClicsAnuncios.Add(clic);
+                anuncio.Clics++;
+
+                // Calcular costo del clic
+                if (anuncio.CostoPorClic > 0)
+                {
+                    anuncio.GastoTotal += anuncio.CostoPorClic;
+                    anuncio.GastoHoy += anuncio.CostoPorClic;
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, urlDestino = anuncio.UrlDestino });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al registrar clic en anuncio {AnuncioId}", anuncioId);
+                return Json(new { success = false });
+            }
+        }
+    }
+
+    // ========================================
+    // REQUEST MODEL
+    // ========================================
+
+    public class ResponderStoryRequest
+    {
+        public int StoryId { get; set; }
+        public string? Mensaje { get; set; }
+        public TipoRespuestaStory? TipoRespuesta { get; set; }
     }
 }

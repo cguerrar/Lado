@@ -231,12 +231,14 @@ namespace Lado.Controllers
                 }
             }
 
-            // Cargar mensajes con respuestas incluidas
+            // Cargar mensajes con respuestas y stories incluidas
             var mensajes = await _context.MensajesPrivados
                 .Include(m => m.Remitente)
                 .Include(m => m.Destinatario)
                 .Include(m => m.MensajeRespondido)
                     .ThenInclude(mr => mr!.Remitente)
+                .Include(m => m.StoryReferencia)
+                    .ThenInclude(s => s!.Creador)
                 .Where(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == id) ||
                            (m.RemitenteId == id && m.DestinatarioId == usuario.Id))
                 .Where(m => (m.RemitenteId == usuario.Id && !m.EliminadoPorRemitente) ||
@@ -289,7 +291,9 @@ namespace Lado.Controllers
             string destinatarioId,
             string? contenido,
             IFormFile? archivo,
-            int? mensajeRespondidoId)
+            int? mensajeRespondidoId,
+            int? storyReferenciaId = null,
+            TipoRespuestaStory? tipoRespuestaStory = null)
         {
             try
             {
@@ -367,6 +371,9 @@ namespace Lado.Controllers
                 }
 
                 // Crear mensaje
+                // Si storyReferenciaId es 0, tratarlo como null
+                int? storyRefId = (storyReferenciaId.HasValue && storyReferenciaId.Value > 0) ? storyReferenciaId : null;
+
                 var mensaje = new MensajePrivado
                 {
                     RemitenteId = usuario.Id,
@@ -374,7 +381,9 @@ namespace Lado.Controllers
                     Contenido = contenido?.Trim() ?? "",
                     FechaEnvio = DateTime.Now,
                     Leido = false,
-                    TipoMensaje = TipoMensaje.Texto
+                    TipoMensaje = TipoMensaje.Texto,
+                    StoryReferenciaId = storyRefId,
+                    TipoRespuestaStory = storyRefId.HasValue ? tipoRespuestaStory : null
                 };
 
                 // Procesar archivo si existe
@@ -455,6 +464,15 @@ namespace Lado.Controllers
                         .FirstOrDefaultAsync(m => m.Id == mensaje.MensajeRespondidoId);
                 }
 
+                // Cargar datos de la story referenciada si existe
+                Story? storyRef = null;
+                if (mensaje.StoryReferenciaId.HasValue)
+                {
+                    storyRef = await _context.Stories
+                        .Include(s => s.Creador)
+                        .FirstOrDefaultAsync(s => s.Id == mensaje.StoryReferenciaId);
+                }
+
                 // Preparar DTO del mensaje - enviar timestamp para que el cliente formatee en su zona horaria
                 var fechaUtc = mensaje.FechaEnvio.Kind == DateTimeKind.Utc
                     ? mensaje.FechaEnvio
@@ -478,7 +496,15 @@ namespace Lado.Controllers
                         contenido = mensajeRespondido.Contenido,
                         remitenteNombre = mensajeRespondido.Remitente?.NombreCompleto ?? mensajeRespondido.Remitente?.UserName ?? "Usuario",
                         tipoMensaje = (int)mensajeRespondido.TipoMensaje
-                    } : null
+                    } : null,
+                    storyReferencia = storyRef != null ? new
+                    {
+                        id = storyRef.Id,
+                        rutaArchivo = storyRef.RutaArchivo,
+                        tipoContenido = (int)storyRef.TipoContenido,
+                        creadorNombre = storyRef.Creador?.NombreCompleto ?? storyRef.Creador?.UserName ?? "Usuario"
+                    } : null,
+                    tipoRespuestaStory = mensaje.TipoRespuestaStory.HasValue ? (int?)mensaje.TipoRespuestaStory : null
                 };
 
                 // Notificar via SignalR al destinatario
@@ -659,6 +685,8 @@ namespace Lado.Controllers
                     .Include(m => m.Remitente)
                     .Include(m => m.MensajeRespondido)
                         .ThenInclude(mr => mr!.Remitente)
+                    .Include(m => m.StoryReferencia)
+                        .ThenInclude(s => s!.Creador)
                     .Where(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == contactoId) ||
                                (m.RemitenteId == contactoId && m.DestinatarioId == usuario.Id))
                     .Where(m => (m.RemitenteId == usuario.Id && !m.EliminadoPorRemitente) ||
@@ -690,7 +718,15 @@ namespace Lado.Controllers
                                 ? (m.MensajeRespondido.Remitente.NombreCompleto ?? m.MensajeRespondido.Remitente.UserName)
                                 : "Usuario",
                             tipoMensaje = (int)m.MensajeRespondido.TipoMensaje
-                        } : null
+                        } : null,
+                        storyReferencia = m.StoryReferencia != null ? new
+                        {
+                            id = m.StoryReferencia.Id,
+                            rutaArchivo = m.StoryReferencia.RutaArchivo,
+                            tipoContenido = (int)m.StoryReferencia.TipoContenido,
+                            creadorNombre = m.StoryReferencia.Creador?.NombreCompleto ?? m.StoryReferencia.Creador?.UserName ?? "Usuario"
+                        } : null,
+                        tipoRespuestaStory = m.TipoRespuestaStory.HasValue ? (int?)m.TipoRespuestaStory : null
                     };
                 }).ToList();
 

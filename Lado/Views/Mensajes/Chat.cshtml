@@ -438,6 +438,75 @@
         color: var(--text-muted);
     }
 
+    /* Referencia a Story */
+    .mensaje-story-ref {
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(147, 51, 234, 0.05));
+        border-left: 3px solid #7c3aed;
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        border-radius: 6px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .mensaje-story-ref-thumb {
+        width: 48px;
+        height: 64px;
+        border-radius: 6px;
+        object-fit: cover;
+        flex-shrink: 0;
+    }
+
+    .mensaje-story-ref-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .mensaje-story-ref-label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: #7c3aed;
+        font-weight: 600;
+        font-size: 12px;
+        margin-bottom: 2px;
+    }
+
+    .mensaje-story-ref-nombre {
+        color: var(--text-dark);
+        font-size: 13px;
+    }
+
+    .mensaje-story-ref-video {
+        position: relative;
+    }
+
+    .mensaje-story-ref-video::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,0.2);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .mensaje-story-ref-play {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 20px;
+        height: 20px;
+        background: rgba(255,255,255,0.9);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
     /* Media */
     .mensaje-imagen {
         max-width: 280px;
@@ -1813,6 +1882,31 @@
                     <div class="mensaje @(esMio ? "mensaje-enviado" : "mensaje-recibido")" data-id="@mensaje.Id" data-timestamp="@timestamp">
                         <div class="mensaje-sender">@(esMio ? "Tú" : (otroUsuario?.NombreCompleto ?? otroUsuario?.UserName ?? "Usuario"))</div>
                         <div class="mensaje-burbuja">
+                            @if (mensaje.StoryReferencia != null)
+                            {
+                                var isVideo = mensaje.StoryReferencia.TipoContenido == Lado.Models.TipoContenido.Video;
+                                <div class="mensaje-story-ref">
+                                    <div class="@(isVideo ? "mensaje-story-ref-video" : "")" style="position:relative;">
+                                        <img src="@mensaje.StoryReferencia.RutaArchivo" alt="Historia" class="mensaje-story-ref-thumb">
+                                        @if (isVideo)
+                                        {
+                                            <div class="mensaje-story-ref-play">
+                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="#7c3aed"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="mensaje-story-ref-info">
+                                        <div class="mensaje-story-ref-label">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="12" cy="12" r="10"/>
+                                                <circle cx="12" cy="12" r="3"/>
+                                            </svg>
+                                            Respondió a tu historia
+                                        </div>
+                                        <div class="mensaje-story-ref-nombre">@(mensaje.StoryReferencia.Creador?.NombreCompleto ?? mensaje.StoryReferencia.Creador?.UserName ?? "Usuario")</div>
+                                    </div>
+                                </div>
+                            }
                             @if (mensaje.MensajeRespondido != null)
                             {
                                 <div class="mensaje-respuesta" onclick="scrollToMessage(@mensaje.MensajeRespondido.Id)">
@@ -1961,7 +2055,7 @@
                 @Html.AntiForgeryToken()
                 <input type="hidden" id="destinatarioId" value="@otroUsuario?.Id">
                 <input type="hidden" id="mensajeRespondidoId" value="">
-                <input type="hidden" id="storyReferenciaId" value="@(storyRef?.Id ?? 0)">
+                <input type="hidden" id="storyReferenciaId" name="storyReferenciaId" value="@(storyRef?.Id ?? 0)">
                 <input type="file" id="fileInput" accept="image/*,video/*" onchange="previewArchivo(this)">
 
                 <button type="button" class="btn-attach" onclick="document.getElementById('fileInput').click()">
@@ -2155,6 +2249,33 @@
                 respuestaHtml = `<div class="mensaje-respuesta" onclick="scrollToMessage(${mr.id})"><div class="mensaje-respuesta-nombre">${escapeHtml(mr.remitenteNombre)}</div>${contenidoRespuesta}</div>`;
             }
 
+            // Referencia a Story
+            let storyRefHtml = '';
+            if (mensaje.storyReferencia) {
+                const sr = mensaje.storyReferencia;
+                const isVideo = sr.tipoContenido === 2;
+                const thumbClass = isVideo ? 'mensaje-story-ref-video' : '';
+                const playIcon = isVideo ? '<div class="mensaje-story-ref-play"><svg width="10" height="10" viewBox="0 0 24 24" fill="#7c3aed"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>' : '';
+
+                storyRefHtml = `
+                    <div class="mensaje-story-ref">
+                        <div class="${thumbClass}" style="position:relative;">
+                            <img src="${sr.rutaArchivo}" alt="Historia" class="mensaje-story-ref-thumb">
+                            ${playIcon}
+                        </div>
+                        <div class="mensaje-story-ref-info">
+                            <div class="mensaje-story-ref-label">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                Respondió a tu historia
+                            </div>
+                            <div class="mensaje-story-ref-nombre">${escapeHtml(sr.creadorNombre)}</div>
+                        </div>
+                    </div>`;
+            }
+
             let mediaHtml = '';
             if (mensaje.tipoMensaje === 1 && mensaje.rutaArchivo) {
                 mediaHtml = `<img src="${mensaje.rutaArchivo}" alt="Imagen" class="mensaje-imagen" onclick="abrirImagenModal(this.src)">`;
@@ -2175,7 +2296,7 @@
             const html = `
                 <div class="mensaje ${esMio ? 'mensaje-enviado' : 'mensaje-recibido'} ${mensajeEmojiClass}" data-id="${mensaje.id}" data-timestamp="${mensaje.fechaEnvioTimestamp || ''}">
                     <div class="mensaje-sender">${senderName}</div>
-                    <div class="mensaje-burbuja">${respuestaHtml}${mediaHtml}${textoHtml}<div class="mensaje-info"><span class="mensaje-hora">${horaFormateada}</span>${checkHtml}</div></div>
+                    <div class="mensaje-burbuja">${storyRefHtml}${respuestaHtml}${mediaHtml}${textoHtml}<div class="mensaje-info"><span class="mensaje-hora">${horaFormateada}</span>${checkHtml}</div></div>
                     <div class="mensaje-actions"><button class="btn-reply" onclick="iniciarRespuesta(${mensaje.id}, '${escapeHtml(mensaje.remitenteNombre || 'Usuario')}', '${escapeHtml(mensaje.contenido || '')}', ${mensaje.tipoMensaje})"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg></button></div>
                 </div>`;
 
@@ -2300,6 +2421,7 @@
                     document.getElementById('inputMensaje').value = '';
                     cancelarRespuesta();
                     cancelarArchivo();
+                    cancelarStoryReply();
                 } else {
                     alert(data.message || 'Error al enviar');
                 }
