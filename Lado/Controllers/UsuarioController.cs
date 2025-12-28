@@ -900,27 +900,19 @@ namespace Lado.Controllers
             var userId = usuario.Id;
             var userName = usuario.UserName;
 
-            // Log inicio
-            Console.WriteLine($"[EliminarCuenta] Iniciando eliminación para usuario: {userName} ({userId})");
-            Console.WriteLine($"[EliminarCuenta] Confirmación recibida: '{confirmacion}'");
-
             // Verificar confirmación (case insensitive)
             if (string.IsNullOrEmpty(confirmacion) || !confirmacion.Equals("ELIMINAR", StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine($"[EliminarCuenta] Confirmación inválida");
                 TempData["Error"] = $"Debes escribir 'ELIMINAR' para confirmar. Recibido: '{confirmacion}'";
                 return RedirectToAction(nameof(Configuracion));
             }
 
             try
             {
-                Console.WriteLine($"[EliminarCuenta] Iniciando transacción...");
-
                 // Usar una transacción para asegurar consistencia
                 using var transaction = await _context.Database.BeginTransactionAsync();
 
                 // Batch 1: Notificaciones, Likes, Comentarios
-                Console.WriteLine("[EliminarCuenta] Batch 1: Notificaciones, Likes, Comentarios...");
                 var notificaciones = _context.Notificaciones.Where(n => n.UsuarioId == usuario.Id);
                 _context.Notificaciones.RemoveRange(notificaciones);
                 var likes = _context.Likes.Where(l => l.UsuarioId == usuario.Id);
@@ -932,10 +924,8 @@ namespace Lado.Controllers
                 var comentariosEnMiContenido = _context.Comentarios.Where(c => c.Contenido.UsuarioId == usuario.Id);
                 _context.Comentarios.RemoveRange(comentariosEnMiContenido);
                 await _context.SaveChangesAsync();
-                Console.WriteLine("[EliminarCuenta] Batch 1 completado");
 
                 // Batch 2: Stories y vistas
-                Console.WriteLine("[EliminarCuenta] Batch 2: Stories y vistas...");
                 var storyVistas = _context.StoryVistas.Where(sv => sv.UsuarioId == usuario.Id);
                 _context.StoryVistas.RemoveRange(storyVistas);
                 var vistasEnMisStories = _context.StoryVistas.Where(sv => sv.Story.CreadorId == usuario.Id);
@@ -943,10 +933,8 @@ namespace Lado.Controllers
                 var stories = _context.Stories.Where(s => s.CreadorId == usuario.Id);
                 _context.Stories.RemoveRange(stories);
                 await _context.SaveChangesAsync();
-                Console.WriteLine("[EliminarCuenta] Batch 2 completado");
 
                 // Batch 3: Reacciones y colecciones
-                Console.WriteLine("[EliminarCuenta] Batch 3: Reacciones y colecciones...");
                 var reacciones = _context.Reacciones.Where(r => r.UsuarioId == usuario.Id);
                 _context.Reacciones.RemoveRange(reacciones);
                 var reaccionesEnMiContenido = _context.Reacciones.Where(r => r.Contenido.UsuarioId == usuario.Id);
@@ -957,10 +945,8 @@ namespace Lado.Controllers
                 var colecciones = _context.Colecciones.Where(c => c.CreadorId == usuario.Id);
                 _context.Colecciones.RemoveRange(colecciones);
                 await _context.SaveChangesAsync();
-                Console.WriteLine("[EliminarCuenta] Batch 3 completado");
 
                 // Batch 4: Tips y desafios
-                Console.WriteLine("[EliminarCuenta] Batch 4: Tips y desafios...");
                 var tips = _context.Tips.Where(t => t.FanId == usuario.Id || t.CreadorId == usuario.Id);
                 _context.Tips.RemoveRange(tips);
                 var desafios = _context.Desafios.Where(d => d.FanId == usuario.Id);
@@ -968,10 +954,8 @@ namespace Lado.Controllers
                 var propuestasDesafios = _context.PropuestasDesafios.Where(p => p.CreadorId == usuario.Id);
                 _context.PropuestasDesafios.RemoveRange(propuestasDesafios);
                 await _context.SaveChangesAsync();
-                Console.WriteLine("[EliminarCuenta] Batch 4 completado");
 
                 // Batch 5: Suscripciones y mensajes
-                Console.WriteLine("[EliminarCuenta] Batch 5: Suscripciones y mensajes...");
                 var suscripcionesFan = _context.Suscripciones.Where(s => s.FanId == usuario.Id);
                 _context.Suscripciones.RemoveRange(suscripcionesFan);
                 var suscripcionesCreador = _context.Suscripciones.Where(s => s.CreadorId == usuario.Id);
@@ -983,10 +967,8 @@ namespace Lado.Controllers
                     .Where(m => m.RemitenteId == usuario.Id || m.DestinatarioId == usuario.Id);
                 _context.ChatMensajes.RemoveRange(chatMensajes);
                 await _context.SaveChangesAsync();
-                Console.WriteLine("[EliminarCuenta] Batch 5 completado");
 
                 // Batch 6: Transacciones, reportes, bloqueos
-                Console.WriteLine("[EliminarCuenta] Batch 6: Transacciones, reportes, bloqueos...");
                 var transacciones = _context.Transacciones.Where(t => t.UsuarioId == usuario.Id);
                 _context.Transacciones.RemoveRange(transacciones);
                 var reportes = _context.Reportes
@@ -996,10 +978,8 @@ namespace Lado.Controllers
                     .Where(b => b.BloqueadorId == usuario.Id || b.BloqueadoId == usuario.Id);
                 _context.BloqueosUsuarios.RemoveRange(bloqueos);
                 await _context.SaveChangesAsync();
-                Console.WriteLine("[EliminarCuenta] Batch 6 completado");
 
                 // Batch 7: Intereses, preferencias, favoritos, interacciones
-                Console.WriteLine("[EliminarCuenta] Batch 7: Intereses, preferencias, favoritos...");
                 var intereses = _context.InteresesUsuarios.Where(i => i.UsuarioId == usuario.Id);
                 _context.InteresesUsuarios.RemoveRange(intereses);
                 var preferencias = _context.PreferenciasAlgoritmoUsuario.Where(p => p.UsuarioId == usuario.Id);
@@ -1011,10 +991,8 @@ namespace Lado.Controllers
                 var interaccionesEnMiContenido = _context.InteraccionesContenidos.Where(i => i.Contenido.UsuarioId == usuario.Id);
                 _context.InteraccionesContenidos.RemoveRange(interaccionesEnMiContenido);
                 await _context.SaveChangesAsync();
-                Console.WriteLine("[EliminarCuenta] Batch 7 completado");
 
                 // Batch 8: Compras, tokens
-                Console.WriteLine("[EliminarCuenta] Batch 8: Compras, tokens...");
                 var comprasContenido = _context.ComprasContenido.Where(c => c.UsuarioId == usuario.Id);
                 _context.ComprasContenido.RemoveRange(comprasContenido);
                 var comprasColeccion = _context.ComprasColeccion.Where(c => c.CompradorId == usuario.Id);
@@ -1024,19 +1002,15 @@ namespace Lado.Controllers
                 var activeTokens = _context.ActiveTokens.Where(a => a.UserId == usuario.Id);
                 _context.ActiveTokens.RemoveRange(activeTokens);
                 await _context.SaveChangesAsync();
-                Console.WriteLine("[EliminarCuenta] Batch 8 completado");
 
                 // Batch 8.5: Impresiones y clics de anuncios
-                Console.WriteLine("[EliminarCuenta] Batch 8.5: Impresiones y clics de anuncios...");
                 var impresionesAnuncios = _context.ImpresionesAnuncios.Where(i => i.UsuarioId == usuario.Id);
                 _context.ImpresionesAnuncios.RemoveRange(impresionesAnuncios);
                 var clicsAnuncios = _context.ClicsAnuncios.Where(c => c.UsuarioId == usuario.Id);
                 _context.ClicsAnuncios.RemoveRange(clicsAnuncios);
                 await _context.SaveChangesAsync();
-                Console.WriteLine("[EliminarCuenta] Batch 8.5 completado");
 
                 // Batch 8.6: Agencia y anuncios
-                Console.WriteLine("[EliminarCuenta] Batch 8.6: Agencia y anuncios...");
                 var agencia = _context.Agencias.FirstOrDefault(a => a.UsuarioId == usuario.Id);
                 if (agencia != null)
                 {
@@ -1055,10 +1029,8 @@ namespace Lado.Controllers
                     _context.Agencias.Remove(agencia);
                 }
                 await _context.SaveChangesAsync();
-                Console.WriteLine("[EliminarCuenta] Batch 8.6 completado");
 
                 // Batch 9: Contenidos del usuario
-                Console.WriteLine("[EliminarCuenta] Batch 9: Contenidos del usuario...");
                 var contenidos = _context.Contenidos.Where(c => c.UsuarioId == usuario.Id).ToList();
                 foreach (var contenido in contenidos)
                 {
@@ -1068,10 +1040,8 @@ namespace Lado.Controllers
                         EliminarArchivoFisico(contenido.Thumbnail);
                 }
                 _context.Contenidos.RemoveRange(contenidos);
-                Console.WriteLine($"[EliminarCuenta] {contenidos.Count} contenidos marcados para eliminar");
 
                 // Batch 10: Archivos físicos del perfil
-                Console.WriteLine("[EliminarCuenta] Batch 10: Archivos físicos del perfil...");
                 if (!string.IsNullOrEmpty(usuario.FotoPerfil))
                 {
                     EliminarArchivoFisico(usuario.FotoPerfil);
@@ -1086,36 +1056,28 @@ namespace Lado.Controllers
                 }
 
                 // 23. Guardar todos los cambios
-                Console.WriteLine($"[EliminarCuenta] Guardando cambios en base de datos...");
                 await _context.SaveChangesAsync();
-                Console.WriteLine($"[EliminarCuenta] Cambios guardados exitosamente");
 
                 // 24. Eliminar usuario de Identity
-                Console.WriteLine($"[EliminarCuenta] Eliminando usuario de Identity...");
                 var result = await _userManager.DeleteAsync(usuario);
 
                 if (result.Succeeded)
                 {
-                    Console.WriteLine($"[EliminarCuenta] Usuario eliminado de Identity exitosamente");
-
-                    // Confirmar la transacción
+                    // Confirmar la transaccion
                     await transaction.CommitAsync();
-                    Console.WriteLine($"[EliminarCuenta] Transacción confirmada");
 
-                    // Cerrar sesión
+                    // Cerrar sesion
                     await _signInManager.SignOutAsync();
-                    Console.WriteLine($"[EliminarCuenta] Sesión cerrada. Cuenta {userName} eliminada completamente.");
 
                     TempData["Success"] = "Tu cuenta ha sido eliminada permanentemente";
                     return RedirectToAction("Index", "Home");
                 }
                 else
                 {
-                    // Revertir la transacción si falla
+                    // Revertir la transaccion si falla
                     await transaction.RollbackAsync();
 
                     var errores = string.Join(", ", result.Errors.Select(e => e.Description));
-                    Console.WriteLine($"[EliminarCuenta] ERROR Identity: {errores}");
 
                     TempData["Error"] = "Error al eliminar la cuenta: " + errores;
                     return RedirectToAction(nameof(Configuracion));
@@ -1124,8 +1086,6 @@ namespace Lado.Controllers
             catch (Exception ex)
             {
                 var errorMsg = ex.Message + (ex.InnerException != null ? " - " + ex.InnerException.Message : "");
-                Console.WriteLine($"[EliminarCuenta] EXCEPCIÓN: {errorMsg}");
-                Console.WriteLine($"[EliminarCuenta] StackTrace: {ex.StackTrace}");
 
                 TempData["Error"] = "Error al eliminar la cuenta: " + errorMsg;
                 return RedirectToAction(nameof(Configuracion));
@@ -1399,6 +1359,10 @@ namespace Lado.Controllers
         [HttpGet]
         public async Task<IActionResult> ObtenerNotificaciones(int pagina = 1, int cantidad = 20)
         {
+            // Limitar cantidad para prevenir DoS
+            cantidad = Math.Clamp(cantidad, 1, 50);
+            pagina = Math.Max(1, pagina);
+
             try
             {
                 var usuario = await _userManager.GetUserAsync(User);

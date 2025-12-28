@@ -41,6 +41,10 @@ namespace Lado.Controllers.Api
             [FromQuery] int pageSize = 20,
             [FromQuery] string lado = "A") // A = publico, B = premium
         {
+            // Limitar paginación para prevenir DoS
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 1, 50);
+
             try
             {
                 var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -106,6 +110,10 @@ namespace Lado.Controllers.Api
             [FromQuery] int pageSize = 20,
             [FromQuery] string? categoria = null)
         {
+            // Limitar paginación para prevenir DoS
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 1, 50);
+
             try
             {
                 var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -282,6 +290,10 @@ namespace Lado.Controllers.Api
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20)
         {
+            // Limitar paginación para prevenir DoS
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 1, 50);
+
             try
             {
                 var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);

@@ -299,9 +299,7 @@
             // Inicializar IndexedDB para cola offline
             try {
                 await this.openDB();
-                console.log('[Offline] IndexedDB inicializado');
             } catch (error) {
-                console.warn('[Offline] IndexedDB no disponible:', error);
             }
         },
 
@@ -351,7 +349,6 @@
                     request.onerror = () => reject(request.error);
                 });
             } catch (error) {
-                console.error('[Offline] Error agregando a cola:', error);
             }
         }
     };
@@ -368,7 +365,6 @@
                 const longTaskObserver = new PerformanceObserver((list) => {
                     for (const entry of list.getEntries()) {
                         if (entry.duration > 100) {
-                            console.warn('[Performance] Long task detectado:', entry.duration.toFixed(2) + 'ms');
                         }
                     }
                 });
@@ -382,7 +378,6 @@
                 const lcpObserver = new PerformanceObserver((list) => {
                     const entries = list.getEntries();
                     const lastEntry = entries[entries.length - 1];
-                    console.log('[Performance] LCP:', lastEntry.startTime.toFixed(2) + 'ms');
                 });
                 lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
             } catch (e) {
@@ -480,8 +475,6 @@
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
             PerformanceMonitor.init();
         }
-
-        console.log('[Lado Mobile] Mejoras avanzadas inicializadas');
     }
 
     // Exportar para uso global

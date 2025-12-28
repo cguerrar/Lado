@@ -289,6 +289,16 @@ builder.Services.AddScoped<Lado.Services.IExifService, Lado.Services.ExifService
 builder.Services.AddSignalR();
 
 // ========================================
+// CONFIGURACIÓN HSTS MEJORADA (Seguridad)
+// ========================================
+builder.Services.AddHsts(options =>
+{
+    options.MaxAge = TimeSpan.FromDays(365);
+    options.IncludeSubDomains = true;
+    options.Preload = true;
+});
+
+// ========================================
 // CONFIGURACIÓN DE LOCALIZACIÓN (i18n)
 // ========================================
 builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -432,6 +442,16 @@ app.Use(async (context, next) =>
         context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
         context.Response.Headers.Pragma = "no-cache";
     }
+    // Páginas sensibles: sin cache (seguridad)
+    else if (path.Contains("/billetera") || path.Contains("/usuario") ||
+             path.Contains("/configuracion") || path.Contains("/dashboard") ||
+             path.Contains("/mensajes") || path.Contains("/admin") ||
+             path.Contains("/account") || path.Contains("/perfil"))
+    {
+        context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate, private";
+        context.Response.Headers.Pragma = "no-cache";
+        context.Response.Headers.Append("Expires", "0");
+    }
 
     await next();
 });
@@ -449,13 +469,11 @@ app.MapRazorPages();
 app.MapHub<ChatHub>("/chatHub");
 
 // ========================================
-// ✅ INICIALIZACIÓN MEJORADA DEL SISTEMA
+// INICIALIZACION MEJORADA DEL SISTEMA
 // ========================================
-try
+using (var scope = app.Services.CreateScope())
 {
-    using (var scope = app.Services.CreateScope())
-    {
-        var services = scope.ServiceProvider;
+    var services = scope.ServiceProvider;
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
         var logger = services.GetRequiredService<ILogger<Program>>();
@@ -764,40 +782,10 @@ try
         logger.LogInformation("========================================");
         logger.LogInformation("📊 RESUMEN DE INICIALIZACIÓN:");
         logger.LogInformation("   Roles: ✅ Configurados");
-        logger.LogInformation("   Admin: ✅ Configurado");
-        logger.LogInformation("   Carpetas: ✅ Verificadas");
-        logger.LogInformation("   Archivos estáticos: ✅ UseStaticFiles configurado");
+        logger.LogInformation("   Admin: Configurado");
+        logger.LogInformation("   Carpetas: Verificadas");
+        logger.LogInformation("   Archivos estaticos: UseStaticFiles configurado");
         logger.LogInformation("========================================");
-    }
 }
-catch (Exception ex)
-{
-    // Capturar y mostrar errores detallados
-    Console.WriteLine("========================================");
-    Console.WriteLine("❌❌❌ ERROR CRÍTICO EN INICIALIZACIÓN ❌❌❌");
-    Console.WriteLine("========================================");
-    Console.WriteLine($"Mensaje: {ex.Message}");
-    Console.WriteLine($"Tipo: {ex.GetType().Name}");
-    Console.WriteLine($"StackTrace: {ex.StackTrace}");
-
-    if (ex.InnerException != null)
-    {
-        Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
-        Console.WriteLine($"Inner StackTrace: {ex.InnerException.StackTrace}");
-    }
-
-    Console.WriteLine("========================================");
-    Console.WriteLine("⚠️  LA APLICACIÓN INTENTARÁ CONTINUAR");
-    Console.WriteLine("⚠️  PERO PUEDE HABER FUNCIONALIDADES LIMITADAS");
-    Console.WriteLine("========================================");
-}
-
-Console.WriteLine("========================================");
-Console.WriteLine("🚀 Lado iniciado correctamente");
-Console.WriteLine("📍 URL: https://localhost:7162");
-Console.WriteLine("🧪 Prueba: https://localhost:7162/uploads/test.txt");
-Console.WriteLine("⚠️  Si hay errores de permisos, ejecuta:");
-Console.WriteLine("   icacls \"C:\\tu\\ruta\\wwwroot\\uploads\" /grant IIS_IUSRS:(OI)(CI)F");
-Console.WriteLine("========================================");
 
 app.Run();

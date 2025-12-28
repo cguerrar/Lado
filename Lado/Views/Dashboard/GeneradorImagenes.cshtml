@@ -1431,12 +1431,13 @@
 
     <script>
         // ========== CONFIGURACION ==========
+        // Usando JSON.parse para prevenir XSS
         const CREATOR_CONFIG = {
-            seudonimo: '@Html.Raw(ViewBag.Seudonimo)',
-            fotoPerfil: '@Html.Raw(ViewBag.FotoPerfil)',
-            linkPerfil: '@Html.Raw(ViewBag.LinkPerfil)',
+            seudonimo: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.Seudonimo ?? "")),
+            fotoPerfil: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.FotoPerfil ?? "")),
+            linkPerfil: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.LinkPerfil ?? "")),
             precio: @(ViewBag.Precio ?? 0),
-            baseUrl: '@Html.Raw(ViewBag.BaseUrl)'
+            baseUrl: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.BaseUrl ?? ""))
         };
 
         const FORMATS = {
@@ -4292,7 +4293,6 @@
                 // Cargar SVG usando fabric
                 fabric.loadSVGFromString(svgString, function(objects, options) {
                     if (!objects || objects.length === 0) {
-                        console.error('No se pudo cargar el SVG');
                         self.addSocialIconFallback(icon, f, iconSize);
                         return;
                     }
@@ -4348,7 +4348,6 @@
                     self.canvas.setActiveObject(group);
                     self.canvas.renderAll();
                     self.saveHistory();
-                    console.log('Icono social agregado:', icon.name);
                 });
             }
 
@@ -4461,7 +4460,6 @@
             }
 
             addShape(shape) {
-                console.log('addShape llamado:', shape);
                 const f = FORMATS[this.currentFormat];
                 let obj;
 
@@ -4563,7 +4561,6 @@
                     this.canvas.setActiveObject(obj);
                     this.canvas.renderAll();
                     this.saveHistory();
-                    console.log('Forma agregada:', shape);
                 }
             }
 
@@ -4571,9 +4568,7 @@
                 const self = this;
                 const f = FORMATS[this.currentFormat];
 
-                // Verificar que la libreria qrcode-generator este cargada
                 if (typeof qrcode === 'undefined') {
-                    console.error('qrcode-generator library no cargada');
                     this.showToast('Error: libreria QR no disponible. Recarga la pagina.', 'error');
                     return;
                 }
@@ -4586,8 +4581,6 @@
                     if (!linkPerfil || linkPerfil === '' || linkPerfil === 'undefined') {
                         linkPerfil = CREATOR_CONFIG.baseUrl + '/Feed/Creador/' + CREATOR_CONFIG.seudonimo;
                     }
-
-                    console.log('Generando QR para:', linkPerfil);
 
                     if (!linkPerfil || linkPerfil.includes('undefined') || linkPerfil === '') {
                         this.showToast('No se pudo generar el QR: configura tu seudonimo primero', 'error');
@@ -4625,12 +4618,9 @@
                     }
 
                     const qrDataUrl = qrCanvas.toDataURL('image/png');
-                    console.log('QR generado correctamente');
 
-                    // Crear imagen Fabric
                     fabric.Image.fromURL(qrDataUrl, function(img) {
                         if (!img) {
-                            console.error('No se pudo crear la imagen del QR');
                             self.showToast('Error al crear imagen QR', 'error');
                             return;
                         }
@@ -4668,11 +4658,9 @@
                         self.canvas.renderAll();
                         self.saveHistory();
                         self.showToast('QR agregado correctamente', 'success');
-                        console.log('QR agregado exitosamente');
                     }, { crossOrigin: 'anonymous' });
 
                 } catch (err) {
-                    console.error('Error generando QR:', err);
                     this.showToast('Error al generar QR: ' + (err.message || 'desconocido'), 'error');
                 }
             }
@@ -5208,7 +5196,6 @@
                     this.showToast('Borrador guardado', 'success');
                 } catch (e) {
                     this.showToast('Error al guardar borrador', 'error');
-                    console.error(e);
                 }
             }
 
@@ -5308,7 +5295,6 @@
                         throw new Error('Error del servidor');
                     }
                 } catch (e) {
-                    console.error(e);
                     this.showToast('Error al publicar. Intenta de nuevo.', 'error');
                     btn.disabled = false;
                     btn.innerHTML = originalText;

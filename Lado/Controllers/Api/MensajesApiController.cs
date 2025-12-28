@@ -109,6 +109,10 @@ namespace Lado.Controllers.Api
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 50)
         {
+            // Limitar paginación para prevenir DoS
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 1, 100);
+
             try
             {
                 var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);

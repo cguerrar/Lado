@@ -1232,6 +1232,10 @@ namespace Lado.Controllers
         [HttpGet]
         public async Task<IActionResult> CargarMasPosts(int pagina = 0, int cantidad = 10)
         {
+            // Limitar cantidad para prevenir DoS
+            cantidad = Math.Clamp(cantidad, 1, 50);
+            pagina = Math.Max(0, pagina);
+
             try
             {
                 var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);

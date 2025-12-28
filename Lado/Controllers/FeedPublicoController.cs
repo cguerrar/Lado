@@ -407,8 +407,22 @@ namespace Lado.Controllers
                 // Registrar el clic
                 await _adService.RegistrarClic(id, usuarioId, ipAddress);
 
-                // Redirigir al destino
-                return Redirect(anuncio.UrlDestino);
+                // Validar URL antes de redirigir (prevenir Open Redirect)
+                if (!Uri.TryCreate(anuncio.UrlDestino, UriKind.Absolute, out var uri))
+                {
+                    _logger.LogWarning("URL de anuncio inválida: {Url}", anuncio.UrlDestino);
+                    return RedirectToAction("Index");
+                }
+
+                // Solo permitir HTTP/HTTPS
+                if (uri.Scheme != "http" && uri.Scheme != "https")
+                {
+                    _logger.LogWarning("Esquema de URL no permitido: {Scheme}", uri.Scheme);
+                    return RedirectToAction("Index");
+                }
+
+                // Redirigir al destino validado
+                return Redirect(uri.ToString());
             }
             catch (Exception ex)
             {

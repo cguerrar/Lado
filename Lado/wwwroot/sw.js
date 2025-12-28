@@ -29,23 +29,18 @@ const IMAGE_CACHE_MAX_ITEMS = 100;
 
 // Instalar - Pre-cachear recursos esenciales
 self.addEventListener('install', (event) => {
-    console.log('[SW] Instalando Service Worker...');
-
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
-                console.log('[SW] Pre-cacheando recursos...');
                 // Usar addAll con manejo de errores individual
                 return Promise.allSettled(
                     PRECACHE_ASSETS.map(url =>
                         cache.add(url).catch(err => {
-                            console.warn(`[SW] No se pudo cachear: ${url}`, err);
                         })
                     )
                 );
             })
             .then(() => {
-                console.log('[SW] Instalacion completada');
                 // Activar inmediatamente sin esperar
                 return self.skipWaiting();
             })
@@ -54,8 +49,6 @@ self.addEventListener('install', (event) => {
 
 // Activar - Limpiar caches antiguos
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activando Service Worker...');
-
     const VALID_CACHES = [CACHE_NAME, DYNAMIC_CACHE, IMAGE_CACHE];
 
     event.waitUntil(
@@ -65,13 +58,11 @@ self.addEventListener('activate', (event) => {
                     cacheNames
                         .filter((name) => !VALID_CACHES.includes(name))
                         .map((name) => {
-                            console.log(`[SW] Eliminando cache antiguo: ${name}`);
                             return caches.delete(name);
                         })
                 );
             })
             .then(() => {
-                console.log('[SW] Activacion completada');
                 // Tomar control de todas las paginas inmediatamente
                 return self.clients.claim();
             })
@@ -165,7 +156,6 @@ async function cacheFirst(request) {
         }
         return networkResponse;
     } catch (error) {
-        console.warn('[SW] Cache First fallo:', error);
         // Intentar devolver algo del cache
         const cachedResponse = await caches.match(request);
         if (cachedResponse) {
@@ -190,8 +180,6 @@ async function networkFirst(request) {
         }
         return networkResponse;
     } catch (error) {
-        console.warn('[SW] Network First fallo, buscando en cache:', error);
-
         // Intentar obtener del cache
         const cachedResponse = await caches.match(request);
         if (cachedResponse) {
@@ -233,7 +221,6 @@ self.addEventListener('message', (event) => {
 
     if (event.data && event.data.type === 'CLEAR_CACHE') {
         caches.delete(CACHE_NAME).then(() => {
-            console.log('[SW] Cache limpiado');
         });
     }
 });
@@ -259,7 +246,6 @@ self.addEventListener('push', (event) => {
             self.registration.showNotification(data.title || 'LADO', options)
         );
     } catch (error) {
-        console.error('[SW] Error procesando push:', error);
     }
 });
 
@@ -300,8 +286,6 @@ self.addEventListener('notificationclick', (event) => {
 // BACKGROUND SYNC - Para acciones offline
 // ========================================
 self.addEventListener('sync', (event) => {
-    console.log('[SW] Background Sync:', event.tag);
-
     if (event.tag === 'sync-likes') {
         event.waitUntil(syncLikes());
     } else if (event.tag === 'sync-comments') {
@@ -332,11 +316,9 @@ async function syncLikes() {
                     await db.delete('pending-likes', like.id);
                 }
             } catch (error) {
-                console.warn('[SW] Error sincronizando like:', error);
             }
         }
     } catch (error) {
-        console.warn('[SW] Error en syncLikes:', error);
     }
 }
 
@@ -372,11 +354,9 @@ async function syncComments() {
                     });
                 }
             } catch (error) {
-                console.warn('[SW] Error sincronizando comentario:', error);
             }
         }
     } catch (error) {
-        console.warn('[SW] Error en syncComments:', error);
     }
 }
 
@@ -401,11 +381,9 @@ async function syncFollows() {
                     await db.delete('pending-follows', follow.id);
                 }
             } catch (error) {
-                console.warn('[SW] Error sincronizando follow:', error);
             }
         }
     } catch (error) {
-        console.warn('[SW] Error en syncFollows:', error);
     }
 }
 
@@ -473,7 +451,6 @@ async function checkNewNotifications() {
             }
         }
     } catch (error) {
-        console.warn('[SW] Error checking notifications:', error);
     }
 }
 
@@ -491,6 +468,5 @@ async function cleanupCaches() {
         for (const request of toDelete) {
             await imageCache.delete(request);
         }
-        console.log(`[SW] Limpiadas ${toDelete.length} imágenes del cache`);
     }
 }

@@ -43,14 +43,6 @@
     // Detectar modo de bajo consumo o datos (heurística)
     const isLowPowerMode = navigator.getBattery ? null : undefined;
 
-    // Log de diagnóstico
-    console.log('[iOS Media v5]', {
-        device: isIPhone ? 'iPhone' : isIPad ? 'iPad' : isIPod ? 'iPod' : 'Unknown',
-        iOS: isIOS,
-        version: iosVersion.full,
-        browser: isSafari ? 'Safari' : isChrome ? 'Chrome' : isFirefox ? 'Firefox' : 'Other'
-    });
-
     // ========================================
     // ESTADO GLOBAL
     // ========================================
@@ -66,7 +58,6 @@
     // LOGGING
     // ========================================
     function log(...args) {
-        console.log('[iOS]', ...args);
         if (window.iOSDebug) window.iOSDebug(args.join(' '));
     }
 

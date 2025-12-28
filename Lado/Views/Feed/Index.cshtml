@@ -7676,7 +7676,6 @@
                 }
             }
         } catch (error) {
-            console.error('Error al procesar like:', error);
         }
     }
 
@@ -7776,8 +7775,6 @@
                         initCarousels();
                     }
 
-                    // Mostrar notificación breve
-                    console.log(`${newCount} nuevos posts cargados`);
                 }
             }
 
@@ -7785,7 +7782,6 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
         } catch (error) {
-            console.error('Error al refrescar:', error);
         } finally {
             pullIndicator.classList.remove('refreshing', 'visible');
             pullIndicator.style.transform = 'translateX(-50%) translateY(-100%)';
@@ -7878,12 +7874,10 @@
             }
 
         } catch (error) {
-            console.error('Error cargando más posts:', error);
             loadRetryCount++;
 
             // Reintentar automáticamente hasta MAX_RETRIES
             if (loadRetryCount < MAX_RETRIES && !isRetry) {
-                console.log(`Reintentando... (${loadRetryCount}/${MAX_RETRIES})`);
                 isLoadingMore = false;
                 setTimeout(() => loadMorePosts(true), 2000);
                 return;
@@ -8223,8 +8217,6 @@
     // Safari detection
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-    console.log('[Video] iOS:', isIOSDevice, 'Safari:', isSafari);
-
     // Videos pausados manualmente por el usuario (no autoplay)
     const manuallyPausedVideos = new Set();
 
@@ -8305,7 +8297,6 @@
             postMedia.classList.add('video-playing');
             return true;
         } catch (err) {
-            console.log('[Video] Autoplay bloqueado:', err.name);
             postMedia.classList.remove('video-playing');
             postMedia.classList.add('video-paused');
             return false;
@@ -8349,7 +8340,6 @@
             video.play().then(() => {
                 updateVideoState(video, true);
             }).catch((err) => {
-                console.log('[Video] Play error:', err);
                 updateVideoState(video, false);
             });
         } else {
@@ -8441,7 +8431,6 @@
 
             // Eventos de estado
             video.addEventListener('playing', () => {
-                console.log('[Video] playing event');
                 updateVideoState(video, true);
                 const postMedia = video.closest('.post-media');
                 if (postMedia) {
@@ -8450,7 +8439,6 @@
                 }
             });
             video.addEventListener('pause', () => {
-                console.log('[Video] pause event');
                 updateVideoState(video, false);
             });
             video.addEventListener('waiting', () => {
@@ -8481,7 +8469,6 @@
 
             // Manejar errores de carga - remover spinner y mostrar estado de error
             video.addEventListener('error', () => {
-                console.log('[Video] Error cargando video');
                 const postMedia = video.closest('.post-media');
                 if (postMedia) {
                     postMedia.classList.remove('video-loading');
@@ -8490,7 +8477,6 @@
                     // Handler para reintentar con click/tap
                     const retryHandler = () => {
                         if (postMedia.classList.contains('video-error')) {
-                            console.log('[Video] Reintentando por tap...');
                             postMedia.classList.remove('video-error');
                             postMedia.classList.add('video-loading');
                             video.load();
@@ -8503,7 +8489,6 @@
                     // También reintentar automáticamente después de 5 segundos
                     setTimeout(() => {
                         if (postMedia.classList.contains('video-error')) {
-                            console.log('[Video] Reintentando automáticamente...');
                             postMedia.classList.remove('video-error');
                             video.load();
                         }
@@ -8525,7 +8510,6 @@
             // 🍎 iOS: Manejar el evento stalled para recuperar videos que se quedan cargando
             video.addEventListener('stalled', () => {
                 if (isIOSDevice && !video.paused) {
-                    console.log('[Video] Stalled - recuperando...');
                     setTimeout(() => {
                         if (!video.paused && video.readyState < 3) {
                             video.load();
@@ -8622,12 +8606,7 @@
                 line.textContent = new Date().toLocaleTimeString().substr(0,8) + ' ' + msg;
                 debugPanel.appendChild(line);
                 debugPanel.scrollTop = debugPanel.scrollHeight;
-                console.log('[iOS Debug]', msg);
             };
-
-            // Log inicial
-            window.iOSDebug('iOS detectado');
-            window.iOSDebug('iOSMediaFix: ' + (window.iOSMediaFix ? 'OK' : 'NO'));
         }
 
         // 🍎 iOS: Forzar reproducción del primer video visible después de cualquier interacción
@@ -8679,20 +8658,12 @@
     const photoMusicObserver = new IntersectionObserver((entries) => {
         // NO reproducir audio del feed si el fullscreen está activo
         if (isFullscreenActive) {
-            console.log('[PhotoMusic] Fullscreen activo, ignorando');
             return;
         }
 
         entries.forEach(entry => {
             const postMedia = entry.target;
             const audio = postMedia.querySelector('.photo-audio-player');
-
-            console.log('[PhotoMusic] Entry:', {
-                isIntersecting: entry.isIntersecting,
-                ratio: entry.intersectionRatio,
-                hasAudio: !!audio,
-                audioSrc: audio?.src
-            });
 
             if (!audio) return;
 
@@ -8701,7 +8672,6 @@
                 if (isFullscreenActive) return;
 
                 // Si el audio global está muteado, no reproducir música de fotos
-                console.log('[PhotoMusic] isGlobalMuted:', isGlobalMuted);
                 if (isGlobalMuted) {
                     // Pausar si estaba sonando
                     if (currentPhotoAudio === audio) {
@@ -8744,7 +8714,6 @@
                             badge.classList.add('needs-tap');
                             badge.title = 'Toca para reproducir música';
                         }
-                        console.log('[iOS] Audio requiere interacción del usuario');
                         currentPhotoAudio = audio;
                     } else {
                         // iOS desbloqueado o no es iOS - reproducir
@@ -8758,8 +8727,6 @@
                     }
                 } else {
                     // Fallback: sin iOSMediaFix (non-iOS)
-                    console.log('[PhotoMusic] Reproduciendo audio (non-iOS):', audio.src, 'startTime:', startTime, 'volume:', volume);
-
                     if (currentPhotoAudio && currentPhotoAudio !== audio) {
                         currentPhotoAudio.pause();
                     }
@@ -8768,11 +8735,9 @@
                     audio.volume = volume;
 
                     audio.play().then(() => {
-                        console.log('[PhotoMusic] ✓ Audio reproduciéndose');
                         if (badge) badge.classList.add('playing');
                         currentPhotoAudio = audio;
                     }).catch((err) => {
-                        console.log('[PhotoMusic] ✗ Autoplay bloqueado:', err.message);
                         if (badge) badge.classList.add('needs-tap');
                         currentPhotoAudio = audio;
                     });
@@ -8802,12 +8767,10 @@
     // Función para observar nuevos posts con música (llamada desde loadMorePosts)
     function initPhotoMusicObserversForNewPosts() {
         const mediaElements = document.querySelectorAll('.post-media:not([data-music-observed])');
-        console.log('[PhotoMusic] Buscando posts con música, encontrados:', mediaElements.length);
 
         mediaElements.forEach(media => {
             const audioPlayer = media.querySelector('.photo-audio-player');
             if (audioPlayer) {
-                console.log('[PhotoMusic] Observando post con audio:', audioPlayer.src);
                 media.setAttribute('data-music-observed', 'true');
                 photoMusicObserver.observe(media);
 
@@ -8816,22 +8779,17 @@
                     audioPlayer.setAttribute('data-loop-configured', 'true');
                     audioPlayer.removeAttribute('loop'); // Quitar loop nativo
 
-                    const startTimeValue = parseFloat(audioPlayer.dataset.start) || 0;
-                    console.log('[PhotoMusic] Configurando audio - PostID:', audioPlayer.dataset.postId, 'StartTime:', startTimeValue);
-
                     // Establecer tiempo inicial al cargar
                     audioPlayer.addEventListener('loadedmetadata', function() {
                         const st = parseFloat(this.dataset.start) || 0;
                         if (st > 0 && this.currentTime < st) {
                             this.currentTime = st;
-                            console.log('[PhotoMusic] loadedmetadata - Tiempo inicial establecido a:', st);
                         }
                     });
 
                     // Cuando el audio termina, reiniciar desde startTime
                     audioPlayer.addEventListener('ended', function() {
                         const startTime = parseFloat(this.dataset.start) || 0;
-                        console.log('[PhotoMusic] Audio terminó, reiniciando desde:', startTime);
                         this.currentTime = startTime;
                         this.play().catch(() => {});
                     });
@@ -8841,7 +8799,6 @@
                         const startTime = parseFloat(this.dataset.start) || 0;
                         // Si el audio está antes del startTime y está reproduciéndose, corregir
                         if (startTime > 0 && this.currentTime < startTime && this.currentTime < 1 && !this.paused) {
-                            console.log('[PhotoMusic] Corrigiendo tiempo de', this.currentTime, 'a', startTime);
                             this.currentTime = startTime;
                         }
                     });
@@ -8857,8 +8814,6 @@
 
     // 🍎 iOS: Evento cuando el media se desbloquea (disparado por iOSMediaFix)
     document.addEventListener('iOSMediaUnlocked', () => {
-        console.log('[iOS Feed] Media desbloqueado - reproduciendo contenido visible');
-
         // Remover indicadores de needs-tap
         document.querySelectorAll('.needs-tap').forEach(el => {
             el.classList.remove('needs-tap');
@@ -8897,7 +8852,6 @@
             mediaUnlockHandled = true;
 
             window.iOSMediaFix.resume().then(() => {
-                console.log('[iOS] Media desbloqueado por interacción');
             });
         }, { once: true, passive: true });
     }
@@ -8951,7 +8905,6 @@
                     badge.classList.add('playing');
                     currentPhotoAudio = audio;
                 }).catch(err => {
-                    console.log('Error al reproducir:', err);
                 });
             }
         } else {
@@ -8990,7 +8943,6 @@
                     document.getElementById(`likes-${postId}`).textContent = `${data.likes} Me gusta`;
                 }
             } catch (err) {
-                console.error('Error:', err);
             } finally {
                 // Liberar después de 500ms para evitar spam
                 setTimeout(() => likeInProgress.delete(postId), 500);
@@ -9017,7 +8969,6 @@
                     this.title = data.esFavorito ? 'Quitar de favoritos' : 'Guardar en favoritos';
                 }
             } catch (err) {
-                console.error('Error:', err);
             }
         });
     });
@@ -9082,7 +9033,6 @@
                     showToast(data.message || 'Error al comentar');
                 }
             } catch (err) {
-                console.error('Error:', err);
                 showToast('Error al publicar comentario');
             }
 
@@ -9119,13 +9069,11 @@
     // Función global para abrir modal de compartir
     async function abrirModalCompartir(postId) {
         if (!postId) {
-            console.error('abrirModalCompartir: postId es undefined');
             return;
         }
 
         const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
         if (!token) {
-            console.error('abrirModalCompartir: token CSRF no encontrado');
             showToast('Error de autenticación');
             return;
         }
@@ -9141,7 +9089,6 @@
             });
 
             if (!res.ok) {
-                console.error('Error HTTP:', res.status);
                 showToast('Error al compartir');
                 return;
             }
@@ -9184,11 +9131,9 @@
                 // Mostrar modal
                 document.getElementById('shareModal').classList.add('active');
             } else {
-                console.error('Compartir falló:', data.message);
                 showToast(data.message || 'Error al compartir');
             }
         } catch (err) {
-            console.error('Error en abrirModalCompartir:', err);
             showToast('Error al preparar compartir');
         }
     }
@@ -9205,7 +9150,6 @@
             shareContactsData = await res.json();
             renderizarContactosGrid(shareContactsData);
         } catch (err) {
-            console.error('Error cargando contactos:', err);
             grid.innerHTML = '<div class="share-contacts-empty">Error al cargar contactos</div>';
         }
     }
@@ -9281,7 +9225,6 @@
                 showToast('Error al enviar');
             }
         } catch (err) {
-            console.error('Error enviando:', err);
             showToast('Error al enviar');
         } finally {
             if (item) item.style.opacity = '1';
@@ -9343,7 +9286,6 @@
                 section.style.display = 'none';
             }
         } catch (err) {
-            console.error('Error cargando contactos:', err);
             section.style.display = 'none';
         }
     }
@@ -9430,10 +9372,7 @@
 
     // Compartir post como story
     async function compartirComoStory() {
-        console.log('compartirComoStory llamada, postId:', currentSharePostId);
-
         if (!currentSharePostId) {
-            console.error('currentSharePostId es null o undefined');
             showToast('Error: no se encontró el post');
             return;
         }
@@ -9443,7 +9382,6 @@
 
         try {
             const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
-            console.log('Token CSRF:', token ? 'encontrado' : 'NO encontrado');
 
             if (!token) {
                 showToast('Error de autenticación');
@@ -9454,8 +9392,6 @@
             formData.append('postId', currentSharePostId);
             formData.append('__RequestVerificationToken', token);
 
-            console.log('Enviando a /Stories/CrearDesdePost con postId:', currentSharePostId);
-
             const response = await fetch('/Stories/CrearDesdePost', {
                 method: 'POST',
                 headers: {
@@ -9464,16 +9400,12 @@
                 body: formData
             });
 
-            console.log('Response status:', response.status);
-
             if (!response.ok) {
-                console.error('Response no OK:', response.status, response.statusText);
                 showToast('Error al crear historia');
                 return;
             }
 
             const data = await response.json();
-            console.log('Response data:', data);
 
             if (data.success) {
                 showToast('¡Compartido en tu historia!');
@@ -9484,7 +9416,6 @@
                 showToast(data.message || 'Error al compartir');
             }
         } catch (error) {
-            console.error('Error al compartir como story:', error);
             showToast('Error al compartir');
         }
     }
@@ -9523,7 +9454,6 @@
             allFriends = await res.json();
             renderFriendsList(allFriends);
         } catch (err) {
-            console.error('Error:', err);
             friendsList.innerHTML = '<div class="friends-empty">Error al cargar amigos</div>';
         }
     }
@@ -9616,7 +9546,6 @@
                 showToast(data.message || 'Error al enviar');
             }
         } catch (err) {
-            console.error('Error:', err);
             showToast('Error al enviar');
         } finally {
             if (btn) btn.disabled = false;
@@ -9667,7 +9596,6 @@
                 showToast(data.message || 'Error al seguir');
             }
         } catch (err) {
-            console.error('Error:', err);
             showToast('Error al seguir usuario');
         }
     }
@@ -9899,7 +9827,6 @@
                 showToast(data.message || 'Error al procesar');
             }
         } catch (err) {
-            console.error('Error:', err);
             showToast('Error al procesar');
         }
         cerrarMenus();
@@ -9921,7 +9848,6 @@
                 showToast(data.message || 'Error al dejar de seguir');
             }
         } catch (err) {
-            console.error('Error:', err);
             showToast('Error al procesar');
         }
         cerrarMenus();
@@ -10027,7 +9953,6 @@
             document.getElementById('reportConfirmation').classList.add('show');
 
         } catch (err) {
-            console.error('Error:', err);
             showToast('Error al enviar reporte');
             closeReportModal();
         }
@@ -10096,7 +10021,6 @@
                 showToast(data.message || 'Error al bloquear usuario');
             }
         } catch (err) {
-            console.error('Error:', err);
             showToast('Error al bloquear usuario');
         }
     }
@@ -10278,7 +10202,6 @@
                 pauseIcon.style.display = 'block';
                 currentPostAudio = audio;
             }).catch(err => {
-                console.log('Error reproduciendo audio:', err);
             });
         } else {
             audio.pause();
@@ -10380,7 +10303,6 @@
             }
             return null;
         } catch (error) {
-            console.error('Error obteniendo likes:', error);
             return null;
         }
     }
@@ -11254,7 +11176,6 @@
             dmConversationsData = await response.json();
             renderDmConversations(dmConversationsData);
         } catch (error) {
-            console.error('Error:', error);
             container.innerHTML = `
                 <div class="dm-empty">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -11360,7 +11281,6 @@
                 }
             }
         } catch (error) {
-            console.log('Error updating badge');
         }
     }
 
@@ -11541,9 +11461,7 @@
             }).catch(() => {});
 
             audioUnlocked = true;
-            console.log('Audio desbloqueado para iOS');
         } catch (e) {
-            console.log('Error al desbloquear audio:', e);
         }
     }
 
@@ -11577,8 +11495,6 @@
     let currentPlayingAudioId = null; // Rastrear qué audio está reproduciéndose
 
     function pauseAllFullscreenMedia() {
-        console.log('[DEBUG] pauseAllFullscreenMedia llamado');
-
         // Pausar todos los videos del visor
         document.querySelectorAll('.fullscreen-slide video').forEach(video => {
             video.pause();
@@ -11587,11 +11503,7 @@
 
         // Pausar TODOS los audios del visor - selector más específico
         const audios = document.querySelectorAll('#fullscreenSlidesContainer audio');
-        console.log('[DEBUG] Audios encontrados para pausar:', audios.length);
         audios.forEach(audio => {
-            if (!audio.paused) {
-                console.log('[DEBUG] Pausando audio:', audio.dataset.postId);
-            }
             audio.pause();
         });
 
@@ -11703,7 +11615,6 @@
                         postData.carouselFiles = JSON.parse(media.dataset.carouselFiles);
                         postData.carouselIndex = 0;
                     } catch (e) {
-                        console.error('Error parsing carousel files:', e);
                     }
                 }
 
@@ -11781,8 +11692,6 @@
         event.preventDefault();
         event.stopPropagation();
 
-        console.log('[DEBUG] openFullscreenViewer para postId:', postId);
-
         // IMPORTANTE: Marcar fullscreen como activo para bloquear el IntersectionObserver del feed
         isFullscreenActive = true;
 
@@ -11807,7 +11716,6 @@
         if (currentFullscreenIndex === -1) {
             currentFullscreenIndex = 0;
         }
-        console.log('[DEBUG] currentFullscreenIndex:', currentFullscreenIndex);
 
         // Iniciar precarga inmediatamente
         preloadAdjacentMedia(currentFullscreenIndex);
@@ -12007,7 +11915,6 @@
                 showFullscreenToast(data.message || 'Error al procesar');
             }
         } catch (error) {
-            console.error('Error al seguir:', error);
             showFullscreenToast('Error de conexión');
         }
     }
@@ -12377,7 +12284,7 @@
                 }
             }
         })
-        .catch(err => console.error('Error al dar like:', err))
+        .catch(err => {})
         .finally(() => {
             setTimeout(() => likeInProgress.delete(postId), 500);
         });
@@ -12452,7 +12359,7 @@
                 }
             }
         })
-        .catch(err => console.error('Error al dar like desde fullscreen:', err))
+        .catch(err => {})
         .finally(() => {
             // Liberar después de 500ms para evitar spam
             setTimeout(() => likeInProgress.delete(postId), 500);
@@ -12512,7 +12419,6 @@
 
         // INMEDIATAMENTE pausar todo cuando se detecta un cambio de slide durante scroll
         if (newIndex !== lastScrollIndex) {
-            console.log('[DEBUG] onFullscreenScroll: cambio de', lastScrollIndex, 'a', newIndex);
             if (!isScrolling) {
                 isScrolling = true;
                 pauseAllFullscreenMedia();
@@ -12527,7 +12433,6 @@
 
             // Solo reproducir si cambió el índice actual
             if (newIndex !== currentFullscreenIndex) {
-                console.log('[DEBUG] onFullscreenScroll fin: actualizando a índice', newIndex);
                 currentFullscreenIndex = newIndex;
                 updateCounter();
                 updateNavButtons();
@@ -12563,19 +12468,16 @@
         // USAR data-index para buscar el slide correcto - más confiable que índices de array
         const container = document.getElementById('fullscreenSlidesContainer');
         if (!container) {
-            console.log('[DEBUG] No se encontró container');
             return;
         }
 
         const slide = container.querySelector(`.fullscreen-slide[data-index="${currentFullscreenIndex}"]`);
 
         if (!slide) {
-            console.log('[DEBUG] No se encontró slide con data-index:', currentFullscreenIndex);
             return;
         }
 
         const postId = slide.dataset.postId;
-        console.log('[DEBUG] playCurrentVideo - índice:', currentFullscreenIndex, 'postId:', postId);
 
         // Intentar desbloquear audio primero (iOS)
         unlockAudio();
@@ -12592,14 +12494,12 @@
                     updateGlobalMuteIcon(false);
                 } catch (e) {
                     // Si falla, intentar con mute
-                    console.log('Reproduciendo video con mute debido a politica de autoplay');
                     video.muted = true;
                     try {
                         await video.play();
                         // Actualizar icono del botón global (con mute)
                         updateGlobalMuteIcon(true);
                     } catch (e2) {
-                        console.log('No se pudo reproducir el video:', e2);
                     }
                 }
             };
@@ -12611,16 +12511,11 @@
         const audio = slide.querySelector('audio.fullscreen-audio-player');
         const musicBadge = slide.querySelector('.fullscreen-music-badge');
 
-        console.log('[DEBUG] Buscando audio en slide', postId, '- encontrado:', !!audio, 'badge:', !!musicBadge);
-
         if (audio && musicBadge) {
             const audioPostId = audio.dataset.postId;
-            const audioSrc = audio.src;
-            console.log('[DEBUG] Audio encontrado - postId:', audioPostId, 'src:', audioSrc);
 
             // Evitar reproducir si ya es el audio actual
             if (currentPlayingAudioId === audioPostId && !audio.paused) {
-                console.log('[DEBUG] Audio ya reproduciéndose, saltando');
                 return;
             }
 
@@ -12634,9 +12529,7 @@
                     await audio.play();
                     currentPlayingAudioId = audioPostId;
                     musicBadge.classList.add('playing');
-                    console.log('[DEBUG] Audio REPRODUCIÉNDOSE - postId:', audioPostId);
                 } catch (e) {
-                    console.log('Autoplay de audio bloqueado, esperando interaccion');
                     // Mostrar indicador de que necesita tap para reproducir
                     musicBadge.classList.add('tap-to-play');
                 }
@@ -12697,8 +12590,6 @@
 
     // Cerrar fullscreen viewer
     function closeFullscreenViewer() {
-        console.log('[DEBUG] closeFullscreenViewer llamado');
-
         // Pausar todo primero
         pauseAllFullscreenMedia();
 
@@ -12785,7 +12676,6 @@
         try {
             carouselFullscreenFiles = JSON.parse(carousel.dataset.carouselFiles || '[]');
         } catch (e) {
-            console.error('Error parsing carousel files:', e);
             return;
         }
 
@@ -13103,10 +12993,7 @@
 
     // Exponer globalmente para el onchange
     window.cambiarAlgoritmoSelect = async function(algoritmoId) {
-        console.log('cambiarAlgoritmoSelect llamado con:', algoritmoId);
-
         if (!algoritmoId) {
-            console.log('algoritmoId es vacío, saliendo');
             return;
         }
 
@@ -13116,8 +13003,6 @@
         }
 
         try {
-            console.log('Enviando POST a /Feed/CambiarAlgoritmo');
-
             const response = await fetch('/Feed/CambiarAlgoritmo', {
                 method: 'POST',
                 headers: {
@@ -13128,24 +13013,19 @@
                 body: `algoritmoId=${algoritmoId}`
             });
 
-            console.log('Respuesta recibida, status:', response.status);
-
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
-            console.log('Data recibida:', data);
 
             if (data.success) {
                 // Recargar pagina para aplicar nuevo algoritmo
                 window.location.reload();
             } else {
-                console.error('Error del servidor:', data.message);
                 if (select) select.disabled = false;
             }
         } catch (error) {
-            console.error('Error en cambiarAlgoritmoSelect:', error);
             if (select) select.disabled = false;
         }
     };
@@ -13157,12 +13037,10 @@
         <text>
     (function() {
         const sharedPostId = @ViewBag.SharedPostId;
-        console.log('[SharedPost] Abriendo post compartido:', sharedPostId);
 
         window.addEventListener('load', function() {
             setTimeout(() => {
                 const postElement = document.querySelector(`.post[data-post-id="${sharedPostId}"]`);
-                console.log('[SharedPost] Post element:', postElement);
 
                 if (postElement) {
                     // Scroll al post
@@ -13275,7 +13153,6 @@
             mostrarStory();
 
         } catch (error) {
-            console.error('Error al abrir stories:', error);
             showToast('Error al cargar stories');
         }
     }
@@ -13318,7 +13195,6 @@
             storiesData.splice(posicionInsercion, 0, anuncioGrupo);
 
         } catch (error) {
-            console.error('Error al cargar anuncio para stories:', error);
         }
     }
 
@@ -13502,20 +13378,17 @@
                 story.liked = data.liked;
                 story.likes = data.likes;
                 actualizarLikeUI(story);
-                console.log('Like actualizado:', data);
             } else {
                 // Revertir si hay error
                 story.liked = wasLiked;
                 story.likes = (story.likes || 0) + (wasLiked ? 1 : -1);
                 actualizarLikeUI(story);
-                console.error('Error al dar like, status:', response.status);
             }
         } catch (error) {
             // Revertir en caso de error
             story.liked = wasLiked;
             story.likes = (story.likes || 0) + (wasLiked ? 1 : -1);
             actualizarLikeUI(story);
-            console.error('Error de red al dar like:', error);
         }
     }
 
@@ -13639,7 +13512,6 @@
                 showToast && showToast(data.message || 'Error al eliminar la historia', 'error');
             }
         } catch (error) {
-            console.error('Error al eliminar story:', error);
             showToast && showToast('Error al eliminar la historia', 'error');
         }
     }
@@ -13743,11 +13615,8 @@
 
             if (response.ok) {
                 mostrarFeedbackStory(`${emoji} Enviado`, 'success');
-            } else {
-                console.error('Error al enviar reacción, status:', response.status);
             }
         } catch (error) {
-            console.error('Error al enviar reacción:', error);
         }
 
         // Reanudar timer después de un pequeño delay
@@ -13801,7 +13670,6 @@
                 mostrarFeedbackStory(data.message || 'Error al enviar', 'error');
             }
         } catch (error) {
-            console.error('Error enviando mensaje:', error);
             mostrarFeedbackStory('Error de conexión', 'error');
         } finally {
             storyResponseInProgress = false;
@@ -13843,8 +13711,6 @@
         const creadorId = String(userStories?.creador?.id || '');
         const isOwnStory = creadorId !== '' && creadorId === currentUserId;
 
-        console.log('[Story] creadorId:', creadorId, 'currentUserId:', currentUserId, 'isOwnStory:', isOwnStory);
-
         if (bottomBar && userStories?.creador) {
             if (isOwnStory) {
                 bottomBar.classList.add('own-story');
@@ -13856,7 +13722,6 @@
         // Mostrar/ocultar botón de eliminar según si es historia propia
         if (btnEliminar) {
             btnEliminar.style.display = isOwnStory ? 'flex' : 'none';
-            console.log('[Story] btnEliminar display:', btnEliminar.style.display);
         }
 
         // Ocultar botón de silenciar en historias propias
@@ -14045,7 +13910,6 @@
             }
 
         } catch (error) {
-            console.error('Error al renderizar overlays:', error);
         }
     }
 
@@ -14071,7 +13935,6 @@
 
             // Reproducir
             audioEl.play().catch(err => {
-                console.log('No se pudo reproducir la música automáticamente:', err);
             });
         }
     }
@@ -14255,7 +14118,6 @@
                 txtSilenciar.textContent = 'Silenciar historias';
             }
         } catch (err) {
-            console.error('Error verificando estado silenciado:', err);
         }
     }
 
@@ -14304,7 +14166,6 @@
                 showToast(data.message || 'Error');
             }
         } catch (err) {
-            console.error('Error:', err);
             showToast('Error al procesar');
         }
     }
@@ -14343,7 +14204,6 @@
                 window.open(data.urlDestino || anuncio.urlDestino, '_blank');
             }
         } catch (err) {
-            console.error('Error al registrar clic en anuncio:', err);
             // Aún así abrir el URL
             if (anuncio.urlDestino) {
                 window.open(anuncio.urlDestino, '_blank');
@@ -14363,7 +14223,6 @@
                 body: formData
             });
         } catch (error) {
-            console.error('Error al marcar story como vista:', error);
         }
     }
 
@@ -14519,7 +14378,6 @@
                 submitBtn.textContent = 'Compartir historia';
             }
         } catch (error) {
-            console.error('Error al crear story:', error);
             showToast('Error al publicar la historia');
             submitBtn.disabled = false;
             submitBtn.textContent = 'Compartir historia';
@@ -14579,7 +14437,6 @@
                 });
             }
         } catch (error) {
-            console.error('Error al actualizar barra de stories:', error);
         }
     }
 

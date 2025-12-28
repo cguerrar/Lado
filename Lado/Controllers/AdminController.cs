@@ -567,7 +567,7 @@ namespace Lado.Controllers
         }
 
         [HttpPost]
-        [IgnoreAntiforgeryToken]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReclasificarContenido(int id)
         {
             try
@@ -3860,7 +3860,7 @@ namespace Lado.Controllers
         // ========================================
 
         [HttpPost]
-        [IgnoreAntiforgeryToken]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> SeedCategoriasInteres()
         {
             try
@@ -3939,7 +3939,7 @@ namespace Lado.Controllers
         }
 
         [HttpPost]
-        [IgnoreAntiforgeryToken]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> LimpiarCategorias()
         {
             try
@@ -4008,7 +4008,7 @@ namespace Lado.Controllers
 
         // Endpoint para clasificar un lote pequeño (5 contenidos)
         [HttpPost]
-        [IgnoreAntiforgeryToken]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReclasificarLoteIA()
         {
             try
@@ -4207,7 +4207,7 @@ namespace Lado.Controllers
         }
 
         [HttpPost]
-        [IgnoreAntiforgeryToken]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReclasificarContenidoIA()
         {
             // Este endpoint ahora solo limpia las categorías
@@ -4280,7 +4280,7 @@ namespace Lado.Controllers
         }
 
         [HttpPost]
-        [IgnoreAntiforgeryToken]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ProbarClasificacionTexto([FromBody] ProbarClasificacionRequest request)
         {
             try
@@ -4325,7 +4325,7 @@ namespace Lado.Controllers
         }
 
         [HttpPost]
-        [IgnoreAntiforgeryToken]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ProbarClasificacionImagen(IFormFile imagen, string? descripcion)
         {
             try
@@ -4574,7 +4574,7 @@ namespace Lado.Controllers
         }
 
         [HttpPost]
-        [IgnoreAntiforgeryToken]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> RestablecerAlgoritmos()
         {
             var clavesAlgoritmos = new[]

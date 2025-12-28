@@ -119,7 +119,9 @@ namespace Lado.Controllers
                     {
                         creadorId = g.Key,
                         creador = g.First().Creador,
-                        stories = g.Select(s => new
+                        // Ordenar stories de cada usuario cronológicamente (más antigua primero)
+                        // para que al navegar se vean en orden: primero la más antigua, al final la más nueva
+                        stories = g.OrderBy(s => s.FechaPublicacion).Select(s => new
                         {
                             id = s.Id,
                             rutaArchivo = s.RutaArchivo,

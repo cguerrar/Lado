@@ -552,6 +552,7 @@ namespace Lado.Controllers
         // ========================================
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CrearRapido(IFormFile archivo, string descripcion, bool esPublico = true)
         {
             try
@@ -590,6 +591,14 @@ namespace Lado.Controllers
                 if (archivo.Length > 20 * 1024 * 1024) // 20MB max
                 {
                     return Json(new { success = false, error = "El archivo es muy grande (max 20MB)" });
+                }
+
+                // Validar magic bytes (prevenir archivos maliciosos disfrazados)
+                var validacionArchivo = await _fileValidationService.ValidarImagenAsync(archivo);
+                if (!validacionArchivo.EsValido)
+                {
+                    _logger.LogWarning("Archivo rechazado por validación de magic bytes: {FileName}", archivo.FileName);
+                    return Json(new { success = false, error = "El archivo no es válido o está corrupto" });
                 }
 
                 // Guardar archivo
@@ -889,6 +898,17 @@ namespace Lado.Controllers
                     if (!esVideo && !esFoto)
                     {
                         continue; // Saltar tipos no permitidos
+                    }
+
+                    // Validar magic bytes (prevenir archivos maliciosos disfrazados)
+                    var validacion = esFoto
+                        ? await _fileValidationService.ValidarImagenAsync(archivo)
+                        : await _fileValidationService.ValidarVideoAsync(archivo);
+
+                    if (!validacion.EsValido)
+                    {
+                        _logger.LogWarning("Archivo rechazado en Carrusel por magic bytes: {FileName}", archivo.FileName);
+                        continue; // Saltar archivos inválidos
                     }
 
                     var uniqueFileName = $"{Guid.NewGuid()}{extension}";
@@ -1191,6 +1211,17 @@ namespace Lado.Controllers
                 else
                 {
                     return Json(new { success = false, message = "Tipo de archivo no soportado" });
+                }
+
+                // Validar magic bytes (prevenir archivos maliciosos disfrazados)
+                var validacion = tipoContenido == TipoContenido.Foto
+                    ? await _fileValidationService.ValidarImagenAsync(archivo)
+                    : await _fileValidationService.ValidarVideoAsync(archivo);
+
+                if (!validacion.EsValido)
+                {
+                    _logger.LogWarning("Archivo rechazado en CrearDesdeReels por magic bytes: {FileName}", archivo.FileName);
+                    return Json(new { success = false, message = "El archivo no es válido o está corrupto" });
                 }
 
                 // Determinar lado

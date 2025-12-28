@@ -1676,7 +1676,7 @@
             <span class="badge badge-success">Público</span>
             @if ((ViewBag.TotalSeguidoresLadoA ?? 0) > 0)
             {
-                <button type="button" class="btn-ver-todos" onclick="console.log('Click en ver todos LadoA'); abrirModalSeguidores('ladoA');">Ver todos (@ViewBag.TotalSeguidoresLadoA)</button>
+                <button type="button" class="btn-ver-todos" onclick="abrirModalSeguidores('ladoA');">Ver todos (@ViewBag.TotalSeguidoresLadoA)</button>
             }
         </div>
     </div>
@@ -1726,7 +1726,7 @@
             <span class="badge" style="background: var(--accent-light); color: var(--accent);">Premium</span>
             @if ((ViewBag.TotalSeguidoresLadoB ?? 0) > 0)
             {
-                <button type="button" class="btn-ver-todos" onclick="console.log('Click en ver todos LadoB'); abrirModalSeguidores('ladoB');">Ver todos (@ViewBag.TotalSeguidoresLadoB)</button>
+                <button type="button" class="btn-ver-todos" onclick="abrirModalSeguidores('ladoB');">Ver todos (@ViewBag.TotalSeguidoresLadoB)</button>
             }
         </div>
     </div>
@@ -1899,7 +1899,6 @@
     let hasMore = true;
 
     function abrirModalSeguidores(tipoLado) {
-        console.log('abrirModalSeguidores llamado con:', tipoLado);
         currentTipoLado = tipoLado;
         currentPage = 1;
         hasMore = true;
@@ -1908,11 +1907,7 @@
         const titulo = document.getElementById('modalSeguidoresTitulo');
         const lista = document.getElementById('listaSeguidores');
 
-        console.log('Elementos encontrados:', { modal: !!modal, titulo: !!titulo, lista: !!lista });
-
         if (!modal) {
-            console.error('Modal no encontrado!');
-            alert('Error: Modal no encontrado');
             return;
         }
 
@@ -1922,7 +1917,6 @@
 
         lista.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
         modal.classList.add('active');
-        console.log('Modal activado, clase active añadida');
 
         cargarSeguidores();
     }
@@ -1932,27 +1926,20 @@
     }
 
     async function cargarSeguidores() {
-        console.log('cargarSeguidores llamado, isLoading:', isLoading, 'hasMore:', hasMore);
         if (isLoading || !hasMore) {
-            console.log('Saliendo temprano de cargarSeguidores');
             return;
         }
         isLoading = true;
 
         try {
             const url = '/Dashboard/ObtenerTodosSeguidores?tipoLado=' + currentTipoLado + '&page=' + currentPage;
-            console.log('Fetching URL:', url);
             const response = await fetch(url);
 
-            console.log('Response status:', response.status);
             if (!response.ok) {
-                const text = await response.text();
-                console.error('Response text:', text);
                 throw new Error('Error HTTP: ' + response.status);
             }
 
             const data = await response.json();
-            console.log('Respuesta JSON:', data);
 
             if (data.success) {
                 const lista = document.getElementById('listaSeguidores');
@@ -2000,7 +1987,6 @@
                 }
             }
         } catch (error) {
-            console.error('Error al cargar seguidores:', error);
             const lista = document.getElementById('listaSeguidores');
             lista.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--muted);">Error al cargar seguidores</div>';
         } finally {
@@ -2024,9 +2010,6 @@
                     cerrarModalSeguidores();
                 }
             });
-            console.log('Event listener para cerrar modal registrado');
-        } else {
-            console.error('Modal no encontrado al cargar DOM');
         }
     });
 </script>
