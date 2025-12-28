@@ -20,6 +20,8 @@
 
     <!-- Fabric.js para canvas interactivo -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <!-- HEIC to JPEG converter para imágenes de iPhone -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js"></script>
 
     <style>
         /* ========================================
@@ -2827,27 +2829,53 @@
         }
 
         .beatsync-waveform-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
             display: block;
+            z-index: 1;
         }
 
-        /* Selection overlay con handles */
+        /* Overlays para oscurecer fuera de selección */
+        .beatsync-waveform-overlay-left,
+        .beatsync-waveform-overlay-right {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .beatsync-waveform-overlay-left {
+            left: 0;
+            width: 0;
+        }
+
+        .beatsync-waveform-overlay-right {
+            right: 0;
+            width: 0;
+        }
+
+        /* Área de selección (solo bordes) */
         .beatsync-waveform-selection {
             position: absolute;
             top: 0;
             height: 100%;
-            background: rgba(45, 212, 191, 0.35);
-            border-left: 3px solid #2dd4bf;
-            border-right: 3px solid #2dd4bf;
+            border-left: 2px solid #2dd4bf;
+            border-right: 2px solid #2dd4bf;
             pointer-events: none;
+            z-index: 10;
+            box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.3);
         }
 
-        /* Selection handles */
+        /* Selection handles (posicionados independientemente) */
         .beatsync-selection-handle {
             position: absolute;
             top: 0;
-            width: 24px;
+            width: 28px;
             height: 100%;
             cursor: ew-resize;
             z-index: 20;
@@ -2859,11 +2887,11 @@
         }
 
         .beatsync-selection-handle .handle-bar {
-            width: 6px;
-            height: 50px;
+            width: 8px;
+            height: 55px;
             background: white;
-            border-radius: 3px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
             pointer-events: none;
             transition: transform 0.15s, background 0.15s;
         }
@@ -2878,14 +2906,13 @@
             z-index: 30;
         }
 
+        /* Posición inicial - será actualizada por JS */
         .beatsync-selection-handle.handle-left {
             left: 0;
-            transform: translateX(-50%);
         }
 
         .beatsync-selection-handle.handle-right {
-            right: 0;
-            transform: translateX(50%);
+            left: 100%;
         }
 
         /* Playhead animado */
@@ -2994,6 +3021,51 @@
             font-weight: 600;
             min-width: 60px;
             text-align: center;
+        }
+
+        .beatsync-current-time .beatsync-time-value {
+            background: rgba(45, 212, 191, 0.3);
+            border: 1px solid #2dd4bf;
+            color: #2dd4bf;
+        }
+
+        .beatsync-current-time label {
+            color: #2dd4bf;
+            opacity: 1;
+        }
+
+        .beatsync-duration-input {
+            background: rgba(255, 200, 50, 0.2);
+            border: 1px solid rgba(255, 200, 50, 0.6);
+            color: #ffc832;
+            padding: 4px 6px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+            font-weight: 600;
+            width: 50px;
+            text-align: center;
+        }
+
+        .beatsync-duration-input:focus {
+            outline: none;
+            border-color: #ffc832;
+            background: rgba(255, 200, 50, 0.3);
+        }
+
+        .beatsync-duration-group label {
+            color: #ffc832;
+            opacity: 1;
+        }
+
+        /* Ocultar flechas del input number */
+        .beatsync-duration-input::-webkit-outer-spin-button,
+        .beatsync-duration-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .beatsync-duration-input[type=number] {
+            -moz-appearance: textfield;
         }
 
         .beatsync-duration-badge {
@@ -3214,23 +3286,37 @@
         /* Botones de acción */
         .beatsync-actions {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             margin-top: 8px;
         }
 
         .beatsync-btn {
             flex: 1;
-            padding: 12px 16px;
+            min-width: 0;
+            padding: 10px 8px;
             border-radius: 10px;
             border: none;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 600;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 5px;
             transition: all 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .beatsync-btn svg {
+            flex-shrink: 0;
+            width: 16px;
+            height: 16px;
+        }
+
+        .beatsync-btn span {
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .beatsync-btn-secondary {
@@ -3257,9 +3343,22 @@
             cursor: not-allowed;
         }
 
-        .beatsync-btn svg {
-            width: 18px;
-            height: 18px;
+        .beatsync-btn-outline {
+            background: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+
+        .beatsync-btn-outline:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .beatsync-btn-outline:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            color: var(--muted);
+            border-color: var(--line);
         }
 
         /* Progress durante generación */
@@ -3508,7 +3607,7 @@
                     </svg>
                     <p><span>Toca para subir</span> una foto o video</p>
                 </div>
-                <input type="file" id="fileInput" accept="image/*,video/*" style="display:none;" onchange="cargarMedia(this)">
+                <input type="file" id="fileInput" accept="image/*,video/*,.heic,.heif" style="display:none;" onchange="cargarMedia(this)">
 
                 <!-- Video de fondo (para cuando se sube un video) -->
                 <video id="videoBackground" muted loop playsinline></video>
@@ -4186,13 +4285,17 @@
                                     <!-- Waveform visual con selección -->
                                     <div class="beatsync-waveform-visual" id="beatsyncWaveformVisual">
                                         <canvas class="beatsync-waveform-canvas" id="beatsyncWaveformCanvas2"></canvas>
-                                        <div class="beatsync-waveform-selection" id="beatsyncWaveformSelection">
-                                            <div class="beatsync-selection-handle handle-left" id="beatsyncHandleLeft">
-                                                <div class="handle-bar"></div>
-                                            </div>
-                                            <div class="beatsync-selection-handle handle-right" id="beatsyncHandleRight">
-                                                <div class="handle-bar"></div>
-                                            </div>
+                                        <!-- Overlays para oscurecer fuera de selección -->
+                                        <div class="beatsync-waveform-overlay-left" id="beatsyncOverlayLeft"></div>
+                                        <div class="beatsync-waveform-overlay-right" id="beatsyncOverlayRight"></div>
+                                        <!-- Área de selección (solo visual) -->
+                                        <div class="beatsync-waveform-selection" id="beatsyncWaveformSelection"></div>
+                                        <!-- Handles independientes -->
+                                        <div class="beatsync-selection-handle handle-left" id="beatsyncHandleLeft">
+                                            <div class="handle-bar"></div>
+                                        </div>
+                                        <div class="beatsync-selection-handle handle-right" id="beatsyncHandleRight">
+                                            <div class="handle-bar"></div>
                                         </div>
                                         <div class="beatsync-waveform-playhead" id="beatsyncCutterPlayhead"></div>
                                     </div>
@@ -4208,16 +4311,24 @@
                                             </svg>
                                         </button>
 
+                                        <div class="beatsync-time-group beatsync-duration-group">
+                                            <label>Dur.</label>
+                                            <input type="number" class="beatsync-duration-input" id="beatsyncCutDuration" value="30" min="5" max="300" step="1" onchange="onDurationChange(this.value)">
+                                        </div>
+
                                         <div class="beatsync-cutter-times">
                                             <div class="beatsync-time-group">
                                                 <label>Desde</label>
                                                 <span class="beatsync-time-value" id="beatsyncCutStart">00:00.0</span>
                                             </div>
+                                            <div class="beatsync-time-group beatsync-current-time">
+                                                <label>Actual</label>
+                                                <span class="beatsync-time-value" id="beatsyncCurrentTime">00:00.0</span>
+                                            </div>
                                             <div class="beatsync-time-group">
                                                 <label>Hasta</label>
                                                 <span class="beatsync-time-value" id="beatsyncCutEnd">00:30.0</span>
                                             </div>
-                                            <div class="beatsync-duration-badge" id="beatsyncCutDuration">30.0s</div>
                                         </div>
                                     </div>
 
@@ -4279,7 +4390,7 @@
                                     Mezclar
                                 </button>
                             </div>
-                            <input type="file" id="beatsyncPhotosInput" accept="image/*" multiple style="display: none;" onchange="handleBeatSyncPhotos(event)">
+                            <input type="file" id="beatsyncPhotosInput" accept="image/*,.heic,.heif" multiple style="display: none;" onchange="handleBeatSyncPhotos(event)">
                         </div>
 
                         <!-- Sección: Configuración -->
@@ -4305,15 +4416,29 @@
                                 <div class="beatsync-config-row">
                                     <span class="beatsync-config-label">Sensibilidad</span>
                                     <div class="beatsync-slider-container">
-                                        <input type="range" class="beatsync-slider" id="beatsyncSensitivity" min="1" max="10" value="5" oninput="updateSensitivityLabel(this.value)" onchange="onSensitivityChange()">
-                                        <span class="beatsync-slider-value" id="beatsyncSensitivityValue">5</span>
+                                        <input type="range" class="beatsync-slider" id="beatsyncSensitivity" min="1" max="20" value="10" oninput="updateSensitivityLabel(this.value); onSensitivityChange();" onchange="onSensitivityChangeImmediate()">
+                                        <span class="beatsync-slider-value" id="beatsyncSensitivityValue">10</span>
+                                    </div>
+                                </div>
+                                <div class="beatsync-config-row">
+                                    <span class="beatsync-config-label">Umbral</span>
+                                    <div class="beatsync-slider-container">
+                                        <input type="range" class="beatsync-slider" id="beatsyncThreshold" min="1" max="10" value="3" oninput="updateThresholdLabel(this.value); onSensitivityChange();" onchange="onSensitivityChangeImmediate()">
+                                        <span class="beatsync-slider-value" id="beatsyncThresholdValue">3 (bajo)</span>
+                                    </div>
+                                </div>
+                                <div class="beatsync-config-row">
+                                    <span class="beatsync-config-label">Agudeza</span>
+                                    <div class="beatsync-slider-container">
+                                        <input type="range" class="beatsync-slider" id="beatsyncSharpness" min="1" max="10" value="3" oninput="updateSharpnessLabel(this.value); onSensitivityChange();" onchange="onSensitivityChangeImmediate()">
+                                        <span class="beatsync-slider-value" id="beatsyncSharpnessValue">3 (suave)</span>
                                     </div>
                                 </div>
                                 <div class="beatsync-config-row">
                                     <span class="beatsync-config-label">Intervalo mín.</span>
                                     <div class="beatsync-slider-container">
-                                        <input type="range" class="beatsync-slider" id="beatsyncMinInterval" min="0.2" max="2" step="0.1" value="0.3" oninput="updateMinIntervalLabel(this.value)" onchange="onSensitivityChange()">
-                                        <span class="beatsync-slider-value" id="beatsyncMinIntervalValue">0.3s</span>
+                                        <input type="range" class="beatsync-slider" id="beatsyncMinInterval" min="0.01" max="1" step="0.01" value="0.08" oninput="updateMinIntervalLabel(this.value); onSensitivityChange();" onchange="onSensitivityChangeImmediate()">
+                                        <span class="beatsync-slider-value" id="beatsyncMinIntervalValue">80ms</span>
                                     </div>
                                 </div>
                             </div>
@@ -4361,6 +4486,13 @@
 
                         <!-- Botones de acción -->
                         <div class="beatsync-actions">
+                            <button class="beatsync-btn beatsync-btn-outline" id="beatsyncRegenerateBtn" onclick="reanalyzeBeatSync()" title="Volver a analizar los beats">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                                Regenerar
+                            </button>
                             <button class="beatsync-btn beatsync-btn-secondary" id="beatsyncPreviewBtn" onclick="previewBeatSync()" disabled>
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polygon points="5 3 19 12 5 21 5 3"/>
@@ -4369,10 +4501,10 @@
                             </button>
                             <button class="beatsync-btn beatsync-btn-primary" id="beatsyncGenerateBtn" onclick="generateBeatSync()" disabled>
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M2 12h2l2-6 3 12 3-8 2 4h8"/>
-                                    <circle cx="20" cy="12" r="2"/>
+                                    <path d="M23 7l-7 5 7 5V7z"/>
+                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
                                 </svg>
-                                Generar Video
+                                Generar
                             </button>
                         </div>
                     </div>
@@ -4678,9 +4810,30 @@
         // ========================================
         let isVideoMedia = false; // Para saber si el media actual es video
 
-        function cargarMedia(input) {
+        async function cargarMedia(input) {
             if (input.files && input.files[0]) {
-                const file = input.files[0];
+                let file = input.files[0];
+
+                // Verificar si es HEIC y convertir
+                const isHeic = file.name.toLowerCase().endsWith('.heic') ||
+                              file.name.toLowerCase().endsWith('.heif');
+
+                if (isHeic) {
+                    // Mostrar indicador de conversión
+                    const overlay = document.getElementById('uploadOverlay');
+                    if (overlay) {
+                        overlay.querySelector('p').innerHTML = '<span>Convirtiendo HEIC...</span>';
+                    }
+
+                    const converted = await convertHeicToJpeg(file);
+                    if (converted) {
+                        file = converted;
+                    } else {
+                        alert('No se pudo convertir la imagen HEIC. Intenta con otro formato.');
+                        return;
+                    }
+                }
+
                 mediaFile = file;
 
                 const reader = new FileReader();
@@ -4688,7 +4841,11 @@
                     mediaUrl = e.target.result;
                     const videoElement = document.getElementById('videoBackground');
 
-                    if (file.type.startsWith('image/')) {
+                    // Verificar tipo de archivo
+                    const isImage = file.type.startsWith('image/') || isHeic;
+                    const isVideo = file.type.startsWith('video/');
+
+                    if (isImage) {
                         // Es una imagen
                         isVideoMedia = false;
                         videoElement.classList.remove('active');
@@ -4715,7 +4872,7 @@
                             canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
                             saveHistory();
                         });
-                    } else if (file.type.startsWith('video/')) {
+                    } else if (isVideo) {
                         // Es un video
                         isVideoMedia = true;
 
@@ -6973,16 +7130,73 @@
             document.getElementById('beatsyncSensitivityValue').textContent = value;
         }
 
-        // Actualizar label de intervalo mínimo
+        // Actualizar label de intervalo mínimo (mostrar en ms para mejor legibilidad)
         function updateMinIntervalLabel(value) {
-            document.getElementById('beatsyncMinIntervalValue').textContent = value + 's';
+            const ms = Math.round(parseFloat(value) * 1000);
+            document.getElementById('beatsyncMinIntervalValue').textContent = ms + 'ms';
         }
 
-        // Cuando cambia la sensibilidad o intervalo, re-analizar
+        // Actualizar label de umbral
+        function updateThresholdLabel(value) {
+            const labels = {
+                1: '1 (mínimo)',
+                2: '2 (muy bajo)',
+                3: '3 (bajo)',
+                4: '4',
+                5: '5 (medio)',
+                6: '6',
+                7: '7 (alto)',
+                8: '8 (muy alto)',
+                9: '9',
+                10: '10 (máximo)'
+            };
+            document.getElementById('beatsyncThresholdValue').textContent = labels[value] || value;
+        }
+
+        // Actualizar label de agudeza
+        function updateSharpnessLabel(value) {
+            const labels = {
+                1: '1 (muy suave)',
+                2: '2 (suave)',
+                3: '3 (suave)',
+                4: '4',
+                5: '5 (medio)',
+                6: '6',
+                7: '7 (agudo)',
+                8: '8 (muy agudo)',
+                9: '9',
+                10: '10 (extremo)'
+            };
+            document.getElementById('beatsyncSharpnessValue').textContent = labels[value] || value;
+        }
+
+        // Cuando cambia la sensibilidad o intervalo, re-analizar (con debounce)
+        let sensitivityDebounceTimer = null;
         function onSensitivityChange() {
-            if (beatSyncConfig.audioBuffer) {
-                reanalyzeBeatSync();
+            if (!beatSyncConfig.audioBuffer) return;
+
+            // Cancelar timer anterior
+            if (sensitivityDebounceTimer) {
+                clearTimeout(sensitivityDebounceTimer);
             }
+
+            // Esperar 300ms después de que el usuario deje de mover el slider
+            sensitivityDebounceTimer = setTimeout(() => {
+                reanalyzeBeatSync();
+            }, 300);
+        }
+
+        // Versión inmediata para cuando se suelta el slider
+        function onSensitivityChangeImmediate() {
+            if (!beatSyncConfig.audioBuffer) return;
+
+            // Cancelar debounce pendiente
+            if (sensitivityDebounceTimer) {
+                clearTimeout(sensitivityDebounceTimer);
+                sensitivityDebounceTimer = null;
+            }
+
+            reanalyzeBeatSync();
         }
 
         // Cambiar modo de detección
@@ -7084,20 +7298,25 @@
                 const x = i * (barWidth + barGap);
                 const y = centerY - (barHeight / 2);
 
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
                 ctx.beginPath();
                 ctx.roundRect(x, y, barWidth, barHeight, 1);
                 ctx.fill();
             }
 
-            // Dibujar marcadores de beats
+            // Dibujar marcadores de beats (sutiles, solo líneas pequeñas arriba y abajo)
             const duration = buffer.duration;
-            beatSyncConfig.beats.forEach(beatTime => {
-                if (beatTime >= beatSyncConfig.trimStart && beatTime <= beatSyncConfig.trimEnd) {
-                    const x = (beatTime / duration) * width;
-                    ctx.fillStyle = 'rgba(239, 68, 68, 0.6)';
-                    ctx.fillRect(x - 1, 0, 2, height);
-                }
+            const beatsInRange = beatSyncConfig.beats.filter(
+                b => b >= beatSyncConfig.trimStart && b <= beatSyncConfig.trimEnd
+            );
+
+            // Si hay muchos beats, solo dibujar indicadores sutiles
+            beatsInRange.forEach(beatTime => {
+                const x = (beatTime / duration) * width;
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
+                // Solo pequeñas marcas arriba y abajo, no líneas completas
+                ctx.fillRect(x, 0, 1, 6);
+                ctx.fillRect(x, height - 6, 1, 6);
             });
         }
 
@@ -7107,21 +7326,61 @@
 
             const container = document.getElementById('beatsyncWaveformVisual');
             const selection = document.getElementById('beatsyncWaveformSelection');
+            const handleLeft = document.getElementById('beatsyncHandleLeft');
+            const handleRight = document.getElementById('beatsyncHandleRight');
+            const overlayLeft = document.getElementById('beatsyncOverlayLeft');
+            const overlayRight = document.getElementById('beatsyncOverlayRight');
+
             if (!container || !selection) return;
 
             const duration = beatSyncConfig.audioBuffer.duration;
             const startPercent = (beatSyncConfig.trimStart / duration) * 100;
             const endPercent = (beatSyncConfig.trimEnd / duration) * 100;
 
+            // Actualizar área de selección
             selection.style.left = startPercent + '%';
             selection.style.width = (endPercent - startPercent) + '%';
+
+            // Actualizar handles (posicionados independientemente)
+            if (handleLeft) {
+                handleLeft.style.left = `calc(${startPercent}% - 14px)`;
+            }
+            if (handleRight) {
+                handleRight.style.left = `calc(${endPercent}% - 14px)`;
+            }
+
+            // Actualizar overlays oscuros
+            if (overlayLeft) {
+                overlayLeft.style.width = startPercent + '%';
+            }
+            if (overlayRight) {
+                overlayRight.style.width = (100 - endPercent) + '%';
+            }
 
             // Actualizar displays de tiempo
             document.getElementById('beatsyncCutStart').textContent = formatTimeMs(beatSyncConfig.trimStart);
             document.getElementById('beatsyncCutEnd').textContent = formatTimeMs(beatSyncConfig.trimEnd);
 
-            const trimDuration = beatSyncConfig.trimEnd - beatSyncConfig.trimStart;
-            document.getElementById('beatsyncCutDuration').textContent = trimDuration.toFixed(1) + 's';
+            // Actualizar input de duración
+            const trimDuration = Math.round(beatSyncConfig.trimEnd - beatSyncConfig.trimStart);
+            const durationInput = document.getElementById('beatsyncCutDuration');
+            if (durationInput) {
+                durationInput.value = trimDuration;
+            }
+
+            // Actualizar tiempo actual del playhead
+            const currentPos = beatSyncConfig.cutterStartTime !== undefined
+                ? beatSyncConfig.cutterStartTime
+                : beatSyncConfig.trimStart;
+            updateCurrentTimeDisplay(currentPos);
+
+            // Actualizar posición visual del playhead
+            const playhead = document.getElementById('beatsyncCutterPlayhead');
+            if (playhead && !beatSyncConfig.cutterPlaying) {
+                const playheadPercent = (currentPos / duration) * 100;
+                playhead.style.left = playheadPercent + '%';
+                playhead.classList.add('active');
+            }
 
             // Actualizar conteo de beats en el rango
             const beatsInRange = beatSyncConfig.beats.filter(
@@ -7162,9 +7421,10 @@
             handleLeft.addEventListener('touchstart', (e) => startDrag(e, 'left'), { passive: false });
             handleRight.addEventListener('touchstart', (e) => startDrag(e, 'right'), { passive: false });
 
-            // Click en waveform para mover selección
+            // Click en waveform para mover playhead o selección
             container.addEventListener('click', function(e) {
                 if (beatSyncConfig.isDraggingHandle) return;
+                if (!beatSyncConfig.audioBuffer) return;
 
                 const rect = container.getBoundingClientRect();
                 const clickX = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
@@ -7172,17 +7432,79 @@
                 const duration = beatSyncConfig.audioBuffer.duration;
                 const clickTime = percent * duration;
 
-                // Mover el rango centrado en el click
-                const rangeWidth = beatSyncConfig.trimEnd - beatSyncConfig.trimStart;
-                let newStart = clickTime - (rangeWidth / 2);
-                newStart = Math.max(0, Math.min(newStart, duration - rangeWidth));
+                // Si el click está dentro de la selección, mover playhead ahí
+                if (clickTime >= beatSyncConfig.trimStart && clickTime <= beatSyncConfig.trimEnd) {
+                    // Mover playhead a la posición del click
+                    seekCutterPlayhead(clickTime);
+                } else {
+                    // Click fuera de selección: mover el rango centrado en el click
+                    const rangeWidth = beatSyncConfig.trimEnd - beatSyncConfig.trimStart;
+                    let newStart = clickTime - (rangeWidth / 2);
+                    newStart = Math.max(0, Math.min(newStart, duration - rangeWidth));
 
-                beatSyncConfig.trimStart = newStart;
-                beatSyncConfig.trimEnd = newStart + rangeWidth;
+                    beatSyncConfig.trimStart = newStart;
+                    beatSyncConfig.trimEnd = newStart + rangeWidth;
 
-                updateCutterSelection();
-                reanalyzeBeatSync();
+                    updateCutterSelection();
+                    reanalyzeBeatSync();
+                }
             });
+        }
+
+        // Mover playhead a una posición específica
+        function seekCutterPlayhead(time) {
+            const playhead = document.getElementById('beatsyncCutterPlayhead');
+            const container = document.getElementById('beatsyncWaveformVisual');
+            if (!playhead || !container || !beatSyncConfig.audioBuffer) return;
+
+            const duration = beatSyncConfig.audioBuffer.duration;
+            const percent = (time / duration) * 100;
+
+            playhead.style.left = percent + '%';
+            playhead.classList.add('active');
+
+            // Actualizar display de tiempo actual
+            updateCurrentTimeDisplay(time);
+
+            // Si está reproduciendo, reiniciar desde esta posición
+            if (beatSyncConfig.cutterPlaying) {
+                stopCutterPlayback();
+                beatSyncConfig.cutterStartTime = time;
+                startCutterPlayback(time);
+            } else {
+                // Guardar posición para cuando se reproduzca
+                beatSyncConfig.cutterStartTime = time;
+            }
+        }
+
+        // Actualizar display de tiempo actual
+        function updateCurrentTimeDisplay(time) {
+            const el = document.getElementById('beatsyncCurrentTime');
+            if (el) {
+                el.textContent = formatTimeMs(time);
+            }
+        }
+
+        // Cambiar duración (modifica "hasta")
+        function onDurationChange(value) {
+            if (!beatSyncConfig.audioBuffer) return;
+
+            const duration = parseFloat(value);
+            if (isNaN(duration) || duration < 5) return;
+
+            const audioDuration = beatSyncConfig.audioBuffer.duration;
+            let newEnd = beatSyncConfig.trimStart + duration;
+
+            // Limitar al final del audio
+            if (newEnd > audioDuration) {
+                newEnd = audioDuration;
+                // Actualizar el input con el valor real
+                document.getElementById('beatsyncCutDuration').value = Math.round(newEnd - beatSyncConfig.trimStart);
+            }
+
+            beatSyncConfig.trimEnd = newEnd;
+            updateCutterSelection();
+            reanalyzeBeatSync();
         }
 
         function onCutterDrag(e) {
@@ -7225,6 +7547,13 @@
             document.removeEventListener('touchmove', onCutterDrag);
             document.removeEventListener('touchend', stopCutterDrag);
 
+            // Asegurar que el playhead esté dentro de la selección
+            if (beatSyncConfig.cutterStartTime === undefined ||
+                beatSyncConfig.cutterStartTime < beatSyncConfig.trimStart ||
+                beatSyncConfig.cutterStartTime > beatSyncConfig.trimEnd) {
+                beatSyncConfig.cutterStartTime = beatSyncConfig.trimStart;
+            }
+
             // Re-analizar beats con el nuevo rango
             reanalyzeBeatSync();
         }
@@ -7238,7 +7567,7 @@
             }
         }
 
-        async function startCutterPlayback() {
+        async function startCutterPlayback(fromTime = null) {
             if (!beatSyncConfig.audioBuffer || !beatSyncConfig.audioContext) return;
 
             // Resume AudioContext si está suspendido
@@ -7254,11 +7583,23 @@
             beatSyncConfig.cutterPlaying = true;
 
             const startTime = beatSyncConfig.audioContext.currentTime;
-            const trimStart = beatSyncConfig.trimStart;
-            const trimEnd = beatSyncConfig.trimEnd;
-            const duration = trimEnd - trimStart;
 
-            source.start(0, trimStart, duration);
+            // Usar: 1) fromTime si se pasa, 2) cutterStartTime si existe, 3) trimStart
+            let playFrom;
+            if (fromTime !== null) {
+                playFrom = fromTime;
+            } else if (beatSyncConfig.cutterStartTime !== undefined &&
+                       beatSyncConfig.cutterStartTime >= beatSyncConfig.trimStart &&
+                       beatSyncConfig.cutterStartTime <= beatSyncConfig.trimEnd) {
+                playFrom = beatSyncConfig.cutterStartTime;
+            } else {
+                playFrom = beatSyncConfig.trimStart;
+            }
+
+            const trimEnd = beatSyncConfig.trimEnd;
+            const duration = trimEnd - playFrom;
+
+            source.start(0, playFrom, duration);
 
             // Actualizar UI
             document.getElementById('beatsyncCutterPlayBtn').classList.add('playing');
@@ -7268,11 +7609,14 @@
             const container = document.getElementById('beatsyncWaveformVisual');
             playhead.classList.add('active');
 
+            // Guardar posición de inicio para la animación
+            const animationStartFrom = playFrom;
+
             function animatePlayhead() {
                 if (!beatSyncConfig.cutterPlaying) return;
 
                 const elapsed = beatSyncConfig.audioContext.currentTime - startTime;
-                const currentTime = trimStart + elapsed;
+                const currentTime = animationStartFrom + elapsed;
 
                 if (elapsed >= duration) {
                     stopCutterPlayback();
@@ -7282,6 +7626,12 @@
                 const totalDuration = beatSyncConfig.audioBuffer.duration;
                 const percent = (currentTime / totalDuration) * 100;
                 playhead.style.left = percent + '%';
+
+                // Guardar posición actual para resume
+                beatSyncConfig.cutterStartTime = currentTime;
+
+                // Actualizar display de tiempo actual
+                updateCurrentTimeDisplay(currentTime);
 
                 beatSyncConfig.cutterAnimationId = requestAnimationFrame(animatePlayhead);
             }
@@ -7394,7 +7744,8 @@
         }
 
         // ========================================
-        // DETECCIÓN DE BEATS MEJORADA (Onset Detection)
+        // DETECCIÓN DE BEATS - SPECTRAL FLUX + ONSET DETECTION
+        // Detecta CUALQUIER cambio musical: notas, acordes, rasgueos, etc.
         // ========================================
         async function detectBeatsImproved() {
             const buffer = beatSyncConfig.audioBuffer;
@@ -7403,110 +7754,221 @@
             const sampleRate = buffer.sampleRate;
             const mode = beatSyncConfig.mode;
 
-            // Configuración
-            const sensitivity = parseInt(document.getElementById('beatsyncSensitivity')?.value) || 5;
-            const minInterval = parseFloat(document.getElementById('beatsyncMinInterval')?.value) || 0.3;
+            // Configuración desde sliders
+            const sensitivity = parseInt(document.getElementById('beatsyncSensitivity')?.value) || 10;
+            const minInterval = parseFloat(document.getElementById('beatsyncMinInterval')?.value) || 0.10;
+            const thresholdParam = parseInt(document.getElementById('beatsyncThreshold')?.value) || 3;
+            const sharpnessParam = parseInt(document.getElementById('beatsyncSharpness')?.value) || 3;
 
             // Obtener datos de audio (combinar canales si es stereo)
-            let channelData;
-            if (mode === 'bass') {
-                channelData = await applyLowPassFilter(buffer, 150);
-            } else {
-                channelData = buffer.getChannelData(0);
-                if (buffer.numberOfChannels > 1) {
-                    const ch2 = buffer.getChannelData(1);
-                    const merged = new Float32Array(channelData.length);
-                    for (let i = 0; i < channelData.length; i++) {
-                        merged[i] = (channelData[i] + ch2[i]) / 2;
-                    }
-                    channelData = merged;
+            let channelData = buffer.getChannelData(0);
+            if (buffer.numberOfChannels > 1) {
+                const ch2 = buffer.getChannelData(1);
+                const merged = new Float32Array(channelData.length);
+                for (let i = 0; i < channelData.length; i++) {
+                    merged[i] = (channelData[i] + ch2[i]) / 2;
                 }
+                channelData = merged;
             }
 
-            // Parámetros de ventana para análisis
-            const hopSize = Math.floor(sampleRate * 0.01); // 10ms hop
-            const windowSize = Math.floor(sampleRate * 0.023); // 23ms ventana (~43 Hz resolución)
-            const numWindows = Math.floor((channelData.length - windowSize) / hopSize);
+            // ========================================
+            // PARÁMETROS DE ANÁLISIS FFT
+            // ========================================
+            const fftSize = 2048;
+            const hopSize = Math.floor(fftSize / 4); // 75% overlap para mejor resolución temporal
+            const numFrames = Math.floor((channelData.length - fftSize) / hopSize);
 
-            // Calcular función de detección de onset (spectral flux)
-            const onsetFunction = new Float32Array(numWindows);
-            let prevSpectrum = null;
+            // Función de ventana Hanning
+            const hanningWindow = new Float32Array(fftSize);
+            for (let i = 0; i < fftSize; i++) {
+                hanningWindow[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (fftSize - 1)));
+            }
 
-            for (let w = 0; w < numWindows; w++) {
-                const start = w * hopSize;
-                const windowData = channelData.slice(start, start + windowSize);
+            // ========================================
+            // CALCULAR ESPECTROS Y SPECTRAL FLUX
+            // ========================================
+            const numBins = fftSize / 2;
+            let prevSpectrum = new Float32Array(numBins);
+            const spectralFlux = new Float32Array(numFrames);
+            const energyDiff = new Float32Array(numFrames);
 
-                // Calcular energía de la ventana (simplificado, sin FFT completo)
+            // Dividir en bandas de frecuencia para mejor detección
+            const bassEnd = Math.floor(200 * fftSize / sampleRate);
+            const midEnd = Math.floor(2000 * fftSize / sampleRate);
+
+            const bassFlux = new Float32Array(numFrames);
+            const midFlux = new Float32Array(numFrames);
+            const highFlux = new Float32Array(numFrames);
+
+            for (let frame = 0; frame < numFrames; frame++) {
+                const start = frame * hopSize;
+
+                // Extraer frame y aplicar ventana
+                const frameData = new Float32Array(fftSize);
+                for (let i = 0; i < fftSize; i++) {
+                    frameData[i] = (channelData[start + i] || 0) * hanningWindow[i];
+                }
+
+                // FFT simple (magnitud del espectro)
+                const spectrum = computeFFTMagnitude(frameData);
+
+                // Calcular Spectral Flux (suma de incrementos positivos)
+                let flux = 0;
+                let bFlux = 0, mFlux = 0, hFlux = 0;
+
+                for (let bin = 1; bin < numBins; bin++) {
+                    const diff = spectrum[bin] - prevSpectrum[bin];
+                    if (diff > 0) {
+                        flux += diff;
+                        if (bin < bassEnd) bFlux += diff;
+                        else if (bin < midEnd) mFlux += diff;
+                        else hFlux += diff;
+                    }
+                }
+
+                spectralFlux[frame] = flux;
+                bassFlux[frame] = bFlux;
+                midFlux[frame] = mFlux;
+                highFlux[frame] = hFlux;
+
+                // También calcular cambio de energía (para complementar)
                 let energy = 0;
-                let zeroCrossings = 0;
-                for (let i = 0; i < windowData.length; i++) {
-                    energy += windowData[i] * windowData[i];
-                    if (i > 0 && ((windowData[i] >= 0) !== (windowData[i-1] >= 0))) {
-                        zeroCrossings++;
-                    }
+                for (let i = 0; i < fftSize; i++) {
+                    energy += frameData[i] * frameData[i];
                 }
-                energy = Math.sqrt(energy / windowData.length);
+                energy = Math.sqrt(energy / fftSize);
 
-                // Usar diferencia de energía como función de onset
-                if (prevSpectrum !== null) {
-                    const diff = Math.max(0, energy - prevSpectrum);
-                    // Ponderar también por zero crossings (más transitorios = más probable beat)
-                    const zcWeight = mode === 'all' ? 1 + (zeroCrossings / windowData.length) : 1;
-                    onsetFunction[w] = diff * zcWeight;
+                if (frame > 0) {
+                    const prevEnergy = energyDiff[frame - 1];
+                    energyDiff[frame] = Math.max(0, energy - prevEnergy * 0.95);
                 }
-                prevSpectrum = energy;
+                energyDiff[frame] = energy;
+
+                // Guardar espectro actual para siguiente frame
+                prevSpectrum = spectrum.slice();
             }
 
-            // Normalizar función de onset
-            let maxOnset = 0;
-            for (let i = 0; i < onsetFunction.length; i++) {
-                if (onsetFunction[i] > maxOnset) maxOnset = onsetFunction[i];
-            }
-            if (maxOnset > 0) {
-                for (let i = 0; i < onsetFunction.length; i++) {
-                    onsetFunction[i] /= maxOnset;
+            // ========================================
+            // COMBINAR SEÑALES DE DETECCIÓN
+            // ========================================
+            const onsetFunction = new Float32Array(numFrames);
+
+            // Normalizar cada señal
+            const normalize = (arr) => {
+                let max = 0;
+                for (let i = 0; i < arr.length; i++) if (arr[i] > max) max = arr[i];
+                if (max > 0) for (let i = 0; i < arr.length; i++) arr[i] /= max;
+            };
+
+            normalize(spectralFlux);
+            normalize(bassFlux);
+            normalize(midFlux);
+            normalize(highFlux);
+
+            // Combinar según el modo
+            // sharpnessParam: 1 = detecta todo (más mids/highs), 10 = solo golpes fuertes (más bass)
+            const bassWeight = 0.2 + (sharpnessParam - 1) * 0.08; // 0.2 a 0.92
+            const midWeight = 0.5 - (sharpnessParam - 1) * 0.03;  // 0.5 a 0.23
+            const highWeight = 0.3 - (sharpnessParam - 1) * 0.025; // 0.3 a 0.075
+
+            for (let i = 0; i < numFrames; i++) {
+                if (mode === 'bass') {
+                    onsetFunction[i] = bassFlux[i];
+                } else if (mode === 'beats') {
+                    onsetFunction[i] = bassFlux[i] * 0.6 + midFlux[i] * 0.3 + highFlux[i] * 0.1;
+                } else {
+                    // Modo 'all' - combinar todo según sharpness
+                    onsetFunction[i] = bassFlux[i] * bassWeight +
+                                       midFlux[i] * midWeight +
+                                       highFlux[i] * highWeight;
                 }
             }
 
-            // Calcular threshold adaptativo
-            const windowForThreshold = Math.floor(sampleRate * 0.1 / hopSize); // 100ms ventana
-            const thresholdMultiplier = 0.3 + (10 - sensitivity) * 0.08; // Menor sensibilidad = mayor threshold
+            // Suavizar ligeramente para reducir ruido
+            const smoothed = new Float32Array(numFrames);
+            for (let i = 1; i < numFrames - 1; i++) {
+                smoothed[i] = onsetFunction[i] * 0.6 +
+                              (onsetFunction[i-1] + onsetFunction[i+1]) * 0.2;
+            }
+
+            // ========================================
+            // DETECCIÓN DE PICOS (ONSETS)
+            // ========================================
+            // Threshold basado en sensibilidad
+            // Sensibilidad 20 = threshold muy bajo (detecta casi todo)
+            // Sensibilidad 1 = threshold alto (solo picos fuertes)
+            const baseThreshold = 0.02 + (thresholdParam - 1) * 0.03; // 0.02 a 0.29
+            const sensitivityMultiplier = 1 - (sensitivity - 1) / 25; // 1.0 a 0.24
+            const globalThreshold = baseThreshold * sensitivityMultiplier;
+
+            // Ventana para threshold adaptativo local
+            const localWindowMs = 100; // 100ms
+            const localWindowFrames = Math.floor(localWindowMs * sampleRate / (hopSize * 1000));
 
             const beats = [];
             let lastBeatTime = -minInterval;
 
-            // Detectar picos que superen el threshold adaptativo
-            for (let i = 2; i < onsetFunction.length - 2; i++) {
+            for (let i = 2; i < numFrames - 2; i++) {
                 const time = (i * hopSize) / sampleRate;
 
                 // Solo detectar dentro del rango de trim
                 if (time < beatSyncConfig.trimStart || time > beatSyncConfig.trimEnd) continue;
 
-                // Calcular threshold local (promedio de ventana cercana)
+                const val = smoothed[i];
+
+                // Verificar que es un pico local (mayor que vecinos inmediatos)
+                const isPeak = val > smoothed[i-1] && val > smoothed[i+1];
+                if (!isPeak) continue;
+
+                // Calcular threshold local adaptativo
                 let localSum = 0;
                 let localCount = 0;
-                for (let j = Math.max(0, i - windowForThreshold); j < Math.min(onsetFunction.length, i + windowForThreshold); j++) {
-                    localSum += onsetFunction[j];
-                    localCount++;
+                for (let j = Math.max(0, i - localWindowFrames); j < Math.min(numFrames, i + localWindowFrames); j++) {
+                    if (j !== i) {
+                        localSum += smoothed[j];
+                        localCount++;
+                    }
                 }
                 const localMean = localSum / localCount;
-                const threshold = localMean * (1 + thresholdMultiplier);
 
-                // Es un pico local significativo?
-                const isPeak = onsetFunction[i] > onsetFunction[i-1] &&
-                               onsetFunction[i] > onsetFunction[i-2] &&
-                               onsetFunction[i] > onsetFunction[i+1] &&
-                               onsetFunction[i] > onsetFunction[i+2] &&
-                               onsetFunction[i] > threshold &&
-                               onsetFunction[i] > 0.05; // Mínimo absoluto
+                // Threshold: combinar global + local
+                // Con alta sensibilidad, el threshold local tiene menos peso
+                const localWeight = 0.3 + (20 - sensitivity) * 0.035; // 0.3 a 0.965
+                const threshold = globalThreshold + localMean * localWeight;
 
-                if (isPeak && (time - lastBeatTime) >= minInterval) {
+                // Verificar prominencia (el pico debe destacar)
+                const neighborAvg = (smoothed[i-1] + smoothed[i+1]) / 2;
+                const prominence = val - neighborAvg;
+                // Con sharpnessParam bajo, requerimos menos prominencia
+                const minProminence = 0.01 + (sharpnessParam - 1) * 0.005; // 0.01 a 0.055
+
+                if (val > threshold && prominence > minProminence && (time - lastBeatTime) >= minInterval) {
                     beats.push(time);
                     lastBeatTime = time;
                 }
             }
 
-            // Si no se detectaron suficientes beats, crear algunos automáticos
+            // Si detectamos muy pocos beats, bajar el threshold y reintentar
+            if (beats.length < 5 && sensitivity >= 10) {
+                beats.length = 0;
+                lastBeatTime = -minInterval;
+                const emergencyThreshold = globalThreshold * 0.3;
+
+                for (let i = 2; i < numFrames - 2; i++) {
+                    const time = (i * hopSize) / sampleRate;
+                    if (time < beatSyncConfig.trimStart || time > beatSyncConfig.trimEnd) continue;
+
+                    const val = smoothed[i];
+                    const isPeak = val > smoothed[i-1] && val > smoothed[i+1];
+
+                    if (isPeak && val > emergencyThreshold && (time - lastBeatTime) >= minInterval) {
+                        beats.push(time);
+                        lastBeatTime = time;
+                    }
+                }
+            }
+
+            // Último recurso: beats automáticos
             if (beats.length < 3) {
                 const duration = beatSyncConfig.trimEnd - beatSyncConfig.trimStart;
                 const interval = Math.max(minInterval, duration / 10);
@@ -7535,6 +7997,73 @@
             return beats;
         }
 
+        // ========================================
+        // FFT Radix-2 (Cooley-Tukey) - Rápida
+        // ========================================
+        function computeFFTMagnitude(signal) {
+            const n = signal.length;
+            const numBins = n / 2;
+
+            // Copiar señal a arrays de partes real e imaginaria
+            const real = new Float32Array(n);
+            const imag = new Float32Array(n);
+            for (let i = 0; i < n; i++) {
+                real[i] = signal[i];
+                imag[i] = 0;
+            }
+
+            // Bit-reversal permutation
+            let j = 0;
+            for (let i = 0; i < n - 1; i++) {
+                if (i < j) {
+                    let temp = real[i];
+                    real[i] = real[j];
+                    real[j] = temp;
+                    temp = imag[i];
+                    imag[i] = imag[j];
+                    imag[j] = temp;
+                }
+                let k = n >> 1;
+                while (k <= j) {
+                    j -= k;
+                    k >>= 1;
+                }
+                j += k;
+            }
+
+            // Cooley-Tukey FFT
+            for (let len = 2; len <= n; len <<= 1) {
+                const halfLen = len >> 1;
+                const angle = -2 * Math.PI / len;
+
+                for (let i = 0; i < n; i += len) {
+                    for (let k = 0; k < halfLen; k++) {
+                        const idx1 = i + k;
+                        const idx2 = i + k + halfLen;
+                        const theta = angle * k;
+                        const cos = Math.cos(theta);
+                        const sin = Math.sin(theta);
+
+                        const tReal = real[idx2] * cos - imag[idx2] * sin;
+                        const tImag = real[idx2] * sin + imag[idx2] * cos;
+
+                        real[idx2] = real[idx1] - tReal;
+                        imag[idx2] = imag[idx1] - tImag;
+                        real[idx1] = real[idx1] + tReal;
+                        imag[idx1] = imag[idx1] + tImag;
+                    }
+                }
+            }
+
+            // Calcular magnitud
+            const magnitude = new Float32Array(numBins);
+            for (let i = 0; i < numBins; i++) {
+                magnitude[i] = Math.sqrt(real[i] * real[i] + imag[i] * imag[i]) / n;
+            }
+
+            return magnitude;
+        }
+
         // Aplicar filtro de paso bajo para detectar solo bajos
         async function applyLowPassFilter(buffer, cutoffFreq) {
             const offlineCtx = new OfflineAudioContext(1, buffer.length, buffer.sampleRate);
@@ -7554,17 +8083,94 @@
             return filteredBuffer.getChannelData(0);
         }
 
-        // Manejar subida de fotos
+        // ========================================
+        // HEIC/HEIF Support - Convertir a JPEG
+        // ========================================
+        async function convertHeicToJpeg(file) {
+            // Verificar si es HEIC/HEIF
+            const isHeic = file.type === 'image/heic' ||
+                          file.type === 'image/heif' ||
+                          file.name.toLowerCase().endsWith('.heic') ||
+                          file.name.toLowerCase().endsWith('.heif');
+
+            if (!isHeic) {
+                return file; // No es HEIC, devolver original
+            }
+
+            // Verificar que heic2any esté disponible
+            if (typeof heic2any === 'undefined') {
+                console.warn('heic2any no está disponible, intentando cargar como imagen normal');
+                return file;
+            }
+
+            try {
+                // Convertir HEIC a JPEG
+                const jpegBlob = await heic2any({
+                    blob: file,
+                    toType: 'image/jpeg',
+                    quality: 0.92
+                });
+
+                // Crear nuevo File con el blob convertido
+                const jpegFile = new File(
+                    [jpegBlob],
+                    file.name.replace(/\.(heic|heif)$/i, '.jpg'),
+                    { type: 'image/jpeg' }
+                );
+
+                return jpegFile;
+            } catch (error) {
+                console.error('Error convirtiendo HEIC:', error);
+                return null; // No se pudo convertir
+            }
+        }
+
+        // Manejar subida de fotos (con soporte HEIC)
         async function handleBeatSyncPhotos(event) {
             const files = Array.from(event.target.files);
             if (!files.length) return;
 
-            // Filtrar solo imágenes
-            const imageFiles = files.filter(file => file.type.startsWith('image/'));
-            if (!imageFiles.length) return;
+            // Mostrar indicador de carga para HEIC
+            const hasHeic = files.some(f =>
+                f.name.toLowerCase().endsWith('.heic') ||
+                f.name.toLowerCase().endsWith('.heif')
+            );
+
+            if (hasHeic) {
+                const progressEl = document.getElementById('beatsyncProgress');
+                if (progressEl) {
+                    progressEl.classList.add('active');
+                    updateBeatSyncProgress(20, 'Convirtiendo imágenes HEIC...');
+                }
+            }
+
+            // Filtrar y convertir archivos
+            const validFiles = [];
+            for (const file of files) {
+                // Verificar si es imagen o HEIC
+                const isImage = file.type.startsWith('image/');
+                const isHeic = file.name.toLowerCase().endsWith('.heic') ||
+                              file.name.toLowerCase().endsWith('.heif');
+
+                if (isImage || isHeic) {
+                    // Convertir HEIC si es necesario
+                    const convertedFile = await convertHeicToJpeg(file);
+                    if (convertedFile) {
+                        validFiles.push(convertedFile);
+                    }
+                }
+            }
+
+            if (!validFiles.length) {
+                if (hasHeic) {
+                    const progressEl = document.getElementById('beatsyncProgress');
+                    if (progressEl) progressEl.classList.remove('active');
+                }
+                return;
+            }
 
             // Leer todas las imágenes en paralelo
-            const readPromises = imageFiles.map(file => {
+            const readPromises = validFiles.map(file => {
                 return new Promise((resolve) => {
                     const reader = new FileReader();
                     reader.onload = (e) => {
@@ -7587,6 +8193,12 @@
                     beatSyncConfig.photos.push(photo);
                 }
             });
+
+            // Ocultar progress
+            if (hasHeic) {
+                const progressEl = document.getElementById('beatsyncProgress');
+                if (progressEl) progressEl.classList.remove('active');
+            }
 
             // Renderizar una sola vez con todas las fotos
             renderBeatSyncPhotos();
@@ -7950,8 +8562,12 @@
 
         // Dibujar foto con transición
         function drawPhotoWithTransition(ctx, img, width, height, transition) {
-            // Calcular dimensiones para cover
-            const imgRatio = img.width / img.height;
+            // Configurar calidad
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            // Calcular dimensiones para cover (usar naturalWidth/Height para proporción real)
+            const imgRatio = (img.naturalWidth || img.width) / (img.naturalHeight || img.height);
             const canvasRatio = width / height;
 
             let drawWidth, drawHeight, drawX, drawY;
@@ -8165,17 +8781,31 @@
                 const recordCanvas = document.createElement('canvas');
                 recordCanvas.width = 1080;
                 recordCanvas.height = 1920;
-                const recordCtx = recordCanvas.getContext('2d', { alpha: false });
+                const recordCtx = recordCanvas.getContext('2d', {
+                    alpha: false,
+                    desynchronized: true // Mejor rendimiento
+                });
 
-                // Precargar imágenes
+                // Configurar calidad de renderizado
+                recordCtx.imageSmoothingEnabled = true;
+                recordCtx.imageSmoothingQuality = 'high';
+
+                // Precargar imágenes con decode() para máxima calidad
                 updateBeatSyncProgress(10, 'Cargando imágenes en alta calidad...');
                 const images = await Promise.all(photos.map(photo => {
-                    return new Promise((resolve) => {
+                    return new Promise(async (resolve) => {
                         const img = new Image();
                         img.crossOrigin = 'anonymous';
-                        img.onload = () => resolve(img);
-                        img.onerror = () => resolve(null);
                         img.src = photo.src;
+
+                        try {
+                            await img.decode(); // Asegura decodificación completa
+                            resolve(img);
+                        } catch (e) {
+                            // Fallback si decode() falla
+                            img.onload = () => resolve(img);
+                            img.onerror = () => resolve(null);
+                        }
                     });
                 }));
 
@@ -8366,28 +8996,84 @@
             }
         }
 
-        // Dibujar foto en canvas (cover mode)
-        function drawPhotoToCanvas(ctx, img, width, height) {
-            const imgRatio = img.width / img.height;
+        // Dibujar foto en canvas (cover mode) con marca de agua
+        function drawPhotoToCanvas(ctx, img, width, height, addWatermark = true) {
+            // Asegurar calidad alta
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            const imgRatio = img.naturalWidth / img.naturalHeight;
             const canvasRatio = width / height;
 
             let drawWidth, drawHeight, drawX, drawY;
 
+            // Cover mode: la imagen cubre todo el canvas, se recorta si es necesario
             if (imgRatio > canvasRatio) {
+                // Imagen más ancha: ajustar por altura
                 drawHeight = height;
                 drawWidth = height * imgRatio;
                 drawX = (width - drawWidth) / 2;
                 drawY = 0;
             } else {
+                // Imagen más alta: ajustar por ancho
                 drawWidth = width;
                 drawHeight = width / imgRatio;
                 drawX = 0;
                 drawY = (height - drawHeight) / 2;
             }
 
+            // Fondo negro
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, width, height);
+
+            // Dibujar imagen
             ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+
+            // Agregar marca de agua
+            if (addWatermark) {
+                drawWatermark(ctx, width, height);
+            }
+        }
+
+        // Dibujar marca de agua
+        function drawWatermark(ctx, width, height) {
+            const text = 'Creado con Ladoapp.com';
+            const fontSize = Math.round(width * 0.028); // ~30px en 1080p
+
+            ctx.save();
+
+            // Configurar fuente
+            ctx.font = `500 ${fontSize}px 'Poppins', sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+
+            // Medir texto
+            const metrics = ctx.measureText(text);
+            const textWidth = metrics.width;
+            const textHeight = fontSize;
+            const padding = fontSize * 0.5;
+
+            // Posición: centrado, abajo
+            const x = width / 2;
+            const y = height - (height * 0.03); // 3% desde abajo
+
+            // Fondo semitransparente
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            const bgX = x - textWidth / 2 - padding;
+            const bgY = y - textHeight - padding / 2;
+            const bgWidth = textWidth + padding * 2;
+            const bgHeight = textHeight + padding;
+            const bgRadius = fontSize * 0.3;
+
+            ctx.beginPath();
+            ctx.roundRect(bgX, bgY, bgWidth, bgHeight, bgRadius);
+            ctx.fill();
+
+            // Texto
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+            ctx.fillText(text, x, y);
+
+            ctx.restore();
         }
     </script>
 </body>
