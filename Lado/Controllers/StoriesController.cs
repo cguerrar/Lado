@@ -8,6 +8,7 @@ using Lado.Data;
 using Lado.Hubs;
 using Lado.Models;
 using Lado.Services;
+using ImageMagick;
 
 namespace Lado.Controllers
 {
@@ -1522,6 +1523,51 @@ namespace Lado.Controllers
             {
                 _logger.LogError(ex, "Error al registrar clic en anuncio {AnuncioId}", anuncioId);
                 return Json(new { success = false });
+            }
+        }
+
+        /// <summary>
+        /// Convertir imagen HEIC a JPEG (para navegadores que no soportan HEIC)
+        /// </summary>
+        [HttpPost("ConvertirHeic")]
+        [RequestSizeLimit(50_000_000)] // 50MB máximo
+        public async Task<IActionResult> ConvertirHeic(IFormFile archivo)
+        {
+            try
+            {
+                if (archivo == null || archivo.Length == 0)
+                {
+                    return BadRequest(new { success = false, error = "No se recibió archivo" });
+                }
+
+                // Verificar extensión
+                var extension = Path.GetExtension(archivo.FileName).ToLowerInvariant();
+                if (extension != ".heic" && extension != ".heif")
+                {
+                    return BadRequest(new { success = false, error = "El archivo no es HEIC/HEIF" });
+                }
+
+                using var inputStream = archivo.OpenReadStream();
+                using var image = new MagickImage(inputStream);
+
+                // Convertir a JPEG
+                image.Format = MagickFormat.Jpeg;
+                image.Quality = 92;
+
+                // Auto-orientar según EXIF
+                image.AutoOrient();
+
+                using var outputStream = new MemoryStream();
+                await image.WriteAsync(outputStream);
+                outputStream.Position = 0;
+
+                var nuevoNombre = Path.GetFileNameWithoutExtension(archivo.FileName) + ".jpg";
+                return File(outputStream.ToArray(), "image/jpeg", nuevoNombre);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error convirtiendo HEIC: {FileName}", archivo?.FileName);
+                return BadRequest(new { success = false, error = "Error al convertir: " + ex.Message });
             }
         }
     }

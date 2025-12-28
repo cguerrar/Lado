@@ -21,7 +21,7 @@
     <!-- Fabric.js para canvas interactivo -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
     <!-- HEIC to JPEG converter para imágenes de iPhone -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 
     <style>
         /* ========================================
@@ -4821,39 +4821,124 @@
 
             console.log('Detectado archivo HEIC:', file.name);
 
-            // Verificar que heic2any esté disponible
-            if (typeof heic2any === 'undefined') {
-                console.error('heic2any no está cargado');
-                alert('Error: No se puede convertir HEIC. Librería no disponible.');
-                return null;
-            }
-
+            // Método 1: Intentar con canvas nativo (funciona en Safari macOS/iOS)
             try {
-                console.log('Convirtiendo HEIC a JPEG...');
-                // Convertir HEIC a JPEG
-                const jpegBlob = await heic2any({
-                    blob: file,
-                    toType: 'image/jpeg',
-                    quality: 0.92
-                });
-
-                // heic2any puede devolver array si hay múltiples imágenes
-                const blob = Array.isArray(jpegBlob) ? jpegBlob[0] : jpegBlob;
-
-                // Crear nuevo File con el blob convertido
-                const jpegFile = new File(
-                    [blob],
-                    file.name.replace(/\.(heic|heif)$/i, '.jpg'),
-                    { type: 'image/jpeg' }
-                );
-
-                console.log('HEIC convertido exitosamente:', jpegFile.name);
-                return jpegFile;
-            } catch (error) {
-                console.error('Error convirtiendo HEIC:', error);
-                alert('Error al convertir imagen HEIC: ' + error.message);
-                return null;
+                const nativeResult = await convertHeicNative(file);
+                if (nativeResult) {
+                    console.log('HEIC convertido con canvas nativo');
+                    return nativeResult;
+                }
+            } catch (e) {
+                console.log('Canvas nativo no soporta HEIC, intentando heic2any...');
             }
+
+            // Método 2: Usar heic2any
+            if (typeof heic2any !== 'undefined') {
+                try {
+                    console.log('Convirtiendo HEIC con heic2any...');
+                    const jpegBlob = await heic2any({
+                        blob: file,
+                        toType: 'image/jpeg',
+                        quality: 0.92
+                    });
+
+                    const blob = Array.isArray(jpegBlob) ? jpegBlob[0] : jpegBlob;
+                    const jpegFile = new File(
+                        [blob],
+                        file.name.replace(/\.(heic|heif)$/i, '.jpg'),
+                        { type: 'image/jpeg' }
+                    );
+
+                    console.log('HEIC convertido exitosamente:', jpegFile.name);
+                    return jpegFile;
+                } catch (error) {
+                    console.error('heic2any falló:', error);
+                }
+            }
+
+            // Método 3: Usar servidor como último recurso
+            try {
+                console.log('Intentando conversión en servidor...');
+                const serverResult = await convertHeicServer(file);
+                if (serverResult) {
+                    console.log('HEIC convertido en servidor');
+                    return serverResult;
+                }
+            } catch (e) {
+                console.error('Conversión en servidor falló:', e);
+            }
+
+            // Si todo falla, mostrar mensaje útil
+            alert('No se pudo convertir la imagen HEIC.\n\nOpciones:\n1. Usa Safari en Mac/iPhone (soporta HEIC nativo)\n2. Convierte la imagen a JPG antes de subirla\n3. Usa una app como "HEIC Converter" en tu dispositivo');
+            return null;
+        }
+
+        // Convertir HEIC usando el servidor
+        async function convertHeicServer(file) {
+            const formData = new FormData();
+            formData.append('archivo', file);
+
+            const response = await fetch('/Stories/ConvertirHeic', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.error || 'Error del servidor');
+            }
+
+            const blob = await response.blob();
+            return new File(
+                [blob],
+                file.name.replace(/\.(heic|heif)$/i, '.jpg'),
+                { type: 'image/jpeg' }
+            );
+        }
+
+        // Intentar convertir HEIC usando canvas nativo (Safari)
+        function convertHeicNative(file) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+
+                img.onload = () => {
+                    try {
+                        // Crear canvas y dibujar imagen
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.naturalWidth;
+                        canvas.height = img.naturalHeight;
+
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+
+                        // Exportar como JPEG
+                        canvas.toBlob((blob) => {
+                            URL.revokeObjectURL(url);
+                            if (blob) {
+                                const jpegFile = new File(
+                                    [blob],
+                                    file.name.replace(/\.(heic|heif)$/i, '.jpg'),
+                                    { type: 'image/jpeg' }
+                                );
+                                resolve(jpegFile);
+                            } else {
+                                reject(new Error('No se pudo crear blob'));
+                            }
+                        }, 'image/jpeg', 0.92);
+                    } catch (e) {
+                        URL.revokeObjectURL(url);
+                        reject(e);
+                    }
+                };
+
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error('Navegador no soporta HEIC'));
+                };
+
+                img.src = url;
+            });
         }
 
         // ========================================
