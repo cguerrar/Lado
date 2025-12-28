@@ -8979,21 +8979,38 @@
                 // Iniciar grabación
                 mediaRecorder.start(100);
 
-                // Iniciar audio
-                const startTime = beatSyncConfig.audioContext.currentTime;
-                audioSource.start(0, trimStart, duration);
-
                 // Dibujar primera imagen
                 let lastBeatIndex = -1;
                 drawPhotoToCanvas(recordCtx, validImages[photoSequence[0] || 0], recordCanvas.width, recordCanvas.height);
 
-                // Animar durante la duración
-                const animationDuration = duration * 1000;
-                const animationStart = performance.now();
+                // Iniciar audio y guardar tiempo de inicio
+                const audioStartTime = beatSyncConfig.audioContext.currentTime;
+                audioSource.start(0, trimStart, duration);
+
+                // Flag para flash en progreso
+                let flashInProgress = false;
+
+                // Usar intervalo fijo para mayor consistencia (60fps = 16.67ms)
+                const frameInterval = 1000 / 60;
+                let lastFrameTime = performance.now();
+                let animationStopped = false;
 
                 function animateRecording() {
-                    const elapsed = performance.now() - animationStart;
-                    const currentTime = elapsed / 1000;
+                    if (animationStopped) return;
+
+                    const now = performance.now();
+                    const deltaFrame = now - lastFrameTime;
+
+                    // Mantener 60fps consistente
+                    if (deltaFrame < frameInterval * 0.8) {
+                        requestAnimationFrame(animateRecording);
+                        return;
+                    }
+                    lastFrameTime = now;
+
+                    // Usar AudioContext para timing preciso (sincronizado con audio)
+                    const audioElapsed = beatSyncConfig.audioContext.currentTime - audioStartTime;
+                    const currentTime = Math.max(0, audioElapsed);
 
                     // Actualizar progreso
                     const recordProgress = Math.min(currentTime / duration, 1);
@@ -9001,12 +9018,13 @@
 
                     if (currentTime >= duration) {
                         // Detener grabación
+                        animationStopped = true;
                         mediaRecorder.stop();
                         try { audioSource.stop(); } catch(e) {}
                         return;
                     }
 
-                    // Encontrar beat actual
+                    // Encontrar beat actual basado en tiempo del audio
                     let currentBeatIndex = 0;
                     for (let i = 0; i < validBeats.length; i++) {
                         if (validBeats[i] <= currentTime) {
@@ -9017,18 +9035,21 @@
                     }
 
                     // Cambiar imagen en cada beat
-                    if (currentBeatIndex !== lastBeatIndex) {
+                    if (currentBeatIndex !== lastBeatIndex && !flashInProgress) {
                         lastBeatIndex = currentBeatIndex;
                         const photoIndex = photoSequence[currentBeatIndex] || 0;
                         const imgToShow = validImages[photoIndex % validImages.length];
 
-                        // Efecto de transición simple para grabación
+                        // Transición flash sincronizada
                         if (transition === 'flash') {
+                            flashInProgress = true;
                             recordCtx.fillStyle = '#fff';
                             recordCtx.fillRect(0, 0, recordCanvas.width, recordCanvas.height);
-                            setTimeout(() => {
+                            // Dibujar imagen en el siguiente frame
+                            requestAnimationFrame(() => {
                                 drawPhotoToCanvas(recordCtx, imgToShow, recordCanvas.width, recordCanvas.height);
-                            }, 30);
+                                flashInProgress = false;
+                            });
                         } else {
                             drawPhotoToCanvas(recordCtx, imgToShow, recordCanvas.width, recordCanvas.height);
                         }
