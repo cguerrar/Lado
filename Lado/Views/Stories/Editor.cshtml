@@ -4133,43 +4133,8 @@
                             </div>
                             <input type="file" id="beatsyncMusicInput" accept="audio/*" style="display: none;" onchange="handleBeatSyncMusic(event)">
 
-                            <!-- Waveform mejorado -->
-                            <div class="beatsync-waveform-container" id="beatsyncWaveformContainer" style="display: none;">
-                                <div class="beatsync-waveform" id="beatsyncWaveform" onclick="seekBeatSyncWaveform(event)">
-                                    <canvas id="beatsyncWaveformCanvas"></canvas>
-                                    <div class="beatsync-waveform-playhead" id="beatsyncPlayhead"></div>
-                                </div>
-                                <div class="beatsync-time-display">
-                                    <span id="beatsyncCurrentTime">0:00</span>
-                                    <span id="beatsyncTotalTime">0:00</span>
-                                </div>
-
-                                <!-- Info de beats y botón re-analizar -->
-                                <div class="beatsync-beats-info">
-                                    <div class="beatsync-beats-stat">
-                                        <div class="beatsync-beats-dot" id="beatsyncBeatDot"></div>
-                                        <span class="beatsync-beats-text">
-                                            <span class="beatsync-beats-count" id="beatsyncBeatsCount">0</span> beats detectados
-                                        </span>
-                                    </div>
-                                    <button class="beatsync-reanalyze-btn" onclick="reanalyzeBeatSync()">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                                            <path d="M3 3v5h5"/>
-                                        </svg>
-                                        Re-analizar
-                                    </button>
-                                </div>
-
-                                <!-- Modo de detección -->
-                                <div class="beatsync-mode-selector">
-                                    <button class="beatsync-mode-btn active" data-mode="auto" onclick="setBeatSyncMode('auto', this)">Auto</button>
-                                    <button class="beatsync-mode-btn" data-mode="bass" onclick="setBeatSyncMode('bass', this)">Solo Bajos</button>
-                                    <button class="beatsync-mode-btn" data-mode="all" onclick="setBeatSyncMode('all', this)">Todos</button>
-                                </div>
-
-                                <!-- Audio Cutter Visual Completo -->
-                                <div class="beatsync-audio-cutter" id="beatsyncAudioCutter">
+                            <!-- Audio Cutter Visual (se muestra después de cargar música) -->
+                            <div class="beatsync-audio-cutter" id="beatsyncAudioCutter" style="display: none;">
                                     <div class="beatsync-cutter-header">
                                         <div class="beatsync-cutter-filename" id="beatsyncCutterFilename">Audio</div>
                                         <div class="beatsync-cutter-info">
@@ -4223,8 +4188,24 @@
                                         </svg>
                                         Arrastra los controles para seleccionar el fragmento
                                     </div>
+
+                                    <!-- Info de beats -->
+                                    <div class="beatsync-beats-info" style="margin-top: 12px;">
+                                        <div class="beatsync-beats-stat">
+                                            <div class="beatsync-beats-dot" id="beatsyncBeatDot"></div>
+                                            <span class="beatsync-beats-text">
+                                                <span class="beatsync-beats-count" id="beatsyncBeatsCount">0</span> beats detectados
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Modo de detección -->
+                                    <div class="beatsync-mode-selector" style="margin-top: 10px;">
+                                        <button class="beatsync-mode-btn active" data-mode="auto" onclick="setBeatSyncMode('auto', this)">Auto</button>
+                                        <button class="beatsync-mode-btn" data-mode="bass" onclick="setBeatSyncMode('bass', this)">Solo Bajos</button>
+                                        <button class="beatsync-mode-btn" data-mode="all" onclick="setBeatSyncMode('all', this)">Todos</button>
+                                    </div>
                                 </div>
-                            </div>
                         </div>
 
                         <!-- Sección: Subir fotos -->
@@ -4295,15 +4276,6 @@
                                         <input type="range" class="beatsync-slider" id="beatsyncMinInterval" min="0.2" max="2" step="0.1" value="0.3" oninput="updateMinIntervalLabel(this.value)" onchange="onSensitivityChange()">
                                         <span class="beatsync-slider-value" id="beatsyncMinIntervalValue">0.3s</span>
                                     </div>
-                                </div>
-                                <div class="beatsync-config-row">
-                                    <span class="beatsync-config-label">Duración</span>
-                                    <select class="beatsync-select" id="beatsyncDuration">
-                                        <option value="15">15 segundos</option>
-                                        <option value="30" selected>30 segundos</option>
-                                        <option value="60">60 segundos</option>
-                                        <option value="auto">Toda la canción</option>
-                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -7365,14 +7337,9 @@
                 await detectBeatsImproved();
                 updateBeatSyncProgress(100, 'Listo!');
 
-                // Mostrar waveform container (el viejo, por compatibilidad)
-                const oldContainer = document.getElementById('beatsyncWaveformContainer');
-                if (oldContainer) oldContainer.style.display = 'block';
-
-                // Actualizar tiempo total
-                const totalTime = beatSyncConfig.audioBuffer.duration;
-                const totalTimeEl = document.getElementById('beatsyncTotalTime');
-                if (totalTimeEl) totalTimeEl.textContent = formatTime(totalTime);
+                // Mostrar el audio cutter visual
+                const audioCutter = document.getElementById('beatsyncAudioCutter');
+                if (audioCutter) audioCutter.style.display = 'block';
 
                 // Ocultar progress después de un momento
                 setTimeout(() => {
@@ -7535,128 +7502,6 @@
 
             const filteredBuffer = await offlineCtx.startRendering();
             return filteredBuffer.getChannelData(0);
-        }
-
-        // Dibujar waveform mejorado
-        function drawBeatSyncWaveform() {
-            const waveformCanvas = document.getElementById('beatsyncWaveformCanvas');
-            if (!waveformCanvas) return;
-            const ctx = waveformCanvas.getContext('2d');
-            const buffer = beatSyncConfig.audioBuffer;
-            if (!buffer) return;
-
-            // Ajustar tamaño del canvas
-            const rect = waveformCanvas.parentElement.getBoundingClientRect();
-            waveformCanvas.width = rect.width * window.devicePixelRatio;
-            waveformCanvas.height = rect.height * window.devicePixelRatio;
-            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-            const width = rect.width;
-            const height = rect.height;
-            const duration = buffer.duration;
-            const channelData = buffer.getChannelData(0);
-            const step = Math.ceil(channelData.length / width);
-
-            // Obtener límites de trim
-            const trimStart = beatSyncConfig.trimStart || 0;
-            const trimEnd = beatSyncConfig.trimEnd || duration;
-
-            // Limpiar
-            ctx.clearRect(0, 0, width, height);
-
-            // Dibujar zona fuera de trim (oscurecida)
-            const trimStartX = (trimStart / duration) * width;
-            const trimEndX = (trimEnd / duration) * width;
-
-            // Zona antes del inicio del trim
-            if (trimStartX > 0) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-                ctx.fillRect(0, 0, trimStartX, height);
-            }
-
-            // Zona después del fin del trim
-            if (trimEndX < width) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-                ctx.fillRect(trimEndX, 0, width - trimEndX, height);
-            }
-
-            // Dibujar waveform
-            ctx.beginPath();
-            const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#3b82f6';
-            ctx.lineWidth = 1;
-
-            const mid = height / 2;
-            for (let i = 0; i < width; i++) {
-                let min = 1.0, max = -1.0;
-                for (let j = 0; j < step; j++) {
-                    const datum = channelData[(i * step) + j];
-                    if (datum < min) min = datum;
-                    if (datum > max) max = datum;
-                }
-                // Color diferente dentro y fuera del trim
-                const time = (i / width) * duration;
-                if (time >= trimStart && time <= trimEnd) {
-                    ctx.strokeStyle = primaryColor;
-                } else {
-                    ctx.strokeStyle = 'rgba(100, 100, 100, 0.5)';
-                }
-                ctx.beginPath();
-                ctx.moveTo(i, mid + min * mid * 0.8);
-                ctx.lineTo(i, mid + max * mid * 0.8);
-                ctx.stroke();
-            }
-
-            // Dibujar líneas de límite de trim
-            ctx.strokeStyle = '#22c55e';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([4, 4]);
-
-            // Línea de inicio
-            ctx.beginPath();
-            ctx.moveTo(trimStartX, 0);
-            ctx.lineTo(trimStartX, height);
-            ctx.stroke();
-
-            // Línea de fin
-            ctx.beginPath();
-            ctx.moveTo(trimEndX, 0);
-            ctx.lineTo(trimEndX, height);
-            ctx.stroke();
-
-            ctx.setLineDash([]);
-
-            // Dibujar marcadores de beats (solo dentro del trim)
-            ctx.fillStyle = 'rgba(239, 68, 68, 0.7)';
-            beatSyncConfig.beats.forEach(beatTime => {
-                if (beatTime >= trimStart && beatTime <= trimEnd) {
-                    const x = (beatTime / duration) * width;
-                    ctx.fillRect(x - 1, 0, 2, height);
-                }
-            });
-        }
-
-        // Buscar en waveform (click para posicionar)
-        function seekBeatSyncWaveform(event) {
-            if (!beatSyncConfig.audioBuffer) return;
-
-            const waveform = document.getElementById('beatsyncWaveform');
-            const rect = waveform.getBoundingClientRect();
-            const clickX = event.clientX - rect.left;
-            const percent = clickX / rect.width;
-
-            const totalDuration = beatSyncConfig.audioBuffer.duration;
-            const clickedTime = percent * totalDuration;
-
-            // Actualizar el tiempo actual mostrado
-            const currentTimeEl = document.getElementById('beatsyncCurrentTime');
-            if (currentTimeEl) currentTimeEl.textContent = formatTime(clickedTime);
-
-            // Mover el playhead
-            const playhead = document.getElementById('beatsyncPlayhead');
-            if (playhead) {
-                playhead.style.display = 'block';
-                playhead.style.left = `${percent * 100}%`;
-            }
         }
 
         // Manejar subida de fotos
