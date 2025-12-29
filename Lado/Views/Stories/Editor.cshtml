@@ -396,6 +396,14 @@
             display: block;
         }
 
+        /* Sección de publicar siempre visible */
+        #publishOptions {
+            display: block !important;
+            border-top: 1px solid var(--border);
+            padding-top: 16px;
+            margin-top: 16px;
+        }
+
         .option-group {
             margin-bottom: 20px;
         }
@@ -4531,6 +4539,24 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Opción: Publicar también en Feed -->
+                    <div class="option-group" style="margin-top: 16px;">
+                        <label class="toggle-option" style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background: var(--surface); border-radius: 8px; cursor: pointer;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" style="color: var(--primary);">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                    <line x1="3" y1="9" x2="21" y2="9"/>
+                                    <line x1="9" y1="21" x2="9" y2="9"/>
+                                </svg>
+                                <div>
+                                    <div style="font-weight: 500; font-size: 13px;">Publicar también en Feed</div>
+                                    <div style="font-size: 11px; color: var(--muted);">Crear un post permanente con este contenido</div>
+                                </div>
+                            </div>
+                            <input type="checkbox" id="publicarEnFeed" style="width: 18px; height: 18px; accent-color: var(--primary);">
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -4809,11 +4835,16 @@
         // HEIC/HEIF Support - Convertir a JPEG
         // ========================================
         async function convertHeicToJpeg(file) {
-            // Verificar si es HEIC/HEIF
-            const isHeic = file.type === 'image/heic' ||
-                          file.type === 'image/heif' ||
-                          file.name.toLowerCase().endsWith('.heic') ||
-                          file.name.toLowerCase().endsWith('.heif');
+            // Verificar si es HEIC/HEIF por:
+            // 1. MIME type explícito
+            // 2. Extensión del archivo (más confiable en algunos navegadores)
+            // 3. MIME vacío o genérico + extensión HEIC (iOS/Chrome puede reportar '' o 'application/octet-stream')
+            const fileName = file.name.toLowerCase();
+            const hasHeicExtension = fileName.endsWith('.heic') || fileName.endsWith('.heif');
+            const hasHeicMime = file.type === 'image/heic' || file.type === 'image/heif';
+            const hasUnknownMime = !file.type || file.type === '' || file.type === 'application/octet-stream';
+
+            const isHeic = hasHeicMime || hasHeicExtension || (hasUnknownMime && hasHeicExtension);
 
             if (!isHeic) {
                 return file; // No es HEIC, devolver original
@@ -5052,6 +5083,12 @@
         // HERRAMIENTAS
         // ========================================
         function seleccionarHerramienta(tool) {
+            // Limpiar recursos de Beat Sync al cambiar de herramienta
+            if (currentTool === 'beatsync' && tool !== 'beatsync') {
+                stopBeatSyncPreview();
+                stopCutterPlayback();
+            }
+
             currentTool = tool;
 
             // Actualizar botones
@@ -6619,6 +6656,12 @@
                 formData.append('elementosJson', JSON.stringify(elementos));
                 formData.append('mencionesIds', mencionesIds.join(','));
 
+                // Opción de publicar también en Feed
+                const publicarEnFeedCheckbox = document.getElementById('publicarEnFeed');
+                if (publicarEnFeedCheckbox && publicarEnFeedCheckbox.checked) {
+                    formData.append('publicarEnFeed', 'true');
+                }
+
                 if (selectedMusic) {
                     formData.append('pistaMusicalId', selectedMusic.id);
                     formData.append('musicaTrimStart', musicTrimStart);
@@ -6653,6 +6696,10 @@
         function cancelarEditor() {
             const mensaje = MODO_EDITOR === 'reel' ? '¿Descartar reel?' : '¿Descartar historia?';
             if (confirm(mensaje)) {
+                // Limpiar recursos de Beat Sync antes de salir
+                if (typeof cleanupBeatSyncResources === 'function') {
+                    cleanupBeatSyncResources();
+                }
                 window.location.href = '/Feed';
             }
         }
@@ -7218,7 +7265,7 @@
         }
 
         // ========================================
-        // BEAT SYNC - Video musical sincronizado (v2.0 - Mejorado)
+        // BEAT SYNC - Video musical sincronizado (v3.0 - Optimizado)
         // ========================================
         const beatSyncConfig = {
             audioContext: null,
@@ -7239,13 +7286,111 @@
             duration: 30,
             trimStart: 0,
             trimEnd: 30,
-            // Nuevo: para el audio cutter visual
+            // Audio cutter visual
             cutterPlaying: false,
             cutterSource: null,
             cutterAnimationId: null,
             isDraggingHandle: false,
-            dragHandle: null
+            dragHandle: null,
+            // ========== OPTIMIZACIONES v3.0 ==========
+            // Caché de imágenes decodificadas (ImageBitmap)
+            cachedImages: [],
+            imagesCacheValid: false,
+            // Caché de análisis spectral (evita recálculo completo)
+            spectralFluxCache: null,
+            spectralFluxCacheValid: false,
+            // FFT twiddle factors precalculados
+            fftTwiddleFactors: null,
+            fftSize: 2048,
+            // Marca de agua pre-renderizada
+            watermarkCanvas: null,
+            // Beats manuales (agregados/eliminados por usuario)
+            manualBeatsAdded: [],
+            manualBeatsRemoved: [],
+            // Posiciones de beats en waveform (para clicks)
+            beatPositions: [],
+            // Flag para evitar duplicación de event listeners
+            waveformClicksSetup: false,
+            dragHandlesSetup: false
         };
+
+        // ========================================
+        // INICIALIZAR OPTIMIZACIONES
+        // ========================================
+        function initBeatSyncOptimizations() {
+            // Pre-calcular twiddle factors para FFT
+            const n = beatSyncConfig.fftSize;
+            beatSyncConfig.fftTwiddleFactors = {
+                cos: new Float32Array(n / 2),
+                sin: new Float32Array(n / 2)
+            };
+            for (let k = 0; k < n / 2; k++) {
+                const angle = -2 * Math.PI * k / n;
+                beatSyncConfig.fftTwiddleFactors.cos[k] = Math.cos(angle);
+                beatSyncConfig.fftTwiddleFactors.sin[k] = Math.sin(angle);
+            }
+
+            // Pre-renderizar marca de agua
+            preRenderWatermark();
+        }
+
+        // Pre-renderizar marca de agua para reutilizar (VERTICAL IZQUIERDA)
+        function preRenderWatermark() {
+            const width = 1080;
+            const height = 1920;
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            const text = 'Creado con Ladoapp.com';
+            const fontSize = Math.round(width * 0.024); // Un poco más pequeño para vertical
+
+            ctx.font = `500 ${fontSize}px 'Poppins', sans-serif`;
+
+            const metrics = ctx.measureText(text);
+            const textWidth = metrics.width;
+            const textHeight = fontSize;
+            const padding = fontSize * 0.4;
+
+            // Posición vertical izquierda (centrado verticalmente)
+            const x = width * 0.03; // 3% desde el borde izquierdo
+            const y = height / 2;   // Centro vertical
+
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(-Math.PI / 2); // Rotar 90° antihorario
+
+            // El texto ahora está rotado, textWidth es la "altura" visual
+            // Fondo semitransparente (pill vertical)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            const bgX = -textWidth / 2 - padding;
+            const bgY = -textHeight / 2 - padding / 2;
+            const bgWidth = textWidth + padding * 2;
+            const bgHeight = textHeight + padding;
+            const bgRadius = fontSize * 0.3;
+
+            ctx.beginPath();
+            ctx.roundRect(bgX, bgY, bgWidth, bgHeight, bgRadius);
+            ctx.fill();
+
+            // Texto centrado
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 0, 0);
+
+            ctx.restore();
+
+            beatSyncConfig.watermarkCanvas = canvas;
+        }
+
+        // Inicializar al cargar
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initBeatSyncOptimizations);
+        } else {
+            initBeatSyncOptimizations();
+        }
 
         // Formatear tiempo mm:ss
         function formatTime(seconds) {
@@ -7367,6 +7512,7 @@
             updateCutterSelection();
             drawCutterWaveform();
             setupCutterDragHandles();
+            setupWaveformBeatClicks(); // Doble click para agregar/eliminar beats
         }
 
         // Dibujar waveform mejorado con barras
@@ -7440,19 +7586,87 @@
                 ctx.fill();
             }
 
-            // Dibujar marcadores de beats (sutiles, solo líneas pequeñas arriba y abajo)
+            // Dibujar marcadores de beats mejorados
             const duration = buffer.duration;
             const beatsInRange = beatSyncConfig.beats.filter(
                 b => b >= beatSyncConfig.trimStart && b <= beatSyncConfig.trimEnd
             );
 
-            // Si hay muchos beats, solo dibujar indicadores sutiles
-            beatsInRange.forEach(beatTime => {
+            // Dibujar beats con mejor visibilidad
+            beatsInRange.forEach((beatTime, idx) => {
                 const x = (beatTime / duration) * width;
-                ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
-                // Solo pequeñas marcas arriba y abajo, no líneas completas
-                ctx.fillRect(x, 0, 1, 6);
-                ctx.fillRect(x, height - 6, 1, 6);
+
+                // Línea vertical tenue
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
+                ctx.fillRect(x - 0.5, 0, 1, height);
+
+                // Marcadores más visibles arriba y abajo
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.7)';
+                ctx.beginPath();
+                // Triángulo arriba
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x - 4, 8);
+                ctx.lineTo(x + 4, 8);
+                ctx.closePath();
+                ctx.fill();
+
+                // Triángulo abajo
+                ctx.beginPath();
+                ctx.moveTo(x, height);
+                ctx.lineTo(x - 4, height - 8);
+                ctx.lineTo(x + 4, height - 8);
+                ctx.closePath();
+                ctx.fill();
+            });
+
+            // Almacenar posiciones de beats para clicks
+            beatSyncConfig.beatPositions = beatsInRange.map(beatTime => ({
+                time: beatTime,
+                x: (beatTime / duration) * width
+            }));
+        }
+
+        // Click en waveform para agregar/eliminar beats
+        function setupWaveformBeatClicks() {
+            const canvas = document.getElementById('beatsyncWaveformCanvas2');
+            const container = document.getElementById('beatsyncWaveformVisual');
+            if (!canvas || !container) return;
+
+            // Evitar duplicación de event listeners
+            if (beatSyncConfig.waveformClicksSetup) return;
+            beatSyncConfig.waveformClicksSetup = true;
+
+            canvas.addEventListener('dblclick', (e) => {
+                if (!beatSyncConfig.audioBuffer) return;
+
+                const rect = container.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const width = container.offsetWidth;
+                const duration = beatSyncConfig.audioBuffer.duration;
+                const clickTime = (x / width) * duration;
+
+                // Verificar si hay un beat cerca (tolerancia de 50px)
+                const tolerance = 50;
+                const positions = beatSyncConfig.beatPositions || [];
+                const nearbyBeat = positions.find(b => Math.abs(b.x - x) < tolerance);
+
+                if (nearbyBeat) {
+                    // Eliminar beat existente
+                    const idx = beatSyncConfig.beats.indexOf(nearbyBeat.time);
+                    if (idx > -1) {
+                        beatSyncConfig.beats.splice(idx, 1);
+                        beatSyncConfig.manualBeatsRemoved.push(nearbyBeat.time);
+                    }
+                } else {
+                    // Agregar nuevo beat
+                    beatSyncConfig.beats.push(clickTime);
+                    beatSyncConfig.beats.sort((a, b) => a - b);
+                    beatSyncConfig.manualBeatsAdded.push(clickTime);
+                }
+
+                // Redibujar waveform y actualizar UI
+                drawCutterWaveform();
+                updateCutterSelection();
             });
         }
 
@@ -7532,6 +7746,10 @@
             const container = document.getElementById('beatsyncWaveformVisual');
 
             if (!handleLeft || !handleRight || !container) return;
+
+            // Evitar duplicación de event listeners
+            if (beatSyncConfig.dragHandlesSetup) return;
+            beatSyncConfig.dragHandlesSetup = true;
 
             const startDrag = (e, handle) => {
                 e.preventDefault();
@@ -7853,6 +8071,10 @@
 
                 // Decodificar audio
                 beatSyncConfig.audioBuffer = await beatSyncConfig.audioContext.decodeAudioData(arrayBuffer);
+
+                // Invalidar caché de spectral flux (nuevo audio)
+                beatSyncConfig.spectralFluxCache = null;
+
                 updateBeatSyncProgress(50, 'Analizando ritmo...');
 
                 // Inicializar audio cutter visual
@@ -7896,110 +8118,102 @@
             const thresholdParam = parseInt(document.getElementById('beatsyncThreshold')?.value) || 3;
             const sharpnessParam = parseInt(document.getElementById('beatsyncSharpness')?.value) || 3;
 
-            // Obtener datos de audio (combinar canales si es stereo)
-            let channelData = buffer.getChannelData(0);
-            if (buffer.numberOfChannels > 1) {
-                const ch2 = buffer.getChannelData(1);
-                const merged = new Float32Array(channelData.length);
-                for (let i = 0; i < channelData.length; i++) {
-                    merged[i] = (channelData[i] + ch2[i]) / 2;
-                }
-                channelData = merged;
-            }
-
             // ========================================
             // PARÁMETROS DE ANÁLISIS FFT
             // ========================================
             const fftSize = 2048;
-            const hopSize = Math.floor(fftSize / 4); // 75% overlap para mejor resolución temporal
-            const numFrames = Math.floor((channelData.length - fftSize) / hopSize);
-
-            // Función de ventana Hanning
-            const hanningWindow = new Float32Array(fftSize);
-            for (let i = 0; i < fftSize; i++) {
-                hanningWindow[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (fftSize - 1)));
-            }
+            const hopSize = Math.floor(fftSize / 4);
+            const numFrames = Math.floor((buffer.getChannelData(0).length - fftSize) / hopSize);
 
             // ========================================
-            // CALCULAR ESPECTROS Y SPECTRAL FLUX
+            // VERIFICAR CACHÉ DE SPECTRAL FLUX
             // ========================================
-            const numBins = fftSize / 2;
-            let prevSpectrum = new Float32Array(numBins);
-            const spectralFlux = new Float32Array(numFrames);
-            const energyDiff = new Float32Array(numFrames);
+            let bassFlux, midFlux, highFlux;
+            const cache = beatSyncConfig.spectralFluxCache;
 
-            // Dividir en bandas de frecuencia para mejor detección
-            const bassEnd = Math.floor(200 * fftSize / sampleRate);
-            const midEnd = Math.floor(2000 * fftSize / sampleRate);
-
-            const bassFlux = new Float32Array(numFrames);
-            const midFlux = new Float32Array(numFrames);
-            const highFlux = new Float32Array(numFrames);
-
-            for (let frame = 0; frame < numFrames; frame++) {
-                const start = frame * hopSize;
-
-                // Extraer frame y aplicar ventana
-                const frameData = new Float32Array(fftSize);
-                for (let i = 0; i < fftSize; i++) {
-                    frameData[i] = (channelData[start + i] || 0) * hanningWindow[i];
-                }
-
-                // FFT simple (magnitud del espectro)
-                const spectrum = computeFFTMagnitude(frameData);
-
-                // Calcular Spectral Flux (suma de incrementos positivos)
-                let flux = 0;
-                let bFlux = 0, mFlux = 0, hFlux = 0;
-
-                for (let bin = 1; bin < numBins; bin++) {
-                    const diff = spectrum[bin] - prevSpectrum[bin];
-                    if (diff > 0) {
-                        flux += diff;
-                        if (bin < bassEnd) bFlux += diff;
-                        else if (bin < midEnd) mFlux += diff;
-                        else hFlux += diff;
+            if (cache && cache.valid && cache.numFrames === numFrames) {
+                // Usar datos cacheados (evita recálculo FFT)
+                bassFlux = cache.bassFlux;
+                midFlux = cache.midFlux;
+                highFlux = cache.highFlux;
+            } else {
+                // Calcular spectral flux desde cero
+                let channelData = buffer.getChannelData(0);
+                if (buffer.numberOfChannels > 1) {
+                    const ch2 = buffer.getChannelData(1);
+                    const merged = new Float32Array(channelData.length);
+                    for (let i = 0; i < channelData.length; i++) {
+                        merged[i] = (channelData[i] + ch2[i]) / 2;
                     }
+                    channelData = merged;
                 }
 
-                spectralFlux[frame] = flux;
-                bassFlux[frame] = bFlux;
-                midFlux[frame] = mFlux;
-                highFlux[frame] = hFlux;
-
-                // También calcular cambio de energía (para complementar)
-                let energy = 0;
+                // Función de ventana Hanning
+                const hanningWindow = new Float32Array(fftSize);
                 for (let i = 0; i < fftSize; i++) {
-                    energy += frameData[i] * frameData[i];
+                    hanningWindow[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (fftSize - 1)));
                 }
-                energy = Math.sqrt(energy / fftSize);
 
-                if (frame > 0) {
-                    const prevEnergy = energyDiff[frame - 1];
-                    energyDiff[frame] = Math.max(0, energy - prevEnergy * 0.95);
+                const numBins = fftSize / 2;
+                let prevSpectrum = new Float32Array(numBins);
+                bassFlux = new Float32Array(numFrames);
+                midFlux = new Float32Array(numFrames);
+                highFlux = new Float32Array(numFrames);
+
+                const bassEnd = Math.floor(200 * fftSize / sampleRate);
+                const midEnd = Math.floor(2000 * fftSize / sampleRate);
+
+                for (let frame = 0; frame < numFrames; frame++) {
+                    const start = frame * hopSize;
+                    const frameData = new Float32Array(fftSize);
+                    for (let i = 0; i < fftSize; i++) {
+                        frameData[i] = (channelData[start + i] || 0) * hanningWindow[i];
+                    }
+
+                    const spectrum = computeFFTMagnitude(frameData);
+
+                    let bFlux = 0, mFlux = 0, hFlux = 0;
+                    for (let bin = 1; bin < numBins; bin++) {
+                        const diff = spectrum[bin] - prevSpectrum[bin];
+                        if (diff > 0) {
+                            if (bin < bassEnd) bFlux += diff;
+                            else if (bin < midEnd) mFlux += diff;
+                            else hFlux += diff;
+                        }
+                    }
+
+                    bassFlux[frame] = bFlux;
+                    midFlux[frame] = mFlux;
+                    highFlux[frame] = hFlux;
+                    prevSpectrum = spectrum.slice();
                 }
-                energyDiff[frame] = energy;
 
-                // Guardar espectro actual para siguiente frame
-                prevSpectrum = spectrum.slice();
+                // Normalizar y cachear
+                const normalize = (arr) => {
+                    let max = 0;
+                    for (let i = 0; i < arr.length; i++) if (arr[i] > max) max = arr[i];
+                    if (max > 0) for (let i = 0; i < arr.length; i++) arr[i] /= max;
+                };
+                normalize(bassFlux);
+                normalize(midFlux);
+                normalize(highFlux);
+
+                // Guardar en caché
+                beatSyncConfig.spectralFluxCache = {
+                    valid: true,
+                    numFrames: numFrames,
+                    bassFlux: bassFlux,
+                    midFlux: midFlux,
+                    highFlux: highFlux,
+                    sampleRate: sampleRate,
+                    hopSize: hopSize
+                };
             }
 
             // ========================================
-            // COMBINAR SEÑALES DE DETECCIÓN
+            // COMBINAR SEÑALES DE DETECCIÓN (rápido, usa caché)
             // ========================================
             const onsetFunction = new Float32Array(numFrames);
-
-            // Normalizar cada señal
-            const normalize = (arr) => {
-                let max = 0;
-                for (let i = 0; i < arr.length; i++) if (arr[i] > max) max = arr[i];
-                if (max > 0) for (let i = 0; i < arr.length; i++) arr[i] /= max;
-            };
-
-            normalize(spectralFlux);
-            normalize(bassFlux);
-            normalize(midFlux);
-            normalize(highFlux);
 
             // Combinar según el modo
             // sharpnessParam: 1 = detecta todo (más mids/highs), 10 = solo golpes fuertes (más bass)
@@ -8134,7 +8348,7 @@
         }
 
         // ========================================
-        // FFT Radix-2 (Cooley-Tukey) - Rápida
+        // FFT Radix-2 (Cooley-Tukey) - OPTIMIZADO con Twiddle Factors
         // ========================================
         function computeFFTMagnitude(signal) {
             const n = signal.length;
@@ -8148,7 +8362,7 @@
                 imag[i] = 0;
             }
 
-            // Bit-reversal permutation
+            // Bit-reversal permutation (precalcular si es posible)
             let j = 0;
             for (let i = 0; i < n - 1; i++) {
                 if (i < j) {
@@ -8167,18 +8381,31 @@
                 j += k;
             }
 
-            // Cooley-Tukey FFT
+            // Cooley-Tukey FFT con twiddle factors precalculados
+            const twiddleCos = beatSyncConfig.fftTwiddleFactors?.cos;
+            const twiddleSin = beatSyncConfig.fftTwiddleFactors?.sin;
+            const hasTwiddle = twiddleCos && twiddleSin && n === beatSyncConfig.fftSize;
+
             for (let len = 2; len <= n; len <<= 1) {
                 const halfLen = len >> 1;
-                const angle = -2 * Math.PI / len;
+                const tableStep = n / len; // Paso en tabla de twiddle
 
                 for (let i = 0; i < n; i += len) {
                     for (let k = 0; k < halfLen; k++) {
                         const idx1 = i + k;
                         const idx2 = i + k + halfLen;
-                        const theta = angle * k;
-                        const cos = Math.cos(theta);
-                        const sin = Math.sin(theta);
+
+                        // Usar twiddle factors precalculados si están disponibles
+                        let cos, sin;
+                        if (hasTwiddle) {
+                            const twiddleIdx = k * tableStep;
+                            cos = twiddleCos[twiddleIdx % (n / 2)];
+                            sin = twiddleSin[twiddleIdx % (n / 2)];
+                        } else {
+                            const theta = -2 * Math.PI * k / len;
+                            cos = Math.cos(theta);
+                            sin = Math.sin(theta);
+                        }
 
                         const tReal = real[idx2] * cos - imag[idx2] * sin;
                         const tImag = real[idx2] * sin + imag[idx2] * cos;
@@ -8288,6 +8515,10 @@
                 }
             });
 
+            // Invalidar caché de imágenes (se regenerará al generar video)
+            beatSyncConfig.imagesCacheValid = false;
+            beatSyncConfig.cachedImages = [];
+
             // Ocultar progress
             if (hasHeic) {
                 const progressEl = document.getElementById('beatsyncProgress');
@@ -8340,6 +8571,19 @@
         // Eliminar foto
         function removeBeatSyncPhoto(index) {
             beatSyncConfig.photos.splice(index, 1);
+
+            // Liberar ImageBitmaps cacheados antes de invalidar
+            if (beatSyncConfig.cachedImages && beatSyncConfig.cachedImages.length > 0) {
+                beatSyncConfig.cachedImages.forEach(img => {
+                    if (img && typeof img.close === 'function') {
+                        img.close();
+                    }
+                });
+            }
+
+            // Invalidar caché de imágenes
+            beatSyncConfig.imagesCacheValid = false;
+            beatSyncConfig.cachedImages = [];
             renderBeatSyncPhotos();
             checkBeatSyncReady();
         }
@@ -8355,6 +8599,8 @@
                 [photos[i], photos[j]] = [photos[j], photos[i]];
             }
 
+            // Invalidar caché (orden cambió)
+            beatSyncConfig.imagesCacheValid = false;
             renderBeatSyncPhotos();
         }
 
@@ -8393,6 +8639,8 @@
                         const photos = beatSyncConfig.photos;
                         const [moved] = photos.splice(fromIndex, 1);
                         photos.splice(toIndex, 0, moved);
+                        // Invalidar caché (orden cambió)
+                        beatSyncConfig.imagesCacheValid = false;
                         renderBeatSyncPhotos();
                     }
                 });
@@ -8787,6 +9035,48 @@
             if (beatFlash) beatFlash.style.opacity = '0';
         }
 
+        // Limpiar recursos de Beat Sync (llamar al salir del modo)
+        function cleanupBeatSyncResources() {
+            // Detener cualquier reproducción
+            stopBeatSyncPreview();
+            stopCutterPlayback();
+
+            // Cerrar ImageBitmaps cacheados para liberar memoria
+            if (beatSyncConfig.cachedImages && beatSyncConfig.cachedImages.length > 0) {
+                beatSyncConfig.cachedImages.forEach(img => {
+                    if (img && typeof img.close === 'function') {
+                        img.close(); // ImageBitmap.close() libera memoria
+                    }
+                });
+                beatSyncConfig.cachedImages = [];
+                beatSyncConfig.imagesCacheValid = false;
+            }
+
+            // Limpiar caché de spectral flux
+            beatSyncConfig.spectralFluxCache = null;
+
+            // Cerrar AudioContext si está activo
+            if (beatSyncConfig.audioContext && beatSyncConfig.audioContext.state !== 'closed') {
+                beatSyncConfig.audioContext.close().catch(() => {});
+                beatSyncConfig.audioContext = null;
+            }
+
+            // Limpiar referencias
+            beatSyncConfig.audioBuffer = null;
+            beatSyncConfig.audioFile = null;
+            beatSyncConfig.beats = [];
+            beatSyncConfig.photos = [];
+            beatSyncConfig.manualBeatsAdded = [];
+            beatSyncConfig.manualBeatsRemoved = [];
+            beatSyncConfig.beatPositions = [];
+
+            // Resetear flags de event listeners para permitir reinicialización
+            beatSyncConfig.waveformClicksSetup = false;
+            beatSyncConfig.dragHandlesSetup = false;
+
+            console.log('Beat Sync: Recursos liberados');
+        }
+
         // Buscar en timeline
         function seekBeatSyncTimeline(event) {
             if (!beatSyncConfig.audioBuffer) return;
@@ -8823,6 +9113,27 @@
         async function generateBeatSync() {
             if (!beatSyncConfig.audioBuffer || beatSyncConfig.photos.length < 2) {
                 alert('Necesitas subir música y al menos 2 fotos');
+                return;
+            }
+
+            // Detectar iOS/Safari y verificar compatibilidad
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+            // Verificar soporte de MediaRecorder
+            if (typeof MediaRecorder === 'undefined') {
+                alert('Tu navegador no soporta la grabación de video.\n\n' +
+                      (isIOS ? 'En iOS, necesitas iOS 14.5 o superior.\nPrueba actualizar tu dispositivo o usa un navegador en computadora.' :
+                               'Intenta usar Chrome, Firefox o Edge en una computadora.'));
+                return;
+            }
+
+            // Verificar canvas.captureStream
+            const testCanvas = document.createElement('canvas');
+            if (typeof testCanvas.captureStream !== 'function') {
+                alert('Tu navegador no soporta captura de canvas.\n\n' +
+                      (isIOS ? 'En iOS, necesitas iOS 13 o superior.' :
+                               'Intenta usar un navegador más reciente.'));
                 return;
             }
 
@@ -8884,38 +9195,79 @@
                 recordCtx.imageSmoothingEnabled = true;
                 recordCtx.imageSmoothingQuality = 'high';
 
-                // Precargar imágenes con timeout para evitar bloqueos
+                // Precargar imágenes con ImageBitmap para renderizado más rápido
                 updateBeatSyncProgress(10, 'Cargando imágenes en alta calidad...');
-                const images = await Promise.all(photos.map((photo, index) => {
-                    return new Promise((resolve) => {
-                        const img = new Image();
-                        img.crossOrigin = 'anonymous';
 
-                        // Timeout de 10 segundos por imagen
-                        const timeout = setTimeout(() => {
-                            console.warn(`Timeout cargando imagen ${index + 1}`);
-                            resolve(img.complete ? img : null);
-                        }, 10000);
+                // Verificar si hay ImageBitmaps cacheados válidos
+                const useCache = beatSyncConfig.imagesCacheValid &&
+                                 beatSyncConfig.cachedImages.length === photos.length;
 
-                        img.onload = () => {
-                            clearTimeout(timeout);
-                            // Intentar decode para mejor calidad, pero no bloquear
-                            if (typeof img.decode === 'function') {
-                                img.decode().then(() => resolve(img)).catch(() => resolve(img));
+                // Función para convertir data URL a Blob (más confiable que fetch)
+                const dataURLtoBlob = (dataURL) => {
+                    const arr = dataURL.split(',');
+                    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+                    const bstr = atob(arr[1]);
+                    const n = bstr.length;
+                    const u8arr = new Uint8Array(n);
+                    for (let i = 0; i < n; i++) {
+                        u8arr[i] = bstr.charCodeAt(i);
+                    }
+                    return new Blob([u8arr], { type: mime });
+                };
+
+                const images = useCache
+                    ? beatSyncConfig.cachedImages
+                    : await Promise.all(photos.map(async (photo, index) => {
+                        try {
+                            // Convertir data URL a blob directamente (más confiable que fetch)
+                            let blob;
+                            if (photo.src.startsWith('data:')) {
+                                blob = dataURLtoBlob(photo.src);
                             } else {
-                                resolve(img);
+                                const response = await fetch(photo.src);
+                                blob = await response.blob();
                             }
-                        };
 
-                        img.onerror = () => {
-                            clearTimeout(timeout);
-                            console.error(`Error cargando imagen ${index + 1}`);
-                            resolve(null);
-                        };
+                            // Crear ImageBitmap (más rápido que Image para canvas)
+                            const bitmap = await createImageBitmap(blob, {
+                                premultiplyAlpha: 'none',
+                                colorSpaceConversion: 'none'
+                            });
 
-                        img.src = photo.src;
-                    });
-                }));
+                            return bitmap;
+                        } catch (e) {
+                            console.warn(`Error creando ImageBitmap para imagen ${index + 1}:`, e);
+                            // Fallback a Image tradicional
+                            return new Promise((resolve) => {
+                                const img = new Image();
+                                img.crossOrigin = 'anonymous';
+
+                                const timeout = setTimeout(() => {
+                                    console.warn(`Timeout cargando imagen ${index + 1}`);
+                                    resolve(img.complete ? img : null);
+                                }, 10000);
+
+                                img.onload = () => {
+                                    clearTimeout(timeout);
+                                    resolve(img);
+                                };
+
+                                img.onerror = () => {
+                                    clearTimeout(timeout);
+                                    console.error(`Error cargando imagen ${index + 1}`);
+                                    resolve(null);
+                                };
+
+                                img.src = photo.src;
+                            });
+                        }
+                    }));
+
+                // Cachear las imágenes para uso futuro
+                if (!useCache) {
+                    beatSyncConfig.cachedImages = images.filter(img => img !== null);
+                    beatSyncConfig.imagesCacheValid = true;
+                }
 
                 const validImages = images.filter(img => img !== null);
                 if (validImages.length === 0) {
@@ -8947,11 +9299,34 @@
                 ]);
 
                 // Configurar MediaRecorder con ALTA CALIDAD (8 Mbps)
-                const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-                    ? 'video/webm;codecs=vp9,opus'
-                    : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
-                    ? 'video/webm;codecs=vp8,opus'
-                    : 'video/webm';
+                // Priorizar MP4/H.264 para máxima compatibilidad (iOS/Safari)
+                // WebM/VP9 tiene mejor compresión pero NO funciona en Safari
+                const codecOptions = [
+                    'video/mp4;codecs=avc1.42E01E,mp4a.40.2', // H.264 Baseline + AAC (iOS/Safari ✓)
+                    'video/mp4;codecs=avc1.4D401E,mp4a.40.2', // H.264 Main Profile + AAC
+                    'video/mp4;codecs=avc1.64001E,mp4a.40.2', // H.264 High Profile + AAC
+                    'video/mp4',                              // MP4 genérico
+                    'video/webm;codecs=vp9,opus',             // VP9 (fallback si no hay MP4)
+                    'video/webm;codecs=vp8,opus',             // VP8 fallback
+                    'video/webm'                              // WebM genérico
+                ];
+
+                let mimeType = 'video/mp4'; // Default a MP4 para iOS
+                let codecFound = false;
+                for (const codec of codecOptions) {
+                    if (MediaRecorder.isTypeSupported(codec)) {
+                        mimeType = codec;
+                        codecFound = true;
+                        console.log('Codec seleccionado:', codec);
+                        break;
+                    }
+                }
+
+                // Si ningún codec fue encontrado, usar WebM como último recurso
+                if (!codecFound) {
+                    mimeType = 'video/webm';
+                    console.warn('Ningún codec preferido soportado, usando WebM genérico');
+                }
 
                 const mediaRecorder = new MediaRecorder(combinedStream, {
                     mimeType: mimeType,
@@ -8966,9 +9341,13 @@
                 };
 
                 // Promesa para esperar que termine la grabación
+                // IMPORTANTE: Usar el mimeType seleccionado, no hardcodeado
                 const recordingComplete = new Promise((resolve, reject) => {
                     mediaRecorder.onstop = () => {
-                        const blob = new Blob(chunks, { type: 'video/webm' });
+                        // Extraer tipo base del mimeType (sin codecs)
+                        const blobType = mimeType.split(';')[0];
+                        const blob = new Blob(chunks, { type: blobType });
+                        console.log('Video generado con tipo:', blobType);
                         resolve(blob);
                     };
                     mediaRecorder.onerror = (e) => reject(e);
@@ -9065,8 +9444,10 @@
 
                 updateBeatSyncProgress(95, 'Finalizando...');
 
-                // Crear archivo de video
-                mediaFile = new File([videoBlob], 'beatsync_' + Date.now() + '.webm', { type: 'video/webm' });
+                // Crear archivo de video con extensión correcta según codec
+                const extension = mimeType.includes('mp4') ? '.mp4' : '.webm';
+                const fileType = mimeType.includes('mp4') ? 'video/mp4' : 'video/webm';
+                mediaFile = new File([videoBlob], 'beatsync_' + Date.now() + extension, { type: fileType });
                 mediaType = 'video';
 
                 // Guardar info del Beat Sync
@@ -9126,12 +9507,16 @@
         }
 
         // Dibujar foto en canvas (cover mode) con marca de agua
+        // Soporta tanto Image como ImageBitmap
         function drawPhotoToCanvas(ctx, img, width, height, addWatermark = true) {
             // Asegurar calidad alta
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
 
-            const imgRatio = img.naturalWidth / img.naturalHeight;
+            // ImageBitmap usa .width/.height, Image usa .naturalWidth/.naturalHeight
+            const imgWidth = img.naturalWidth || img.width;
+            const imgHeight = img.naturalHeight || img.height;
+            const imgRatio = imgWidth / imgHeight;
             const canvasRatio = width / height;
 
             let drawWidth, drawHeight, drawX, drawY;
@@ -9164,32 +9549,38 @@
             }
         }
 
-        // Dibujar marca de agua
+        // Dibujar marca de agua (OPTIMIZADO - usa canvas pre-renderizado) - VERTICAL IZQUIERDA
         function drawWatermark(ctx, width, height) {
+            // Usar watermark pre-renderizado si está disponible y tiene el tamaño correcto
+            if (beatSyncConfig.watermarkCanvas &&
+                width === 1080 && height === 1920) {
+                ctx.drawImage(beatSyncConfig.watermarkCanvas, 0, 0);
+                return;
+            }
+
+            // Fallback: renderizar dinámicamente para otros tamaños (también vertical izquierda)
             const text = 'Creado con Ladoapp.com';
-            const fontSize = Math.round(width * 0.028); // ~30px en 1080p
+            const fontSize = Math.round(width * 0.024);
 
             ctx.save();
-
-            // Configurar fuente
             ctx.font = `500 ${fontSize}px 'Poppins', sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
 
-            // Medir texto
             const metrics = ctx.measureText(text);
             const textWidth = metrics.width;
             const textHeight = fontSize;
-            const padding = fontSize * 0.5;
+            const padding = fontSize * 0.4;
 
-            // Posición: centrado, abajo
-            const x = width / 2;
-            const y = height - (height * 0.03); // 3% desde abajo
+            // Posición vertical izquierda (centrado verticalmente)
+            const x = width * 0.03;
+            const y = height / 2;
+
+            ctx.translate(x, y);
+            ctx.rotate(-Math.PI / 2); // Rotar 90° antihorario
 
             // Fondo semitransparente
             ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-            const bgX = x - textWidth / 2 - padding;
-            const bgY = y - textHeight - padding / 2;
+            const bgX = -textWidth / 2 - padding;
+            const bgY = -textHeight / 2 - padding / 2;
             const bgWidth = textWidth + padding * 2;
             const bgHeight = textHeight + padding;
             const bgRadius = fontSize * 0.3;
@@ -9198,9 +9589,11 @@
             ctx.roundRect(bgX, bgY, bgWidth, bgHeight, bgRadius);
             ctx.fill();
 
-            // Texto
+            // Texto centrado
             ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-            ctx.fillText(text, x, y);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 0, 0);
 
             ctx.restore();
         }

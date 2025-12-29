@@ -1,0 +1,2332 @@
+@model List<Lado.Models.Popup>
+@{
+    ViewData["Title"] = "Administrar Popups";
+}
+
+<style>
+    /* ========================================
+       ESTILOS GENERALES
+       ======================================== */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .page-title {
+        font-size: 28px;
+        font-weight: 800;
+        color: var(--text-dark);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .page-title svg {
+        width: 32px;
+        height: 32px;
+        color: var(--primary);
+    }
+
+    .btn-nuevo {
+        background: var(--primary-gradient);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: var(--radius-md);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: var(--shadow-primary);
+    }
+
+    .btn-nuevo:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 35px rgba(70, 130, 180, 0.45);
+    }
+
+    /* Stats Cards */
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .stat-icon svg {
+        width: 24px;
+        height: 24px;
+        color: white;
+    }
+
+    .stat-icon.blue { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+    .stat-icon.green { background: linear-gradient(135deg, #10b981, #059669); }
+    .stat-icon.orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .stat-icon.purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+
+    .stat-content h3 {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0;
+    }
+
+    .stat-content p {
+        font-size: 13px;
+        color: var(--text-gray);
+        margin: 0;
+    }
+
+    /* Filtros */
+    .filters-bar {
+        background: white;
+        border-radius: var(--radius-lg);
+        padding: 16px 20px;
+        margin-bottom: 20px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .filter-select {
+        padding: 8px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        font-size: 14px;
+        min-width: 140px;
+    }
+
+    .filter-search {
+        flex: 1;
+        min-width: 200px;
+        padding: 8px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        font-size: 14px;
+    }
+
+    /* Tabla de Popups */
+    .popups-table-container {
+        background: white;
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .popups-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .popups-table th {
+        background: var(--bg-light);
+        padding: 14px 16px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-gray);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .popups-table td {
+        padding: 16px;
+        border-bottom: 1px solid var(--border-light);
+        vertical-align: middle;
+    }
+
+    .popups-table tr:hover {
+        background: var(--primary-pale);
+    }
+
+    .popup-name {
+        font-weight: 600;
+        color: var(--text-dark);
+    }
+
+    .popup-tipo {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .popup-tipo.banner { background: #dbeafe; color: #1e40af; }
+    .popup-tipo.modal { background: #fce7f3; color: #9d174d; }
+    .popup-tipo.toast { background: #d1fae5; color: #065f46; }
+    .popup-tipo.fullscreen { background: #fef3c7; color: #92400e; }
+    .popup-tipo.slide { background: #e0e7ff; color: #3730a3; }
+
+    .popup-estado {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .estado-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+
+    .estado-dot.activo { background: #10b981; }
+    .estado-dot.inactivo { background: #ef4444; }
+
+    .popup-stats {
+        display: flex;
+        gap: 16px;
+        font-size: 13px;
+        color: var(--text-gray);
+    }
+
+    .popup-stats span {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .popup-actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-action {
+        width: 36px;
+        height: 36px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-color);
+        background: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+
+    .btn-action:hover {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: white;
+    }
+
+    .btn-action.danger:hover {
+        background: #ef4444;
+        border-color: #ef4444;
+    }
+
+    .btn-action svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Switch Toggle */
+    .toggle-switch {
+        position: relative;
+        width: 44px;
+        height: 24px;
+    }
+
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #cbd5e1;
+        border-radius: 24px;
+        transition: 0.3s;
+    }
+
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background: white;
+        border-radius: 50%;
+        transition: 0.3s;
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+        background: var(--primary);
+    }
+
+    .toggle-switch input:checked + .toggle-slider:before {
+        transform: translateX(20px);
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .empty-state svg {
+        width: 80px;
+        height: 80px;
+        color: var(--text-light);
+        margin-bottom: 16px;
+    }
+
+    .empty-state h3 {
+        font-size: 18px;
+        color: var(--text-dark);
+        margin-bottom: 8px;
+    }
+
+    .empty-state p {
+        color: var(--text-gray);
+        margin-bottom: 20px;
+    }
+
+    /* ========================================
+       MODAL DE EDICION
+       ======================================== */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 9999;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 20px;
+        overflow-y: auto;
+    }
+
+    .modal-overlay.active {
+        display: flex;
+    }
+
+    .modal-container {
+        background: white;
+        border-radius: var(--radius-xl);
+        width: 100%;
+        max-width: 1200px;
+        margin: 20px auto;
+        box-shadow: var(--shadow-xl);
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100vh - 40px);
+    }
+
+    .modal-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h2 {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0;
+    }
+
+    .modal-close {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: none;
+        background: var(--bg-light);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+
+    .modal-close:hover {
+        background: #fee2e2;
+        color: #ef4444;
+    }
+
+    .modal-body {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .modal-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+    }
+
+    .modal-preview {
+        width: 380px;
+        background: #1a1a2e;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        border-left: 1px solid var(--border-color);
+    }
+
+    .preview-title {
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .preview-device {
+        flex: 1;
+        background: #0f0f1a;
+        border-radius: 20px;
+        overflow: hidden;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .preview-phone {
+        width: 280px;
+        height: 500px;
+        background: white;
+        border-radius: 30px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .preview-notch {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 120px;
+        height: 25px;
+        background: black;
+        border-radius: 0 0 15px 15px;
+        z-index: 10;
+    }
+
+    .preview-screen {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 40px 16px 16px;
+        position: relative;
+    }
+
+    /* Tabs */
+    .tabs-container {
+        display: flex;
+        gap: 4px;
+        background: var(--bg-light);
+        padding: 4px;
+        border-radius: var(--radius-md);
+        margin-bottom: 24px;
+    }
+
+    .tab-btn {
+        flex: 1;
+        padding: 10px 16px;
+        border: none;
+        background: transparent;
+        border-radius: var(--radius-sm);
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 14px;
+    }
+
+    .tab-btn.active {
+        background: white;
+        box-shadow: var(--shadow-sm);
+        color: var(--primary);
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    /* Form Groups */
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-dark);
+        margin-bottom: 6px;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        font-size: 14px;
+        transition: border-color 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+
+    .form-group small {
+        display: block;
+        font-size: 12px;
+        color: var(--text-gray);
+        margin-top: 4px;
+    }
+
+    /* Color Picker */
+    .color-input-wrapper {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .color-input-wrapper input[type="color"] {
+        width: 40px;
+        height: 40px;
+        padding: 2px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+    }
+
+    .color-input-wrapper input[type="text"] {
+        flex: 1;
+    }
+
+    /* Position Selector */
+    .position-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        max-width: 240px;
+    }
+
+    .position-btn {
+        padding: 8px 4px;
+        border: 2px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        background: white;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        font-size: 9px;
+        color: var(--text-gray);
+    }
+
+    .position-btn:hover {
+        border-color: var(--primary);
+        background: var(--primary-pale);
+    }
+
+    .position-btn.active {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: white;
+    }
+
+    .position-btn .dot {
+        width: 6px;
+        height: 6px;
+        background: currentColor;
+        border-radius: 50%;
+    }
+
+    .position-btn span {
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    /* Badges para tabla */
+    .popup-badges {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+        margin-top: 4px;
+    }
+
+    .popup-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 500;
+    }
+
+    .popup-badge.pwa { background: #dbeafe; color: #1e40af; }
+    .popup-badge.movil { background: #d1fae5; color: #065f46; }
+    .popup-badge.desktop { background: #e0e7ff; color: #3730a3; }
+    .popup-badge.programado { background: #fef3c7; color: #92400e; }
+
+    .popup-badge svg {
+        width: 10px;
+        height: 10px;
+    }
+
+    /* Checkbox Group */
+    .checkbox-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
+
+    /* Templates */
+    .templates-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+
+    .template-card {
+        border: 2px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 16px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .template-card:hover {
+        border-color: var(--primary);
+        background: var(--primary-pale);
+    }
+
+    .template-card svg {
+        width: 32px;
+        height: 32px;
+        color: var(--primary);
+        margin-bottom: 8px;
+    }
+
+    .template-card span {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-dark);
+    }
+
+    /* Editor Toggle */
+    .editor-toggle {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 12px;
+    }
+
+    .editor-toggle button {
+        padding: 6px 12px;
+        border: 1px solid var(--border-color);
+        background: white;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s;
+    }
+
+    .editor-toggle button:first-child {
+        border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    }
+
+    .editor-toggle button:last-child {
+        border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    }
+
+    .editor-toggle button.active {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: white;
+    }
+
+    .editor-visual {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        min-height: 200px;
+    }
+
+    .editor-visual .ql-toolbar {
+        border: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .editor-visual .ql-container {
+        border: none;
+        font-size: 14px;
+    }
+
+    .editor-code {
+        display: none;
+    }
+
+    .editor-code textarea {
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 13px;
+        min-height: 200px;
+    }
+
+    /* Buttons Editor */
+    .buttons-editor {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        padding: 16px;
+    }
+
+    .button-item {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 12px;
+        background: var(--bg-light);
+        border-radius: var(--radius-sm);
+        margin-bottom: 12px;
+    }
+
+    .button-item input {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        font-size: 13px;
+    }
+
+    .button-item select {
+        padding: 8px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        font-size: 13px;
+    }
+
+    .btn-add-button {
+        background: var(--primary-pale);
+        color: var(--primary);
+        border: 1px dashed var(--primary);
+        padding: 10px;
+        border-radius: var(--radius-sm);
+        width: 100%;
+        cursor: pointer;
+        font-weight: 500;
+    }
+
+    /* Modal Footer */
+    .modal-footer {
+        padding: 16px 24px;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .btn-cancel {
+        padding: 10px 20px;
+        border: 1px solid var(--border-color);
+        background: white;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        font-weight: 500;
+    }
+
+    .btn-save {
+        padding: 10px 24px;
+        background: var(--primary-gradient);
+        color: white;
+        border: none;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    /* Responsive */
+    @@media (max-width: 1024px) {
+        .modal-preview {
+            display: none;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .filters-bar {
+            flex-direction: column;
+        }
+
+        .filter-select,
+        .filter-search {
+            width: 100%;
+        }
+
+        .popups-table {
+            display: block;
+            overflow-x: auto;
+        }
+
+        .modal-body {
+            flex-direction: column;
+        }
+
+        .modal-content {
+            padding: 16px;
+        }
+    }
+</style>
+
+<!-- Header -->
+<div class="page-header">
+    <h1 class="page-title">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="9" y1="3" x2="9" y2="21"></line>
+        </svg>
+        Popups
+    </h1>
+    <button class="btn-nuevo" onclick="abrirModal()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        Nuevo Popup
+    </button>
+</div>
+
+<!-- Stats -->
+<div class="stats-row">
+    <div class="stat-card">
+        <div class="stat-icon blue">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            </svg>
+        </div>
+        <div class="stat-content">
+            <h3>@Model.Count</h3>
+            <p>Total Popups</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon green">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+        </div>
+        <div class="stat-content">
+            <h3>@Model.Count(p => p.EstaActivo)</h3>
+            <p>Activos</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+        </div>
+        <div class="stat-content">
+            <h3>@Model.Sum(p => p.Impresiones).ToString("N0")</h3>
+            <p>Impresiones</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon purple">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                <polyline points="10 17 15 12 10 7"></polyline>
+                <line x1="15" y1="12" x2="3" y2="12"></line>
+            </svg>
+        </div>
+        <div class="stat-content">
+            <h3>@Model.Sum(p => p.Clics).ToString("N0")</h3>
+            <p>Clics</p>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="filters-bar">
+    <select class="filter-select" id="filtroEstado" onchange="filtrarPopups()">
+        <option value="">Todos los estados</option>
+        <option value="activo">Activos</option>
+        <option value="inactivo">Inactivos</option>
+    </select>
+    <select class="filter-select" id="filtroTipo" onchange="filtrarPopups()">
+        <option value="">Todos los tipos</option>
+        <option value="0">Banner</option>
+        <option value="1">Modal</option>
+        <option value="2">Toast</option>
+        <option value="3">Pantalla completa</option>
+        <option value="4">Panel lateral</option>
+    </select>
+    <input type="text" class="filter-search" id="busqueda" placeholder="Buscar por nombre..." oninput="filtrarPopups()">
+</div>
+
+<!-- Tabla de Popups -->
+<div class="popups-table-container">
+    @if (Model.Any())
+    {
+        <table class="popups-table">
+            <thead>
+                <tr>
+                    <th>Estado</th>
+                    <th>Nombre</th>
+                    <th>Tipo</th>
+                    <th>Trigger</th>
+                    <th>Estadisticas</th>
+                    <th>Prioridad</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="popupsTableBody">
+                @foreach (var popup in Model)
+                {
+                    <tr data-id="@popup.Id" data-estado="@(popup.EstaActivo ? "activo" : "inactivo")" data-tipo="@((int)popup.Tipo)" data-nombre="@System.Net.WebUtility.HtmlEncode(popup.Nombre.ToLower())">
+                        <td>
+                            <label class="toggle-switch">
+                                <input type="checkbox" @(popup.EstaActivo ? "checked" : "") onchange="togglePopup(@popup.Id)">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </td>
+                        <td>
+                            <span class="popup-name">@popup.Nombre</span>
+                            @if (!string.IsNullOrEmpty(popup.Titulo))
+                            {
+                                <br><small style="color: var(--text-gray);">@popup.Titulo</small>
+                            }
+                            <div class="popup-badges">
+                                @if (popup.EsPWA)
+                                {
+                                    <span class="popup-badge pwa" title="Popup PWA">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                                        PWA
+                                    </span>
+                                }
+                                @if (popup.MostrarEnMovil && !popup.MostrarEnDesktop)
+                                {
+                                    <span class="popup-badge movil" title="Solo movil">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/></svg>
+                                        Movil
+                                    </span>
+                                }
+                                @if (popup.MostrarEnDesktop && !popup.MostrarEnMovil)
+                                {
+                                    <span class="popup-badge desktop" title="Solo desktop">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                        Desktop
+                                    </span>
+                                }
+                                @if (popup.FechaInicio.HasValue || popup.FechaFin.HasValue)
+                                {
+                                    <span class="popup-badge programado" title="@(popup.FechaInicio?.ToString("dd/MM") ?? "∞") - @(popup.FechaFin?.ToString("dd/MM") ?? "∞")">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                        Programado
+                                    </span>
+                                }
+                            </div>
+                        </td>
+                        <td>
+                            <span class="popup-tipo @popup.Tipo.ToString().ToLower()">
+                                @popup.TipoDisplay
+                            </span>
+                        </td>
+                        <td>
+                            @switch (popup.Trigger)
+                            {
+                                case TriggerPopup.Inmediato:
+                                    <span>Inmediato</span>
+                                    break;
+                                case TriggerPopup.Delay:
+                                    <span>@(popup.DelaySegundos)s delay</span>
+                                    break;
+                                case TriggerPopup.Scroll:
+                                    <span>@(popup.ScrollPorcentaje)% scroll</span>
+                                    break;
+                                case TriggerPopup.Visitas:
+                                    <span>@(popup.VisitasRequeridas) visitas</span>
+                                    break;
+                                case TriggerPopup.ExitIntent:
+                                    <span>Exit intent</span>
+                                    break;
+                                default:
+                                    <span>@popup.Trigger</span>
+                                    break;
+                            }
+                        </td>
+                        <td>
+                            <div class="popup-stats">
+                                <span title="Impresiones">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    @popup.Impresiones.ToString("N0")
+                                </span>
+                                <span title="Clics">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
+                                    @popup.Clics.ToString("N0")
+                                </span>
+                                <span title="CTR">@popup.CTR%</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span style="font-weight: 600;">@popup.Prioridad</span>
+                        </td>
+                        <td>
+                            <div class="popup-actions">
+                                <button class="btn-action" onclick="editarPopup(@popup.Id)" title="Editar">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                </button>
+                                <button class="btn-action" onclick="duplicarPopup(@popup.Id)" title="Duplicar">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                </button>
+                                <button class="btn-action danger" data-id="@popup.Id" data-nombre="@System.Net.WebUtility.HtmlEncode(popup.Nombre)" onclick="eliminarPopupBtn(this)" title="Eliminar">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="empty-state">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="9" y1="3" x2="9" y2="21"></line>
+            </svg>
+            <h3>No hay popups</h3>
+            <p>Crea tu primer popup para mostrar mensajes a los usuarios</p>
+            <button class="btn-nuevo" onclick="abrirModal()">Crear Popup</button>
+        </div>
+    }
+</div>
+
+<!-- Modal de Edicion -->
+<div class="modal-overlay" id="modalPopup" onclick="if(event.target === this) cerrarModal()">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h2 id="modalTitle">Nuevo Popup</h2>
+            <button class="modal-close" onclick="cerrarModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+
+        <div class="modal-body">
+            <div class="modal-content">
+                <form id="popupForm">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" id="popupId" name="id">
+
+                    <!-- Templates -->
+                    <div id="templatesSection">
+                        <label style="font-weight: 600; margin-bottom: 12px; display: block;">Comenzar desde template:</label>
+                        <div class="templates-grid">
+                            <div class="template-card" onclick="cargarTemplate('promocion')">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                                <span>Promocion</span>
+                            </div>
+                            <div class="template-card" onclick="cargarTemplate('newsletter')">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                                <span>Newsletter</span>
+                            </div>
+                            <div class="template-card" onclick="cargarTemplate('cookies')">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                <span>Cookies</span>
+                            </div>
+                            <div class="template-card" onclick="cargarTemplate('alerta')">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                <span>Alerta</span>
+                            </div>
+                            <div class="template-card" onclick="cargarTemplate('pwa')">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                                <span>PWA Install</span>
+                            </div>
+                            <div class="template-card" onclick="cargarTemplate('bienvenida')">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                                <span>Bienvenida</span>
+                            </div>
+                            <div class="template-card" onclick="cargarTemplate('vacio')">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                                <span>Vacio</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="tabs-container">
+                        <button type="button" class="tab-btn active" onclick="cambiarTab('contenido')">Contenido</button>
+                        <button type="button" class="tab-btn" onclick="cambiarTab('diseno')">Apariencia</button>
+                        <button type="button" class="tab-btn" onclick="cambiarTab('triggers')">Comportamiento</button>
+                        <button type="button" class="tab-btn" onclick="cambiarTab('audiencia')">Audiencia</button>
+                    </div>
+
+                    <!-- Tab: Contenido -->
+                    <div class="tab-content active" id="tab-contenido">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Nombre interno *</label>
+                                <input type="text" id="nombre" name="nombre" required placeholder="Ej: Promo Navidad 2024">
+                                <small>Solo visible en admin</small>
+                            </div>
+                            <div class="form-group">
+                                <label>Tipo de popup *</label>
+                                <select id="tipo" name="tipo" onchange="actualizarPreview()">
+                                    <option value="0">Banner</option>
+                                    <option value="1" selected>Modal</option>
+                                    <option value="2">Toast</option>
+                                    <option value="3">Pantalla completa</option>
+                                    <option value="4">Panel lateral</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Titulo</label>
+                            <input type="text" id="titulo" name="titulo" placeholder="Titulo del popup" oninput="actualizarPreview()">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Contenido</label>
+                            <div class="editor-toggle">
+                                <button type="button" class="active" onclick="toggleEditor('visual')">Visual</button>
+                                <button type="button" onclick="toggleEditor('codigo')">Codigo HTML</button>
+                            </div>
+                            <div id="editorVisual" class="editor-visual"></div>
+                            <div id="editorCodigo" class="editor-code">
+                                <textarea id="contenido" name="contenido" rows="8" oninput="actualizarPreview()"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>URL de imagen</label>
+                                <input type="text" id="imagenUrl" name="imagenUrl" placeholder="/images/promo.jpg">
+                            </div>
+                            <div class="form-group">
+                                <label>Icono (Font Awesome)</label>
+                                <input type="text" id="iconoClase" name="iconoClase" placeholder="fas fa-bell">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Botones</label>
+                            <div class="buttons-editor" id="botonesEditor">
+                                <div id="botonesContainer"></div>
+                                <button type="button" class="btn-add-button" onclick="agregarBoton()">+ Botón con URL</button>
+                                <button type="button" class="btn-add-button" onclick="agregarBotonCerrar()" style="background: #f3f4f6; color: #374151;">+ Botón Cerrar</button>
+                            </div>
+                            <input type="hidden" id="botonesJson" name="botonesJson">
+                        </div>
+                    </div>
+
+                    <!-- Tab: Diseno -->
+                    <div class="tab-content" id="tab-diseno">
+                        <div class="form-group">
+                            <label>Posicion</label>
+                            <div class="position-grid">
+                                <button type="button" class="position-btn" data-pos="1" onclick="seleccionarPosicion(1)"><span class="dot"></span><span>Arriba Izq</span></button>
+                                <button type="button" class="position-btn" data-pos="2" onclick="seleccionarPosicion(2)"><span class="dot"></span><span>Arriba</span></button>
+                                <button type="button" class="position-btn" data-pos="3" onclick="seleccionarPosicion(3)"><span class="dot"></span><span>Arriba Der</span></button>
+                                <button type="button" class="position-btn" data-pos="7" onclick="seleccionarPosicion(7)"><span class="dot"></span><span>Izquierda</span></button>
+                                <button type="button" class="position-btn active" data-pos="0" onclick="seleccionarPosicion(0)"><span class="dot"></span><span>Centro</span></button>
+                                <button type="button" class="position-btn" data-pos="8" onclick="seleccionarPosicion(8)"><span class="dot"></span><span>Derecha</span></button>
+                                <button type="button" class="position-btn" data-pos="4" onclick="seleccionarPosicion(4)"><span class="dot"></span><span>Abajo Izq</span></button>
+                                <button type="button" class="position-btn" data-pos="5" onclick="seleccionarPosicion(5)"><span class="dot"></span><span>Abajo</span></button>
+                                <button type="button" class="position-btn" data-pos="6" onclick="seleccionarPosicion(6)"><span class="dot"></span><span>Abajo Der</span></button>
+                            </div>
+                            <input type="hidden" id="posicion" name="posicion" value="0">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Color de fondo</label>
+                                <div class="color-input-wrapper">
+                                    <input type="color" id="colorFondoPicker" value="#ffffff" onchange="document.getElementById('colorFondo').value = this.value; actualizarPreview();">
+                                    <input type="text" id="colorFondo" name="colorFondo" placeholder="#ffffff" oninput="actualizarPreview()">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Color de texto</label>
+                                <div class="color-input-wrapper">
+                                    <input type="color" id="colorTextoPicker" value="#111111" onchange="document.getElementById('colorTexto').value = this.value; actualizarPreview();">
+                                    <input type="text" id="colorTexto" name="colorTexto" placeholder="#111111" oninput="actualizarPreview()">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Color boton primario</label>
+                                <div class="color-input-wrapper">
+                                    <input type="color" id="colorBotonPicker" value="#4682B4" onchange="document.getElementById('colorBotonPrimario').value = this.value; actualizarPreview();">
+                                    <input type="text" id="colorBotonPrimario" name="colorBotonPrimario" placeholder="#4682B4" oninput="actualizarPreview()">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Ancho maximo (px)</label>
+                                <input type="number" id="anchoMaximo" name="anchoMaximo" value="400" min="200" max="800" oninput="actualizarPreview()">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Animacion</label>
+                            <select id="animacion" name="animacion" onchange="actualizarPreview()">
+                                <option value="0">Sin animacion</option>
+                                <option value="1" selected>Fade In</option>
+                                <option value="2">Slide Up</option>
+                                <option value="3">Slide Down</option>
+                                <option value="4">Slide Left</option>
+                                <option value="5">Slide Right</option>
+                                <option value="6">Bounce</option>
+                                <option value="7">Zoom</option>
+                                <option value="8">Shake</option>
+                            </select>
+                        </div>
+
+                        <div class="checkbox-group">
+                            <label class="checkbox-item">
+                                <input type="checkbox" id="mostrarBotonCerrar" name="mostrarBotonCerrar" checked onchange="actualizarPreview()">
+                                <span>Mostrar boton cerrar (X)</span>
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" id="cerrarAlClickFuera" name="cerrarAlClickFuera" checked>
+                                <span>Cerrar al click fuera</span>
+                            </label>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 20px;">
+                            <label>CSS personalizado</label>
+                            <textarea id="cssPersonalizado" name="cssPersonalizado" rows="4" placeholder=".popup-custom { }" oninput="actualizarPreview()"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Triggers -->
+                    <div class="tab-content" id="tab-triggers">
+                        <div class="form-group">
+                            <label>Cuando mostrar</label>
+                            <select id="trigger" name="trigger" onchange="toggleTriggerOptions()">
+                                <option value="0">Inmediato (al cargar pagina)</option>
+                                <option value="1">Despues de X segundos</option>
+                                <option value="2">Al hacer scroll X%</option>
+                                <option value="3">Exit intent (al intentar salir)</option>
+                                <option value="4">Despues de X visitas</option>
+                            </select>
+                        </div>
+
+                        <div class="form-row" id="triggerDelay" style="display: none;">
+                            <div class="form-group">
+                                <label>Segundos de delay</label>
+                                <input type="number" id="delaySegundos" name="delaySegundos" value="3" min="1" max="60">
+                            </div>
+                        </div>
+
+                        <div class="form-row" id="triggerScroll" style="display: none;">
+                            <div class="form-group">
+                                <label>Porcentaje de scroll</label>
+                                <input type="number" id="scrollPorcentaje" name="scrollPorcentaje" value="50" min="10" max="100">
+                            </div>
+                        </div>
+
+                        <div class="form-row" id="triggerVisitas" style="display: none;">
+                            <div class="form-group">
+                                <label>Numero de visitas</label>
+                                <input type="number" id="visitasRequeridas" name="visitasRequeridas" value="3" min="1" max="100">
+                            </div>
+                        </div>
+
+                        <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--border-color);">
+
+                        <div class="form-group">
+                            <label>Frecuencia de aparicion</label>
+                            <select id="frecuencia" name="frecuencia" onchange="toggleFrecuenciaOptions()">
+                                <option value="0">Siempre (cada pagina)</option>
+                                <option value="1" selected>Una sola vez</option>
+                                <option value="2">Una vez por sesion</option>
+                                <option value="3">Cada X dias</option>
+                            </select>
+                        </div>
+
+                        <div class="form-row" id="frecuenciaDias" style="display: none;">
+                            <div class="form-group">
+                                <label>Dias entre apariciones</label>
+                                <input type="number" id="diasFrecuencia" name="diasFrecuencia" value="7" min="1" max="365">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Audiencia (Segmentacion + PWA) -->
+                    <div class="tab-content" id="tab-audiencia">
+                        <div class="form-group">
+                            <label>Mostrar a</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-item">
+                                    <input type="checkbox" id="mostrarUsuariosLogueados" name="mostrarUsuariosLogueados" checked>
+                                    <span>Usuarios logueados</span>
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" id="mostrarUsuariosAnonimos" name="mostrarUsuariosAnonimos" checked>
+                                    <span>Visitantes anonimos</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Dispositivos</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-item">
+                                    <input type="checkbox" id="mostrarEnMovil" name="mostrarEnMovil" checked>
+                                    <span>Movil</span>
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" id="mostrarEnDesktop" name="mostrarEnDesktop" checked>
+                                    <span>Desktop</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Paginas donde mostrar</label>
+                            <input type="text" id="paginasIncluidas" name="paginasIncluidas" placeholder="* (todas) o /Feed,/Perfil">
+                            <small>Usa * para todas las paginas, o lista separada por comas</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Paginas excluidas</label>
+                            <input type="text" id="paginasExcluidas" name="paginasExcluidas" placeholder="/Admin,/Account">
+                            <small>Paginas donde NO mostrar (separadas por coma)</small>
+                        </div>
+
+                        <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--border-color);">
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Fecha inicio (opcional)</label>
+                                <input type="datetime-local" id="fechaInicio" name="fechaInicio">
+                            </div>
+                            <div class="form-group">
+                                <label>Fecha fin (opcional)</label>
+                                <input type="datetime-local" id="fechaFin" name="fechaFin">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Prioridad (1-10)</label>
+                                <input type="number" id="prioridad" name="prioridad" value="5" min="1" max="10">
+                                <small>Mayor numero = mayor prioridad</small>
+                            </div>
+                            <div class="form-group">
+                                <label>Estado</label>
+                                <select id="estaActivo" name="estaActivo">
+                                    <option value="true" selected>Activo</option>
+                                    <option value="false">Inactivo</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Seccion PWA integrada -->
+                        <div style="background: linear-gradient(135deg, #4682B4 0%, #2c5f8a 100%); color: white; padding: 16px; border-radius: 12px; margin-top: 24px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                                <label class="checkbox-item" style="font-size: 15px; font-weight: 600; color: white; margin: 0;">
+                                    <input type="checkbox" id="esPWA" name="esPWA" onchange="togglePWAOptions()" style="width: 18px; height: 18px;">
+                                    <span>Popup de instalacion PWA</span>
+                                </label>
+                            </div>
+                            <p style="margin: 8px 0 0 32px; opacity: 0.9; font-size: 13px;">
+                                Detecta automaticamente iOS/Android y muestra las instrucciones correctas
+                            </p>
+                        </div>
+
+                        <div id="pwaOptionsContainer" style="display: none; margin-top: 16px; padding: 16px; background: var(--bg-light); border-radius: 8px;">
+                            <div class="form-row">
+                                <div class="form-group" style="margin-bottom: 12px;">
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" id="soloSiInstalable" name="soloSiInstalable" checked>
+                                        <span>Solo si se puede instalar (no en standalone)</span>
+                                    </label>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 12px;">
+                                    <label>Texto boton instalar</label>
+                                    <input type="text" id="textoBotonInstalar" name="textoBotonInstalar" value="Instalar" placeholder="Instalar">
+                                </div>
+                            </div>
+
+                            <div class="form-group" style="margin-bottom: 12px;">
+                                <label>Plataforma</label>
+                                <div class="checkbox-group">
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" id="soloIOS" name="soloIOS" onchange="handlePlatformFilter('ios')">
+                                        <span>Solo iOS</span>
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" id="soloAndroid" name="soloAndroid" onchange="handlePlatformFilter('android')">
+                                        <span>Solo Android</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label>Contenido alternativo iOS <small style="font-weight: normal; color: var(--text-gray);">(instrucciones manuales)</small></label>
+                                <textarea id="contenidoIOS" name="contenidoIOS" rows="4" placeholder="<strong>Para instalar:</strong><br>1. Toca Compartir<br>2. Agregar a Inicio"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Preview -->
+            <div class="modal-preview">
+                <div class="preview-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    Vista previa
+                </div>
+                <div class="preview-device">
+                    <div class="preview-phone">
+                        <div class="preview-notch"></div>
+                        <div class="preview-screen" id="previewScreen">
+                            <!-- Preview content goes here -->
+                            <div id="previewPopup"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button type="button" class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
+            <button type="button" class="btn-save" onclick="guardarPopup()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                Guardar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Quill Editor CSS (usando CDN permitido) -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
+
+<script>
+    // Variables globales
+    let quillEditor = null;
+    let botones = [];
+    let antiForgeryToken = null;
+
+    // Obtener token de forma segura
+    function getAntiForgeryToken() {
+        if (!antiForgeryToken) {
+            const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+            antiForgeryToken = tokenInput ? tokenInput.value : '';
+        }
+        return antiForgeryToken;
+    }
+
+    // Inicializar Quill Editor
+    document.addEventListener('DOMContentLoaded', function() {
+        // Inicializar token
+        getAntiForgeryToken();
+
+        // Inicializar Quill solo si está disponible
+        try {
+            if (typeof Quill !== 'undefined') {
+                quillEditor = new Quill('#editorVisual', {
+                    theme: 'snow',
+                    placeholder: 'Escribe el contenido del popup...',
+                    modules: {
+                        toolbar: [
+                            ['bold', 'italic', 'underline'],
+                            [{ 'color': [] }, { 'background': [] }],
+                            [{ 'align': [] }],
+                            ['link'],
+                            ['clean']
+                        ]
+                    }
+                });
+
+                quillEditor.on('text-change', function() {
+                    document.getElementById('contenido').value = quillEditor.root.innerHTML;
+                    actualizarPreview();
+                });
+            } else {
+                console.warn('Quill no está disponible, usando textarea simple');
+                document.getElementById('editorVisual').style.display = 'none';
+                document.getElementById('contenido').style.display = 'block';
+            }
+        } catch (e) {
+            console.error('Error inicializando Quill:', e);
+        }
+    });
+
+    // Abrir modal
+    function abrirModal(popupId = null) {
+        document.getElementById('modalPopup').classList.add('active');
+        document.getElementById('modalTitle').textContent = popupId ? 'Editar Popup' : 'Nuevo Popup';
+        document.getElementById('templatesSection').style.display = popupId ? 'none' : 'block';
+
+        if (!popupId) {
+            limpiarFormulario();
+        }
+    }
+
+    function cerrarModal() {
+        document.getElementById('modalPopup').classList.remove('active');
+    }
+
+    // Limpiar formulario
+    function limpiarFormulario() {
+        document.getElementById('popupForm').reset();
+        document.getElementById('popupId').value = '';
+        botones = [];
+        renderizarBotones();
+        if (quillEditor) {
+            quillEditor.root.innerHTML = '';
+        }
+        seleccionarPosicion(0);
+        actualizarPreview();
+    }
+
+    // Cambiar tabs
+    function cambiarTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+        document.querySelector(`[onclick="cambiarTab('${tab}')"]`).classList.add('active');
+        document.getElementById(`tab-${tab}`).classList.add('active');
+    }
+
+    // Variable para guardar el contenido original antes de editar en visual
+    let contenidoBackup = '';
+
+    // Toggle editor visual/codigo
+    function toggleEditor(modo) {
+        const visual = document.getElementById('editorVisual');
+        const codigo = document.getElementById('editorCodigo');
+        const textarea = document.getElementById('contenido');
+        const botones = document.querySelectorAll('.editor-toggle button');
+
+        botones.forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+
+        if (modo === 'visual') {
+            // Guardar backup antes de pasar a Quill
+            contenidoBackup = textarea.value;
+
+            // Verificar si el HTML tiene estilos complejos
+            const tieneEstilosComplejos = contenidoBackup.includes('style="') &&
+                (contenidoBackup.includes('display:') || contenidoBackup.includes('flex') ||
+                 contenidoBackup.includes('font-size:') || contenidoBackup.includes('margin:'));
+
+            if (tieneEstilosComplejos) {
+                alert('⚠️ El contenido tiene estilos HTML complejos.\n\nEl editor visual puede alterar el formato.\nSe recomienda usar el modo Código para este contenido.');
+            }
+
+            visual.style.display = 'block';
+            codigo.style.display = 'none';
+
+            if (quillEditor) {
+                try {
+                    quillEditor.root.innerHTML = contenidoBackup;
+                } catch(e) {
+                    console.error('Error al cargar en Quill:', e);
+                }
+            }
+        } else {
+            // Cambiar a modo código
+            visual.style.display = 'none';
+            codigo.style.display = 'block';
+
+            // Obtener contenido de Quill
+            const contenidoQuill = quillEditor ? quillEditor.root.innerHTML : '';
+
+            // Si Quill está vacío o solo tiene <p><br></p>, restaurar backup
+            const quillVacio = !contenidoQuill ||
+                               contenidoQuill === '<p><br></p>' ||
+                               contenidoQuill === '<p></p>' ||
+                               contenidoQuill.trim() === '';
+
+            if (quillVacio && contenidoBackup) {
+                console.log('Quill vacío, restaurando backup');
+                textarea.value = contenidoBackup;
+            } else if (contenidoQuill) {
+                textarea.value = contenidoQuill;
+            }
+            // Si ambos están vacíos, dejar el textarea como está
+        }
+    }
+
+    // Seleccionar posicion
+    function seleccionarPosicion(pos) {
+        document.querySelectorAll('.position-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.pos == pos);
+        });
+        document.getElementById('posicion').value = pos;
+        actualizarPreview();
+    }
+
+    // Toggle opciones de trigger
+    function toggleTriggerOptions() {
+        const trigger = document.getElementById('trigger').value;
+        document.getElementById('triggerDelay').style.display = trigger === '1' ? 'flex' : 'none';
+        document.getElementById('triggerScroll').style.display = trigger === '2' ? 'flex' : 'none';
+        document.getElementById('triggerVisitas').style.display = trigger === '4' ? 'flex' : 'none';
+    }
+
+    // Toggle opciones de frecuencia
+    function toggleFrecuenciaOptions() {
+        const frecuencia = document.getElementById('frecuencia').value;
+        document.getElementById('frecuenciaDias').style.display = frecuencia === '3' ? 'flex' : 'none';
+    }
+
+    // Toggle opciones PWA
+    function togglePWAOptions() {
+        const esPWA = document.getElementById('esPWA').checked;
+        document.getElementById('pwaOptionsContainer').style.display = esPWA ? 'block' : 'none';
+    }
+
+    // Filtro de plataforma PWA (mutuamente excluyente)
+    function handlePlatformFilter(platform) {
+        if (platform === 'ios') {
+            if (document.getElementById('soloIOS').checked) {
+                document.getElementById('soloAndroid').checked = false;
+            }
+        } else if (platform === 'android') {
+            if (document.getElementById('soloAndroid').checked) {
+                document.getElementById('soloIOS').checked = false;
+            }
+        }
+    }
+
+    // Manejo de botones
+    function agregarBoton() {
+        botones.push({ texto: 'Nuevo botón', url: '', estilo: 'secondary', accion: 'link' });
+        renderizarBotones();
+    }
+
+    function agregarBotonCerrar() {
+        botones.push({ texto: 'Ahora no', url: '#cerrar', estilo: 'secondary', accion: 'close' });
+        renderizarBotones();
+    }
+
+    function eliminarBoton(index) {
+        botones.splice(index, 1);
+        renderizarBotones();
+    }
+
+    function actualizarBoton(index, campo, valor) {
+        botones[index][campo] = valor;
+        actualizarBotonesJson();
+        actualizarPreview();
+    }
+
+    function renderizarBotones() {
+        const container = document.getElementById('botonesContainer');
+        container.innerHTML = botones.map((btn, i) => {
+            const esClose = btn.accion === 'close' || btn.url === '#cerrar';
+            return `
+            <div class="button-item" style="flex-wrap: wrap;">
+                <input type="text" value="${btn.texto}" placeholder="Texto del botón" onchange="actualizarBoton(${i}, 'texto', this.value)" style="min-width: 120px;">
+                <select onchange="actualizarBoton(${i}, 'accion', this.value); actualizarBoton(${i}, 'url', this.value === 'close' ? '#cerrar' : ''); renderizarBotones();" style="min-width: 130px;">
+                    <option value="link" ${!esClose ? 'selected' : ''}>Ir a URL</option>
+                    <option value="close" ${esClose ? 'selected' : ''}>Cerrar popup</option>
+                </select>
+                ${!esClose ? `<input type="text" value="${btn.url || ''}" placeholder="URL destino" onchange="actualizarBoton(${i}, 'url', this.value)" style="flex: 1; min-width: 150px;">` : ''}
+                <select onchange="actualizarBoton(${i}, 'estilo', this.value)">
+                    <option value="primary" ${btn.estilo === 'primary' ? 'selected' : ''}>Primario</option>
+                    <option value="secondary" ${btn.estilo === 'secondary' ? 'selected' : ''}>Secundario</option>
+                    <option value="link" ${btn.estilo === 'link' ? 'selected' : ''}>Link</option>
+                </select>
+                <button type="button" onclick="eliminarBoton(${i})" style="background: #fee2e2; color: #ef4444; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">✕</button>
+            </div>
+        `}).join('');
+        actualizarBotonesJson();
+    }
+
+    function actualizarBotonesJson() {
+        document.getElementById('botonesJson').value = JSON.stringify(botones);
+    }
+
+    // Templates predefinidos
+    function cargarTemplate(tipo) {
+        const templates = {
+            promocion: {
+                nombre: 'Promocion',
+                tipo: 1,
+                titulo: 'Oferta Especial',
+                contenido: '<p>Aprovecha nuestra promocion exclusiva por tiempo limitado.</p>',
+                posicion: 0,
+                colorFondo: '#ffffff',
+                colorTexto: '#111111',
+                colorBotonPrimario: '#4682B4',
+                animacion: 1,
+                trigger: 1,
+                delaySegundos: 3,
+                frecuencia: 1,
+                botones: [
+                    { texto: 'Ver oferta', url: '/promocion', estilo: 'primary' },
+                    { texto: 'Ahora no', url: '#cerrar', estilo: 'secondary' }
+                ]
+            },
+            newsletter: {
+                nombre: 'Newsletter',
+                tipo: 1,
+                titulo: 'Suscribete al newsletter',
+                contenido: '<p>Recibe las ultimas novedades y ofertas exclusivas en tu correo.</p>',
+                posicion: 0,
+                colorFondo: '#ffffff',
+                colorTexto: '#111111',
+                colorBotonPrimario: '#10b981',
+                animacion: 7,
+                trigger: 2,
+                scrollPorcentaje: 50,
+                frecuencia: 1,
+                botones: [
+                    { texto: 'Suscribirse', url: '/newsletter', estilo: 'primary' }
+                ]
+            },
+            cookies: {
+                nombre: 'Aviso de cookies',
+                tipo: 0,
+                titulo: '',
+                contenido: '<p>Usamos cookies para mejorar tu experiencia. Al continuar navegando, aceptas nuestra politica de privacidad.</p>',
+                posicion: 5,
+                colorFondo: '#1a1a2e',
+                colorTexto: '#ffffff',
+                colorBotonPrimario: '#4682B4',
+                animacion: 2,
+                trigger: 0,
+                frecuencia: 1,
+                botones: [
+                    { texto: 'Aceptar', url: '#cerrar', estilo: 'primary' },
+                    { texto: 'Configurar', url: '/privacidad', estilo: 'link' }
+                ]
+            },
+            alerta: {
+                nombre: 'Alerta importante',
+                tipo: 0,
+                titulo: 'Aviso importante',
+                contenido: '<p>Mensaje importante para los usuarios.</p>',
+                posicion: 2,
+                colorFondo: '#fef2f2',
+                colorTexto: '#991b1b',
+                colorBotonPrimario: '#ef4444',
+                animacion: 8,
+                trigger: 0,
+                frecuencia: 2,
+                botones: [
+                    { texto: 'Entendido', url: '#cerrar', estilo: 'primary' }
+                ]
+            },
+            pwa: {
+                nombre: 'Instalar App',
+                tipo: 0,
+                titulo: 'Instalar LADO',
+                contenido: '<p>Accede rapidamente desde tu pantalla de inicio. Instala nuestra app para una mejor experiencia.</p>',
+                posicion: 5,
+                colorFondo: '#ffffff',
+                colorTexto: '#111111',
+                colorBotonPrimario: '#4682B4',
+                animacion: 2,
+                trigger: 4,
+                visitasRequeridas: 3,
+                frecuencia: 3,
+                diasFrecuencia: 7,
+                // PWA fields
+                esPWA: true,
+                soloSiInstalable: true,
+                textoBotonInstalar: 'Instalar',
+                contenidoIOS: '<strong>Para instalar en iPhone/iPad:</strong><br>1. Toca el boton <strong>Compartir</strong> (cuadro con flecha)<br>2. Desplaza y toca <strong>Agregar a Inicio</strong><br>3. Confirma tocando <strong>Agregar</strong>',
+                botones: [
+                    { texto: 'Ahora no', url: '#cerrar', estilo: 'secondary', accion: 'close' }
+                ]
+            },
+            bienvenida: {
+                nombre: 'Bienvenida',
+                tipo: 3,
+                titulo: 'Bienvenido a LADO',
+                contenido: '<p>Descubre todo lo que tenemos para ti. Explora, conecta y comparte.</p>',
+                posicion: 0,
+                colorFondo: 'rgba(0,0,0,0.9)',
+                colorTexto: '#ffffff',
+                colorBotonPrimario: '#4682B4',
+                animacion: 1,
+                trigger: 0,
+                frecuencia: 1,
+                mostrarUsuariosAnonimos: false,
+                botones: [
+                    { texto: 'Comenzar', url: '#cerrar', estilo: 'primary' }
+                ]
+            },
+            vacio: {
+                nombre: '',
+                tipo: 1,
+                titulo: '',
+                contenido: '',
+                posicion: 0,
+                colorFondo: '#ffffff',
+                colorTexto: '#111111',
+                colorBotonPrimario: '#4682B4',
+                animacion: 1,
+                trigger: 0,
+                frecuencia: 1,
+                botones: []
+            }
+        };
+
+        const t = templates[tipo];
+        if (!t) return;
+
+        document.getElementById('nombre').value = t.nombre;
+        document.getElementById('tipo').value = t.tipo;
+        document.getElementById('titulo').value = t.titulo;
+        document.getElementById('contenido').value = t.contenido;
+        if (quillEditor) quillEditor.root.innerHTML = t.contenido;
+        seleccionarPosicion(t.posicion);
+        document.getElementById('colorFondo').value = t.colorFondo;
+        document.getElementById('colorFondoPicker').value = t.colorFondo.startsWith('#') ? t.colorFondo : '#ffffff';
+        document.getElementById('colorTexto').value = t.colorTexto;
+        document.getElementById('colorTextoPicker').value = t.colorTexto;
+        document.getElementById('colorBotonPrimario').value = t.colorBotonPrimario;
+        document.getElementById('colorBotonPicker').value = t.colorBotonPrimario;
+        document.getElementById('animacion').value = t.animacion;
+        document.getElementById('trigger').value = t.trigger;
+        if (t.delaySegundos) document.getElementById('delaySegundos').value = t.delaySegundos;
+        if (t.scrollPorcentaje) document.getElementById('scrollPorcentaje').value = t.scrollPorcentaje;
+        if (t.visitasRequeridas) document.getElementById('visitasRequeridas').value = t.visitasRequeridas;
+        document.getElementById('frecuencia').value = t.frecuencia;
+        if (t.diasFrecuencia) document.getElementById('diasFrecuencia').value = t.diasFrecuencia;
+
+        // PWA fields
+        document.getElementById('esPWA').checked = t.esPWA || false;
+        document.getElementById('soloSiInstalable').checked = t.soloSiInstalable !== false;
+        document.getElementById('soloIOS').checked = t.soloIOS || false;
+        document.getElementById('soloAndroid').checked = t.soloAndroid || false;
+        document.getElementById('textoBotonInstalar').value = t.textoBotonInstalar || 'Instalar';
+        document.getElementById('contenidoIOS').value = t.contenidoIOS || '';
+        togglePWAOptions();
+
+        botones = t.botones || [];
+        renderizarBotones();
+
+        toggleTriggerOptions();
+        toggleFrecuenciaOptions();
+        actualizarPreview();
+
+        // Ocultar templates y mostrar tabs
+        document.getElementById('templatesSection').style.display = 'none';
+    }
+
+    // Actualizar preview
+    function actualizarPreview() {
+        const tipo = parseInt(document.getElementById('tipo').value);
+        const titulo = document.getElementById('titulo').value;
+        const contenido = document.getElementById('contenido').value || (quillEditor ? quillEditor.root.innerHTML : '');
+        const colorFondo = document.getElementById('colorFondo').value || '#ffffff';
+        const colorTexto = document.getElementById('colorTexto').value || '#111111';
+        const colorBoton = document.getElementById('colorBotonPrimario').value || '#4682B4';
+        const posicion = parseInt(document.getElementById('posicion').value);
+        const anchoMaximo = parseInt(document.getElementById('anchoMaximo').value) || 400;
+        const mostrarBotonCerrar = document.getElementById('mostrarBotonCerrar').checked;
+        const cssPersonalizado = document.getElementById('cssPersonalizado').value || '';
+
+        // Escalar ancho para preview (el preview es pequeño)
+        const anchoPreview = Math.min(Math.round(anchoMaximo * 0.5), 200);
+
+        let previewHtml = '';
+        let positionStyle = '';
+
+        // Determinar posicion
+        switch (posicion) {
+            case 1: positionStyle = 'top: 30px; left: 10px;'; break;
+            case 2: positionStyle = 'top: 30px; left: 50%; transform: translateX(-50%);'; break;
+            case 3: positionStyle = 'top: 30px; right: 10px;'; break;
+            case 4: positionStyle = 'bottom: 10px; left: 10px;'; break;
+            case 5: positionStyle = 'bottom: 10px; left: 50%; transform: translateX(-50%);'; break;
+            case 6: positionStyle = 'bottom: 10px; right: 10px;'; break;
+            case 7: positionStyle = 'top: 50%; left: 10px; transform: translateY(-50%);'; break;
+            case 8: positionStyle = 'top: 50%; right: 10px; transform: translateY(-50%);'; break;
+            default: positionStyle = 'top: 50%; left: 50%; transform: translate(-50%, -50%);';
+        }
+
+        // Boton cerrar para preview
+        const closeBtn = mostrarBotonCerrar
+            ? `<button style="position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.1); border: none; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;">&times;</button>`
+            : '';
+
+        // Generar botones HTML
+        let botonesHtml = botones.map(btn => {
+            const btnStyle = btn.estilo === 'primary'
+                ? `background: ${colorBoton}; color: white; border: none;`
+                : btn.estilo === 'secondary'
+                    ? `background: transparent; color: ${colorTexto}; border: 1px solid ${colorTexto};`
+                    : `background: transparent; color: ${colorBoton}; border: none; text-decoration: underline;`;
+            return `<button style="${btnStyle} padding: 6px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; margin: 2px;">${btn.texto}</button>`;
+        }).join('');
+
+        // Generar segun tipo
+        switch (tipo) {
+            case 0: // Banner
+                previewHtml = `
+                    <div style="position: absolute; ${posicion <= 3 ? 'top: 30px;' : 'bottom: 10px;'} left: 10px; right: 10px; background: ${colorFondo}; color: ${colorTexto}; padding: 10px; border-radius: 8px; font-size: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); ${cssPersonalizado}">
+                        ${closeBtn}
+                        ${titulo ? `<strong>${titulo}</strong>` : ''}
+                        <div style="font-size: 9px; opacity: 0.9;">${contenido}</div>
+                        <div style="margin-top: 6px; display: flex; gap: 4px; justify-content: flex-end;">${botonesHtml}</div>
+                    </div>
+                `;
+                break;
+            case 1: // Modal
+                previewHtml = `
+                    <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;">
+                        <div style="position: relative; background: ${colorFondo}; color: ${colorTexto}; padding: 16px; border-radius: 12px; width: 85%; max-width: ${anchoPreview}px; font-size: 11px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); ${cssPersonalizado}">
+                            ${closeBtn}
+                            ${titulo ? `<h4 style="margin: 0 0 8px; font-size: 13px;">${titulo}</h4>` : ''}
+                            <div style="font-size: 10px; opacity: 0.9;">${contenido}</div>
+                            <div style="margin-top: 12px; display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">${botonesHtml}</div>
+                        </div>
+                    </div>
+                `;
+                break;
+            case 2: // Toast
+                previewHtml = `
+                    <div style="position: absolute; ${positionStyle} background: ${colorFondo}; color: ${colorTexto}; padding: 10px 14px; border-radius: 8px; font-size: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); max-width: 180px; ${cssPersonalizado}">
+                        ${closeBtn}
+                        ${titulo ? `<strong>${titulo}</strong><br>` : ''}
+                        <span style="font-size: 9px;">${contenido}</span>
+                    </div>
+                `;
+                break;
+            case 3: // FullScreen
+                previewHtml = `
+                    <div style="position: absolute; inset: 0; background: ${colorFondo}; color: ${colorTexto}; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; ${cssPersonalizado}">
+                        ${closeBtn}
+                        ${titulo ? `<h3 style="margin: 0 0 12px; font-size: 16px;">${titulo}</h3>` : ''}
+                        <div style="font-size: 11px; opacity: 0.9; max-width: 200px;">${contenido}</div>
+                        <div style="margin-top: 16px; display: flex; gap: 8px;">${botonesHtml}</div>
+                    </div>
+                `;
+                break;
+            case 4: // Slide
+                previewHtml = `
+                    <div style="position: absolute; top: 30px; bottom: 0; ${posicion === 7 ? 'left: 0;' : 'right: 0;'} width: 70%; background: ${colorFondo}; color: ${colorTexto}; padding: 16px; box-shadow: ${posicion === 7 ? '4px' : '-4px'} 0 20px rgba(0,0,0,0.2); ${cssPersonalizado}">
+                        ${closeBtn}
+                        ${titulo ? `<h4 style="margin: 0 0 12px; font-size: 13px;">${titulo}</h4>` : ''}
+                        <div style="font-size: 10px;">${contenido}</div>
+                        <div style="margin-top: 12px;">${botonesHtml}</div>
+                    </div>
+                `;
+                break;
+        }
+
+        document.getElementById('previewPopup').innerHTML = previewHtml;
+    }
+
+    // Editar popup
+    async function editarPopup(id) {
+        try {
+            const res = await fetch(`/Admin/ObtenerPopup?id=${id}`);
+            const data = await res.json();
+
+            if (data.success) {
+                const p = data.popup;
+                console.log('Datos del popup recibidos:', p);
+                console.log('Valores de audiencia:', {
+                    mostrarUsuariosLogueados: p.mostrarUsuariosLogueados,
+                    mostrarUsuariosAnonimos: p.mostrarUsuariosAnonimos,
+                    mostrarEnMovil: p.mostrarEnMovil,
+                    mostrarEnDesktop: p.mostrarEnDesktop
+                });
+                document.getElementById('popupId').value = p.id;
+                document.getElementById('nombre').value = p.nombre;
+                document.getElementById('tipo').value = p.tipo;
+                document.getElementById('titulo').value = p.titulo || '';
+                // Contenido - guardar en textarea (fuente de verdad)
+                const contenido = p.contenido || '';
+                console.log('Contenido recibido:', contenido.substring(0, 100) + '...');
+                document.getElementById('contenido').value = contenido;
+
+                // Detectar si el contenido tiene estilos inline complejos
+                const tieneEstilosComplejos = contenido.includes('style="') &&
+                    (contenido.includes('display:') || contenido.includes('flex') ||
+                     contenido.includes('font-size:') || contenido.includes('margin:'));
+
+                if (tieneEstilosComplejos) {
+                    // HTML complejo: activar modo código automáticamente
+                    console.log('HTML con estilos complejos detectado - activando modo código');
+                    document.getElementById('editorVisual').style.display = 'none';
+                    document.getElementById('editorCodigo').style.display = 'block';
+                    document.querySelectorAll('.editor-toggle button').forEach((btn, i) => {
+                        btn.classList.toggle('active', i === 1); // Activar botón "Código"
+                    });
+                    // NO cargar en Quill para preservar HTML exacto
+                } else if (quillEditor) {
+                    // HTML simple: cargar en Quill normalmente
+                    try {
+                        quillEditor.root.innerHTML = contenido;
+                    } catch (e) {
+                        console.warn('Error al cargar en Quill:', e);
+                    }
+                }
+
+                document.getElementById('imagenUrl').value = p.imagenUrl || '';
+                document.getElementById('iconoClase').value = p.iconoClase || '';
+                seleccionarPosicion(p.posicion);
+
+                // Colores - actualizar tanto el input como el color picker
+                const colorFondo = p.colorFondo || '#ffffff';
+                const colorTexto = p.colorTexto || '#111111';
+                const colorBoton = p.colorBotonPrimario || '#4682B4';
+
+                document.getElementById('colorFondo').value = colorFondo;
+                document.getElementById('colorFondoPicker').value = colorFondo.startsWith('#') ? colorFondo : '#ffffff';
+                document.getElementById('colorTexto').value = colorTexto;
+                document.getElementById('colorTextoPicker').value = colorTexto.startsWith('#') ? colorTexto : '#111111';
+                document.getElementById('colorBotonPrimario').value = colorBoton;
+                document.getElementById('colorBotonPicker').value = colorBoton.startsWith('#') ? colorBoton : '#4682B4';
+
+                document.getElementById('cssPersonalizado').value = p.cssPersonalizado || '';
+                document.getElementById('animacion').value = p.animacion;
+                document.getElementById('anchoMaximo').value = p.anchoMaximo || 400;
+                document.getElementById('mostrarBotonCerrar').checked = p.mostrarBotonCerrar;
+                document.getElementById('cerrarAlClickFuera').checked = p.cerrarAlClickFuera;
+                document.getElementById('trigger').value = p.trigger;
+                document.getElementById('delaySegundos').value = p.delaySegundos || 3;
+                document.getElementById('scrollPorcentaje').value = p.scrollPorcentaje || 50;
+                document.getElementById('visitasRequeridas').value = p.visitasRequeridas || 3;
+                document.getElementById('mostrarUsuariosLogueados').checked = p.mostrarUsuariosLogueados;
+                document.getElementById('mostrarUsuariosAnonimos').checked = p.mostrarUsuariosAnonimos;
+                document.getElementById('mostrarEnMovil').checked = p.mostrarEnMovil;
+                document.getElementById('mostrarEnDesktop').checked = p.mostrarEnDesktop;
+                document.getElementById('paginasIncluidas').value = p.paginasIncluidas || '';
+                document.getElementById('paginasExcluidas').value = p.paginasExcluidas || '';
+                document.getElementById('frecuencia').value = p.frecuencia;
+                document.getElementById('diasFrecuencia').value = p.diasFrecuencia || 7;
+                document.getElementById('estaActivo').value = p.estaActivo ? 'true' : 'false';
+                document.getElementById('fechaInicio').value = p.fechaInicio || '';
+                document.getElementById('fechaFin').value = p.fechaFin || '';
+                document.getElementById('prioridad').value = p.prioridad;
+
+                // PWA fields
+                document.getElementById('esPWA').checked = p.esPWA;
+                document.getElementById('soloSiInstalable').checked = p.soloSiInstalable;
+                document.getElementById('soloIOS').checked = p.soloIOS;
+                document.getElementById('soloAndroid').checked = p.soloAndroid;
+                document.getElementById('textoBotonInstalar').value = p.textoBotonInstalar || 'Instalar';
+                document.getElementById('contenidoIOS').value = p.contenidoIOS || '';
+                togglePWAOptions();
+
+                botones = p.botonesJson ? JSON.parse(p.botonesJson) : [];
+                renderizarBotones();
+
+                toggleTriggerOptions();
+                toggleFrecuenciaOptions();
+                actualizarPreview();
+
+                abrirModal(id);
+            }
+        } catch (error) {
+            alert('Error al cargar popup');
+        }
+    }
+
+    // Guardar popup
+    async function guardarPopup() {
+        const form = document.getElementById('popupForm');
+        const formData = new FormData(form);
+
+        console.log('=== ANTES DE MODIFICAR FORMDATA ===');
+        for (let [key, value] of formData.entries()) {
+            console.log(`  ${key}: "${value}"`);
+        }
+
+        // Asegurar contenido del editor
+        // IMPORTANTE: Sincronizar y obtener el contenido correctamente
+        const editorCodigo = document.getElementById('editorCodigo');
+        const editorVisual = document.getElementById('editorVisual');
+        const textareaContenido = document.getElementById('contenido');
+        const modoCodigoActivo = editorCodigo && editorCodigo.style.display !== 'none';
+
+        let contenidoFinal;
+
+        // Primero sincronizar Quill -> Textarea si estamos en modo visual
+        if (!modoCodigoActivo && quillEditor) {
+            textareaContenido.value = quillEditor.root.innerHTML;
+        }
+
+        // Ahora decidir qué fuente usar
+        if (modoCodigoActivo) {
+            // Modo código: usar el textarea directamente (preserva HTML exacto)
+            contenidoFinal = textareaContenido.value;
+            console.log('Usando contenido del TEXTAREA (modo código activo)');
+        } else if (quillEditor) {
+            // Modo visual: usar Quill (ya sincronizado arriba)
+            contenidoFinal = quillEditor.root.innerHTML;
+            console.log('Usando contenido de QUILL (modo visual)');
+        } else {
+            contenidoFinal = textareaContenido.value;
+            console.log('Usando contenido del TEXTAREA (fallback - Quill no disponible)');
+        }
+
+        // Limpiar contenido vacío de Quill
+        if (contenidoFinal === '<p><br></p>' || contenidoFinal === '<p></p>') {
+            contenidoFinal = '';
+            console.log('Contenido vacío detectado, limpiando');
+        }
+
+        console.log('=== CONTENIDO A GUARDAR ===');
+        console.log('Modo código activo:', modoCodigoActivo);
+        console.log('Quill disponible:', !!quillEditor);
+        console.log('Longitud:', contenidoFinal.length);
+        console.log('Contenido:', contenidoFinal.substring(0, 300));
+
+        formData.set('contenido', contenidoFinal);
+
+        // Verificar contenidoIOS también
+        const contenidoIOSVal = document.getElementById('contenidoIOS').value;
+        console.log('ContenidoIOS length:', contenidoIOSVal.length);
+        if (contenidoIOSVal.length > 0) {
+            console.log('ContenidoIOS:', contenidoIOSVal.substring(0, 200));
+        }
+        formData.set('botonesJson', JSON.stringify(botones));
+        formData.set('estaActivo', document.getElementById('estaActivo').value === 'true' ? 'true' : 'false');
+
+        // Asegurar que todos los checkboxes se envíen explícitamente como "true"/"false"
+        const checkboxes = [
+            'mostrarBotonCerrar', 'cerrarAlClickFuera',
+            'mostrarUsuariosLogueados', 'mostrarUsuariosAnonimos',
+            'mostrarEnMovil', 'mostrarEnDesktop',
+            'esPWA', 'soloSiInstalable', 'soloIOS', 'soloAndroid'
+        ];
+
+        // IMPORTANTE: Primero eliminar los valores existentes, luego agregar los nuevos
+        checkboxes.forEach(name => {
+            formData.delete(name);
+            const cb = document.getElementById(name);
+            if (!cb) {
+                console.error(`ERROR: No se encontró elemento con id="${name}"`);
+                formData.append(name, 'false');
+                return;
+            }
+            const valor = cb.checked ? 'true' : 'false';
+            formData.append(name, valor);
+            console.log(`Checkbox ${name}: element.checked=${cb.checked} → sending="${valor}"`);
+        });
+
+        console.log('=== DESPUES DE MODIFICAR FORMDATA ===');
+        for (let [key, value] of formData.entries()) {
+            if (checkboxes.includes(key) || key === 'estaActivo') {
+                console.log(`  ${key}: "${value}"`);
+            }
+        }
+
+        try {
+            const res = await fetch('/Admin/GuardarPopup', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+
+            console.log('=== RESPUESTA DEL SERVIDOR ===');
+            console.log(data);
+            if (data.debug) {
+                console.log('Valores guardados en BD:');
+                Object.entries(data.debug).forEach(([k, v]) => console.log(`  ${k}: ${v}`));
+            }
+
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert(data.message);
+            }
+        } catch (error) {
+            console.error('Error al guardar:', error);
+            alert('Error al guardar');
+        }
+    }
+
+    // Toggle estado
+    async function togglePopup(id) {
+        try {
+            const formData = new FormData();
+            formData.append('__RequestVerificationToken', getAntiForgeryToken());
+
+            const res = await fetch(`/Admin/TogglePopup?id=${id}`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                alert(data.message);
+                window.location.reload();
+            }
+        } catch (error) {
+            alert('Error');
+        }
+    }
+
+    // Duplicar popup
+    async function duplicarPopup(id) {
+        if (!confirm('Duplicar este popup?')) return;
+
+        try {
+            const formData = new FormData();
+            formData.append('__RequestVerificationToken', getAntiForgeryToken());
+
+            const res = await fetch(`/Admin/DuplicarPopup?id=${id}`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert(data.message);
+            }
+        } catch (error) {
+            alert('Error');
+        }
+    }
+
+    // Wrapper para eliminar desde botón con data attributes
+    function eliminarPopupBtn(btn) {
+        const id = btn.dataset.id;
+        const nombre = btn.dataset.nombre;
+        eliminarPopup(id, nombre);
+    }
+
+    // Eliminar popup
+    async function eliminarPopup(id, nombre) {
+        if (!confirm(`Eliminar popup "${nombre}"?`)) return;
+
+        try {
+            const formData = new FormData();
+            formData.append('__RequestVerificationToken', getAntiForgeryToken());
+
+            const res = await fetch(`/Admin/EliminarPopup?id=${id}`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert(data.message);
+            }
+        } catch (error) {
+            alert('Error');
+        }
+    }
+
+    // Filtrar popups
+    function filtrarPopups() {
+        const estado = document.getElementById('filtroEstado').value;
+        const tipo = document.getElementById('filtroTipo').value;
+        const busqueda = document.getElementById('busqueda').value.toLowerCase();
+
+        document.querySelectorAll('#popupsTableBody tr').forEach(row => {
+            const rowEstado = row.dataset.estado;
+            const rowTipo = row.dataset.tipo;
+            const rowNombre = row.dataset.nombre;
+
+            let mostrar = true;
+
+            if (estado && rowEstado !== estado) mostrar = false;
+            if (tipo && rowTipo !== tipo) mostrar = false;
+            if (busqueda && !rowNombre.includes(busqueda)) mostrar = false;
+
+            row.style.display = mostrar ? '' : 'none';
+        });
+    }
+
+    // Cerrar modal con Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') cerrarModal();
+    });
+</script>

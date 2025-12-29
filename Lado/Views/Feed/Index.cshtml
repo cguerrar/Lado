@@ -388,7 +388,8 @@
     }
 
     .story-progress-bar.active .story-progress-fill {
-        animation: storyProgress 5s linear forwards;
+        /* Duración se establece dinámicamente via JavaScript con --story-duration */
+        animation: storyProgress var(--story-duration, 5s) linear forwards;
     }
 
     @@keyframes storyProgress {
@@ -2116,14 +2117,27 @@
         backface-visibility: hidden;
     }
 
-    /* iOS Safari: fix para videos que se ven negros */
+    /* iOS Safari: fix para videos que se ven negros o no reproducen */
     @@supports (-webkit-touch-callout: none) {
         .feed-video {
             -webkit-transform: translate3d(0, 0, 0);
             transform: translate3d(0, 0, 0);
+            /* iOS necesita esto para renderizar correctamente */
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
         }
 
         .post-media video {
+            opacity: 1 !important;
+            visibility: visible !important;
+            /* Forzar que iOS muestre el video */
+            background: transparent !important;
+        }
+
+        /* Forzar que los videos del fullscreen se muestren en iOS */
+        .fullscreen-slide video {
+            -webkit-transform: translate3d(0, 0, 0);
+            transform: translate3d(0, 0, 0);
             opacity: 1 !important;
             visibility: visible !important;
         }
@@ -3734,6 +3748,10 @@
         background: #000;
         z-index: 9999;
         overflow: hidden;
+        /* iOS Safari fix: usar altura dinámica del viewport */
+        height: 100vh;
+        height: 100dvh;
+        height: -webkit-fill-available;
     }
 
     .fullscreen-viewer.active {
@@ -3741,9 +3759,13 @@
         flex-direction: column;
     }
 
+    /* iOS Safari: NO agregar padding al slide, solo ajustar elementos UI */
+    /* El slide debe ocupar 100% sin padding para evitar desplazamiento */
+
     .fullscreen-viewer-close {
         position: fixed;
-        top: 20px;
+        /* iOS: Posicionar debajo del safe area */
+        top: max(20px, calc(env(safe-area-inset-top, 0) + 10px));
         right: 20px;
         width: 44px;
         height: 44px;
@@ -3770,6 +3792,10 @@
 
     .fullscreen-slides-container {
         flex: 1;
+        /* iOS Safari fix: altura explícita para evitar desplazamiento */
+        height: 100%;
+        max-height: 100vh;
+        max-height: 100dvh;
         overflow-y: scroll;
         overflow-x: hidden;
         scroll-snap-type: y mandatory;
@@ -3777,7 +3803,7 @@
         scrollbar-width: none;
         -ms-overflow-style: none;
         overscroll-behavior-y: contain;
-        scroll-behavior: smooth;
+        /* Remover scroll-behavior smooth para mejor snap inicial */
     }
 
     .fullscreen-slides-container::-webkit-scrollbar {
@@ -3790,7 +3816,8 @@
         height: 100dvh;
         min-height: 100vh;
         min-height: 100dvh;
-        scroll-snap-align: center;
+        /* iOS Safari fix: usar 'start' en lugar de 'center' para evitar desplazamiento */
+        scroll-snap-align: start;
         scroll-snap-stop: always;
         display: flex;
         align-items: center;
@@ -6498,19 +6525,31 @@
                                 }
                                 else if (esVideo)
                                 {
-                                    <video src="@rutaArchivoLimpia"
-                                           class="feed-video"
+                                    @* iOS Safari requiere tipo MIME explícito y prefiere preload="metadata" *@
+                                    var esWebm = rutaArchivoLimpia.EndsWith(".webm", StringComparison.OrdinalIgnoreCase);
+                                    var esMp4 = rutaArchivoLimpia.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase) ||
+                                                rutaArchivoLimpia.EndsWith(".m4v", StringComparison.OrdinalIgnoreCase);
+                                    var tipoMime = esWebm ? "video/webm" : "video/mp4";
+                                    <video class="feed-video"
                                            autoplay
                                            muted
                                            loop
                                            playsinline
-                                           webkit-playsinline=""
+                                           webkit-playsinline="true"
                                            x-webkit-airplay="allow"
                                            disablepictureinpicture
                                            disableremoteplayback
-                                           preload="auto"
+                                           preload="metadata"
                                            data-post-id="@post.Id"
-                                           onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'media-error-placeholder\'><svg viewBox=\'0 0 24 24\' fill=\'rgba(255,255,255,0.3)\'><path d=\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\'/></svg></div>';"></video>
+                                           poster="@(post.Thumbnail ?? "")"
+                                           onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'media-error-placeholder\'><svg viewBox=\'0 0 24 24\' fill=\'rgba(255,255,255,0.3)\'><path d=\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\'/></svg></div>';">
+                                        @* Primero MP4 para iOS, luego WebM como fallback *@
+                                        @if (!esWebm)
+                                        {
+                                            <source src="@rutaArchivoLimpia" type="video/mp4">
+                                        }
+                                        <source src="@rutaArchivoLimpia" type="@tipoMime">
+                                    </video>
                                 }
                                 else if (esAudio)
                                 {
@@ -6569,19 +6608,27 @@
                                     <div class="carousel-slide" data-index="@i" style="width: @(100.0 / archivosCarrusel.Count)%;">
                                         @if (esArchivoVideo)
                                         {
-                                            <video src="@rutaArchivoCarrusel"
-                                                   class="carousel-media feed-video"
+                                            @* iOS Safari requiere tipo MIME explícito *@
+                                            var esWebmCarrusel = rutaArchivoCarrusel.EndsWith(".webm", StringComparison.OrdinalIgnoreCase);
+                                            var tipoMimeCarrusel = esWebmCarrusel ? "video/webm" : "video/mp4";
+                                            <video class="carousel-media feed-video"
                                                    autoplay
                                                    muted
                                                    loop
                                                    playsinline
-                                                   webkit-playsinline=""
+                                                   webkit-playsinline="true"
                                                    x-webkit-airplay="allow"
                                                    disablepictureinpicture
                                                    disableremoteplayback
-                                                   preload="auto"
+                                                   preload="metadata"
                                                    data-post-id="@post.Id"
-                                                   onerror="this.parentElement.innerHTML='<div class=\'media-error-placeholder\'><svg viewBox=\'0 0 24 24\' fill=\'rgba(255,255,255,0.3)\'><path d=\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\'/></svg></div>';"></video>
+                                                   onerror="this.parentElement.innerHTML='<div class=\'media-error-placeholder\'><svg viewBox=\'0 0 24 24\' fill=\'rgba(255,255,255,0.3)\'><path d=\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\'/></svg></div>';">
+                                                @if (!esWebmCarrusel)
+                                                {
+                                                    <source src="@rutaArchivoCarrusel" type="video/mp4">
+                                                }
+                                                <source src="@rutaArchivoCarrusel" type="@tipoMimeCarrusel">
+                                            </video>
                                             <div class="video-play-icon carousel-play-icon">
                                                 <svg class="icon-play" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
                                                 <svg class="icon-pause" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
@@ -6770,19 +6817,27 @@
                         }
                         else if (esVideo)
                         {
-                            <video src="@rutaPostMedia"
-                                   class="feed-video"
+                            @* iOS Safari requiere MIME type explícito en <source> *@
+                            var esWebmPost = rutaPostMedia.EndsWith(".webm", StringComparison.OrdinalIgnoreCase);
+                            var tipoMimePost = esWebmPost ? "video/webm" : "video/mp4";
+                            <video class="feed-video"
                                    autoplay
                                    muted
                                    loop
                                    playsinline
-                                   webkit-playsinline=""
+                                   webkit-playsinline="true"
                                    x-webkit-airplay="allow"
                                    disablepictureinpicture
                                    disableremoteplayback
-                                   preload="auto"
+                                   preload="metadata"
                                    data-post-id="@post.Id"
+                                   poster="@(post.Thumbnail ?? "")"
                                    onerror="this.parentElement.innerHTML='<div class=\'media-error-placeholder\'><svg viewBox=\'0 0 24 24\' fill=\'rgba(255,255,255,0.3)\'><path d=\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\'/></svg></div>';">
+                                @if (!esWebmPost)
+                                {
+                                    <source src="@rutaPostMedia" type="video/mp4">
+                                }
+                                <source src="@rutaPostMedia" type="@tipoMimePost">
                             </video>
                             <div class="video-controls-overlay" onclick="handleVideoClick(event, this)">
                                 <div class="video-play-icon">
@@ -7043,7 +7098,16 @@
                     <a href="@Url.Action("RedirectAnuncio", "FeedPublico", new { id = anuncioFeed.Id })" target="_blank" class="post-ad-media">
                         @if (anuncioFeed.TipoCreativo == TipoCreativo.Video && !string.IsNullOrEmpty(anuncioFeed.UrlCreativo))
                         {
-                            <video src="@Url.Content($"~{anuncioFeed.UrlCreativo}")" muted autoplay loop playsinline></video>
+                            var urlCreativoLimpio = Url.Content($"~{anuncioFeed.UrlCreativo}");
+                            var esWebmAnuncio = anuncioFeed.UrlCreativo.EndsWith(".webm", StringComparison.OrdinalIgnoreCase);
+                            var tipoMimeAnuncio = esWebmAnuncio ? "video/webm" : "video/mp4";
+                            <video muted autoplay loop playsinline webkit-playsinline="true" preload="metadata">
+                                @if (!esWebmAnuncio)
+                                {
+                                    <source src="@urlCreativoLimpio" type="video/mp4">
+                                }
+                                <source src="@urlCreativoLimpio" type="@tipoMimeAnuncio">
+                            </video>
                         }
                         else if (!string.IsNullOrEmpty(anuncioFeed.UrlCreativo))
                         {
@@ -7987,6 +8051,10 @@
                         ${carouselMusicHtml}
                     </div>`;
             } else if (post.esVideo) {
+                // iOS Safari requiere MIME type explícito en <source>
+                const isWebmFeed = rutaArchivoLimpia.toLowerCase().endsWith('.webm');
+                const mimeTypeFeed = isWebmFeed ? 'video/webm' : 'video/mp4';
+                const posterAttrFeed = post.thumbnail ? `poster="${post.thumbnail}"` : '';
                 mediaHtml = `
                     <div class="post-media video-paused"
                          data-post-id="${post.id}"
@@ -7994,7 +8062,10 @@
                          data-media-src="${rutaArchivoLimpia}"
                          onclick="openFullscreenViewer(event, ${post.id})"
                          style="cursor: pointer;">
-                        <video src="${rutaArchivoLimpia}" class="feed-video" autoplay muted loop playsinline webkit-playsinline="" x-webkit-airplay="allow" disablepictureinpicture disableremoteplayback preload="auto" data-post-id="${post.id}" onerror="this.parentElement.innerHTML='<div class=\\'media-error-placeholder\\'><svg viewBox=\\'0 0 24 24\\' fill=\\'rgba(255,255,255,0.3)\\'><path d=\\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\\'/></svg></div>';"></video>
+                        <video class="feed-video" autoplay muted loop playsinline webkit-playsinline="true" x-webkit-airplay="allow" disablepictureinpicture disableremoteplayback preload="metadata" data-post-id="${post.id}" ${posterAttrFeed} onerror="this.parentElement.innerHTML='<div class=\\'media-error-placeholder\\'><svg viewBox=\\'0 0 24 24\\' fill=\\'rgba(255,255,255,0.3)\\'><path d=\\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\\'/></svg></div>';">
+                            ${!isWebmFeed ? `<source src="${rutaArchivoLimpia}" type="video/mp4">` : ''}
+                            <source src="${rutaArchivoLimpia}" type="${mimeTypeFeed}">
+                        </video>
                         <div class="video-controls-overlay" onclick="handleVideoClick(event, this)">
                             <div class="video-play-icon">
                                 <svg class="icon-play" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
@@ -8564,51 +8635,6 @@
         initPullToRefresh();
         initInfiniteScroll();
 
-        // 🍎 iOS Debug Panel - Solo visible en iOS para diagnóstico
-        if (isIOSDevice) {
-            const debugPanel = document.createElement('div');
-            debugPanel.id = 'ios-debug-panel';
-            debugPanel.style.cssText = `
-                position: fixed;
-                bottom: 80px;
-                right: 10px;
-                background: rgba(0,0,0,0.85);
-                color: #0f0;
-                font-size: 10px;
-                font-family: monospace;
-                padding: 8px;
-                border-radius: 8px;
-                z-index: 99999;
-                max-width: 200px;
-                max-height: 150px;
-                overflow: auto;
-                display: none;
-            `;
-            debugPanel.innerHTML = '<div>iOS Debug</div>';
-            document.body.appendChild(debugPanel);
-
-            // Triple tap para mostrar/ocultar debug
-            let tapCount = 0;
-            let tapTimer = null;
-            document.addEventListener('touchend', () => {
-                tapCount++;
-                if (tapCount === 3) {
-                    debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
-                    tapCount = 0;
-                }
-                clearTimeout(tapTimer);
-                tapTimer = setTimeout(() => tapCount = 0, 500);
-            }, { passive: true });
-
-            // Función para loggear en el panel
-            window.iOSDebug = function(msg) {
-                const line = document.createElement('div');
-                line.textContent = new Date().toLocaleTimeString().substr(0,8) + ' ' + msg;
-                debugPanel.appendChild(line);
-                debugPanel.scrollTop = debugPanel.scrollHeight;
-            };
-        }
-
         // 🍎 iOS: Forzar reproducción del primer video visible después de cualquier interacción
         if (isIOSDevice) {
             let firstInteractionHandled = false;
@@ -8616,8 +8642,6 @@
             const forcePlayOnInteraction = () => {
                 if (firstInteractionHandled) return;
                 firstInteractionHandled = true;
-
-                if (window.iOSDebug) window.iOSDebug('Primera interacción');
 
                 // Esperar un momento y luego intentar reproducir
                 setTimeout(() => {
@@ -8628,9 +8652,11 @@
                                          rect.left < window.innerWidth && rect.right > 0;
 
                         if (isVisible && video.paused) {
-                            if (window.iOSDebug) window.iOSDebug('Intentando reproducir video visible');
                             playVideo(video).then(success => {
-                                if (window.iOSDebug) window.iOSDebug('Resultado: ' + (success ? 'OK' : 'FAIL'));
+                                if (!success && window.ladoLog) {
+                                    window.ladoLog.warn('iOS: Fallo autoplay video en Feed',
+                                        JSON.stringify({ videoSrc: video.src?.substring(0, 100) }));
+                                }
                             });
                         }
                     });
@@ -11733,21 +11759,32 @@
 
         // Scroll al slide actual Y LUEGO reproducir
         // IMPORTANTE: NO reproducir antes del scroll para evitar audio duplicado
-        setTimeout(() => {
-            // Scroll sin animación para evitar múltiples llamadas a onFullscreenScroll
-            const container = document.getElementById('fullscreenSlidesContainer');
-            const slideHeight = window.innerHeight;
-            container.scrollTop = slideHeight * currentFullscreenIndex;
+        // Usar requestAnimationFrame para asegurar que el DOM esté actualizado
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                const container = document.getElementById('fullscreenSlidesContainer');
+                const slides = container.querySelectorAll('.fullscreen-slide');
 
-            updateCounter();
-            updateNavButtons();
+                if (slides.length > 0 && currentFullscreenIndex < slides.length) {
+                    // iOS Safari fix: usar scrollIntoView para posicionamiento preciso
+                    const targetSlide = slides[currentFullscreenIndex];
+                    targetSlide.scrollIntoView({ behavior: 'instant', block: 'start' });
 
-            // Ahora sí reproducir después de que el scroll terminó
-            setTimeout(() => {
-                lastScrollIndex = currentFullscreenIndex; // Evitar que onFullscreenScroll lo pause
-                playCurrentVideo();
-            }, 50);
-        }, 50);
+                    // Fallback: también establecer scrollTop por si scrollIntoView falla
+                    const slideHeight = targetSlide.offsetHeight || window.innerHeight;
+                    container.scrollTop = slideHeight * currentFullscreenIndex;
+                }
+
+                updateCounter();
+                updateNavButtons();
+
+                // Ahora sí reproducir después de que el scroll terminó
+                setTimeout(() => {
+                    lastScrollIndex = currentFullscreenIndex; // Evitar que onFullscreenScroll lo pause
+                    playCurrentVideo();
+                }, 50);
+            });
+        });
     }
 
     // Generar HTML de créditos estilo YouTube Shorts
@@ -11977,15 +12014,22 @@
             if (post.type === 'video') {
                 // Usar el video precargado si existe
                 const preloadedVideo = preloadedMedia.get(post.src);
+                // Determinar MIME type para iOS Safari
+                const isWebm = post.src.toLowerCase().endsWith('.webm');
+                const mimeType = isWebm ? 'video/webm' : 'video/mp4';
+                const posterAttr = post.thumbnail ? `poster="${post.thumbnail}"` : '';
                 slide.innerHTML = `
                     <div class="fullscreen-loading-indicator">
                         <div class="loading-spinner"></div>
                     </div>
-                    <video src="${post.src}"
-                           playsinline
+                    <video playsinline
+                           webkit-playsinline="true"
                            loop
                            muted
-                           preload="metadata">
+                           preload="metadata"
+                           ${posterAttr}>
+                        ${!isWebm ? `<source src="${post.src}" type="video/mp4">` : ''}
+                        <source src="${post.src}" type="${mimeType}">
                     </video>
                     <button class="fullscreen-mute-btn" onclick="event.stopPropagation(); toggleFullscreenMute(this)" title="Activar/Desactivar sonido">
                         <svg class="icon-muted" viewBox="0 0 24 24" fill="white">
@@ -12020,8 +12064,14 @@
                 // CARRUSEL - Múltiples archivos con navegación horizontal
                 const carouselSlidesHtml = post.carouselFiles.map((file, idx) => {
                     if (file.type === 'video') {
+                        // iOS Safari requiere MIME type explícito
+                        const isWebmCarousel = file.src.toLowerCase().endsWith('.webm');
+                        const mimeTypeCarousel = isWebmCarousel ? 'video/webm' : 'video/mp4';
                         return `<div class="fs-carousel-item ${idx === 0 ? 'active' : ''}" data-idx="${idx}">
-                            <video src="${file.src}" playsinline loop muted></video>
+                            <video playsinline webkit-playsinline="true" loop muted preload="metadata">
+                                ${!isWebmCarousel ? `<source src="${file.src}" type="video/mp4">` : ''}
+                                <source src="${file.src}" type="${mimeTypeCarousel}">
+                            </video>
                         </div>`;
                     } else {
                         return `<div class="fs-carousel-item ${idx === 0 ? 'active' : ''}" data-idx="${idx}">
@@ -12411,7 +12461,9 @@
         const container = document.getElementById('fullscreenSlidesContainer');
         if (!container) return;
 
-        const slideHeight = window.innerHeight;
+        // iOS fix: usar altura real del slide
+        const slides = container.querySelectorAll('.fullscreen-slide');
+        const slideHeight = slides.length > 0 ? slides[0].offsetHeight : window.innerHeight;
         const newIndex = Math.round(container.scrollTop / slideHeight);
 
         // Validar índice
@@ -12445,7 +12497,9 @@
     // Scroll al slide
     function scrollToSlide(index, smooth = true) {
         const container = document.getElementById('fullscreenSlidesContainer');
-        const slideHeight = window.innerHeight;
+        // iOS fix: usar altura real del slide
+        const slides = container.querySelectorAll('.fullscreen-slide');
+        const slideHeight = slides.length > 0 ? slides[0].offsetHeight : window.innerHeight;
         container.scrollTo({
             top: slideHeight * index,
             behavior: smooth ? 'smooth' : 'auto'
@@ -12621,7 +12675,9 @@
     // Navegar entre slides con botones
     function navigateFullscreen(direction) {
         const container = document.getElementById('fullscreenSlidesContainer');
-        const slideHeight = window.innerHeight;
+        // iOS fix: usar altura real del slide
+        const slides = container.querySelectorAll('.fullscreen-slide');
+        const slideHeight = slides.length > 0 ? slides[0].offsetHeight : window.innerHeight;
         const newIndex = currentFullscreenIndex + direction;
 
         if (newIndex < 0 || newIndex >= fullscreenPosts.length) return;
@@ -12755,8 +12811,14 @@
         const content = document.getElementById('carouselFsContent');
         content.innerHTML = carouselFullscreenFiles.map((file, index) => {
             if (file.type === 'video') {
+                // iOS Safari requiere MIME type explícito
+                const isWebmFs = file.src.toLowerCase().endsWith('.webm');
+                const mimeTypeFs = isWebmFs ? 'video/webm' : 'video/mp4';
                 return `<div class="carousel-fs-slide ${index === carouselFullscreenIndex ? 'active' : ''}" data-index="${index}">
-                    <video src="${file.src}" playsinline loop muted></video>
+                    <video playsinline webkit-playsinline="true" loop muted preload="metadata">
+                        ${!isWebmFs ? `<source src="${file.src}" type="video/mp4">` : ''}
+                        <source src="${file.src}" type="${mimeTypeFs}">
+                    </video>
                     <button class="carousel-fs-mute" onclick="toggleCarouselFsVideoMute(this)">
                         <svg class="icon-muted" viewBox="0 0 24 24" fill="white"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
                         <svg class="icon-unmuted" viewBox="0 0 24 24" fill="white" style="display:none;"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
@@ -13282,8 +13344,25 @@
             }
             // Aplicar estado de audio (muted por defecto en iOS hasta que el usuario toque)
             aplicarEstadoAudio();
+
+            // Manejar error de video (ej: WebM en iOS/Safari)
+            videoEl.onerror = function() {
+                // Mostrar mensaje de error y avanzar después de 3 segundos
+                videoEl.style.display = 'none';
+                textoEl.textContent = '⚠️ Video no compatible con tu dispositivo';
+                textoEl.style.display = 'block';
+                storyDuration = 3000;
+                iniciarTimerStory();
+            };
+
             // Manejar promesa de play para evitar AbortError
-            videoEl.play().catch(() => {});
+            videoEl.play().catch((err) => {
+                // Si no puede reproducir, tratar como error
+                if (err.name !== 'AbortError') {
+                    videoEl.onerror?.();
+                }
+            });
+
             // Para videos, usar su duración real
             videoEl.onloadedmetadata = function() {
                 storyDuration = Math.min(videoEl.duration * 1000, 30000); // Máximo 30s
@@ -13960,6 +14039,19 @@
     // Iniciar timer para avanzar
     function iniciarTimerStory() {
         if (storyTimer) clearTimeout(storyTimer);
+
+        // Sincronizar la animación de la barra de progreso con la duración real
+        const activeBar = document.querySelector('.story-progress-bar.active .story-progress-fill');
+        if (activeBar) {
+            // Establecer duración dinámica (convertir ms a segundos)
+            const durationSec = (storyDuration / 1000) + 's';
+            activeBar.style.setProperty('--story-duration', durationSec);
+
+            // Reiniciar animación para que comience desde 0
+            activeBar.style.animation = 'none';
+            activeBar.offsetHeight; // Forzar reflow
+            activeBar.style.animation = '';
+        }
 
         storyTimer = setTimeout(() => {
             storySiguiente();

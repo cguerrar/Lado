@@ -70,11 +70,15 @@ namespace Lado.Services
             ["image/bmp"] = new[] { new byte[] { 0x42, 0x4D } },
             ["image/tiff"] = new[] { new byte[] { 0x49, 0x49, 0x2A, 0x00 }, new byte[] { 0x4D, 0x4D, 0x00, 0x2A } },
 
-            // Videos
+            // Videos - MP4 tiene muchos tamaños de ftyp atom posibles
             ["video/mp4"] = new[] {
-                new byte[] { 0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70 }, // ftyp
-                new byte[] { 0x00, 0x00, 0x00, 0x1C, 0x66, 0x74, 0x79, 0x70 },
-                new byte[] { 0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70 }
+                new byte[] { 0x00, 0x00, 0x00, 0x14, 0x66, 0x74, 0x79, 0x70 }, // ftyp tamaño 20
+                new byte[] { 0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70 }, // ftyp tamaño 24
+                new byte[] { 0x00, 0x00, 0x00, 0x1C, 0x66, 0x74, 0x79, 0x70 }, // ftyp tamaño 28
+                new byte[] { 0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70 }, // ftyp tamaño 32
+                new byte[] { 0x00, 0x00, 0x00, 0x24, 0x66, 0x74, 0x79, 0x70 }, // ftyp tamaño 36
+                new byte[] { 0x00, 0x00, 0x00, 0x28, 0x66, 0x74, 0x79, 0x70 }, // ftyp tamaño 40
+                new byte[] { 0x00, 0x00, 0x00, 0x2C, 0x66, 0x74, 0x79, 0x70 }, // ftyp tamaño 44
             },
             ["video/webm"] = new[] { new byte[] { 0x1A, 0x45, 0xDF, 0xA3 } },
             ["video/quicktime"] = new[] {
@@ -300,6 +304,28 @@ namespace Lado.Services
             }
 
             // Detección adicional para archivos que no coinciden exactamente
+
+            // MP4/M4V/MOV - Buscar "ftyp" en los primeros 32 bytes (cualquier tamaño de atom)
+            if (header.Length >= 8)
+            {
+                for (int i = 0; i < Math.Min(header.Length - 4, 32); i++)
+                {
+                    // Buscar secuencia "ftyp" (0x66, 0x74, 0x79, 0x70)
+                    if (header[i] == 0x66 && header[i + 1] == 0x74 &&
+                        header[i + 2] == 0x79 && header[i + 3] == 0x70)
+                    {
+                        return "video/mp4";
+                    }
+                }
+            }
+
+            // WebM/MKV - EBML header (0x1A, 0x45, 0xDF, 0xA3)
+            if (header.Length >= 4 && header[0] == 0x1A && header[1] == 0x45 &&
+                header[2] == 0xDF && header[3] == 0xA3)
+            {
+                return "video/webm";
+            }
+
             // MP3 con ID3 tag
             if (header.Length >= 3 && header[0] == 0x49 && header[1] == 0x44 && header[2] == 0x33)
             {

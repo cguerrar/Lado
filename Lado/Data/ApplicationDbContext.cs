@@ -141,6 +141,11 @@ namespace Lado.Data
         public DbSet<PlantillaEmail> PlantillasEmail { get; set; }
         public DbSet<CampanaEmail> CampanasEmail { get; set; }
 
+        // ========================================
+        // ⭐ DbSets NUEVOS - SISTEMA DE POPUPS
+        // ========================================
+        public DbSet<Popup> Popups { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -1489,6 +1494,94 @@ namespace Lado.Data
 
                 entity.HasIndex(c => new { c.Estado, c.FechaCreacion })
                     .HasDatabaseName("IX_CampanasEmail_Estado_Fecha");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE POPUPS
+            // ========================================
+            modelBuilder.Entity<Popup>(entity =>
+            {
+                entity.HasKey(p => p.Id);
+
+                entity.Property(p => p.Nombre)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(p => p.Titulo)
+                    .HasMaxLength(200);
+
+                entity.Property(p => p.ImagenUrl)
+                    .HasMaxLength(500);
+
+                entity.Property(p => p.IconoClase)
+                    .HasMaxLength(50);
+
+                entity.Property(p => p.ColorFondo)
+                    .HasMaxLength(50);
+
+                entity.Property(p => p.ColorTexto)
+                    .HasMaxLength(50);
+
+                entity.Property(p => p.ColorBotonPrimario)
+                    .HasMaxLength(50);
+
+                entity.Property(p => p.SelectorClick)
+                    .HasMaxLength(200);
+
+                entity.Property(p => p.PaginasIncluidas)
+                    .HasMaxLength(1000);
+
+                entity.Property(p => p.PaginasExcluidas)
+                    .HasMaxLength(1000);
+
+                entity.Property(p => p.AnchoMaximo)
+                    .HasDefaultValue(400);
+
+                entity.Property(p => p.MostrarBotonCerrar)
+                    .HasDefaultValue(true);
+
+                entity.Property(p => p.CerrarAlClickFuera)
+                    .HasDefaultValue(true);
+
+                entity.Property(p => p.MostrarUsuariosLogueados)
+                    .HasDefaultValue(true);
+
+                entity.Property(p => p.MostrarUsuariosAnonimos)
+                    .HasDefaultValue(true);
+
+                entity.Property(p => p.MostrarEnMovil)
+                    .HasDefaultValue(true);
+
+                entity.Property(p => p.MostrarEnDesktop)
+                    .HasDefaultValue(true);
+
+                entity.Property(p => p.EstaActivo)
+                    .HasDefaultValue(true);
+
+                entity.Property(p => p.Prioridad)
+                    .HasDefaultValue(5);
+
+                entity.Property(p => p.Impresiones)
+                    .HasDefaultValue(0);
+
+                entity.Property(p => p.Clics)
+                    .HasDefaultValue(0);
+
+                entity.Property(p => p.Cierres)
+                    .HasDefaultValue(0);
+
+                // Índices para optimización
+                entity.HasIndex(p => p.EstaActivo)
+                    .HasDatabaseName("IX_Popups_EstaActivo");
+
+                entity.HasIndex(p => p.Tipo)
+                    .HasDatabaseName("IX_Popups_Tipo");
+
+                entity.HasIndex(p => new { p.EstaActivo, p.Prioridad })
+                    .HasDatabaseName("IX_Popups_Activo_Prioridad");
+
+                entity.HasIndex(p => new { p.EstaActivo, p.FechaInicio, p.FechaFin })
+                    .HasDatabaseName("IX_Popups_Activo_Fechas");
             });
 
             // ========================================

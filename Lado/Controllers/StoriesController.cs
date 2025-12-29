@@ -248,7 +248,8 @@ namespace Lado.Controllers
             string? mencionesIds,
             int? pistaMusicalId,
             int? musicaTrimStart,
-            int? musicaVolumen)
+            int? musicaVolumen,
+            bool publicarEnFeed = false)
         {
             try
             {
@@ -351,14 +352,78 @@ namespace Lado.Controllers
                     }
                 }
 
-                _logger.LogInformation("Story creada: {StoryId} por usuario {UserId} (Editor: {TieneEditor})",
-                    story.Id, usuarioId, !string.IsNullOrEmpty(elementosJson));
+                // ========================================
+                // PUBLICAR TAMBIÉN EN FEED (si se solicitó)
+                // ========================================
+                int? contenidoId = null;
+                if (publicarEnFeed)
+                {
+                    try
+                    {
+                        // Copiar archivo a carpeta de uploads
+                        var rutaStoryCompleta = Path.Combine("wwwroot", rutaArchivo.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                        var extension = Path.GetExtension(rutaStoryCompleta);
+                        var nombreArchivoFeed = $"{Guid.NewGuid()}{extension}";
+                        var carpetaFeed = Path.Combine("wwwroot", "uploads", usuarioId);
+
+                        if (!Directory.Exists(carpetaFeed))
+                        {
+                            Directory.CreateDirectory(carpetaFeed);
+                        }
+
+                        var rutaArchivoFeed = Path.Combine(carpetaFeed, nombreArchivoFeed);
+
+                        // Copiar archivo
+                        if (System.IO.File.Exists(rutaStoryCompleta))
+                        {
+                            System.IO.File.Copy(rutaStoryCompleta, rutaArchivoFeed, overwrite: true);
+                        }
+
+                        // Crear contenido en Feed
+                        var contenido = new Contenido
+                        {
+                            UsuarioId = usuarioId,
+                            TipoContenido = tipoContenido,
+                            Descripcion = texto ?? "Historia compartida en Feed",
+                            RutaArchivo = $"/uploads/{usuarioId}/{nombreArchivoFeed}",
+                            TipoLado = tipoLadoFinal,
+                            EsGratis = true,
+                            EsPremium = false,
+                            EstaActivo = true,
+                            FechaPublicacion = DateTime.Now,
+                            NumeroLikes = 0,
+                            NumeroComentarios = 0,
+                            NumeroVistas = 0,
+                            // Vincular música si aplica
+                            PistaMusicalId = pistaMusicalId,
+                            MusicaVolumen = musicaVolumen.HasValue ? (decimal)musicaVolumen.Value / 100 : null
+                        };
+
+                        _context.Contenidos.Add(contenido);
+                        await _context.SaveChangesAsync();
+                        contenidoId = contenido.Id;
+
+                        _logger.LogInformation("Contenido en Feed creado desde Story: {ContenidoId} por usuario {UserId}",
+                            contenido.Id, usuarioId);
+                    }
+                    catch (Exception exFeed)
+                    {
+                        // No fallar la story si falla el post en Feed
+                        _logger.LogWarning(exFeed, "Error al crear post en Feed desde Story {StoryId}", story.Id);
+                    }
+                }
+
+                _logger.LogInformation("Story creada: {StoryId} por usuario {UserId} (Editor: {TieneEditor}, Feed: {EnFeed})",
+                    story.Id, usuarioId, !string.IsNullOrEmpty(elementosJson), publicarEnFeed);
 
                 return Json(new
                 {
                     success = true,
                     storyId = story.Id,
-                    message = "Story publicada exitosamente"
+                    contenidoId = contenidoId,
+                    message = publicarEnFeed && contenidoId.HasValue
+                        ? "Historia publicada y compartida en tu Feed"
+                        : "Story publicada exitosamente"
                 });
             }
             catch (Exception ex)
@@ -786,10 +851,9 @@ namespace Lado.Controllers
 
         private async Task<string> GuardarArchivoStory(IFormFile archivo, string usuarioId)
         {
-            // Implementar tu lógica de guardado de archivos
-            // Puede ser en servidor local, Azure Blob Storage, AWS S3, etc.
-
-            var nombreArchivo = $"{Guid.NewGuid()}{Path.GetExtension(archivo.FileName)}";
+            var extension = Path.GetExtension(archivo.FileName).ToLowerInvariant();
+            var nombreBase = Guid.NewGuid().ToString();
+            var nombreArchivo = $"{nombreBase}{extension}";
             var carpeta = Path.Combine("wwwroot", "stories", usuarioId);
 
             if (!Directory.Exists(carpeta))
@@ -804,7 +868,96 @@ namespace Lado.Controllers
                 await archivo.CopyToAsync(stream);
             }
 
+            // ========================================
+            // CONVERSIÓN WEBM → MP4 para compatibilidad iOS/Safari
+            // ========================================
+            if (extension == ".webm")
+            {
+                var rutaMp4 = await ConvertirWebmAMp4Async(rutaCompleta, carpeta, nombreBase);
+                if (!string.IsNullOrEmpty(rutaMp4))
+                {
+                    // Usar el archivo MP4 convertido
+                    nombreArchivo = Path.GetFileName(rutaMp4);
+                    _logger.LogInformation("Video WebM convertido a MP4: {Original} → {Convertido}",
+                        archivo.FileName, nombreArchivo);
+                }
+            }
+
             return $"/stories/{usuarioId}/{nombreArchivo}";
+        }
+
+        /// <summary>
+        /// Convierte un archivo WebM a MP4 usando FFmpeg para compatibilidad con iOS/Safari
+        /// </summary>
+        private async Task<string?> ConvertirWebmAMp4Async(string rutaWebm, string carpeta, string nombreBase)
+        {
+            try
+            {
+                var rutaMp4 = Path.Combine(carpeta, $"{nombreBase}.mp4");
+
+                // Verificar si FFmpeg está disponible
+                var ffmpegPath = "ffmpeg"; // Asume que está en PATH
+
+                // Argumentos para conversión optimizada para iOS
+                // -c:v libx264 -preset fast -crf 23 : Video H.264 con buena calidad
+                // -c:a aac -b:a 128k : Audio AAC a 128kbps
+                // -movflags +faststart : Optimiza para streaming web
+                // -pix_fmt yuv420p : Formato de pixel compatible con todos los dispositivos
+                var argumentos = $"-i \"{rutaWebm}\" -c:v libx264 -preset fast -crf 23 -c:a aac -b:a 128k -movflags +faststart -pix_fmt yuv420p -y \"{rutaMp4}\"";
+
+                var proceso = new System.Diagnostics.Process
+                {
+                    StartInfo = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = ffmpegPath,
+                        Arguments = argumentos,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
+                proceso.Start();
+
+                // Esperar máximo 2 minutos para conversión
+                var completado = await Task.Run(() => proceso.WaitForExit(120000));
+
+                if (!completado)
+                {
+                    proceso.Kill();
+                    _logger.LogWarning("FFmpeg timeout al convertir: {Archivo}", rutaWebm);
+                    return null;
+                }
+
+                if (proceso.ExitCode != 0)
+                {
+                    var error = await proceso.StandardError.ReadToEndAsync();
+                    _logger.LogWarning("FFmpeg error al convertir {Archivo}: {Error}", rutaWebm, error);
+                    return null;
+                }
+
+                // Eliminar archivo WebM original si la conversión fue exitosa
+                if (System.IO.File.Exists(rutaMp4))
+                {
+                    try
+                    {
+                        System.IO.File.Delete(rutaWebm);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning("No se pudo eliminar WebM original: {Error}", ex.Message);
+                    }
+                    return rutaMp4;
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al convertir WebM a MP4: {Archivo}", rutaWebm);
+                return null; // Devolver null para usar el WebM original como fallback
+            }
         }
 
         private async Task EnviarNotificacionesMenciones(Story story, string mencionesIds, string creadorId)

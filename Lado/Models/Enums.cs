@@ -185,4 +185,61 @@
         ReaccionSorpresa = 4,// 😮
         ReaccionAplauso = 5 // 👏
     }
+
+    // ====================================
+    // ENUMS PARA SISTEMA DE POPUPS
+    // ====================================
+
+    public enum TipoPopup
+    {
+        Banner = 0,      // Barra fija arriba/abajo
+        Modal = 1,       // Ventana centrada con overlay
+        Toast = 2,       // Notificacion pequena esquina
+        FullScreen = 3,  // Pantalla completa con overlay
+        Slide = 4        // Panel lateral deslizable
+    }
+
+    public enum PosicionPopup
+    {
+        Centro = 0,
+        TopLeft = 1,
+        TopCenter = 2,
+        TopRight = 3,
+        BottomLeft = 4,
+        BottomCenter = 5,
+        BottomRight = 6,
+        Left = 7,
+        Right = 8
+    }
+
+    public enum AnimacionPopup
+    {
+        None = 0,
+        FadeIn = 1,
+        SlideUp = 2,
+        SlideDown = 3,
+        SlideLeft = 4,
+        SlideRight = 5,
+        Bounce = 6,
+        Zoom = 7,
+        Shake = 8
+    }
+
+    public enum TriggerPopup
+    {
+        Inmediato = 0,      // Al cargar pagina
+        Delay = 1,          // Despues de X segundos
+        Scroll = 2,         // Al hacer scroll X%
+        ExitIntent = 3,     // Al intentar salir (mouse hacia arriba)
+        Visitas = 4,        // Despues de X visitas
+        Click = 5           // Al hacer click en elemento especifico
+    }
+
+    public enum FrecuenciaPopup
+    {
+        Siempre = 0,        // Cada pagina
+        UnaVez = 1,         // Una sola vez (localStorage)
+        CadaSesion = 2,     // Una vez por sesion
+        CadaXDias = 3       // Cada X dias
+    }
 }

@@ -4,6 +4,7 @@ using Lado.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Lado.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251229012440_AgregarSistemaPopups")]
+    partial class AgregarSistemaPopups
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1299,7 +1302,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "ComisionBilleteraElectronica",
                             Descripcion = "Comision por usar billetera electronica (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 28, 22, 40, 17, 687, DateTimeKind.Local).AddTicks(9618),
+                            UltimaModificacion = new DateTime(2025, 12, 28, 22, 24, 39, 968, DateTimeKind.Local).AddTicks(8604),
                             Valor = "2.5"
                         },
                         new
@@ -1308,7 +1311,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "TiempoProcesoRetiro",
                             Descripcion = "Tiempo estimado para procesar retiros",
-                            UltimaModificacion = new DateTime(2025, 12, 28, 22, 40, 17, 687, DateTimeKind.Local).AddTicks(9740),
+                            UltimaModificacion = new DateTime(2025, 12, 28, 22, 24, 39, 968, DateTimeKind.Local).AddTicks(8677),
                             Valor = "3-5 dias habiles"
                         },
                         new
@@ -1317,7 +1320,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMinimoRecarga",
                             Descripcion = "Monto minimo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 28, 22, 40, 17, 687, DateTimeKind.Local).AddTicks(9741),
+                            UltimaModificacion = new DateTime(2025, 12, 28, 22, 24, 39, 968, DateTimeKind.Local).AddTicks(8679),
                             Valor = "5"
                         },
                         new
@@ -1326,7 +1329,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMaximoRecarga",
                             Descripcion = "Monto maximo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 28, 22, 40, 17, 687, DateTimeKind.Local).AddTicks(9743),
+                            UltimaModificacion = new DateTime(2025, 12, 28, 22, 24, 39, 968, DateTimeKind.Local).AddTicks(8680),
                             Valor = "1000"
                         },
                         new
@@ -1335,7 +1338,7 @@ namespace Lado.Migrations
                             Categoria = "General",
                             Clave = "ComisionPlataforma",
                             Descripcion = "Comision general de la plataforma (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 28, 22, 40, 17, 687, DateTimeKind.Local).AddTicks(9744),
+                            UltimaModificacion = new DateTime(2025, 12, 28, 22, 24, 39, 968, DateTimeKind.Local).AddTicks(8682),
                             Valor = "20"
                         });
                 });
@@ -2583,9 +2586,6 @@ namespace Lado.Migrations
                     b.Property<string>("Contenido")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ContenidoIOS")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("CssPersonalizado")
                         .HasColumnType("nvarchar(max)");
 
@@ -2594,9 +2594,6 @@ namespace Lado.Migrations
 
                     b.Property<int?>("DiasFrecuencia")
                         .HasColumnType("int");
-
-                    b.Property<bool>("EsPWA")
-                        .HasColumnType("bit");
 
                     b.Property<bool>("EstaActivo")
                         .ValueGeneratedOnAdd()
@@ -2680,19 +2677,6 @@ namespace Lado.Migrations
                     b.Property<string>("SelectorClick")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
-
-                    b.Property<bool>("SoloAndroid")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("SoloIOS")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("SoloSiInstalable")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("TextoBotonInstalar")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
 
                     b.Property<int>("Tipo")
                         .HasColumnType("int");

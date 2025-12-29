@@ -24,7 +24,8 @@ namespace Lado.Models
         Usuario = 2,    // Acciones de usuario
         Pago = 3,       // Suscripciones, pagos, retiros, propinas
         Contenido = 4,  // Publicaciones, comentarios, likes
-        Admin = 5       // Acciones administrativas
+        Admin = 5,      // Acciones administrativas
+        Frontend = 6    // Errores y eventos del frontend (JS, Feed, Videos, etc.)
     }
 
     /// <summary>

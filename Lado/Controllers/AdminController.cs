@@ -4941,6 +4941,74 @@ namespace Lado.Controllers
             });
         }
 
+        /// <summary>
+        /// Endpoint para recibir logs desde el frontend (JavaScript)
+        /// </summary>
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<IActionResult> RegistrarLogFrontend([FromBody] LogFrontendRequest request)
+        {
+            try
+            {
+                if (request == null || string.IsNullOrWhiteSpace(request.Mensaje))
+                {
+                    return Json(new { success = false });
+                }
+
+                // Mapear tipo de log
+                var tipoLog = request.Tipo?.ToLower() switch
+                {
+                    "error" => TipoLogEvento.Error,
+                    "warning" or "warn" => TipoLogEvento.Warning,
+                    "info" => TipoLogEvento.Info,
+                    _ => TipoLogEvento.Evento
+                };
+
+                // Obtener usuario actual si está autenticado
+                string? usuarioId = null;
+                string? usuarioNombre = null;
+                if (User.Identity?.IsAuthenticated == true)
+                {
+                    usuarioId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                    usuarioNombre = User.Identity.Name;
+                }
+
+                var log = new LogEvento
+                {
+                    Fecha = DateTime.UtcNow,
+                    Tipo = tipoLog,
+                    Categoria = CategoriaEvento.Frontend,
+                    Mensaje = (request.Mensaje.Length > 500 ? request.Mensaje.Substring(0, 500) : request.Mensaje),
+                    Detalle = request.Detalle,
+                    UsuarioId = usuarioId,
+                    UsuarioNombre = usuarioNombre,
+                    IpAddress = GetClientIpAddress(),
+                    UserAgent = Request.Headers["User-Agent"].ToString().Length > 500
+                        ? Request.Headers["User-Agent"].ToString().Substring(0, 500)
+                        : Request.Headers["User-Agent"].ToString(),
+                    Url = request.Url ?? Request.Headers["Referer"].ToString(),
+                    MetodoHttp = "JS"
+                };
+
+                _context.LogEventos.Add(log);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true });
+            }
+            catch
+            {
+                return Json(new { success = false });
+            }
+        }
+
+        private string? GetClientIpAddress()
+        {
+            var ip = Request.Headers["X-Forwarded-For"].FirstOrDefault();
+            if (string.IsNullOrEmpty(ip))
+                ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+            return ip?.Length > 45 ? ip.Substring(0, 45) : ip;
+        }
+
         // ========================================
         // PRUEBA DE EMAIL
         // ========================================
@@ -6570,6 +6638,576 @@ Este email fue enviado a {{{{email}}}}
             _mediaIntegrity.LimpiarCache();
             return Json(new { success = true, mensaje = "Caché limpiada correctamente" });
         }
+
+        // ========================================
+        // SISTEMA DE POPUPS - CRUD
+        // ========================================
+
+        /// <summary>
+        /// Vista principal de administración de popups
+        /// </summary>
+        public async Task<IActionResult> Popups()
+        {
+            var popups = await _context.Popups
+                .OrderByDescending(p => p.Prioridad)
+                .ThenByDescending(p => p.FechaCreacion)
+                .ToListAsync();
+
+            return View(popups);
+        }
+
+        /// <summary>
+        /// Guardar popup (crear o editar)
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> GuardarPopup(
+            int? id,
+            string nombre,
+            TipoPopup tipo,
+            string? titulo,
+            string? contenido,
+            string? imagenUrl,
+            string? iconoClase,
+            string? botonesJson,
+            PosicionPopup posicion,
+            string? colorFondo,
+            string? colorTexto,
+            string? colorBotonPrimario,
+            string? cssPersonalizado,
+            AnimacionPopup animacion,
+            int anchoMaximo,
+            bool mostrarBotonCerrar,
+            bool cerrarAlClickFuera,
+            TriggerPopup trigger,
+            int? delaySegundos,
+            int? scrollPorcentaje,
+            int? visitasRequeridas,
+            string? selectorClick,
+            bool mostrarUsuariosLogueados,
+            bool mostrarUsuariosAnonimos,
+            bool mostrarEnMovil,
+            bool mostrarEnDesktop,
+            string? paginasIncluidas,
+            string? paginasExcluidas,
+            // PWA fields
+            bool esPWA,
+            bool soloSiInstalable,
+            string? contenidoIOS,
+            string? textoBotonInstalar,
+            bool soloIOS,
+            bool soloAndroid,
+            // Frecuencia y estado
+            FrecuenciaPopup frecuencia,
+            int? diasFrecuencia,
+            bool estaActivo,
+            DateTime? fechaInicio,
+            DateTime? fechaFin,
+            int prioridad)
+        {
+            // DEBUG: Log de valores recibidos
+            Console.WriteLine("=== GUARDANDO POPUP - VALORES RECIBIDOS ===");
+            Console.WriteLine($"  id: {id}");
+            Console.WriteLine($"  nombre: {nombre}");
+            Console.WriteLine($"  contenido length: {contenido?.Length ?? 0}");
+            Console.WriteLine($"  contenido (primeros 200): {(contenido?.Length > 200 ? contenido.Substring(0, 200) : contenido)}");
+            Console.WriteLine($"  mostrarUsuariosLogueados: {mostrarUsuariosLogueados}");
+            Console.WriteLine($"  mostrarUsuariosAnonimos: {mostrarUsuariosAnonimos}");
+            Console.WriteLine($"  mostrarEnMovil: {mostrarEnMovil}");
+            Console.WriteLine($"  mostrarEnDesktop: {mostrarEnDesktop}");
+            Console.WriteLine($"  esPWA: {esPWA}");
+            Console.WriteLine($"  soloSiInstalable: {soloSiInstalable}");
+
+            try
+            {
+                Popup popup;
+
+                if (id.HasValue && id.Value > 0)
+                {
+                    // Editar existente
+                    popup = await _context.Popups.FindAsync(id.Value);
+                    if (popup == null)
+                    {
+                        return Json(new { success = false, message = "Popup no encontrado" });
+                    }
+                    popup.UltimaModificacion = DateTime.Now;
+                }
+                else
+                {
+                    // Crear nuevo
+                    popup = new Popup
+                    {
+                        FechaCreacion = DateTime.Now
+                    };
+                    _context.Popups.Add(popup);
+                }
+
+                // Asignar valores
+                popup.Nombre = nombre;
+                popup.Tipo = tipo;
+                popup.Titulo = titulo;
+                popup.Contenido = contenido;
+                popup.ImagenUrl = imagenUrl;
+                popup.IconoClase = iconoClase;
+                popup.BotonesJson = botonesJson;
+                popup.Posicion = posicion;
+                popup.ColorFondo = colorFondo;
+                popup.ColorTexto = colorTexto;
+                popup.ColorBotonPrimario = colorBotonPrimario;
+                popup.CssPersonalizado = cssPersonalizado;
+                popup.Animacion = animacion;
+                popup.AnchoMaximo = anchoMaximo > 0 ? anchoMaximo : 400;
+                popup.MostrarBotonCerrar = mostrarBotonCerrar;
+                popup.CerrarAlClickFuera = cerrarAlClickFuera;
+                popup.Trigger = trigger;
+                popup.DelaySegundos = delaySegundos;
+                popup.ScrollPorcentaje = scrollPorcentaje;
+                popup.VisitasRequeridas = visitasRequeridas;
+                popup.SelectorClick = selectorClick;
+                popup.MostrarUsuariosLogueados = mostrarUsuariosLogueados;
+                popup.MostrarUsuariosAnonimos = mostrarUsuariosAnonimos;
+                popup.MostrarEnMovil = mostrarEnMovil;
+                popup.MostrarEnDesktop = mostrarEnDesktop;
+                popup.PaginasIncluidas = paginasIncluidas;
+                popup.PaginasExcluidas = paginasExcluidas;
+                // PWA fields
+                popup.EsPWA = esPWA;
+                popup.SoloSiInstalable = soloSiInstalable;
+                popup.ContenidoIOS = contenidoIOS;
+                popup.TextoBotonInstalar = textoBotonInstalar;
+                popup.SoloIOS = soloIOS;
+                popup.SoloAndroid = soloAndroid;
+                // Frecuencia
+                popup.Frecuencia = frecuencia;
+                popup.DiasFrecuencia = diasFrecuencia;
+                popup.EstaActivo = estaActivo;
+                popup.FechaInicio = fechaInicio;
+                popup.FechaFin = fechaFin;
+                popup.Prioridad = prioridad;
+
+                await _context.SaveChangesAsync();
+
+                Console.WriteLine($"=== POPUP GUARDADO ===");
+                Console.WriteLine($"  Contenido guardado length: {popup.Contenido?.Length ?? 0}");
+
+                return Json(new {
+                    success = true,
+                    message = id.HasValue ? "Popup actualizado" : "Popup creado",
+                    popupId = popup.Id,
+                    // DEBUG: Valores guardados
+                    debug = new {
+                        contenidoLength = popup.Contenido?.Length ?? 0,
+                        contenidoPreview = popup.Contenido?.Length > 100 ? popup.Contenido.Substring(0, 100) + "..." : popup.Contenido,
+                        mostrarUsuariosLogueados = popup.MostrarUsuariosLogueados,
+                        mostrarUsuariosAnonimos = popup.MostrarUsuariosAnonimos,
+                        mostrarEnMovil = popup.MostrarEnMovil,
+                        mostrarEnDesktop = popup.MostrarEnDesktop,
+                        esPWA = popup.EsPWA,
+                        soloSiInstalable = popup.SoloSiInstalable
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Error: " + ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Corregir popup PWA (temporal)
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> CorregirPopupPWA(int id = 1)
+        {
+            var popup = await _context.Popups.FindAsync(id);
+            if (popup == null)
+            {
+                return Json(new { success = false, message = "Popup no encontrado" });
+            }
+
+            popup.EsPWA = true;
+            popup.SoloSiInstalable = true;
+            popup.MostrarUsuariosLogueados = true;
+            popup.MostrarUsuariosAnonimos = true;
+            popup.MostrarEnMovil = true;
+            popup.MostrarEnDesktop = true;
+            popup.Contenido = @"<div style=""text-align: center; padding: 8px;"">
+    <div style=""font-size: 56px; margin-bottom: 12px;"">📲</div>
+    <h3 style=""margin: 0 0 8px; font-size: 20px; font-weight: 700;"">¡Instala LADO!</h3>
+    <p style=""margin: 0 0 16px; font-size: 14px; opacity: 0.85; line-height: 1.5;"">
+        Accede más rápido, recibe notificaciones y disfruta la experiencia completa.
+    </p>
+    <div style=""display: flex; justify-content: center; gap: 24px; margin-top: 12px;"">
+        <div style=""text-align: center;"">
+            <div style=""font-size: 24px;"">⚡</div>
+            <div style=""font-size: 11px; opacity: 0.7;"">Más rápido</div>
+        </div>
+        <div style=""text-align: center;"">
+            <div style=""font-size: 24px;"">🔔</div>
+            <div style=""font-size: 11px; opacity: 0.7;"">Notificaciones</div>
+        </div>
+        <div style=""text-align: center;"">
+            <div style=""font-size: 24px;"">📱</div>
+            <div style=""font-size: 11px; opacity: 0.7;"">Como app</div>
+        </div>
+    </div>
+</div>";
+            popup.ContenidoIOS = @"<div style=""text-align: center; padding: 8px;"">
+    <div style=""font-size: 48px; margin-bottom: 12px;"">📱</div>
+    <h3 style=""margin: 0 0 16px; font-size: 18px; font-weight: 700;"">Instala LADO en tu iPhone</h3>
+    <div style=""text-align: left; background: rgba(255,255,255,0.1); border-radius: 12px; padding: 16px;"">
+        <div style=""display: flex; align-items: center; margin-bottom: 12px;"">
+            <span style=""font-size: 20px; margin-right: 12px;"">1️⃣</span>
+            <span>Toca el botón <strong>Compartir</strong> <span style=""background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px;"">⬆️</span></span>
+        </div>
+        <div style=""display: flex; align-items: center; margin-bottom: 12px;"">
+            <span style=""font-size: 20px; margin-right: 12px;"">2️⃣</span>
+            <span>Selecciona <strong>Agregar a Inicio</strong></span>
+        </div>
+        <div style=""display: flex; align-items: center;"">
+            <span style=""font-size: 20px; margin-right: 12px;"">3️⃣</span>
+            <span>Toca <strong>Agregar</strong> para confirmar</span>
+        </div>
+    </div>
+</div>";
+            popup.UltimaModificacion = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+
+            return Json(new {
+                success = true,
+                message = "Popup PWA corregido",
+                popup = new {
+                    popup.Id,
+                    popup.Nombre,
+                    popup.EsPWA,
+                    popup.SoloSiInstalable,
+                    popup.MostrarUsuariosLogueados,
+                    popup.MostrarUsuariosAnonimos,
+                    popup.Contenido
+                }
+            });
+        }
+
+        /// <summary>
+        /// Obtener popup por ID (para editar)
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ObtenerPopup(int id)
+        {
+            var popup = await _context.Popups.FindAsync(id);
+            if (popup == null)
+            {
+                return Json(new { success = false, message = "Popup no encontrado" });
+            }
+
+            // Forzar todos los nombres en camelCase explícitamente
+            return Json(new
+            {
+                success = true,
+                popup = new
+                {
+                    id = popup.Id,
+                    nombre = popup.Nombre,
+                    tipo = (int)popup.Tipo,
+                    titulo = popup.Titulo,
+                    contenido = popup.Contenido,
+                    imagenUrl = popup.ImagenUrl,
+                    iconoClase = popup.IconoClase,
+                    botonesJson = popup.BotonesJson,
+                    posicion = (int)popup.Posicion,
+                    colorFondo = popup.ColorFondo,
+                    colorTexto = popup.ColorTexto,
+                    colorBotonPrimario = popup.ColorBotonPrimario,
+                    cssPersonalizado = popup.CssPersonalizado,
+                    animacion = (int)popup.Animacion,
+                    anchoMaximo = popup.AnchoMaximo,
+                    mostrarBotonCerrar = popup.MostrarBotonCerrar,
+                    cerrarAlClickFuera = popup.CerrarAlClickFuera,
+                    trigger = (int)popup.Trigger,
+                    delaySegundos = popup.DelaySegundos,
+                    scrollPorcentaje = popup.ScrollPorcentaje,
+                    visitasRequeridas = popup.VisitasRequeridas,
+                    selectorClick = popup.SelectorClick,
+                    mostrarUsuariosLogueados = popup.MostrarUsuariosLogueados,
+                    mostrarUsuariosAnonimos = popup.MostrarUsuariosAnonimos,
+                    mostrarEnMovil = popup.MostrarEnMovil,
+                    mostrarEnDesktop = popup.MostrarEnDesktop,
+                    paginasIncluidas = popup.PaginasIncluidas,
+                    paginasExcluidas = popup.PaginasExcluidas,
+                    // PWA fields
+                    esPWA = popup.EsPWA,
+                    soloSiInstalable = popup.SoloSiInstalable,
+                    contenidoIOS = popup.ContenidoIOS,
+                    textoBotonInstalar = popup.TextoBotonInstalar,
+                    soloIOS = popup.SoloIOS,
+                    soloAndroid = popup.SoloAndroid,
+                    // Frecuencia y estado
+                    frecuencia = (int)popup.Frecuencia,
+                    diasFrecuencia = popup.DiasFrecuencia,
+                    estaActivo = popup.EstaActivo,
+                    fechaInicio = popup.FechaInicio?.ToString("yyyy-MM-ddTHH:mm"),
+                    fechaFin = popup.FechaFin?.ToString("yyyy-MM-ddTHH:mm"),
+                    prioridad = popup.Prioridad,
+                    impresiones = popup.Impresiones,
+                    clics = popup.Clics,
+                    cierres = popup.Cierres
+                }
+            });
+        }
+
+        /// <summary>
+        /// Eliminar popup
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarPopup(int id)
+        {
+            var popup = await _context.Popups.FindAsync(id);
+            if (popup == null)
+            {
+                return Json(new { success = false, message = "Popup no encontrado" });
+            }
+
+            _context.Popups.Remove(popup);
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, message = "Popup eliminado" });
+        }
+
+        /// <summary>
+        /// Toggle estado activo/inactivo
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> TogglePopup(int id)
+        {
+            var popup = await _context.Popups.FindAsync(id);
+            if (popup == null)
+            {
+                return Json(new { success = false, message = "Popup no encontrado" });
+            }
+
+            popup.EstaActivo = !popup.EstaActivo;
+            popup.UltimaModificacion = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, activo = popup.EstaActivo, message = popup.EstaActivo ? "Popup activado" : "Popup desactivado" });
+        }
+
+        /// <summary>
+        /// Duplicar popup
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DuplicarPopup(int id)
+        {
+            var original = await _context.Popups.FindAsync(id);
+            if (original == null)
+            {
+                return Json(new { success = false, message = "Popup no encontrado" });
+            }
+
+            var copia = new Popup
+            {
+                Nombre = original.Nombre + " (copia)",
+                Tipo = original.Tipo,
+                Titulo = original.Titulo,
+                Contenido = original.Contenido,
+                ImagenUrl = original.ImagenUrl,
+                IconoClase = original.IconoClase,
+                BotonesJson = original.BotonesJson,
+                Posicion = original.Posicion,
+                ColorFondo = original.ColorFondo,
+                ColorTexto = original.ColorTexto,
+                ColorBotonPrimario = original.ColorBotonPrimario,
+                CssPersonalizado = original.CssPersonalizado,
+                Animacion = original.Animacion,
+                AnchoMaximo = original.AnchoMaximo,
+                MostrarBotonCerrar = original.MostrarBotonCerrar,
+                CerrarAlClickFuera = original.CerrarAlClickFuera,
+                Trigger = original.Trigger,
+                DelaySegundos = original.DelaySegundos,
+                ScrollPorcentaje = original.ScrollPorcentaje,
+                VisitasRequeridas = original.VisitasRequeridas,
+                SelectorClick = original.SelectorClick,
+                MostrarUsuariosLogueados = original.MostrarUsuariosLogueados,
+                MostrarUsuariosAnonimos = original.MostrarUsuariosAnonimos,
+                MostrarEnMovil = original.MostrarEnMovil,
+                MostrarEnDesktop = original.MostrarEnDesktop,
+                PaginasIncluidas = original.PaginasIncluidas,
+                PaginasExcluidas = original.PaginasExcluidas,
+                // PWA fields
+                EsPWA = original.EsPWA,
+                SoloSiInstalable = original.SoloSiInstalable,
+                ContenidoIOS = original.ContenidoIOS,
+                TextoBotonInstalar = original.TextoBotonInstalar,
+                SoloIOS = original.SoloIOS,
+                SoloAndroid = original.SoloAndroid,
+                // Frecuencia
+                Frecuencia = original.Frecuencia,
+                DiasFrecuencia = original.DiasFrecuencia,
+                EstaActivo = false, // La copia empieza inactiva
+                FechaInicio = original.FechaInicio,
+                FechaFin = original.FechaFin,
+                Prioridad = original.Prioridad,
+                FechaCreacion = DateTime.Now
+            };
+
+            _context.Popups.Add(copia);
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, message = "Popup duplicado", popupId = copia.Id });
+        }
+
+        /// <summary>
+        /// Registrar impresión de popup (llamado desde frontend)
+        /// </summary>
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<IActionResult> PopupImpresion(int popupId)
+        {
+            var popup = await _context.Popups.FindAsync(popupId);
+            if (popup != null)
+            {
+                popup.Impresiones++;
+                await _context.SaveChangesAsync();
+            }
+            return Json(new { success = true });
+        }
+
+        /// <summary>
+        /// Registrar clic en popup (llamado desde frontend)
+        /// </summary>
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<IActionResult> PopupClic(int popupId)
+        {
+            var popup = await _context.Popups.FindAsync(popupId);
+            if (popup != null)
+            {
+                popup.Clics++;
+                await _context.SaveChangesAsync();
+            }
+            return Json(new { success = true });
+        }
+
+        /// <summary>
+        /// Registrar cierre de popup (llamado desde frontend)
+        /// </summary>
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<IActionResult> PopupCierre(int popupId)
+        {
+            var popup = await _context.Popups.FindAsync(popupId);
+            if (popup != null)
+            {
+                popup.Cierres++;
+                await _context.SaveChangesAsync();
+            }
+            return Json(new { success = true });
+        }
+
+        /// <summary>
+        /// Obtener popups activos para una página (llamado desde frontend)
+        /// </summary>
+        [HttpGet]
+        [AllowAnonymous]
+        public async Task<IActionResult> ObtenerPopupsActivos(string pagina, bool esLogueado, bool esMovil)
+        {
+            var ahora = DateTime.Now;
+
+            var popups = await _context.Popups
+                .Where(p => p.EstaActivo)
+                .Where(p => !p.FechaInicio.HasValue || p.FechaInicio <= ahora)
+                .Where(p => !p.FechaFin.HasValue || p.FechaFin >= ahora)
+                .Where(p => (esLogueado && p.MostrarUsuariosLogueados) || (!esLogueado && p.MostrarUsuariosAnonimos))
+                .Where(p => (esMovil && p.MostrarEnMovil) || (!esMovil && p.MostrarEnDesktop))
+                .OrderByDescending(p => p.Prioridad)
+                .ToListAsync();
+
+            // Filtrar por página
+            var popupsFiltrados = popups.Where(p =>
+            {
+                // Si no hay páginas configuradas, mostrar en todas
+                if (string.IsNullOrEmpty(p.PaginasIncluidas) || p.PaginasIncluidas == "*")
+                {
+                    // Verificar exclusiones
+                    if (!string.IsNullOrEmpty(p.PaginasExcluidas))
+                    {
+                        var excluidas = p.PaginasExcluidas.Split(',').Select(x => x.Trim().ToLower());
+                        if (excluidas.Any(e => pagina.ToLower().StartsWith(e)))
+                            return false;
+                    }
+                    return true;
+                }
+
+                // Verificar inclusiones
+                var incluidas = p.PaginasIncluidas.Split(',').Select(x => x.Trim().ToLower());
+                return incluidas.Any(i => pagina.ToLower().StartsWith(i));
+            }).ToList();
+
+            return Json(popupsFiltrados.Select(p => new
+            {
+                p.Id,
+                p.Nombre,
+                tipo = (int)p.Tipo,
+                tipoNombre = p.TipoDisplay,
+                p.Titulo,
+                p.Contenido,
+                p.ImagenUrl,
+                p.IconoClase,
+                p.BotonesJson,
+                posicion = (int)p.Posicion,
+                posicionNombre = p.PosicionDisplay,
+                p.ColorFondo,
+                p.ColorTexto,
+                p.ColorBotonPrimario,
+                p.CssPersonalizado,
+                animacion = (int)p.Animacion,
+                p.AnchoMaximo,
+                p.MostrarBotonCerrar,
+                p.CerrarAlClickFuera,
+                trigger = (int)p.Trigger,
+                p.DelaySegundos,
+                p.ScrollPorcentaje,
+                p.VisitasRequeridas,
+                p.SelectorClick,
+                // PWA fields
+                p.EsPWA,
+                p.SoloSiInstalable,
+                p.ContenidoIOS,
+                p.TextoBotonInstalar,
+                p.SoloIOS,
+                p.SoloAndroid,
+                // Frecuencia
+                frecuencia = (int)p.Frecuencia,
+                p.DiasFrecuencia,
+                p.Prioridad
+            }));
+        }
+
+        /// <summary>
+        /// Resetear métricas de un popup
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResetearMetricasPopup(int id)
+        {
+            var popup = await _context.Popups.FindAsync(id);
+            if (popup == null)
+            {
+                return Json(new { success = false, message = "Popup no encontrado" });
+            }
+
+            popup.Impresiones = 0;
+            popup.Clics = 0;
+            popup.Cierres = 0;
+            popup.UltimaModificacion = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, message = "Métricas reseteadas" });
+        }
     }
 
     public class ConfiguracionEmailViewModel
@@ -6603,5 +7241,16 @@ Este email fue enviado a {{{{email}}}}
         // Por Intereses (deben sumar 100)
         public int Intereses_Categoria { get; set; }
         public int Intereses_Descubrimiento { get; set; }
+    }
+
+    /// <summary>
+    /// Request para registrar logs desde el frontend
+    /// </summary>
+    public class LogFrontendRequest
+    {
+        public string? Tipo { get; set; }  // error, warning, info, event
+        public string Mensaje { get; set; } = "";
+        public string? Detalle { get; set; }
+        public string? Url { get; set; }
     }
 }
