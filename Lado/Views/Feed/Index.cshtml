@@ -6525,11 +6525,16 @@
                                 }
                                 else if (esVideo)
                                 {
-                                    @* iOS Safari requiere tipo MIME explícito y prefiere preload="metadata" *@
+                                    @* iOS Safari requiere tipo MIME explícito *@
                                     var esWebm = rutaArchivoLimpia.EndsWith(".webm", StringComparison.OrdinalIgnoreCase);
                                     var esMp4 = rutaArchivoLimpia.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase) ||
                                                 rutaArchivoLimpia.EndsWith(".m4v", StringComparison.OrdinalIgnoreCase);
                                     var tipoMime = esWebm ? "video/webm" : "video/mp4";
+                                    var posterUrl = !string.IsNullOrEmpty(post.Thumbnail) ? post.Thumbnail : "";
+                                    @* Agregar clase video-loading para mostrar spinner mientras carga *@
+                                    <text>
+                                    <script>document.currentScript.parentElement.classList.add('video-loading');</script>
+                                    </text>
                                     <video class="feed-video"
                                            autoplay
                                            muted
@@ -6539,10 +6544,12 @@
                                            x-webkit-airplay="allow"
                                            disablepictureinpicture
                                            disableremoteplayback
-                                           preload="metadata"
+                                           preload="auto"
                                            data-post-id="@post.Id"
-                                           poster="@(post.Thumbnail ?? "")"
-                                           onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'media-error-placeholder\'><svg viewBox=\'0 0 24 24\' fill=\'rgba(255,255,255,0.3)\'><path d=\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\'/></svg></div>';">
+                                           poster="@posterUrl"
+                                           style="background:#000;"
+                                           onloadeddata="this.closest('.post-media')?.classList.remove('video-loading');"
+                                           onerror="this.closest('.post-media')?.classList.remove('video-loading'); this.style.display='none'; this.parentElement.innerHTML='<div class=\'media-error-placeholder\'><svg viewBox=\'0 0 24 24\' fill=\'rgba(255,255,255,0.3)\'><path d=\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\'/></svg></div>';">
                                         @* Primero MP4 para iOS, luego WebM como fallback *@
                                         @if (!esWebm)
                                         {
@@ -6620,8 +6627,9 @@
                                                    x-webkit-airplay="allow"
                                                    disablepictureinpicture
                                                    disableremoteplayback
-                                                   preload="metadata"
+                                                   preload="auto"
                                                    data-post-id="@post.Id"
+                                                   style="background:#000;"
                                                    onerror="this.parentElement.innerHTML='<div class=\'media-error-placeholder\'><svg viewBox=\'0 0 24 24\' fill=\'rgba(255,255,255,0.3)\'><path d=\'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z\'/></svg></div>';">
                                                 @if (!esWebmCarrusel)
                                                 {
