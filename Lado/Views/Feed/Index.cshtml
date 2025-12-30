@@ -8649,17 +8649,24 @@
                 }
             });
 
-            // Manejar errores en elementos <source> (detecta 404, etc.)
-            video.querySelectorAll('source').forEach(source => {
+            // Manejar errores en elementos <source>
+            // NOTA: En iOS Chrome, source error puede dispararse aunque otra fuente funcione
+            // Solo loguear si TODAS las fuentes fallan (video.error existe)
+            video.querySelectorAll('source').forEach((source, index, sources) => {
                 source.addEventListener('error', (e) => {
-                    const postId = video.getAttribute('data-post-id') || 'unknown';
-                    const srcUrl = source.src || 'unknown';
-                    if (window.ladoLog) {
-                        window.ladoLog.error(`Video source error (posible 404) post:${postId}`, {
-                            postId,
-                            src: srcUrl.substring(0, 200),
-                            type: source.type || 'unknown'
-                        });
+                    // Solo reportar si es la última fuente Y el video tiene error real
+                    const isLastSource = index === sources.length - 1;
+                    if (isLastSource && video.error) {
+                        const postId = video.getAttribute('data-post-id') || 'unknown';
+                        const srcUrl = source.src || 'unknown';
+                        if (window.ladoLog) {
+                            window.ladoLog.error(`Video source error (404 o formato) post:${postId}`, {
+                                postId,
+                                src: srcUrl.substring(0, 200),
+                                type: source.type || 'unknown',
+                                videoError: video.error?.code
+                            });
+                        }
                     }
                 });
             });
