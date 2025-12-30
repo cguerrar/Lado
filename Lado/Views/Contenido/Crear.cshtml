@@ -2147,12 +2147,6 @@
                 e.preventDefault();
                 e.stopPropagation();
 
-                // Verificar si el tipo de contenido no es "solo texto"
-                if (tipoInput.value === '0') {
-                    alert('Selecciona "Foto" o "Video" para subir imágenes');
-                    return;
-                }
-
                 // En iOS, abrir directamente el selector de archivos (más confiable)
                 if (isIOS) {
                     archivoInput.click();
@@ -2204,8 +2198,6 @@
 
             // Upload - Paste en la zona de upload (cuando tiene focus)
             uploadArea.addEventListener('paste', (e) => {
-                if (tipoInput.value === '0') return;
-
                 const clipboardData = e.clipboardData || window.clipboardData;
                 if (!clipboardData) return;
 
@@ -2253,9 +2245,6 @@
 
             // Upload - Paste desde portapapeles (Ctrl+V)
             document.addEventListener('paste', (e) => {
-                // Solo procesar si el tipo de contenido no es "solo texto"
-                if (tipoInput.value === '0') return;
-
                 // Verificar si hay archivos en el clipboard
                 const clipboardData = e.clipboardData || window.clipboardData;
                 if (!clipboardData) return;
@@ -2332,14 +2321,21 @@
                 const filesArray = Array.from(files);
 
                 // Extensiones permitidas (para iOS que a veces no tiene MIME type)
-                const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.bmp'];
+                // Incluye formatos RAW que serán convertidos a JPEG en el servidor
+                const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.bmp', '.avif', '.dng', '.raw', '.cr2', '.nef', '.arw', '.tiff', '.tif'];
                 const videoExtensions = ['.mp4', '.mov', '.avi', '.webm', '.m4v', '.3gp'];
                 const allExtensions = [...imageExtensions, ...videoExtensions];
+
+                // Log para diagnóstico
+                console.log('[FileSelect] Archivos recibidos:', filesArray.length);
+                filesArray.forEach((f, i) => {
+                    console.log(`[FileSelect] Archivo ${i}: ${f.name}, MIME: ${f.type || 'N/A'}, Size: ${(f.size/1024/1024).toFixed(2)}MB`);
+                });
 
                 // Filtrar archivos válidos
                 const validFiles = filesArray.filter(file => {
                     // Verificar por MIME type
-                    const isImageMime = file.type && file.type.startsWith('image/');
+                    const isImageMime = file.type && (file.type.startsWith('image/') || file.type === 'application/octet-stream');
                     const isVideoMime = file.type && file.type.startsWith('video/');
 
                     // Verificar por extensión (fallback para iOS con HEIC)
@@ -2352,17 +2348,25 @@
                     const isImage = isImageMime || isImageExt;
                     const isVideo = isVideoMime || isVideoExt;
 
+                    // Para formatos RAW (HEIC, DNG, etc.), usar límite de video ya que son archivos grandes
+                    const rawFormats = ['.heic', '.heif', '.dng', '.raw', '.cr2', '.nef', '.arw', '.tiff', '.tif'];
+                    const isRawFormat = rawFormats.includes(ext);
+
                     // Limite de tamaño desde configuración Admin
                     const maxSizeImage = MAX_SIZE_IMAGE_MB * 1024 * 1024;
                     const maxSizeVideo = MAX_SIZE_VIDEO_MB * 1024 * 1024;
-                    const maxSize = isVideo ? maxSizeVideo : maxSizeImage;
+                    // RAW usa límite de video por su tamaño típico (serán convertidos a JPEG en servidor)
+                    const maxSize = (isVideo || isRawFormat) ? maxSizeVideo : maxSizeImage;
                     const isValidSize = file.size <= maxSize;
+
+                    console.log(`[FileSelect] Validando ${file.name}: isImage=${isImage}, isVideo=${isVideo}, isRaw=${isRawFormat}, size=${(file.size/1024/1024).toFixed(2)}MB, limit=${maxSize/1024/1024}MB`);
 
                     // Mostrar error especifico si excede el tamaño
                     if (!isValidSize && (isImage || isVideo)) {
                         const sizeInMB = (file.size / (1024 * 1024)).toFixed(1);
-                        const limitMB = isVideo ? MAX_SIZE_VIDEO_MB : MAX_SIZE_IMAGE_MB;
-                        alert(`El archivo "${file.name}" (${sizeInMB}MB) excede el límite de ${limitMB}MB para ${isVideo ? 'videos' : 'fotos'}`);
+                        const limitMB = (isVideo || isRawFormat) ? MAX_SIZE_VIDEO_MB : MAX_SIZE_IMAGE_MB;
+                        const tipoArchivo = isVideo ? 'videos' : (isRawFormat ? 'fotos RAW' : 'fotos');
+                        alert(`El archivo "${file.name}" (${sizeInMB}MB) excede el límite de ${limitMB}MB para ${tipoArchivo}`);
                     }
 
                     return (isImage || isVideo) && isValidSize;

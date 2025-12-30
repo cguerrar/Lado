@@ -878,7 +878,8 @@ namespace Lado.Controllers
                     Directory.CreateDirectory(uploadsFolder);
                 }
 
-                var tiposPermitidosImg = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".bmp" };
+                // Incluye formatos RAW que serán convertidos a JPEG
+                var tiposPermitidosImg = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".bmp", ".dng", ".raw", ".cr2", ".nef", ".arw", ".orf", ".rw2", ".tiff", ".tif" };
                 var tiposPermitidosVideo = new[] { ".mp4", ".mov", ".avi", ".webm", ".m4v", ".3gp" };
                 var archivosGuardados = new List<ArchivoContenido>();
 
@@ -901,22 +902,68 @@ namespace Lado.Controllers
                     }
 
                     // Validar magic bytes (prevenir archivos maliciosos disfrazados)
+                    _logger.LogInformation("[Carrusel] Validando archivo: {FileName}, Extension: {Extension}, ContentType: {ContentType}, Size: {Size}MB",
+                        archivo.FileName, extension, archivo.ContentType, archivo.Length / (1024.0 * 1024.0));
+
                     var validacion = esFoto
                         ? await _fileValidationService.ValidarImagenAsync(archivo)
                         : await _fileValidationService.ValidarVideoAsync(archivo);
 
-                    if (!validacion.EsValido)
+                    // Verificar si necesita conversión a JPEG (RAW, HEIC, DNG, etc.)
+                    var requiereConversion = esFoto && _imageService.RequiereConversion(extension);
+                    _logger.LogWarning("[Carrusel] CHECK: Extension={Extension}, EsFoto={EsFoto}, RequiereConversion={RequiereConversion}",
+                        extension, esFoto, requiereConversion);
+
+                    if (!requiereConversion)
                     {
-                        _logger.LogWarning("Archivo rechazado en Carrusel por magic bytes: {FileName}", archivo.FileName);
-                        continue; // Saltar archivos inválidos
+                        // Validar magic bytes solo para formatos estándar
+                        if (!validacion.EsValido)
+                        {
+                            _logger.LogWarning("[Carrusel] Archivo rechazado: {FileName}, Razón: {Razon}, TipoDetectado: {TipoDetectado}",
+                                archivo.FileName, validacion.MensajeError, validacion.TipoDetectado ?? "ninguno");
+                            continue; // Saltar archivos inválidos
+                        }
                     }
 
-                    var uniqueFileName = $"{Guid.NewGuid()}{extension}";
-                    var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+                    string filePath;
+                    string uniqueFileName;
+                    long tamanoFinal;
 
-                    using (var fileStream = new FileStream(filePath, FileMode.Create))
+                    if (requiereConversion)
                     {
-                        await archivo.CopyToAsync(fileStream);
+                        // Convertir RAW/HEIC/DNG a JPEG
+                        _logger.LogWarning("[Carrusel] CONVIRTIENDO {FileName} ({Extension}) a JPEG...",
+                            archivo.FileName, extension);
+
+                        var nombreBase = Guid.NewGuid().ToString();
+                        using var stream = archivo.OpenReadStream();
+                        var rutaConvertida = await _imageService.ConvertirAJpegAsync(stream, uploadsFolder, nombreBase, 2048, 85);
+
+                        if (string.IsNullOrEmpty(rutaConvertida))
+                        {
+                            _logger.LogWarning("[Carrusel] Error convirtiendo {FileName}, saltando archivo", archivo.FileName);
+                            continue;
+                        }
+
+                        filePath = rutaConvertida;
+                        uniqueFileName = Path.GetFileName(rutaConvertida);
+                        tamanoFinal = new FileInfo(rutaConvertida).Length;
+
+                        _logger.LogInformation("[Carrusel] Conversión exitosa: {Original} ({OriginalSize}MB) -> {Convertido} ({ConvertedSize}MB)",
+                            archivo.FileName, (archivo.Length / 1024.0 / 1024.0).ToString("F1"),
+                            uniqueFileName, (tamanoFinal / 1024.0 / 1024.0).ToString("F1"));
+                    }
+                    else
+                    {
+                        // Guardar archivo sin conversión
+                        uniqueFileName = $"{Guid.NewGuid()}{extension}";
+                        filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                        using (var fileStream = new FileStream(filePath, FileMode.Create))
+                        {
+                            await archivo.CopyToAsync(fileStream);
+                        }
+                        tamanoFinal = archivo.Length;
                     }
 
                     var archivoContenido = new ArchivoContenido
@@ -925,12 +972,13 @@ namespace Lado.Controllers
                         RutaArchivo = $"/uploads/{carpetaUsuario}/{uniqueFileName}",
                         Orden = i,
                         TipoArchivo = esVideo ? TipoArchivo.Video : TipoArchivo.Foto,
-                        TamanoBytes = archivo.Length,
+                        TamanoBytes = tamanoFinal,
                         FechaCreacion = DateTime.Now
                     };
 
-                    // Generar thumbnail para imágenes
-                    if (esFoto && _imageService.EsImagenValida(extension))
+                    // Generar thumbnail para imágenes (usar extensión final, no original)
+                    var extensionFinal = Path.GetExtension(filePath).ToLower();
+                    if (esFoto && _imageService.EsImagenValida(extensionFinal))
                     {
                         var thumbnail = await _imageService.GenerarThumbnailAsync(filePath, 400, 400, 75);
                         if (!string.IsNullOrEmpty(thumbnail))

@@ -69,6 +69,7 @@ namespace Lado.Services
             ["image/webp"] = new[] { new byte[] { 0x52, 0x49, 0x46, 0x46 } }, // RIFF header, WebP tiene WEBP después
             ["image/bmp"] = new[] { new byte[] { 0x42, 0x4D } },
             ["image/tiff"] = new[] { new byte[] { 0x49, 0x49, 0x2A, 0x00 }, new byte[] { 0x4D, 0x4D, 0x00, 0x2A } },
+            // HEIC/HEIF se detecta en DetectarTipoPorMagicBytes por brands específicos (heic, heix, mif1, etc.)
 
             // Videos - MP4 tiene muchos tamaños de ftyp atom posibles
             ["video/mp4"] = new[] {
@@ -100,7 +101,7 @@ namespace Lado.Services
         private static readonly Dictionary<TipoArchivoValidacion, HashSet<string>> ExtensionesPermitidas = new()
         {
             [TipoArchivoValidacion.Imagen] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp" },
+                { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".heic", ".heif", ".dng" },
             [TipoArchivoValidacion.Video] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 { ".mp4", ".webm", ".mov", ".avi", ".mkv", ".m4v" },
             [TipoArchivoValidacion.Audio] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -111,7 +112,9 @@ namespace Lado.Services
         private static readonly Dictionary<TipoArchivoValidacion, HashSet<string>> ContentTypesPermitidos = new()
         {
             [TipoArchivoValidacion.Imagen] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                { "image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp" },
+                { "image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp",
+                  "image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence",
+                  "image/avif", "image/tiff", "image/x-adobe-dng", "image/dng" },
             [TipoArchivoValidacion.Video] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 { "video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/x-matroska", "video/mpeg" },
             [TipoArchivoValidacion.Audio] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -160,7 +163,7 @@ namespace Lado.Services
 
         public async Task<string?> ObtenerTipoRealAsync(IFormFile archivo)
         {
-            var header = await LeerHeaderAsync(archivo, 32);
+            var header = await LeerHeaderAsync(archivo, 64);
             return DetectarTipoPorMagicBytes(header);
         }
 
@@ -186,7 +189,8 @@ namespace Lado.Services
             {
                 resultado.EsValido = false;
                 resultado.MensajeError = $"Extensión no permitida: {resultado.Extension}. Extensiones válidas: {string.Join(", ", ExtensionesPermitidas[tipoEsperado])}";
-                _logger.LogWarning("Extensión no permitida: {Extension} para tipo {Tipo}", resultado.Extension, tipoEsperado);
+                _logger.LogWarning("[FileValidation] Extensión no permitida - Archivo: {FileName}, Extensión: {Extension}, Tipo esperado: {Tipo}, ContentType: {ContentType}, Tamaño: {Size}MB",
+                    archivo.FileName, resultado.Extension, tipoEsperado, archivo.ContentType, archivo.Length / (1024.0 * 1024.0));
                 return resultado;
             }
 
@@ -203,25 +207,38 @@ namespace Lado.Services
                     _ => false
                 };
 
-                if (!esContentTypeGenericoPermitido)
+                // Permitir application/octet-stream para formatos que los navegadores no reconocen bien
+                // (HEIC, HEIF, AVIF, DNG) - la validación de magic bytes verificará el tipo real
+                var extensionesConOctetStream = new[] { ".heic", ".heif", ".avif", ".dng" };
+                var esOctetStreamPermitido = contentType == "application/octet-stream" &&
+                    extensionesConOctetStream.Contains(resultado.Extension);
+
+                if (!esContentTypeGenericoPermitido && !esOctetStreamPermitido)
                 {
                     resultado.EsValido = false;
                     resultado.MensajeError = $"Content-Type no válido: {contentType}";
-                    _logger.LogWarning("Content-Type no válido: {ContentType} para tipo {Tipo}", contentType, tipoEsperado);
+                    _logger.LogWarning("[FileValidation] Content-Type no válido - Archivo: {FileName}, ContentType: {ContentType}, Tipo esperado: {Tipo}, Extensión: {Extension}, Tamaño: {Size}MB",
+                        archivo.FileName, contentType, tipoEsperado, resultado.Extension, archivo.Length / (1024.0 * 1024.0));
                     return resultado;
+                }
+
+                if (esOctetStreamPermitido)
+                {
+                    _logger.LogInformation("[FileValidation] Permitiendo octet-stream para extensión {Extension}, validación por magic bytes", resultado.Extension);
                 }
             }
 
             // 4. CRÍTICO: Validar magic bytes (firma del archivo)
-            var header = await LeerHeaderAsync(archivo, 32);
+            // Leer 64 bytes para asegurar detección de HEIC/HEIF (necesita ftyp + brands)
+            var header = await LeerHeaderAsync(archivo, 64);
             var tipoDetectado = DetectarTipoPorMagicBytes(header);
 
             if (string.IsNullOrEmpty(tipoDetectado))
             {
                 resultado.EsValido = false;
                 resultado.MensajeError = "No se pudo verificar el tipo real del archivo. El archivo puede estar corrupto o no ser válido.";
-                _logger.LogWarning("Magic bytes no reconocidos para archivo: {FileName}, Header: {Header}",
-                    archivo.FileName, BitConverter.ToString(header.Take(16).ToArray()));
+                _logger.LogWarning("[FileValidation] Magic bytes no reconocidos - Archivo: {FileName}, Extensión: {Extension}, ContentType: {ContentType}, Tamaño: {Size}MB, Header (hex): {Header}",
+                    archivo.FileName, resultado.Extension, archivo.ContentType, archivo.Length / (1024.0 * 1024.0), BitConverter.ToString(header.Take(20).ToArray()));
                 return resultado;
             }
 
@@ -233,14 +250,15 @@ namespace Lado.Services
             {
                 resultado.EsValido = false;
                 resultado.MensajeError = $"El contenido real del archivo ({tipoDetectado}) no coincide con el tipo esperado ({tipoEsperado})";
-                _logger.LogWarning("Posible spoofing detectado: {FileName} declarado como {ContentType} pero es {TipoReal}",
-                    archivo.FileName, contentType, tipoDetectado);
+                _logger.LogWarning("[FileValidation] Tipo detectado no coincide - Archivo: {FileName}, ContentType declarado: {ContentType}, Tipo real detectado: {TipoReal}, Categoría detectada: {CategoriaReal}, Categoría esperada: {CategoriaEsperada}, Tamaño: {Size}MB",
+                    archivo.FileName, contentType, tipoDetectado, tipoDetectadoCategoria, tipoEsperado, archivo.Length / (1024.0 * 1024.0));
                 return resultado;
             }
 
             // 6. Todo OK
             resultado.EsValido = true;
-            _logger.LogDebug("Archivo validado correctamente: {FileName}, Tipo: {Tipo}", archivo.FileName, tipoDetectado);
+            _logger.LogInformation("[FileValidation] Archivo validado OK - Archivo: {FileName}, Tipo detectado: {Tipo}, Tamaño: {Size}MB",
+                archivo.FileName, tipoDetectado, archivo.Length / (1024.0 * 1024.0));
             return resultado;
         }
 
@@ -304,6 +322,54 @@ namespace Lado.Services
             }
 
             // Detección adicional para archivos que no coinciden exactamente
+
+            // HEIC/HEIF/AVIF - Buscar "ftyp" seguido de brands de imagen (heic, heix, mif1, msf1, avif)
+            // Formato ISOBMFF: [4 bytes size][4 bytes "ftyp"][4 bytes major brand][4 bytes minor version][compatible brands...]
+            if (header.Length >= 12)
+            {
+                int ftypPos = -1;
+                // Buscar "ftyp" en los primeros bytes
+                for (int i = 0; i < Math.Min(header.Length - 4, 16); i++)
+                {
+                    if (header[i] == 0x66 && header[i + 1] == 0x74 &&
+                        header[i + 2] == 0x79 && header[i + 3] == 0x70)
+                    {
+                        ftypPos = i;
+                        break;
+                    }
+                }
+
+                if (ftypPos >= 0 && ftypPos + 8 <= header.Length)
+                {
+                    // Leer el major brand (4 bytes después de "ftyp")
+                    var majorBrand = System.Text.Encoding.ASCII.GetString(header, ftypPos + 4, 4);
+
+                    // Brands de HEIC/HEIF/AVIF
+                    var heicBrands = new[] { "heic", "heix", "hevc", "hevx", "mif1", "msf1", "avif", "avis" };
+                    if (heicBrands.Any(b => majorBrand.Equals(b, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return majorBrand.StartsWith("avif", StringComparison.OrdinalIgnoreCase)
+                            ? "image/avif"
+                            : "image/heic";
+                    }
+
+                    // Si el major brand no es HEIC, verificar compatible brands (después de minor version)
+                    // Buscar en más bytes ya que puede haber múltiples brands compatibles
+                    if (ftypPos + 16 <= header.Length)
+                    {
+                        for (int offset = ftypPos + 12; offset + 4 <= header.Length && offset < ftypPos + 56; offset += 4)
+                        {
+                            var compatBrand = System.Text.Encoding.ASCII.GetString(header, offset, 4);
+                            if (heicBrands.Any(b => compatBrand.Equals(b, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                return compatBrand.StartsWith("avif", StringComparison.OrdinalIgnoreCase)
+                                    ? "image/avif"
+                                    : "image/heic";
+                            }
+                        }
+                    }
+                }
+            }
 
             // MP4/M4V/MOV - Buscar "ftyp" en los primeros 32 bytes (cualquier tamaño de atom)
             if (header.Length >= 8)

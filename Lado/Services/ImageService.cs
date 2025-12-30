@@ -2,6 +2,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Webp;
+using ImageMagick;
 
 namespace Lado.Services
 {
@@ -31,6 +32,22 @@ namespace Lado.Services
         /// Verifica si un archivo es una imagen válida
         /// </summary>
         bool EsImagenValida(string extension);
+
+        /// <summary>
+        /// Verifica si la extensión requiere conversión a JPEG (RAW, HEIC, DNG, etc.)
+        /// </summary>
+        bool RequiereConversion(string extension);
+
+        /// <summary>
+        /// Convierte formatos RAW/HEIC/DNG a JPEG usando Magick.NET
+        /// </summary>
+        /// <param name="inputStream">Stream del archivo original</param>
+        /// <param name="carpetaDestino">Carpeta donde guardar el JPEG</param>
+        /// <param name="nombreBase">Nombre base del archivo (sin extensión)</param>
+        /// <param name="maxDimension">Dimensión máxima (ancho o alto)</param>
+        /// <param name="quality">Calidad JPEG (1-100)</param>
+        /// <returns>Ruta del archivo JPEG convertido, o null si falla</returns>
+        Task<string?> ConvertirAJpegAsync(Stream inputStream, string carpetaDestino, string nombreBase, int maxDimension = 2048, int quality = 85);
     }
 
     public class ImageService : IImageService
@@ -39,6 +56,9 @@ namespace Lado.Services
         private readonly IWebHostEnvironment _environment;
 
         private static readonly string[] ExtensionesPermitidas = { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp" };
+
+        // Extensiones que requieren conversión a JPEG (formatos RAW/especiales)
+        private static readonly string[] ExtensionesConversion = { ".heic", ".heif", ".dng", ".raw", ".cr2", ".nef", ".arw", ".orf", ".rw2", ".tiff", ".tif" };
 
         public ImageService(ILogger<ImageService> logger, IWebHostEnvironment environment)
         {
@@ -213,6 +233,152 @@ namespace Lado.Services
                 return rutaRelativa.Replace("\\", "/");
             }
             return rutaFisica;
+        }
+
+        public bool RequiereConversion(string extension)
+        {
+            return ExtensionesConversion.Contains(extension.ToLower());
+        }
+
+        public async Task<string?> ConvertirAJpegAsync(Stream inputStream, string carpetaDestino, string nombreBase, int maxDimension = 2048, int quality = 85)
+        {
+            try
+            {
+                _logger.LogWarning("[ImageConversion] INICIANDO conversión de {Nombre} a JPEG", nombreBase);
+
+                // Asegurar que el directorio existe
+                Directory.CreateDirectory(carpetaDestino);
+
+                var rutaDestino = Path.Combine(carpetaDestino, $"{nombreBase}.jpg");
+
+                // Leer el archivo en memoria
+                using var memoryStream = new MemoryStream();
+                await inputStream.CopyToAsync(memoryStream);
+                memoryStream.Position = 0;
+
+                // Para DNG/RAW: intentar extraer la preview embebida (ya procesada)
+                // Los DNG de iPhone tienen una preview JPEG de alta calidad
+                using var images = new MagickImageCollection();
+
+                try
+                {
+                    // Leer todas las imágenes/capas del archivo
+                    images.Read(memoryStream);
+
+                    _logger.LogWarning("[ImageConversion] Archivo tiene {Count} imagen(es)/capa(s)", images.Count);
+
+                    MagickImage? imagenFinal = null;
+
+                    if (images.Count > 1)
+                    {
+                        // DNG típicamente tiene: [0] = thumbnail, [1] = preview grande, [2+] = RAW
+                        // Buscar la preview más grande que no sea el RAW
+                        MagickImage? mejorPreview = null;
+                        long mejorPixeles = 0;
+
+                        foreach (var img in images)
+                        {
+                            var pixeles = (long)img.Width * img.Height;
+                            _logger.LogInformation("[ImageConversion] Capa: {Width}x{Height}, Format: {Format}",
+                                img.Width, img.Height, img.Format);
+
+                            // La preview suele ser más pequeña que el RAW pero aún grande
+                            // RAW de iPhone es ~8000x6000, preview es ~1500-3000
+                            if (pixeles > mejorPixeles && img.Width < 5000)
+                            {
+                                mejorPixeles = pixeles;
+                                mejorPreview = (MagickImage)img;
+                            }
+                        }
+
+                        if (mejorPreview != null)
+                        {
+                            _logger.LogInformation("[ImageConversion] Usando preview embebida: {Width}x{Height}",
+                                mejorPreview.Width, mejorPreview.Height);
+                            imagenFinal = (MagickImage)mejorPreview.Clone();
+                        }
+                    }
+
+                    // Si no encontramos preview, usar la imagen principal
+                    if (imagenFinal == null)
+                    {
+                        imagenFinal = (MagickImage)images[0].Clone();
+                        _logger.LogInformation("[ImageConversion] Usando imagen principal: {Width}x{Height}",
+                            imagenFinal.Width, imagenFinal.Height);
+
+                        // Solo aplicar correcciones si es RAW (imagen muy grande)
+                        if (imagenFinal.Width > 4000 || imagenFinal.Height > 4000)
+                        {
+                            _logger.LogInformation("[ImageConversion] Aplicando correcciones para RAW...");
+                            imagenFinal.AutoLevel();
+                            imagenFinal.BrightnessContrast(new Percentage(10), new Percentage(5));
+                        }
+                    }
+
+                    // Auto-orientar según EXIF
+                    imagenFinal.AutoOrient();
+
+                    // Redimensionar si excede el máximo
+                    if (imagenFinal.Width > maxDimension || imagenFinal.Height > maxDimension)
+                    {
+                        var geometry = new MagickGeometry((uint)maxDimension, (uint)maxDimension)
+                        {
+                            IgnoreAspectRatio = false
+                        };
+                        imagenFinal.Resize(geometry);
+                        _logger.LogInformation("[ImageConversion] Redimensionado a: {Width}x{Height}",
+                            imagenFinal.Width, imagenFinal.Height);
+                    }
+
+                    // Configurar calidad y formato
+                    imagenFinal.Format = MagickFormat.Jpeg;
+                    imagenFinal.Quality = (uint)quality;
+                    imagenFinal.SetProfile(ColorProfile.SRGB);
+
+                    // Guardar
+                    await imagenFinal.WriteAsync(rutaDestino);
+                    imagenFinal.Dispose();
+                }
+                catch (MagickException ex)
+                {
+                    _logger.LogWarning(ex, "[ImageConversion] Error leyendo capas, intentando lectura simple...");
+
+                    // Fallback: lectura simple
+                    memoryStream.Position = 0;
+                    using var image = new MagickImage(memoryStream);
+
+                    image.AutoOrient();
+
+                    if (image.Width > maxDimension || image.Height > maxDimension)
+                    {
+                        var geometry = new MagickGeometry((uint)maxDimension, (uint)maxDimension)
+                        {
+                            IgnoreAspectRatio = false
+                        };
+                        image.Resize(geometry);
+                    }
+
+                    image.Format = MagickFormat.Jpeg;
+                    image.Quality = (uint)quality;
+                    await image.WriteAsync(rutaDestino);
+                }
+
+                var fileInfo = new FileInfo(rutaDestino);
+                _logger.LogInformation("[ImageConversion] Conversión exitosa: {Ruta}, Tamaño: {Size}MB",
+                    rutaDestino, (fileInfo.Length / 1024.0 / 1024.0).ToString("F2"));
+
+                return rutaDestino;
+            }
+            catch (MagickException ex)
+            {
+                _logger.LogError(ex, "[ImageConversion] Error de Magick.NET convirtiendo {Nombre}: {Message}", nombreBase, ex.Message);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[ImageConversion] Error convirtiendo {Nombre} a JPEG", nombreBase);
+                return null;
+            }
         }
     }
 }
