@@ -71,18 +71,19 @@ namespace Lado.Controllers
 
                 _logger.LogInformation("FeedPublico: Query BD retornó {Count} contenidos raw", contenidoPublicoRaw.Count);
 
-                // Filtrar contenido cuyos archivos no existen en disco
+                // Filtrar contenido: excluir archivos faltantes Y videos muy grandes (>20MB)
                 List<Contenido> contenidoPublico;
                 try
                 {
-                    contenidoPublico = _mediaIntegrity.FiltrarContenidoValido(contenidoPublicoRaw)
+                    // Usar filtro especial para feed público que excluye videos grandes
+                    contenidoPublico = _mediaIntegrity.FiltrarContenidoParaFeedPublico(contenidoPublicoRaw, 20 * 1024 * 1024)
                         .Take(300)
                         .ToList();
-                    _logger.LogInformation("FeedPublico: Después de filtrar integridad: {Count} contenidos válidos", contenidoPublico.Count);
+                    _logger.LogInformation("FeedPublico: Después de filtrar (integridad + tamaño): {Count} contenidos válidos", contenidoPublico.Count);
                 }
                 catch (Exception exFiltro)
                 {
-                    _logger.LogError(exFiltro, "FeedPublico: Error en FiltrarContenidoValido, usando contenido sin filtrar");
+                    _logger.LogError(exFiltro, "FeedPublico: Error en FiltrarContenidoParaFeedPublico, usando contenido sin filtrar");
                     // Si falla el filtro, usar el contenido raw (mejor mostrar algo que nada)
                     contenidoPublico = contenidoPublicoRaw.Take(300).ToList();
                 }

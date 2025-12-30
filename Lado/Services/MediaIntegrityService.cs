@@ -22,6 +22,11 @@ namespace Lado.Services
         List<Contenido> FiltrarContenidoValido(IEnumerable<Contenido> contenidos);
 
         /// <summary>
+        /// Filtra contenidos excluyendo archivos muy grandes (para feeds públicos)
+        /// </summary>
+        List<Contenido> FiltrarContenidoParaFeedPublico(IEnumerable<Contenido> contenidos, long maxFileSizeBytes = 20 * 1024 * 1024);
+
+        /// <summary>
         /// Obtiene estadísticas de archivos faltantes
         /// </summary>
         Task<MediaIntegrityStats> ObtenerEstadisticasAsync();
@@ -149,6 +154,102 @@ namespace Lado.Services
             }
 
             return resultado;
+        }
+
+        /// <summary>
+        /// Filtra contenidos para feed público, excluyendo archivos muy grandes
+        /// Por defecto excluye videos > 20MB para mejor rendimiento en móviles
+        /// </summary>
+        public List<Contenido> FiltrarContenidoParaFeedPublico(IEnumerable<Contenido> contenidos, long maxFileSizeBytes = 20 * 1024 * 1024)
+        {
+            var resultado = new List<Contenido>();
+            var excluidos = 0;
+            var excluidos404 = 0;
+
+            foreach (var contenido in contenidos)
+            {
+                // Si no tiene archivo, incluirlo
+                if (string.IsNullOrEmpty(contenido.RutaArchivo))
+                {
+                    resultado.Add(contenido);
+                    continue;
+                }
+
+                // Verificar si existe
+                if (!ArchivoExiste(contenido.RutaArchivo))
+                {
+                    // Si es video y tiene thumbnail, usar thumbnail
+                    if (contenido.TipoContenido == TipoContenido.Video &&
+                        !string.IsNullOrEmpty(contenido.Thumbnail) &&
+                        ArchivoExiste(contenido.Thumbnail))
+                    {
+                        resultado.Add(contenido);
+                        continue;
+                    }
+                    excluidos404++;
+                    continue;
+                }
+
+                // Para videos, verificar tamaño
+                if (contenido.TipoContenido == TipoContenido.Video)
+                {
+                    var fileSize = ObtenerTamañoArchivo(contenido.RutaArchivo);
+                    if (fileSize > maxFileSizeBytes)
+                    {
+                        // Video muy grande - excluir del feed público
+                        excluidos++;
+                        _logger.LogDebug("FeedPublico: Excluido video grande {Id} ({SizeMB}MB)",
+                            contenido.Id, fileSize / (1024 * 1024));
+                        continue;
+                    }
+                }
+
+                resultado.Add(contenido);
+            }
+
+            if (excluidos > 0 || excluidos404 > 0)
+            {
+                _logger.LogInformation("FeedPublico filtro: {Excluidos} videos grandes, {Excluidos404} archivos faltantes",
+                    excluidos, excluidos404);
+            }
+
+            return resultado;
+        }
+
+        /// <summary>
+        /// Obtiene el tamaño de un archivo en bytes (con caché)
+        /// </summary>
+        private long ObtenerTamañoArchivo(string rutaRelativa)
+        {
+            try
+            {
+                var rutaLimpia = LimpiarRuta(rutaRelativa);
+                var cacheKey = $"{CacheKeyPrefix}size_{rutaLimpia}";
+
+                if (_cache.TryGetValue(cacheKey, out long sizeEnCache))
+                {
+                    return sizeEnCache;
+                }
+
+                var wwwrootPath = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+                var rutaCompleta = Path.Combine(wwwrootPath, rutaLimpia.Replace("/", Path.DirectorySeparatorChar.ToString()));
+
+                if (!File.Exists(rutaCompleta))
+                {
+                    return 0;
+                }
+
+                var fileInfo = new FileInfo(rutaCompleta);
+                var size = fileInfo.Length;
+
+                _cache.Set(cacheKey, size, CacheDuration);
+                return size;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error obteniendo tamaño de archivo: {Ruta}", rutaRelativa);
+                return 0; // Si hay error, asumir pequeño para no excluir
+            }
         }
 
         /// <summary>
