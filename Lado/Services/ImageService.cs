@@ -250,11 +250,44 @@ namespace Lado.Services
                 Directory.CreateDirectory(carpetaDestino);
 
                 var rutaDestino = Path.Combine(carpetaDestino, $"{nombreBase}.jpg");
+                var rutaTemporal = Path.Combine(carpetaDestino, $"{nombreBase}_temp.dng");
 
-                // Leer el archivo en memoria
+                // Guardar el archivo temporalmente para procesarlo con exiftool
+                using (var fileStream = new FileStream(rutaTemporal, FileMode.Create))
+                {
+                    await inputStream.CopyToAsync(fileStream);
+                }
+
+                // Intentar extraer preview con exiftool (mejor calidad para DNG)
+                var previewExtraida = await ExtraerPreviewConExiftool(rutaTemporal, rutaDestino);
+
+                if (previewExtraida && File.Exists(rutaDestino))
+                {
+                    // Limpiar archivo temporal
+                    try { File.Delete(rutaTemporal); } catch { }
+
+                    // Redimensionar si es necesario
+                    await RedimensionarSiNecesario(rutaDestino, maxDimension, quality);
+
+                    var archivoFinal = new FileInfo(rutaDestino);
+                    _logger.LogWarning("[ImageConversion] Preview extraída con exiftool: {Ruta}, Tamaño: {Size}MB",
+                        rutaDestino, (archivoFinal.Length / 1024.0 / 1024.0).ToString("F2"));
+
+                    return rutaDestino;
+                }
+
+                _logger.LogWarning("[ImageConversion] Exiftool falló, usando Magick.NET como fallback...");
+
+                // Fallback: usar Magick.NET
                 using var memoryStream = new MemoryStream();
-                await inputStream.CopyToAsync(memoryStream);
+                using (var fileStream = new FileStream(rutaTemporal, FileMode.Open))
+                {
+                    await fileStream.CopyToAsync(memoryStream);
+                }
                 memoryStream.Position = 0;
+
+                // Limpiar archivo temporal
+                try { File.Delete(rutaTemporal); } catch { }
 
                 // Para DNG/RAW: intentar extraer la preview embebida (ya procesada)
                 // Los DNG de iPhone tienen una preview JPEG de alta calidad
@@ -378,6 +411,115 @@ namespace Lado.Services
             {
                 _logger.LogError(ex, "[ImageConversion] Error convirtiendo {Nombre} a JPEG", nombreBase);
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// Extrae la preview JPEG embebida de un archivo DNG/RAW usando exiftool
+        /// </summary>
+        private async Task<bool> ExtraerPreviewConExiftool(string rutaOrigen, string rutaDestino)
+        {
+            try
+            {
+                // Buscar exiftool
+                var exiftoolPath = "exiftool";
+
+                // Intentar extraer JpgFromRaw primero (mayor calidad)
+                var processInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = exiftoolPath,
+                    Arguments = $"-b -JpgFromRaw \"{rutaOrigen}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = System.Diagnostics.Process.Start(processInfo);
+                if (process == null) return false;
+
+                // Leer el output binario (la imagen)
+                using (var outputStream = new FileStream(rutaDestino, FileMode.Create))
+                {
+                    await process.StandardOutput.BaseStream.CopyToAsync(outputStream);
+                }
+
+                await process.WaitForExitAsync();
+
+                // Verificar si se extrajo algo
+                var fileInfo = new FileInfo(rutaDestino);
+                if (fileInfo.Exists && fileInfo.Length > 10000) // Al menos 10KB
+                {
+                    _logger.LogWarning("[Exiftool] JpgFromRaw extraído: {Size}KB", fileInfo.Length / 1024);
+                    return true;
+                }
+
+                // Si JpgFromRaw falló, intentar PreviewImage
+                File.Delete(rutaDestino);
+
+                processInfo.Arguments = $"-b -PreviewImage \"{rutaOrigen}\"";
+                using var process2 = System.Diagnostics.Process.Start(processInfo);
+                if (process2 == null) return false;
+
+                using (var outputStream = new FileStream(rutaDestino, FileMode.Create))
+                {
+                    await process2.StandardOutput.BaseStream.CopyToAsync(outputStream);
+                }
+
+                await process2.WaitForExitAsync();
+
+                fileInfo = new FileInfo(rutaDestino);
+                if (fileInfo.Exists && fileInfo.Length > 10000)
+                {
+                    _logger.LogWarning("[Exiftool] PreviewImage extraído: {Size}KB", fileInfo.Length / 1024);
+                    return true;
+                }
+
+                _logger.LogWarning("[Exiftool] No se encontró preview embebida");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[Exiftool] Error extrayendo preview");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Redimensiona una imagen si excede el tamaño máximo
+        /// </summary>
+        private async Task RedimensionarSiNecesario(string rutaImagen, int maxDimension, int quality)
+        {
+            try
+            {
+                using var image = new MagickImage(rutaImagen);
+
+                // Auto-orientar según EXIF
+                image.AutoOrient();
+
+                bool necesitaGuardar = false;
+
+                // Redimensionar si excede el máximo
+                if (image.Width > maxDimension || image.Height > maxDimension)
+                {
+                    var geometry = new MagickGeometry((uint)maxDimension, (uint)maxDimension)
+                    {
+                        IgnoreAspectRatio = false
+                    };
+                    image.Resize(geometry);
+                    necesitaGuardar = true;
+                    _logger.LogWarning("[ImageConversion] Redimensionado a: {Width}x{Height}", image.Width, image.Height);
+                }
+
+                if (necesitaGuardar || image.Orientation != OrientationType.TopLeft)
+                {
+                    image.Quality = (uint)quality;
+                    await image.WriteAsync(rutaImagen);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[ImageConversion] Error redimensionando imagen");
             }
         }
     }
