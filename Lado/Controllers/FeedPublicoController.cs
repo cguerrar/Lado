@@ -69,10 +69,43 @@ namespace Lado.Controllers
                     .Take(400)  // Obtener más para compensar los que se filtren
                     .ToListAsync();
 
+                _logger.LogInformation("FeedPublico: Query BD retornó {Count} contenidos raw", contenidoPublicoRaw.Count);
+
                 // Filtrar contenido cuyos archivos no existen en disco
-                var contenidoPublico = _mediaIntegrity.FiltrarContenidoValido(contenidoPublicoRaw)
-                    .Take(300)
-                    .ToList();
+                List<Contenido> contenidoPublico;
+                try
+                {
+                    contenidoPublico = _mediaIntegrity.FiltrarContenidoValido(contenidoPublicoRaw)
+                        .Take(300)
+                        .ToList();
+                    _logger.LogInformation("FeedPublico: Después de filtrar integridad: {Count} contenidos válidos", contenidoPublico.Count);
+                }
+                catch (Exception exFiltro)
+                {
+                    _logger.LogError(exFiltro, "FeedPublico: Error en FiltrarContenidoValido, usando contenido sin filtrar");
+                    // Si falla el filtro, usar el contenido raw (mejor mostrar algo que nada)
+                    contenidoPublico = contenidoPublicoRaw.Take(300).ToList();
+                }
+
+                // FALLBACK: Si no hay contenido, intentar query más simple (sin filtros estrictos)
+                if (!contenidoPublico.Any())
+                {
+                    _logger.LogWarning("FeedPublico: No hay contenido con filtros normales, intentando fallback");
+
+                    var contenidoFallback = await _context.Contenidos
+                        .Include(c => c.Usuario)
+                        .Where(c => c.EstaActivo
+                                && !c.EsBorrador
+                                && !string.IsNullOrEmpty(c.RutaArchivo)
+                                && c.Usuario != null
+                                && c.Usuario.EstaActivo)
+                        .OrderByDescending(c => c.FechaPublicacion)
+                        .Take(100)
+                        .ToListAsync();
+
+                    _logger.LogInformation("FeedPublico: Fallback retornó {Count} contenidos", contenidoFallback.Count);
+                    contenidoPublico = contenidoFallback;
+                }
 
                 // 2. CONTENIDO PREMIUM (LadoB) para mostrar difuminado
                 var contenidoPremiumRaw = await _context.Contenidos

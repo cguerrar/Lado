@@ -55,7 +55,8 @@ namespace Lado.Services
         private readonly IMemoryCache _cache;
 
         // Caché de archivos verificados (ruta -> existe)
-        private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
+        // Aumentado a 30 minutos para reducir I/O en disco
+        private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(30);
         private const string CacheKeyPrefix = "MediaIntegrity_";
 
         public MediaIntegrityService(
@@ -305,10 +306,23 @@ namespace Lado.Services
 
                 return File.Exists(rutaCompleta);
             }
+            catch (UnauthorizedAccessException)
+            {
+                // Si no hay permisos, asumir que existe (mejor mostrar algo que nada)
+                _logger.LogWarning("Sin permisos para verificar archivo: {Ruta}, asumiendo que existe", rutaRelativa);
+                return true;
+            }
+            catch (IOException ioEx)
+            {
+                // Error de I/O temporal, asumir que existe
+                _logger.LogWarning(ioEx, "Error I/O verificando archivo: {Ruta}, asumiendo que existe", rutaRelativa);
+                return true;
+            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error verificando archivo: {Ruta}", rutaRelativa);
-                return false;
+                _logger.LogError(ex, "Error verificando archivo: {Ruta}, asumiendo que existe", rutaRelativa);
+                // En caso de error, asumir que existe para no romper el feed
+                return true;
             }
         }
     }
