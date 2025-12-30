@@ -8590,6 +8590,7 @@
             // Luego playVideo() ajusta según isGlobalMuted
             video.muted = true;
             video.autoplay = false; // Controlamos nosotros el autoplay
+            video.loop = true; // Los videos del feed deben hacer loop
 
             // Eventos de estado
             video.addEventListener('playing', () => {
@@ -8605,6 +8606,17 @@
             });
             video.addEventListener('waiting', () => {
                 video.closest('.post-media')?.classList.add('video-loading');
+            });
+
+            // Fallback: reiniciar si el video termina (por si loop no funciona)
+            video.addEventListener('ended', () => {
+                video.currentTime = 0;
+                // Solo reproducir si está visible
+                const rect = video.getBoundingClientRect();
+                const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+                if (isVisible) {
+                    playVideo(video);
+                }
             });
 
             // iOS fix: Forzar repaint cuando el video carga para evitar pantalla negra
@@ -8826,7 +8838,12 @@
                     !postMedia.classList.contains('video-playing') &&
                     video.readyState >= 1) {
 
-                    if (now - lastReport > 30000) { // Solo reportar cada 30 segundos por video
+                    // Determinar si el video está cerca del final (>90% reproducido)
+                    const isNearEnd = video.duration > 0 && (video.currentTime / video.duration) > 0.9;
+                    const hasPlayed = video.currentTime > 0.5; // Ha reproducido más de 0.5 segundos
+
+                    // Solo loguear si no ha reproducido mucho (evitar spam de videos que terminaron normalmente)
+                    if (now - lastReport > 30000 && !isNearEnd) {
                         video.dataset.lastBlackScreenReport = now;
 
                         if (window.ladoLog) {
@@ -8844,10 +8861,20 @@
                                 userAgent: navigator.userAgent.substring(0, 100)
                             });
                         }
-
-                        // Intentar recuperar el video
-                        playVideo(video);
                     }
+
+                    // Si el video está cerca del final o terminó, reiniciar desde el principio
+                    if (isNearEnd || video.ended) {
+                        video.currentTime = 0;
+                    }
+
+                    // Asegurar que el video tiene loop para que no se pause al final
+                    if (!video.loop) {
+                        video.loop = true;
+                    }
+
+                    // Intentar recuperar el video
+                    playVideo(video);
                 }
 
                 // Detectar videos atascados en carga (readyState bajo por mucho tiempo)
