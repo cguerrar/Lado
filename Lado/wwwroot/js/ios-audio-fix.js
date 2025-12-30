@@ -51,14 +51,39 @@
     let audioContext = null;
     const videoQueue = new Map(); // videoElement -> { attempts, lastAttempt }
     const audioQueue = [];
-    const MAX_ATTEMPTS = 3;
-    const RETRY_DELAY = 500;
+    const MAX_ATTEMPTS = 5;
+    const RETRY_DELAY = 1000;
+    const LOAD_TIMEOUT = 15000; // 15 segundos para conexiones móviles lentas
+
+    // Control de carga simultánea para evitar saturar conexiones iOS
+    const MAX_CONCURRENT_LOADS = 2;
+    let currentlyLoading = 0;
+    const loadQueue = [];
 
     // ========================================
     // LOGGING
     // ========================================
     function log(...args) {
         if (window.iOSDebug) window.iOSDebug(args.join(' '));
+    }
+
+    // Log de errores al servidor
+    function logToServer(type, message, data = {}) {
+        if (window.ladoLog) {
+            const enrichedData = {
+                ...data,
+                isIOS,
+                iosVersion: iosVersion.full,
+                isSafari,
+                isUnlocked,
+                hasInteracted
+            };
+            if (type === 'error') {
+                window.ladoLog.error(`[iOSMedia] ${message}`, enrichedData);
+            } else if (type === 'warn') {
+                window.ladoLog.warn(`[iOSMedia] ${message}`, enrichedData);
+            }
+        }
     }
 
     // ========================================
@@ -128,8 +153,11 @@
         video.autoplay = true;
 
         // Preload agresivo para iOS
-        if (video.preload !== 'auto') {
-            video.preload = 'auto';
+        video.preload = 'auto';
+
+        // Forzar inicio de carga del video
+        if (video.readyState === 0 && video.src) {
+            video.load();
         }
 
         // Eventos de debug
@@ -144,7 +172,26 @@
             if (!video.ended) log('pause');
         });
         video.addEventListener('error', (e) => {
+            // Ignorar errores de videos sin src válido (esperado durante lazy loading)
+            const videoSrc = video.currentSrc || video.src || video.querySelector('source')?.src || '';
+            // Si no hay src o el src es la URL de la página (src="" se resuelve a la página actual)
+            const isInvalidSrc = !videoSrc ||
+                videoSrc === window.location.href ||
+                videoSrc === window.location.origin + window.location.pathname ||
+                !videoSrc.match(/\.(mp4|webm|mov|m4v|ogg|ogv)(\?|$)/i);
+            if (isInvalidSrc) {
+                log('error ignorado: video sin src válido (lazy loading)');
+                return;
+            }
             log('error:', video.error?.message || 'unknown');
+            logToServer('error', 'Video error event', {
+                postId: video.getAttribute('data-post-id'),
+                src: videoSrc.substring(0, 100),
+                errorCode: video.error?.code,
+                errorMessage: video.error?.message,
+                readyState: video.readyState,
+                networkState: video.networkState
+            });
         });
         video.addEventListener('stalled', () => {
             log('stalled - reintentando...');
@@ -159,10 +206,41 @@
         });
     }
 
+    // Procesar siguiente video en cola
+    function processLoadQueue() {
+        if (currentlyLoading >= MAX_CONCURRENT_LOADS || loadQueue.length === 0) return;
+
+        const { video, options, resolve } = loadQueue.shift();
+        currentlyLoading++;
+
+        _doPlayVideo(video, options).then(result => {
+            currentlyLoading--;
+            resolve(result);
+            processLoadQueue();
+        });
+    }
+
     // ========================================
     // REPRODUCCIÓN DE VIDEO
     // ========================================
     async function playVideo(video, options = {}) {
+        if (!video) return false;
+
+        // Si ya está reproduciendo, no hacer nada
+        if (!video.paused && video.readyState >= 2) return true;
+
+        // Si ya hay muchos videos cargando, encolar
+        if (currentlyLoading >= MAX_CONCURRENT_LOADS && video.readyState < 2) {
+            log('Encolando video (carga concurrente:', currentlyLoading + ')');
+            return new Promise(resolve => {
+                loadQueue.push({ video, options, resolve });
+            });
+        }
+
+        return _doPlayVideo(video, options);
+    }
+
+    async function _doPlayVideo(video, options = {}) {
         if (!video) return false;
 
         const { force = false, attempt = 1 } = options;
@@ -187,26 +265,42 @@
                 video.load();
             }
 
-            // Esperar con timeout
+            // Esperar con timeout - usar timeout progresivo según intento
+            const timeoutMs = LOAD_TIMEOUT + (attempt - 1) * 5000; // 15s, 20s, 25s, etc.
+
             const loaded = await Promise.race([
                 new Promise(resolve => {
                     const onLoad = () => {
                         video.removeEventListener('canplay', onLoad);
                         video.removeEventListener('loadeddata', onLoad);
+                        video.removeEventListener('loadedmetadata', onLoad);
                         resolve(true);
                     };
                     video.addEventListener('canplay', onLoad);
                     video.addEventListener('loadeddata', onLoad);
+                    video.addEventListener('loadedmetadata', onLoad); // También escuchar metadata
                 }),
-                new Promise(resolve => setTimeout(() => resolve(false), 5000))
+                new Promise(resolve => setTimeout(() => resolve(false), timeoutMs))
             ]);
 
             if (!loaded) {
                 log('Timeout cargando video');
+                logToServer('warn', 'Video load timeout', {
+                    postId: video.getAttribute('data-post-id'),
+                    src: (video.currentSrc || video.querySelector('source')?.src || '').substring(0, 100),
+                    attempt,
+                    readyState: video.readyState,
+                    networkState: video.networkState
+                });
                 if (attempt < MAX_ATTEMPTS) {
                     await new Promise(r => setTimeout(r, RETRY_DELAY));
                     return playVideo(video, { force, attempt: attempt + 1 });
                 }
+                logToServer('error', 'Video load failed after max attempts', {
+                    postId: video.getAttribute('data-post-id'),
+                    src: (video.currentSrc || video.querySelector('source')?.src || '').substring(0, 100),
+                    maxAttempts: MAX_ATTEMPTS
+                });
                 updateVideoUI(video, false, true);
                 return false;
             }
@@ -230,19 +324,55 @@
         } catch (error) {
             log('Error:', error.name);
 
+            const videoData = {
+                postId: video.getAttribute('data-post-id'),
+                src: (video.currentSrc || video.querySelector('source')?.src || '').substring(0, 100),
+                errorName: error.name,
+                errorMessage: error.message,
+                attempt,
+                readyState: video.readyState,
+                networkState: video.networkState,
+                paused: video.paused,
+                muted: video.muted
+            };
+
             if (error.name === 'NotAllowedError') {
-                // Autoplay bloqueado - necesita interacción
+                // iOS 18+ es más estricto - si el video ya está cargado (readyState >= 3)
+                // y aún falla, es un bloqueo real que requiere interacción directa
+                const isFullyLoaded = video.readyState >= 3;
+
+                if (isFullyLoaded && attempt >= 2) {
+                    // Video cargado pero bloqueado - mostrar "tap para reproducir"
+                    // No seguir reintentando, esperar interacción del usuario
+                    log('iOS 18+ bloqueo real - requiere tap directo');
+                    updateVideoUI(video, false, true);
+                    // NO loggear como warning si es comportamiento esperado de iOS 18+
+                    if (attempt === 2) {
+                        logToServer('warn', 'Video NotAllowedError', videoData);
+                    }
+                    return false;
+                }
+
+                // Autoplay bloqueado - reintentar si no está cargado aún
+                logToServer('warn', 'Video NotAllowedError', videoData);
                 updateVideoUI(video, false, true);
 
                 if (attempt < MAX_ATTEMPTS && hasInteracted) {
-                    // Reintentar después de un delay
+                    // Reintentar después de un delay más largo para iOS 18+
+                    const delay = iosVersion.major >= 18 ? RETRY_DELAY * 2 : RETRY_DELAY;
+                    await new Promise(r => setTimeout(r, delay));
+                    return playVideo(video, { force, attempt: attempt + 1 });
+                }
+            } else if (error.name === 'AbortError') {
+                logToServer('warn', 'Video AbortError', videoData);
+                if (attempt < MAX_ATTEMPTS) {
+                    // Carga interrumpida - reintentar
                     await new Promise(r => setTimeout(r, RETRY_DELAY));
                     return playVideo(video, { force, attempt: attempt + 1 });
                 }
-            } else if (error.name === 'AbortError' && attempt < MAX_ATTEMPTS) {
-                // Carga interrumpida - reintentar
-                await new Promise(r => setTimeout(r, RETRY_DELAY));
-                return playVideo(video, { force, attempt: attempt + 1 });
+            } else {
+                // Otro tipo de error
+                logToServer('error', 'Video play() failed', videoData);
             }
 
             return false;
@@ -342,20 +472,8 @@
         const contextOk = await resumeAudioContext();
         log('AudioContext:', contextOk ? 'OK' : 'FAIL');
 
-        // Reproducir video silencioso para desbloquear
-        try {
-            const v = document.createElement('video');
-            v.muted = true;
-            v.playsInline = true;
-            v.style.cssText = 'position:fixed;top:-9999px;width:1px;height:1px;';
-            v.src = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAA3RtZGF0AAACrwYF//+r3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE2NCByMzEwOCBhZjRmNjM0IC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAyNCAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiB0aHJlYWRzPTEyIGxvb2thaGVhZF90aHJlYWRzPTIgc2xpY2VkX3RocmVhZHM9MCBucj0wIGRlY2ltYXRlPTEgaW50ZXJsYWNlZD0wIGJsdXJheV9jb21wYXQ9MCBjb25zdHJhaW5lZF9pbnRyYT0wIGJmcmFtZXM9MyBiX3B5cmFtaWQ9MiBiX2FkYXB0PTEgYl9iaWFzPTAgZGlyZWN0PTEgd2VpZ2h0Yj0xIG9wZW5fZ29wPTAgd2VpZ2h0cD0yIGtleWludD0yNTAga2V5aW50X21pbj0yNSBzY2VuZWN1dD00MCBpbnRyYV9yZWZyZXNoPTAgcmNfbG9va2FoZWFkPTQwIHJjPWNyZiBtYnRyZWU9MSBjcmY9MjMuMCBxY29tcD0wLjYwIHFwbWluPTAgcXBtYXg9NjkgcXBzdGVwPTQgaXBfcmF0aW89MS40MCBhcT0xOjEuMDAAgAAAAA9liIQAM///7N/y1AAMWTAAAAMAUAAAMAADAAA8YAgAJ/4oAArVPgvshQAAAAwAAAwBkYXRhAAAAAA==';
-            document.body.appendChild(v);
-            await v.play();
-            v.remove();
-            log('Video silencioso OK');
-        } catch (e) {
-            log('Video silencioso falló');
-        }
+        // Nota: El video base64 silencioso ya no funciona en iOS 18+
+        // AudioContext resume es suficiente para desbloquear
 
         isUnlocked = true;
 

@@ -7657,12 +7657,15 @@
     const likeInProgress = new Set();
 
     // Función de escape para prevenir XSS
-    function escapeHtml(text) {
+    // ⚠️ GLOBAL para que otros scripts puedan usarla
+    window.escapeHtml = function(text) {
         if (!text) return '';
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
-    }
+    };
+    // Alias local para compatibilidad
+    const escapeHtml = window.escapeHtml;
 
     // Toast simple para el feed (función interna)
     function _feedToast(msg) {
@@ -7695,7 +7698,8 @@
     // LIKES EN COMENTARIOS DEL FEED
     // ========================================
 
-    async function toggleFeedCommentLike(comentarioId, btn) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.toggleFeedCommentLike = async function(comentarioId, btn) {
         try {
             const svg = btn.querySelector('svg');
             const countSpan = btn.querySelector('.count');
@@ -7741,7 +7745,7 @@
             }
         } catch (error) {
         }
-    }
+    };
 
     // ========================================
     // PULL TO REFRESH & INFINITE SCROLL
@@ -8315,67 +8319,78 @@
         });
     }
 
-    // Reproducir video - estrategia para iOS (usa iOSMediaFix si disponible)
-    async function playVideo(video) {
+    // Reproducir video - estrategia IGUAL que fullscreen (que funciona bien en iOS)
+    async function playVideo(video, retryCount = 0) {
         const postMedia = video?.closest('.post-media');
-        if (!video || !postMedia) return false;
+        const postId = video?.getAttribute('data-post-id') || 'unknown';
+        const MAX_RETRIES = 2;
 
-        // 🍎 iOS: Usar el nuevo API iOSMediaFix para mejor compatibilidad
-        if (window.iOSMediaFix?.isIOS) {
-            const success = await window.iOSMediaFix.playVideo(video);
-            if (!success) {
-                // Mostrar indicador visual de que necesita tap
-                postMedia.classList.add('needs-tap');
-                postMedia.classList.remove('video-playing');
-                postMedia.classList.add('video-paused');
-            } else {
-                postMedia.classList.remove('needs-tap');
-                // IMPORTANTE: Aplicar estado global de mute después de reproducir
-                video.muted = isGlobalMuted;
-            }
-            return success;
-        }
-
-        // Fallback para navegadores sin iOSMediaFix
-        video.muted = isGlobalMuted; // Respetar estado global de mute
-
-        if (video.readyState < 2) {
-            video.load();
-            await new Promise(resolve => {
-                const onCanPlay = () => {
-                    video.removeEventListener('canplay', onCanPlay);
-                    video.removeEventListener('error', onError);
-                    resolve();
-                };
-                const onError = () => {
-                    video.removeEventListener('canplay', onCanPlay);
-                    video.removeEventListener('error', onError);
-                    resolve();
-                };
-                video.addEventListener('canplay', onCanPlay);
-                video.addEventListener('error', onError);
-                // Timeout más largo para conexiones 3G/LTE lentas (8 segundos)
-                setTimeout(resolve, 8000);
-            });
-        }
-
-        try {
-            const playPromise = video.play();
-            if (playPromise !== undefined) {
-                await playPromise;
-            }
-            postMedia.classList.remove('video-paused');
-            postMedia.classList.add('video-playing');
-            return true;
-        } catch (err) {
-            postMedia.classList.remove('video-playing');
-            postMedia.classList.add('video-paused');
+        if (!video || !postMedia) {
             return false;
         }
+
+        // Preparar atributos iOS si es necesario
+        if (isIOSDevice && window.iOSMediaFix?.enhance) {
+            window.iOSMediaFix.enhance(video);
+        }
+
+        // Asegurar atributos críticos
+        video.playsInline = true;
+        video.setAttribute('playsinline', '');
+        video.setAttribute('webkit-playsinline', '');
+
+        // Si el video no tiene src o readyState es 0, cargarlo
+        if (video.readyState < 1) {
+            video.preload = 'auto';
+            video.load();
+        }
+
+        // ESTRATEGIA EXACTA DEL FULLSCREEN (líneas 12627-12641):
+        // 1. Primero intentar SIN mute (para que tenga audio)
+        // 2. Si falla, reintentar CON mute
+        const tryPlay = async () => {
+            try {
+                // Intento 1: SIN mute (como fullscreen)
+                video.muted = isGlobalMuted;
+                await video.play();
+                postMedia.classList.remove('needs-tap', 'video-paused', 'video-loading');
+                postMedia.classList.add('video-playing');
+                return true;
+            } catch (e) {
+                // Intento 2: CON mute (fallback como fullscreen)
+                try {
+                    video.muted = true;
+                    await video.play();
+                    postMedia.classList.remove('needs-tap', 'video-paused', 'video-loading');
+                    postMedia.classList.add('video-playing');
+                    return true;
+                } catch (e2) {
+                    return false;
+                }
+            }
+        };
+
+        let success = await tryPlay();
+
+        // Si falló y no hemos agotado reintentos, esperar y reintentar
+        if (!success && retryCount < MAX_RETRIES) {
+            // Esperar 500ms antes de reintentar (backoff)
+            await new Promise(r => setTimeout(r, 500 * (retryCount + 1)));
+            return playVideo(video, retryCount + 1);
+        }
+
+        if (!success) {
+            // Falló después de todos los reintentos - mostrar needs-tap
+            postMedia.classList.remove('video-playing', 'video-loading');
+            postMedia.classList.add('video-paused', 'needs-tap');
+        }
+
+        return success;
     }
 
     // Handler para click en overlay - toggle play/pause con tap
-    function handleVideoClick(event, overlay) {
+    // ⚠️ GLOBAL para que onclick del HTML pueda accederla
+    window.handleVideoClick = function(event, overlay) {
         event.stopPropagation();
         event.preventDefault();
 
@@ -8385,40 +8400,53 @@
 
         const videoId = video.getAttribute('data-post-id') || video.src;
 
-        // 🍎 iOS: Usar iOSMediaFix.toggleVideo para mejor compatibilidad
-        if (window.iOSMediaFix?.isIOS) {
-            if (video.paused) {
-                // Usuario quiere reproducir
-                manuallyPausedVideos.delete(videoId);
-                postMedia.classList.remove('needs-tap');
-                video.muted = isGlobalMuted;
-            } else {
-                // Usuario quiere pausar - marcar como pausa manual
-                manuallyPausedVideos.add(videoId);
+        if (video.paused) {
+            // Usuario quiere reproducir - TAP DIRECTO (funciona en iOS 18+)
+            manuallyPausedVideos.delete(videoId);
+            postMedia.classList.remove('needs-tap');
+            pauseAllVideosExcept(video);
+
+            // iOS 18+: Asegurar estado correcto antes de play
+            video.muted = isGlobalMuted;
+            if (video.readyState < 2) {
+                video.load();
             }
 
-            window.iOSMediaFix.toggleVideo(video, { preserveMuteState: false });
-            // Asegurar estado mute correcto después del toggle
-            video.muted = isGlobalMuted;
-            return;
-        }
+            // Usar promesa encadenada para iOS 18+
+            const playWithFallback = async () => {
+                try {
+                    await video.play();
+                    updateVideoState(video, true);
+                } catch (err1) {
+                    // Fallback 1: Forzar muted
+                    video.muted = true;
+                    try {
+                        await video.play();
+                        updateVideoState(video, true);
+                    } catch (err2) {
+                        // Fallback 2: Reiniciar y reproducir
+                        video.currentTime = 0;
+                        video.load();
+                        try {
+                            await video.play();
+                            updateVideoState(video, true);
+                        } catch (err3) {
+                            // Falló todo - mostrar needs-tap de nuevo
+                            postMedia.classList.add('needs-tap');
+                            updateVideoState(video, false);
+                        }
+                    }
+                }
+            };
 
-        // Fallback para navegadores sin iOSMediaFix
-        if (video.paused) {
-            manuallyPausedVideos.delete(videoId);
-            pauseAllVideosExcept(video);
-            video.muted = isGlobalMuted;
-            video.play().then(() => {
-                updateVideoState(video, true);
-            }).catch((err) => {
-                updateVideoState(video, false);
-            });
+            playWithFallback();
         } else {
+            // Usuario quiere pausar - marcar como pausa manual
             manuallyPausedVideos.add(videoId);
             video.pause();
             updateVideoState(video, false);
         }
-    }
+    };
 
     // Actualizar iconos de mute
     function updateAllMuteIcons() {
@@ -8442,17 +8470,53 @@
         });
     }
 
-    // Intersection Observer para autoplay
+    // ========================================
+    // SCROLL DEBOUNCE (como fullscreen)
+    // ========================================
+    let isFeedScrolling = false;
+    let feedScrollTimeout = null;
+    let pendingVideoToPlay = null;
+
+    // Detectar scroll para aplicar debounce
+    const feedContainer = document.querySelector('.feed-container') || document.querySelector('.feed-main');
+    if (feedContainer) {
+        window.addEventListener('scroll', () => {
+            isFeedScrolling = true;
+            clearTimeout(feedScrollTimeout);
+
+            feedScrollTimeout = setTimeout(() => {
+                isFeedScrolling = false;
+                // Reproducir el video pendiente después del debounce
+                if (pendingVideoToPlay) {
+                    const video = pendingVideoToPlay;
+                    pendingVideoToPlay = null;
+                    // Pausar TODOS antes de reproducir (como fullscreen)
+                    pauseAllVideosExcept(video);
+                    playVideo(video);
+                }
+            }, 150); // 150ms debounce como fullscreen
+        }, { passive: true });
+    }
+
+    // Intersection Observer para autoplay (mejorado como fullscreen)
     const videoObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             const video = entry.target;
             const videoId = video.getAttribute('data-post-id') || video.src;
 
             if (entry.isIntersecting) {
-                // No reproducir si el usuario lo pauso manualmente
+                // No reproducir si el usuario lo pausó manualmente
                 if (manuallyPausedVideos.has(videoId)) {
                     return;
                 }
+
+                // Si estamos scrolleando, guardar para después del debounce
+                if (isFeedScrolling) {
+                    pendingVideoToPlay = video;
+                    return;
+                }
+
+                // Pausar TODOS antes de reproducir (como fullscreen)
                 pauseAllVideosExcept(video);
                 playVideo(video);
             } else {
@@ -8460,12 +8524,17 @@
                 manuallyPausedVideos.delete(videoId);
                 video.pause();
                 updateVideoState(video, false);
+
+                // Si era el video pendiente, limpiar
+                if (pendingVideoToPlay === video) {
+                    pendingVideoToPlay = null;
+                }
             }
         });
     }, {
         root: null,
         rootMargin: '0px',
-        threshold: 0.5
+        threshold: 0.7  // Aumentado de 0.5 a 0.7 (70% visible)
     });
 
     // Preload observer - rootMargin reducido para móviles para evitar sobrecargar la red
@@ -8476,6 +8545,10 @@
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const video = entry.target;
+                // Cambiar a preload auto para que iOS descargue el video
+                video.preload = 'auto';
+                // Asegurar que esté muted para autoplay en iOS
+                video.muted = true;
                 if (video.readyState < 1) {
                     video.load();
                 }
@@ -8487,6 +8560,22 @@
     function initVideoObserversForNewPosts() {
         document.querySelectorAll('.post-media video.feed-video:not([data-observed])').forEach(video => {
             video.setAttribute('data-observed', 'true');
+            video.dataset.loadStartTime = Date.now();
+
+            const postId = video.getAttribute('data-post-id') || 'unknown';
+            const videoSrc = video.currentSrc || video.querySelector('source')?.src || '';
+
+            // Log inicial: verificar si el video tiene src válido
+            if (!videoSrc || videoSrc.endsWith('/Feed') || videoSrc.includes('undefined')) {
+                if (window.ladoLog) {
+                    window.ladoLog.error(`Video inicializado sin src válido post:${postId}`, {
+                        postId,
+                        src: videoSrc || 'EMPTY',
+                        sourceElements: video.querySelectorAll('source').length,
+                        videoHTML: video.outerHTML.substring(0, 400)
+                    });
+                }
+            }
 
             // 🍎 iOS: Usar iOSMediaFix.enhance() para configurar atributos correctamente
             if (window.iOSMediaFix?.isIOS) {
@@ -8497,7 +8586,9 @@
             video.playsInline = true;
             video.setAttribute('playsinline', '');
             video.setAttribute('webkit-playsinline', '');
-            video.muted = isGlobalMuted; // Respetar estado global de mute
+            // IMPORTANTE: Iniciar siempre muted para que autoplay funcione en iOS
+            // Luego playVideo() ajusta según isGlobalMuted
+            video.muted = true;
             video.autoplay = false; // Controlamos nosotros el autoplay
 
             // Eventos de estado
@@ -8538,9 +8629,51 @@
                 }
             });
 
+            // Manejar errores en elementos <source> (detecta 404, etc.)
+            video.querySelectorAll('source').forEach(source => {
+                source.addEventListener('error', (e) => {
+                    const postId = video.getAttribute('data-post-id') || 'unknown';
+                    const srcUrl = source.src || 'unknown';
+                    if (window.ladoLog) {
+                        window.ladoLog.error(`Video source error (posible 404) post:${postId}`, {
+                            postId,
+                            src: srcUrl.substring(0, 200),
+                            type: source.type || 'unknown'
+                        });
+                    }
+                });
+            });
+
             // Manejar errores de carga - remover spinner y mostrar estado de error
-            video.addEventListener('error', () => {
+            video.addEventListener('error', (e) => {
                 const postMedia = video.closest('.post-media');
+                const postId = video.getAttribute('data-post-id') || 'unknown';
+                const videoSrc = video.currentSrc || video.querySelector('source')?.src || 'no-src';
+                const errorCode = video.error?.code;
+                const errorMessage = video.error?.message || 'Unknown error';
+
+                // Interpretar código de error
+                const errorDescriptions = {
+                    1: 'MEDIA_ERR_ABORTED - Carga abortada',
+                    2: 'MEDIA_ERR_NETWORK - Error de red',
+                    3: 'MEDIA_ERR_DECODE - Error de decodificación',
+                    4: 'MEDIA_ERR_SRC_NOT_SUPPORTED - Formato no soportado o archivo no encontrado (404)'
+                };
+
+                // Log detallado del error
+                if (window.ladoLog) {
+                    window.ladoLog.error(`Video error post:${postId}`, {
+                        postId: postId,
+                        src: videoSrc.substring(0, 200),
+                        errorCode: errorCode,
+                        errorDescription: errorDescriptions[errorCode] || 'Error desconocido',
+                        errorMessage: errorMessage,
+                        readyState: video.readyState,
+                        networkState: video.networkState,
+                        userAgent: navigator.userAgent.substring(0, 150)
+                    });
+                }
+
                 if (postMedia) {
                     postMedia.classList.remove('video-loading');
                     postMedia.classList.add('video-error');
@@ -8611,6 +8744,141 @@
         });
     }
 
+    // ========================================
+    // DETECTOR DE PANTALLA NEGRA
+    // ========================================
+    // Detecta videos visibles que no se reproducen y reporta al log
+    function initBlackScreenDetector() {
+        // Ejecutar en TODOS los dispositivos para detectar videos problemáticos
+        setInterval(() => {
+            document.querySelectorAll('video.feed-video').forEach(video => {
+                const postMedia = video.closest('.post-media');
+                if (!postMedia) return;
+
+                const rect = video.getBoundingClientRect();
+                const isVisible = rect.top < window.innerHeight && rect.bottom > 0 &&
+                                 rect.left < window.innerWidth && rect.right > 0;
+
+                if (!isVisible) return;
+
+                const postId = video.getAttribute('data-post-id') || 'unknown';
+                const videoSrc = video.currentSrc || video.querySelector('source')?.src || '';
+                const lastReport = video.dataset.lastBlackScreenReport || 0;
+                const now = Date.now();
+
+                // Detectar videos con src inválido o vacío
+                if (!videoSrc || videoSrc.endsWith('/Feed') || videoSrc.includes('undefined')) {
+                    if (now - lastReport > 60000) { // Reportar cada 60 segundos
+                        video.dataset.lastBlackScreenReport = now;
+                        if (window.ladoLog) {
+                            window.ladoLog.error(`Video SRC inválido post:${postId}`, {
+                                postId,
+                                src: videoSrc || 'EMPTY',
+                                videoElement: video.outerHTML.substring(0, 300)
+                            });
+                        }
+                        postMedia.classList.add('video-error');
+                    }
+                    return;
+                }
+
+                // Detectar videos que no cargan (networkState=3 es NETWORK_NO_SOURCE)
+                if (video.networkState === 3) {
+                    if (now - lastReport > 30000) {
+                        video.dataset.lastBlackScreenReport = now;
+                        if (window.ladoLog) {
+                            window.ladoLog.error(`Video sin fuente válida post:${postId}`, {
+                                postId,
+                                src: videoSrc.substring(0, 150),
+                                networkState: video.networkState,
+                                readyState: video.readyState,
+                                error: video.error ? { code: video.error.code, message: video.error.message } : null
+                            });
+                        }
+                        postMedia.classList.add('video-error');
+                    }
+                    return;
+                }
+
+                // Detectar videos con error de carga
+                if (video.error) {
+                    if (now - lastReport > 30000) {
+                        video.dataset.lastBlackScreenReport = now;
+                        if (window.ladoLog) {
+                            window.ladoLog.error(`Video con error post:${postId}`, {
+                                postId,
+                                src: videoSrc.substring(0, 150),
+                                errorCode: video.error.code,
+                                errorMessage: video.error.message,
+                                networkState: video.networkState,
+                                readyState: video.readyState
+                            });
+                        }
+                        postMedia.classList.add('video-error');
+                    }
+                    return;
+                }
+
+                // Si el video está visible, pausado, sin error visible, y no tiene needs-tap
+                if (video.paused &&
+                    !postMedia.classList.contains('video-error') &&
+                    !postMedia.classList.contains('needs-tap') &&
+                    !postMedia.classList.contains('video-playing') &&
+                    video.readyState >= 1) {
+
+                    if (now - lastReport > 30000) { // Solo reportar cada 30 segundos por video
+                        video.dataset.lastBlackScreenReport = now;
+
+                        if (window.ladoLog) {
+                            window.ladoLog.warn(`Video pantalla negra detectado post:${postId}`, {
+                                postId,
+                                src: videoSrc.substring(0, 150),
+                                readyState: video.readyState,
+                                networkState: video.networkState,
+                                paused: video.paused,
+                                ended: video.ended,
+                                duration: video.duration,
+                                currentTime: video.currentTime,
+                                muted: video.muted,
+                                isIOS: isIOSDevice,
+                                userAgent: navigator.userAgent.substring(0, 100)
+                            });
+                        }
+
+                        // Intentar recuperar el video
+                        playVideo(video);
+                    }
+                }
+
+                // Detectar videos atascados en carga (readyState bajo por mucho tiempo)
+                if (video.readyState < 2 && !postMedia.classList.contains('video-error')) {
+                    const loadStartTime = parseInt(video.dataset.loadStartTime || '0');
+                    if (!loadStartTime) {
+                        video.dataset.loadStartTime = now;
+                    } else if (now - loadStartTime > 10000) { // 10 segundos sin cargar
+                        if (now - lastReport > 30000) {
+                            video.dataset.lastBlackScreenReport = now;
+                            if (window.ladoLog) {
+                                window.ladoLog.warn(`Video atascado en carga post:${postId}`, {
+                                    postId,
+                                    src: videoSrc.substring(0, 150),
+                                    readyState: video.readyState,
+                                    networkState: video.networkState,
+                                    loadTime: Math.round((now - loadStartTime) / 1000) + 's'
+                                });
+                            }
+                            // Intentar recargar
+                            video.load();
+                        }
+                    }
+                } else if (video.readyState >= 2) {
+                    // Reset load timer when video loads
+                    video.dataset.loadStartTime = '0';
+                }
+            });
+        }, 5000); // Revisar cada 5 segundos
+    }
+
     // Limpiar observers de posts antiguos para evitar memory leak
     function cleanupOldObservers() {
         if (activeVideoObservers <= MAX_VIDEO_OBSERVERS) return;
@@ -8634,6 +8902,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         initPullToRefresh();
         initInfiniteScroll();
+        initBlackScreenDetector();
 
         // 🍎 iOS: Forzar reproducción del primer video visible después de cualquier interacción
         if (isIOSDevice) {
@@ -8675,7 +8944,8 @@
     // ========================================
     // PHOTO MUSIC PLAYER - Reproducción automática
     // ========================================
-    let currentPhotoAudio = null;
+    // ⚠️ GLOBAL para que openFullscreenViewer (en otro script) pueda accederla
+    window.currentPhotoAudio = null;
 
     // Variable para controlar si el fullscreen está activo
     let isFullscreenActive = false;
@@ -8700,7 +8970,7 @@
                 // Si el audio global está muteado, no reproducir música de fotos
                 if (isGlobalMuted) {
                     // Pausar si estaba sonando
-                    if (currentPhotoAudio === audio) {
+                    if (window.currentPhotoAudio === audio) {
                         if (window.iOSMediaFix?.isIOS) {
                             window.iOSMediaFix.pause(audio);
                         } else {
@@ -8726,8 +8996,8 @@
                 // 🍎 iOS: Usar iOSMediaFix.playPhotoMusic para mejor compatibilidad
                 if (window.iOSMediaFix?.isIOS) {
                     // Pausar audio anterior si existe
-                    if (currentPhotoAudio && currentPhotoAudio !== audio) {
-                        window.iOSMediaFix.pause(currentPhotoAudio);
+                    if (window.currentPhotoAudio && window.currentPhotoAudio !== audio) {
+                        window.iOSMediaFix.pause(window.currentPhotoAudio);
                         // Limpiar badge del audio anterior
                         document.querySelectorAll('.music-badge.playing').forEach(b => {
                             if (b !== badge) b.classList.remove('playing');
@@ -8740,7 +9010,7 @@
                             badge.classList.add('needs-tap');
                             badge.title = 'Toca para reproducir música';
                         }
-                        currentPhotoAudio = audio;
+                        window.currentPhotoAudio = audio;
                     } else {
                         // iOS desbloqueado o no es iOS - reproducir
                         window.iOSMediaFix.playPhotoMusic(audio, { startTime, volume }).then(success => {
@@ -8748,13 +9018,13 @@
                                 badge.classList.remove('needs-tap');
                                 badge.classList.add('playing');
                             }
-                            currentPhotoAudio = audio;
+                            window.currentPhotoAudio = audio;
                         });
                     }
                 } else {
                     // Fallback: sin iOSMediaFix (non-iOS)
-                    if (currentPhotoAudio && currentPhotoAudio !== audio) {
-                        currentPhotoAudio.pause();
+                    if (window.currentPhotoAudio && window.currentPhotoAudio !== audio) {
+                        window.currentPhotoAudio.pause();
                     }
 
                     audio.currentTime = startTime;
@@ -8762,21 +9032,21 @@
 
                     audio.play().then(() => {
                         if (badge) badge.classList.add('playing');
-                        currentPhotoAudio = audio;
+                        window.currentPhotoAudio = audio;
                     }).catch((err) => {
                         if (badge) badge.classList.add('needs-tap');
-                        currentPhotoAudio = audio;
+                        window.currentPhotoAudio = audio;
                     });
                 }
             } else {
                 // La foto no está visible - pausar música
-                if (currentPhotoAudio === audio) {
+                if (window.currentPhotoAudio === audio) {
                     if (window.iOSMediaFix?.isIOS) {
                         window.iOSMediaFix.pause(audio);
                     } else {
                         audio.pause();
                     }
-                    currentPhotoAudio = null;
+                    window.currentPhotoAudio = null;
                 }
 
                 // Detener animación del badge
@@ -8859,13 +9129,13 @@
         }
 
         // Reproducir el audio visible si hay uno
-        if (currentPhotoAudio && currentPhotoAudio.paused) {
-            const startTime = parseFloat(currentPhotoAudio.dataset.start) || 0;
-            let volume = parseFloat(currentPhotoAudio.dataset.volume) || 0.7;
+        if (window.currentPhotoAudio && window.currentPhotoAudio.paused) {
+            const startTime = parseFloat(window.currentPhotoAudio.dataset.start) || 0;
+            let volume = parseFloat(window.currentPhotoAudio.dataset.volume) || 0.7;
             if (volume > 1) volume = volume / 10;
 
             if (window.iOSMediaFix?.isIOS) {
-                window.iOSMediaFix.playPhotoMusic(currentPhotoAudio, { startTime, volume });
+                window.iOSMediaFix.playPhotoMusic(window.currentPhotoAudio, { startTime, volume });
             }
         }
     });
@@ -8898,11 +9168,11 @@
 
         if (audio.paused) {
             // Pausar audio anterior si existe
-            if (currentPhotoAudio && currentPhotoAudio !== audio) {
+            if (window.currentPhotoAudio && window.currentPhotoAudio !== audio) {
                 if (window.iOSMediaFix?.isIOS) {
-                    window.iOSMediaFix.pause(currentPhotoAudio);
+                    window.iOSMediaFix.pause(window.currentPhotoAudio);
                 } else {
-                    currentPhotoAudio.pause();
+                    window.currentPhotoAudio.pause();
                 }
                 // Limpiar badge anterior
                 document.querySelectorAll('.music-badge.playing').forEach(b => b.classList.remove('playing'));
@@ -8920,7 +9190,7 @@
                         if (success) {
                             badge.classList.remove('needs-tap');
                             badge.classList.add('playing');
-                            currentPhotoAudio = audio;
+                            window.currentPhotoAudio = audio;
                         }
                     });
                 });
@@ -8929,7 +9199,7 @@
                 audio.volume = volume;
                 audio.play().then(() => {
                     badge.classList.add('playing');
-                    currentPhotoAudio = audio;
+                    window.currentPhotoAudio = audio;
                 }).catch(err => {
                 });
             }
@@ -8940,7 +9210,7 @@
             } else {
                 audio.pause();
             }
-            currentPhotoAudio = null;
+            window.currentPhotoAudio = null;
             badge.classList.remove('playing');
             badge.classList.remove('needs-tap');
         }
@@ -9357,15 +9627,17 @@
         await abrirModalCompartir(postId);
     };
 
-    function closeShareModal() {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.closeShareModal = function() {
         document.getElementById('shareModal').classList.remove('active');
         // Resetear panel de amigos
         closeFriendsPanel();
         selectedFriends.clear();
         updateSendButton();
-    }
+    };
 
-    function copyShareUrl() {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.copyShareUrl = function() {
         const input = document.getElementById('shareUrlInput');
         const copyBtn = document.getElementById('shareCopyBtn');
 
@@ -9394,10 +9666,11 @@
                 copyBtn.classList.remove('copied');
             }, 2000);
         }
-    }
+    };
 
     // Compartir post como story
-    async function compartirComoStory() {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.compartirComoStory = async function() {
         if (!currentSharePostId) {
             showToast('Error: no se encontró el post');
             return;
@@ -9599,7 +9872,8 @@
     });
 
     // Seguir usuario desde sidebar (con TipoLado)
-    async function seguirUsuario(userId, btn, tipoLado = 0) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.seguirUsuario = async function(userId, btn, tipoLado = 0) {
         try {
             const res = await fetch('/Feed/Seguir', {
                 method: 'POST',
@@ -9624,13 +9898,14 @@
         } catch (err) {
             showToast('Error al seguir usuario');
         }
-    }
+    };
 
     // ========================================
     // CONTENIDO SENSIBLE
     // ========================================
 
-    function revelarContenidoSensible(event, postId) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.revelarContenidoSensible = function(event, postId) {
         event.stopPropagation();
         event.preventDefault();
 
@@ -9641,26 +9916,32 @@
                 overlay.remove();
             }, 300);
         }
-    }
+    };
 
     // ========================================
     // FUNCIONES DEL CARRUSEL
     // ========================================
 
-    function carouselPrev(event, btn) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.carouselPrev = function(event, btn) {
         event.stopPropagation();
         const carousel = btn.closest('.post-carousel');
         navigateCarousel(carousel, -1);
-    }
+    };
 
-    function carouselNext(event, btn) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.carouselNext = function(event, btn) {
         event.stopPropagation();
         const carousel = btn.closest('.post-carousel');
         navigateCarousel(carousel, 1);
-    }
+    };
 
     function navigateCarousel(carousel, direction) {
+        if (!carousel) return;
+
         const track = carousel.querySelector('.carousel-track');
+        if (!track) return;
+
         const slides = carousel.querySelectorAll('.carousel-slide');
         const dots = carousel.querySelectorAll('.carousel-dot');
         const counter = carousel.querySelector('.carousel-counter');
@@ -9670,6 +9951,8 @@
         // Obtener índice actual
         let currentIndex = parseInt(carousel.dataset.currentIndex || '0');
         const totalSlides = slides.length;
+
+        if (totalSlides === 0) return;
 
         // Calcular nuevo índice
         let newIndex = currentIndex + direction;
@@ -9733,7 +10016,9 @@
                     if (direction !== 0) {
                         // Ir directamente al índice
                         const track = carousel.querySelector('.carousel-track');
+                        if (!track) return;
                         const totalSlides = carousel.querySelectorAll('.carousel-slide').length;
+                        if (totalSlides === 0) return;
                         const offset = -index * (100 / totalSlides);
                         track.style.transform = `translateX(${offset}%)`;
                         carousel.dataset.currentIndex = index;
@@ -9790,7 +10075,8 @@
     // ========================================
 
     // Toggle del menu dropdown
-    function togglePostMenu(event, element) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.togglePostMenu = function(event, element) {
         event.stopPropagation();
         const dropdown = element.querySelector('.post-menu-dropdown');
 
@@ -9800,7 +10086,7 @@
         });
 
         dropdown.classList.toggle('show');
-    }
+    };
 
     // Cerrar menus al hacer clic fuera
     document.addEventListener('click', function(e) {
@@ -9812,12 +10098,14 @@
     });
 
     // Ir a la publicacion
-    function irAPublicacion(postId) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.irAPublicacion = function(postId) {
         window.location.href = '/Feed/Detalle/' + postId;
-    }
+    };
 
     // Copiar enlace
-    function copiarEnlace(postId) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.copiarEnlace = function(postId) {
         const url = window.location.origin + '/Feed/Detalle/' + postId;
         navigator.clipboard.writeText(url).then(() => {
             showToast('Enlace copiado al portapapeles');
@@ -9832,10 +10120,11 @@
             showToast('Enlace copiado al portapapeles');
         });
         cerrarMenus();
-    }
+    };
 
     // Agregar a favoritos
-    async function agregarFavorito(postId, btn) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.agregarFavorito = async function(postId, btn) {
         try {
             const res = await fetch('/Feed/ToggleFavorito', {
                 method: 'POST',
@@ -9856,10 +10145,11 @@
             showToast('Error al procesar');
         }
         cerrarMenus();
-    }
+    };
 
     // Dejar de seguir
-    async function dejarDeSeguir(userId, tipoLado, btn) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.dejarDeSeguir = async function(userId, tipoLado, btn) {
         try {
             const res = await fetch('/Feed/DejarDeSeguir', {
                 method: 'POST',
@@ -9877,7 +10167,7 @@
             showToast('Error al procesar');
         }
         cerrarMenus();
-    }
+    };
 
     // ========================================
     // SISTEMA DE REPORTES ESTILO INSTAGRAM
@@ -9887,7 +10177,8 @@
     let requiresDetails = false;
 
     // Abrir modal de reportes
-    function reportarContenido(postId) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.reportarContenido = function(postId) {
         currentReportPostId = postId;
         currentReportReason = '';
         requiresDetails = false;
@@ -9905,26 +10196,29 @@
         document.body.style.overflow = 'hidden';
 
         cerrarMenus();
-    }
+    };
 
     // Cerrar modal de reportes
-    function closeReportModal() {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.closeReportModal = function() {
         document.getElementById('reportModal').classList.remove('show');
         document.body.style.overflow = '';
         currentReportPostId = null;
         currentReportReason = '';
-    }
+    };
 
     // Mostrar opciones principales
-    function showMainReportOptions() {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.showMainReportOptions = function() {
         document.getElementById('reportMainContent').style.display = 'block';
         document.getElementById('reportSubViolencia').classList.remove('show');
         document.getElementById('reportSubSexual').classList.remove('show');
         document.getElementById('reportDetailsStep').classList.remove('show');
-    }
+    };
 
     // Mostrar subopciones
-    function showReportSuboptions(category) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.showReportSuboptions = function(category) {
         document.getElementById('reportMainContent').style.display = 'none';
 
         if (category === 'violencia') {
@@ -9932,10 +10226,11 @@
         } else if (category === 'sexual') {
             document.getElementById('reportSubSexual').classList.add('show');
         }
-    }
+    };
 
     // Seleccionar motivo de reporte
-    function selectReportReason(reason, needsDetails) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.selectReportReason = function(reason, needsDetails) {
         currentReportReason = reason;
         requiresDetails = needsDetails;
 
@@ -9953,7 +10248,7 @@
             // Enviar reporte directamente con el motivo seleccionado
             submitReportWithReason(reason);
         }
-    }
+    };
 
     // Enviar reporte con motivo
     async function submitReportWithReason(reason) {
@@ -9990,7 +10285,8 @@
     }
 
     // Enviar reporte desde el formulario de detalles
-    async function submitReport() {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.submitReport = async function() {
         const details = document.getElementById('reportDetails').value.trim();
         let fullReason = currentReportReason;
 
@@ -9999,7 +10295,7 @@
         }
 
         await submitReportWithReason(fullReason);
-    }
+    };
 
     // Cerrar modal al hacer clic fuera
     document.getElementById('reportModal')?.addEventListener('click', function(e) {
@@ -10016,7 +10312,8 @@
     });
 
     // Bloquear usuario
-    async function bloquearUsuario(userId, nombreUsuario) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.bloquearUsuario = async function(userId, nombreUsuario) {
         cerrarMenus();
 
         const confirmar = confirm(`¿Estás seguro de que quieres bloquear a ${nombreUsuario}?\n\nAl bloquear:\n• No verás su contenido\n• No podrás enviarle mensajes\n• Se cancelarán suscripciones mutuas`);
@@ -10049,7 +10346,7 @@
         } catch (err) {
             showToast('Error al bloquear usuario');
         }
-    }
+    };
 
     // Cerrar todos los menus
     function cerrarMenus() {
@@ -10083,7 +10380,8 @@
     }
 
     // Toggle mute global
-    function toggleVideoMute(event, btn) {
+    // ⚠️ GLOBAL para que onclick del HTML pueda accederla
+    window.toggleVideoMute = function(event, btn) {
         event.stopPropagation();
         event.preventDefault();
         userHasInteracted = true;
@@ -10098,11 +10396,11 @@
         // Aplicar a audio de fotos
         if (isGlobalMuted) {
             // Pausar el audio de foto actual si existe
-            if (currentPhotoAudio) {
+            if (window.currentPhotoAudio) {
                 if (window.iOSMediaFix?.isIOS) {
-                    window.iOSMediaFix.pause(currentPhotoAudio);
+                    window.iOSMediaFix.pause(window.currentPhotoAudio);
                 } else {
-                    currentPhotoAudio.pause();
+                    window.currentPhotoAudio.pause();
                 }
                 // Quitar indicador de playing del badge
                 document.querySelectorAll('.music-badge.playing').forEach(b => {
@@ -10129,7 +10427,7 @@
                         visiblePhotoWithMusic.volume = volume;
                         visiblePhotoWithMusic.play().catch(() => {});
                     }
-                    currentPhotoAudio = visiblePhotoWithMusic;
+                    window.currentPhotoAudio = visiblePhotoWithMusic;
                     const badge = postMedia?.querySelector('.music-badge');
                     if (badge) badge.classList.add('playing');
                 }
@@ -10137,10 +10435,11 @@
         }
 
         updateAllMuteIcons();
-    }
+    };
 
     // Toggle mute para música de foto
-    function togglePhotoMusicMute(event, btn) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.togglePhotoMusicMute = function(event, btn) {
         event.stopPropagation();
         event.preventDefault();
         userHasInteracted = true;
@@ -10155,11 +10454,11 @@
         // Aplicar a audio de fotos
         if (isGlobalMuted) {
             // Pausar el audio de foto actual si existe
-            if (currentPhotoAudio) {
+            if (window.currentPhotoAudio) {
                 if (window.iOSMediaFix?.isIOS) {
-                    window.iOSMediaFix.pause(currentPhotoAudio);
+                    window.iOSMediaFix.pause(window.currentPhotoAudio);
                 } else {
-                    currentPhotoAudio.pause();
+                    window.currentPhotoAudio.pause();
                 }
                 // Quitar indicador de playing del badge
                 document.querySelectorAll('.music-badge.playing').forEach(b => {
@@ -10183,21 +10482,22 @@
                     audioPlayer.volume = volume;
                     audioPlayer.play().catch(() => {});
                 }
-                currentPhotoAudio = audioPlayer;
+                window.currentPhotoAudio = audioPlayer;
                 const badge = postMedia?.querySelector('.music-badge');
                 if (badge) badge.classList.add('playing');
             }
         }
 
         updateAllMuteIcons();
-    }
+    };
 
     // ========================================
     // AUDIO POST CONTROLS
     // ========================================
     let currentPostAudio = null;
 
-    function toggleAudioPlay(event, btn) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.toggleAudioPlay = function(event, btn) {
         event.stopPropagation();
         event.preventDefault();
 
@@ -10235,9 +10535,10 @@
             playIcon.style.display = 'block';
             pauseIcon.style.display = 'none';
         }
-    }
+    };
 
-    function toggleAudioMute(event, btn) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.toggleAudioMute = function(event, btn) {
         event.stopPropagation();
         event.preventDefault();
 
@@ -10257,7 +10558,7 @@
             mutedIcon.style.display = 'none';
             unmutedIcon.style.display = 'block';
         }
-    }
+    };
 
     // Actualizar barra de progreso del audio
     document.addEventListener('DOMContentLoaded', function() {
@@ -10418,11 +10719,12 @@
     }
 
     // Cerrar modal
-    function closeLikesModal() {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.closeLikesModal = function() {
         const overlay = document.getElementById('likesModalOverlay');
         overlay.classList.remove('visible');
         document.body.style.overflow = '';
-    }
+    };
 
     // Inicializar eventos de likes en elementos .post-likes
     function initLikesTooltipEvents() {
@@ -10494,9 +10796,9 @@
         });
     });
 
-    const feedContainer = document.querySelector('.feed-container');
-    if (feedContainer) {
-        likesObserver.observe(feedContainer, { childList: true, subtree: true });
+    const likesContainer = document.querySelector('.feed-container');
+    if (likesContainer) {
+        likesObserver.observe(likesContainer, { childList: true, subtree: true });
     }
 </script>
 
@@ -11397,7 +11699,8 @@
 
     let currentCreatorId = null;
 
-    function openSubscribeModal(postElement) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.openSubscribeModal = function(postElement) {
         if (!postElement) return;
 
         const creatorId = postElement.dataset.creatorId;
@@ -11432,18 +11735,20 @@
 
         // Mostrar modal
         document.getElementById('subscribeModal').classList.add('active');
-    }
+    };
 
-    function closeSubscribeModal() {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.closeSubscribeModal = function() {
         document.getElementById('subscribeModal').classList.remove('active');
         currentCreatorId = null;
-    }
+    };
 
-    function goToSubscribe() {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.goToSubscribe = function() {
         if (currentCreatorId) {
             window.location.href = '/Feed/Perfil/' + currentCreatorId + '?verSeudonimo=true&subscribe=true';
         }
-    }
+    };
 
     // Cerrar con Escape
     document.addEventListener('keydown', function(e) {
@@ -11457,6 +11762,8 @@
      FULLSCREEN VIEWER JAVASCRIPT
      ======================================== -->
 <script>
+    // Usar window.escapeHtml directamente (definida en script anterior)
+
     // Variables globales del fullscreen viewer
     let fullscreenPosts = [];
     let currentFullscreenIndex = 0;
@@ -11543,17 +11850,19 @@
     }
 
     // Toggle Fullscreen Video Mute (legacy - para botones dentro de slides)
-    function toggleFullscreenMute(btn) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.toggleFullscreenMute = function(btn) {
         const slide = btn.closest('.fullscreen-slide');
         const video = slide ? slide.querySelector('video') : null;
         if (!video) return;
 
         video.muted = !video.muted;
         updateGlobalMuteIcon(video.muted);
-    }
+    };
 
     // Toggle Global Mute - Botón fijo arriba izquierda
-    function toggleGlobalMute() {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.toggleGlobalMute = function() {
         const container = document.getElementById('fullscreenSlidesContainer');
         const currentSlide = container.querySelector(`.fullscreen-slide[data-index="${currentFullscreenIndex}"]`);
         if (!currentSlide) return;
@@ -11563,7 +11872,7 @@
             video.muted = !video.muted;
             updateGlobalMuteIcon(video.muted);
         }
-    }
+    };
 
     // Actualizar icono del botón global de mute
     function updateGlobalMuteIcon(isMuted) {
@@ -11710,7 +12019,8 @@
     }
 
     // Abrir el fullscreen viewer
-    function openFullscreenViewer(event, postId) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.openFullscreenViewer = function(event, postId) {
         // Prevenir si es un click en audio controls
         if (event.target.tagName === 'AUDIO') {
             return;
@@ -11724,9 +12034,9 @@
         // Pausar cualquier audio/video del feed antes de abrir el viewer
         pauseFeedMedia();
         // También pausar el audio actual del feed si existe
-        if (currentPhotoAudio) {
-            currentPhotoAudio.pause();
-            currentPhotoAudio = null;
+        if (window.currentPhotoAudio) {
+            window.currentPhotoAudio.pause();
+            window.currentPhotoAudio = null;
         }
 
         // Resetear estado de scroll
@@ -11785,7 +12095,7 @@
                 }, 50);
             });
         });
-    }
+    };
 
     // Generar HTML de créditos estilo YouTube Shorts
     function generateCreditsHtml(post) {
@@ -11799,8 +12109,8 @@
 
         // Avatar del creador
         const avatarHtml = post.creatorPhoto
-            ? `<img class="credits-avatar" src="${post.creatorPhoto}" alt="${escapeHtml(post.creatorName)}" onclick="event.stopPropagation(); goToCreatorProfile('${post.creatorId}', ${post.isLadoB})">`
-            : `<div class="credits-avatar-placeholder" onclick="event.stopPropagation(); goToCreatorProfile('${post.creatorId}', ${post.isLadoB})">${escapeHtml(post.creatorName?.charAt(0) || '?')}</div>`;
+            ? `<img class="credits-avatar" src="${post.creatorPhoto}" alt="${window.escapeHtml(post.creatorName)}" onclick="event.stopPropagation(); goToCreatorProfile('${post.creatorId}', ${post.isLadoB})">`
+            : `<div class="credits-avatar-placeholder" onclick="event.stopPropagation(); goToCreatorProfile('${post.creatorId}', ${post.isLadoB})">${window.escapeHtml(post.creatorName?.charAt(0) || '?')}</div>`;
 
         // Música si existe
         const musicHtml = (post.audioTitle || post.audioArtist)
@@ -11812,7 +12122,7 @@
 
         // Descripción si existe
         const descHtml = post.description
-            ? `<div class="credits-description">${escapeHtml(post.description)}</div>`
+            ? `<div class="credits-description">${window.escapeHtml(post.description)}</div>`
             : '';
 
         return `
@@ -11824,11 +12134,11 @@
                             ${avatarHtml}
                             <div class="credits-creator-info" onclick="event.stopPropagation(); goToCreatorProfile('${post.creatorId}', ${post.isLadoB})">
                                 <div class="credits-name">
-                                    ${escapeHtml(post.creatorName)}
+                                    ${window.escapeHtml(post.creatorName)}
                                     ${verifiedHtml}
                                     ${ladoBBadge}
                                 </div>
-                                <div class="credits-username">@@${escapeHtml(post.creatorUsername || post.creatorName)}</div>
+                                <div class="credits-username">@@${window.escapeHtml(post.creatorUsername || post.creatorName)}</div>
                             </div>
                             <button class="credits-follow-btn ${post.isFollowing ? 'following' : ''}"
                                     data-creator-id="${post.creatorId}"
@@ -12643,7 +12953,8 @@
     }
 
     // Cerrar fullscreen viewer
-    function closeFullscreenViewer() {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.closeFullscreenViewer = function() {
         // Pausar todo primero
         pauseAllFullscreenMedia();
 
@@ -12670,10 +12981,11 @@
 
         // Cerrar también el carrusel fullscreen si está abierto
         closeFullscreenCarousel();
-    }
+    };
 
     // Navegar entre slides con botones
-    function navigateFullscreen(direction) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.navigateFullscreen = function(direction) {
         const container = document.getElementById('fullscreenSlidesContainer');
         // iOS fix: usar altura real del slide
         const slides = container.querySelectorAll('.fullscreen-slide');
@@ -12700,7 +13012,7 @@
             lastScrollIndex = newIndex;
             playCurrentVideo();
         }, 300);
-    }
+    };
 
     // Actualizar estado de botones de navegación
     function updateNavButtons() {
@@ -12717,7 +13029,8 @@
     let carouselFullscreenFiles = [];
     let carouselFullscreenIndex = 0;
 
-    function openFullscreenCarousel(event, postId) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.openFullscreenCarousel = function(event, postId) {
         // No abrir si el click fue en un botón de navegación
         if (event.target.closest('.carousel-btn') || event.target.closest('.carousel-dot')) {
             return;
@@ -12887,12 +13200,14 @@
         }
     }
 
-    function goToCarouselFsSlide(index) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.goToCarouselFsSlide = function(index) {
         carouselFullscreenIndex = index;
         updateCarouselFullscreen();
-    }
+    };
 
-    function toggleCarouselFsVideoMute(btn) {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.toggleCarouselFsVideoMute = function(btn) {
         const slide = btn.closest('.carousel-fs-slide');
         const video = slide ? slide.querySelector('video') : null;
         if (!video) return;
@@ -12900,9 +13215,10 @@
         video.muted = !video.muted;
         btn.querySelector('.icon-muted').style.display = video.muted ? 'block' : 'none';
         btn.querySelector('.icon-unmuted').style.display = video.muted ? 'none' : 'block';
-    }
+    };
 
-    function closeFullscreenCarousel() {
+    // ⚠️ GLOBAL para onclick en HTML
+    window.closeFullscreenCarousel = function() {
         const viewer = document.getElementById('carouselFullscreenViewer');
         if (viewer) {
             // Pausar todos los videos
@@ -12914,7 +13230,7 @@
         isFullscreenActive = false;
         carouselFullscreenFiles = [];
         carouselFullscreenIndex = 0;
-    }
+    };
 
     // Keyboard navigation para carrusel fullscreen
     document.addEventListener('keydown', function(e) {
