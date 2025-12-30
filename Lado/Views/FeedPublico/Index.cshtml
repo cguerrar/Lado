@@ -694,7 +694,8 @@
                                    loop
                                    playsinline
                                    webkit-playsinline
-                                   preload="none"
+                                   preload="metadata"
+                                   style="background:#000;"
                                    class="video-placeholder">
                             </video>
                             <div class="video-badge">
@@ -879,12 +880,13 @@
                         item.classList.add('media-loaded');
                     };
 
-                    // Timeout de 5 segundos para videos que no cargan
+                    // Timeout de 15 segundos para videos que no cargan (videos grandes pueden tardar)
                     const timeout = setTimeout(() => {
                         if (!video.classList.contains('loaded')) {
+                            console.warn('Video timeout:', src);
                             showPlaceholder();
                         }
-                    }, 5000);
+                    }, 15000);
 
                     video.onloadeddata = function() {
                         clearTimeout(timeout);
@@ -897,8 +899,16 @@
                         video.play().catch(() => {});
                     };
 
-                    video.onerror = function() {
+                    video.onerror = function(e) {
                         clearTimeout(timeout);
+                        console.error('Video error:', src, video.error);
+                        if (window.ladoLog) {
+                            window.ladoLog.error('FeedPublico video error', {
+                                src: src.substring(0, 150),
+                                errorCode: video.error?.code,
+                                errorMessage: video.error?.message
+                            });
+                        }
                         showPlaceholder();
                     };
 
