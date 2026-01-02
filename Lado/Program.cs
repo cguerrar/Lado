@@ -237,6 +237,7 @@ builder.Services.AddScoped<Lado.Services.IVisitasService, Lado.Services.VisitasS
 builder.Services.AddScoped<Lado.Services.INotificationService, Lado.Services.NotificationService>();
 builder.Services.AddScoped<Lado.Services.IFeedAlgorithmService, Lado.Services.FeedAlgorithmService>();
 builder.Services.AddScoped<Lado.Services.IImageService, Lado.Services.ImageService>();
+builder.Services.AddScoped<Lado.Services.IMediaConversionService, Lado.Services.MediaConversionService>();
 builder.Services.AddScoped<Lado.Services.IDateTimeService, Lado.Services.DateTimeService>();
 builder.Services.AddScoped<Lado.Services.IInteresesService, Lado.Services.InteresesService>();
 builder.Services.AddScoped<Lado.Services.ILogEventoService, Lado.Services.LogEventoService>();
@@ -282,6 +283,16 @@ builder.Services.AddSingleton<Lado.Services.IRateLimitService, Lado.Services.Rat
 // ========================================
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<Lado.Services.IExifService, Lado.Services.ExifService>();
+
+// ========================================
+// SISTEMA LADO COINS (Dólares Premio)
+// ========================================
+builder.Services.AddScoped<Lado.Services.ILadoCoinsService, Lado.Services.LadoCoinsService>();
+builder.Services.AddScoped<Lado.Services.IReferidosService, Lado.Services.ReferidosService>();
+builder.Services.AddScoped<Lado.Services.IRachasService, Lado.Services.RachasService>();
+builder.Services.AddHostedService<Lado.Services.LadoCoinsExpirationBackgroundService>();
+builder.Services.AddHostedService<Lado.Services.RachasResetBackgroundService>();
+builder.Services.AddHostedService<Lado.Services.ReferidosBackgroundService>();
 
 // ========================================
 // CONFIGURACIÓN DE SIGNALR (Chat en tiempo real)

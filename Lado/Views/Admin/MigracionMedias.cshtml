@@ -1,0 +1,348 @@
+@{
+    ViewData["Title"] = "Migración de Medios";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+@Html.AntiForgeryToken()
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">Migración de Medios</h1>
+            <p class="text-muted mb-0">Convertir archivos existentes a formatos estándar (JPEG + MP4)</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/Admin/AnalizarVideos" class="btn btn-outline-danger" title="Analizar codec real de videos y reconvertir">
+                <i class="fas fa-video"></i> Analizar Videos
+            </a>
+            <a href="/Admin/SincronizarRutasMedias" class="btn btn-outline-warning" title="Reparar rutas en BD que no coinciden con archivos">
+                <i class="fas fa-link"></i> Sincronizar Rutas
+            </a>
+            <a href="/Admin" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </div>
+    </div>
+
+    <!-- Resumen de archivos -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title text-primary">
+                        <i class="fas fa-image"></i> Imágenes No Estándar
+                    </h5>
+                    <div class="d-flex justify-content-between">
+                        <span>Contenidos:</span>
+                        <strong>@ViewBag.ImagenesNoEstandar</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Carrusel:</span>
+                        <strong>@ViewBag.ArchivosImagenNoEstandar</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Stories:</span>
+                        <strong>@ViewBag.StoriesImagenNoEstandar</strong>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <strong>Total:</strong>
+                        <strong class="text-primary">@(ViewBag.ImagenesNoEstandar + ViewBag.ArchivosImagenNoEstandar + ViewBag.StoriesImagenNoEstandar)</strong>
+                    </div>
+                    <small class="text-muted">Se convertirán a JPEG (calidad 90)</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title text-success">
+                        <i class="fas fa-video"></i> Videos No Estándar
+                    </h5>
+                    <div class="d-flex justify-content-between">
+                        <span>Contenidos:</span>
+                        <strong>@ViewBag.VideosNoEstandar</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Carrusel:</span>
+                        <strong>@ViewBag.ArchivosVideoNoEstandar</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Stories:</span>
+                        <strong>@ViewBag.StoriesVideoNoEstandar</strong>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <strong>Total:</strong>
+                        <strong class="text-success">@(ViewBag.VideosNoEstandar + ViewBag.ArchivosVideoNoEstandar + ViewBag.StoriesVideoNoEstandar)</strong>
+                    </div>
+                    <small class="text-muted">Se convertirán a MP4 H.264 (CRF 20)</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-light">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-info-circle"></i> Total a Migrar
+                    </h5>
+                    <h2 class="display-4 text-center my-3">@ViewBag.TotalNoEstandar</h2>
+                    <p class="text-center text-muted mb-0">archivos pendientes de conversión</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de control -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">Control de Migración</h5>
+        </div>
+        <div class="card-body">
+            @if (ViewBag.TotalNoEstandar == 0)
+            {
+                <div class="alert alert-success mb-0">
+                    <i class="fas fa-check-circle"></i> Todos los archivos están en formatos estándar. No hay nada que migrar.
+                </div>
+            }
+            else
+            {
+                <div id="controles-migracion">
+                    <div class="row align-items-end mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Tipo de archivos a migrar:</label>
+                            <select id="tipoMigracion" class="form-select">
+                                <option value="todos">Todos (imágenes y videos)</option>
+                                <option value="imagenes">Solo imágenes</option>
+                                <option value="videos">Solo videos</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check mt-4">
+                                <input class="form-check-input" type="checkbox" id="reconvertirMp4">
+                                <label class="form-check-label" for="reconvertirMp4">
+                                    <strong>Incluir MP4 existentes</strong>
+                                    <br><small class="text-muted">(@ViewBag.VideosMp4Total videos MP4 para reconvertir)</small>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <button id="btnIniciar" class="btn btn-primary btn-lg w-100" onclick="iniciarMigracion()">
+                                <i class="fas fa-play"></i> Iniciar Migración
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button id="btnCancelar" class="btn btn-danger btn-lg w-100" onclick="cancelarMigracion()" disabled>
+                                <i class="fas fa-stop"></i> Cancelar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info mb-2">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Tip:</strong> Activa "Incluir MP4 existentes" para reconvertir videos MP4 con codec incompatible (HEVC) a H.264.
+                        <a href="/Admin/AnalizarVideos" class="alert-link">Ver análisis detallado de videos</a>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Advertencia:</strong> La migración de videos puede tomar varios minutos por archivo dependiendo del tamaño.
+                        No cierre esta página mientras la migración está en progreso.
+                    </div>
+                </div>
+
+                <!-- Progreso -->
+                <div id="progreso-migracion" style="display: none;">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span id="mensaje-progreso">Preparando...</span>
+                            <span id="porcentaje-progreso">0%</span>
+                        </div>
+                        <div class="progress" style="height: 25px;">
+                            <div id="barra-progreso" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="row text-center">
+                        <div class="col-3">
+                            <div class="h4 mb-0" id="stat-procesados">0</div>
+                            <small class="text-muted">Procesados</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="h4 mb-0 text-success" id="stat-exitosos">0</div>
+                            <small class="text-muted">Exitosos</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="h4 mb-0 text-danger" id="stat-fallidos">0</div>
+                            <small class="text-muted">Fallidos</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="h4 mb-0" id="stat-total">0</div>
+                            <small class="text-muted">Total</small>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Información sobre formatos -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">Formatos Estándar</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="fas fa-image text-primary"></i> Imágenes: JPEG</h6>
+                    <ul class="small">
+                        <li>Calidad: 90 (imperceptible pérdida)</li>
+                        <li>Máximo: 2048px de lado mayor</li>
+                        <li>Compatible con todos los navegadores y dispositivos</li>
+                        <li>Formatos que se convierten: PNG, GIF, WebP, BMP, TIFF, HEIC/HEIF, AVIF</li>
+                        <li>Formatos RAW: DNG, CR2, NEF, ARW, ORF, RW2</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6><i class="fas fa-video text-success"></i> Videos: MP4 H.264</h6>
+                    <ul class="small">
+                        <li>CRF: 20 (alta calidad)</li>
+                        <li>Máximo ancho: 1920px</li>
+                        <li>Audio: AAC 128kbps</li>
+                        <li>Optimizado para streaming web</li>
+                        <li>Formatos que se convierten: MOV, AVI, MKV, WebM, WMV, FLV, M4V, 3GP, MPEG, MPG</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    let intervaloEstado = null;
+
+    function iniciarMigracion() {
+        const tipo = document.getElementById('tipoMigracion').value;
+        const soloImagenes = tipo === 'imagenes';
+        const soloVideos = tipo === 'videos';
+        const reconvertirMp4 = document.getElementById('reconvertirMp4')?.checked || false;
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+
+        const mensaje = reconvertirMp4
+            ? '¿Iniciar migración de medios INCLUYENDO reconversión de MP4 existentes? Esto puede tomar MUCHO tiempo.'
+            : '¿Iniciar migración de medios? Este proceso puede tomar varios minutos.';
+
+        if (!confirm(mensaje)) {
+            return;
+        }
+
+        console.log('[MigracionMedias] Iniciando fetch a IniciarMigracionMedias... reconvertirMp4=' + reconvertirMp4);
+
+        fetch('/Admin/IniciarMigracionMedias', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `__RequestVerificationToken=${encodeURIComponent(token)}&soloImagenes=${soloImagenes}&soloVideos=${soloVideos}&reconvertirMp4=${reconvertirMp4}`
+        })
+        .then(r => {
+            console.log('[MigracionMedias] Response status:', r.status);
+            if (!r.ok) {
+                throw new Error('HTTP ' + r.status);
+            }
+            return r.json();
+        })
+        .then(data => {
+            console.log('[MigracionMedias] Response data:', data);
+            if (data.success) {
+                document.getElementById('btnIniciar').disabled = true;
+                document.getElementById('btnCancelar').disabled = false;
+                document.getElementById('progreso-migracion').style.display = 'block';
+                intervaloEstado = setInterval(actualizarEstado, 2000);
+                actualizarEstado(); // Actualizar inmediatamente
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(err => {
+            console.error('[MigracionMedias] Error:', err);
+            alert('Error al iniciar migración: ' + err.message);
+        });
+    }
+
+    function cancelarMigracion() {
+        if (!confirm('¿Cancelar la migración en progreso?')) {
+            return;
+        }
+
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+
+        fetch('/Admin/CancelarMigracion', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `__RequestVerificationToken=${encodeURIComponent(token)}`
+        })
+        .then(r => r.json())
+        .then(data => {
+            alert(data.message);
+            if (data.success) {
+                finalizarMigracion();
+            }
+        })
+        .catch(err => {
+            console.error('[MigracionMedias] Error cancelando:', err);
+            alert('Error al cancelar: ' + err.message);
+        });
+    }
+
+    function actualizarEstado() {
+        fetch('/Admin/EstadoMigracion')
+        .then(r => r.json())
+        .then(data => {
+            console.log('[MigracionMedias] Estado:', data);
+
+            document.getElementById('mensaje-progreso').textContent = data.mensaje || 'Sin mensaje';
+            document.getElementById('porcentaje-progreso').textContent = (data.porcentaje || 0) + '%';
+            document.getElementById('barra-progreso').style.width = (data.porcentaje || 0) + '%';
+            document.getElementById('stat-procesados').textContent = data.procesados || 0;
+            document.getElementById('stat-exitosos').textContent = data.exitosos || 0;
+            document.getElementById('stat-fallidos').textContent = data.fallidos || 0;
+            document.getElementById('stat-total').textContent = data.total || 0;
+
+            if (!data.enProgreso) {
+                console.log('[MigracionMedias] Migración terminada');
+                finalizarMigracion();
+            }
+        })
+        .catch(err => {
+            console.error('[MigracionMedias] Error obteniendo estado:', err);
+        });
+    }
+
+    function finalizarMigracion() {
+        if (intervaloEstado) {
+            clearInterval(intervaloEstado);
+            intervaloEstado = null;
+        }
+        document.getElementById('btnIniciar').disabled = false;
+        document.getElementById('btnCancelar').disabled = true;
+        document.getElementById('barra-progreso').classList.remove('progress-bar-animated');
+    }
+
+    // Verificar estado al cargar la página
+    @if (ViewBag.MigracionEnProgreso)
+    {
+        <text>
+        document.getElementById('btnIniciar').disabled = true;
+        document.getElementById('btnCancelar').disabled = false;
+        document.getElementById('progreso-migracion').style.display = 'block';
+        intervaloEstado = setInterval(actualizarEstado, 2000);
+        actualizarEstado();
+        </text>
+    }
+</script>
+}

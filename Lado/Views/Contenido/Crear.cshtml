@@ -123,7 +123,7 @@
                         </button>
                         <span class="upload-hint">Fotos: max @(limiteFotoMB)MB · Videos: max @(limiteVideoMB)MB · Hasta @limiteCantidadArchivos archivos</span>
                     </div>
-                    <input type="file" name="archivos" id="archivoInput" class="file-input" accept="image/*,video/*,.heic,.heif,.mov" multiple>
+                    <input type="file" name="archivos" id="archivoInput" class="file-input" accept="image/*,video/*,.heic,.heif,.mov,.dng,.raw,.cr2,.nef,.arw,.mkv,.avi,.mpg,.mpeg" multiple>
                 </div>
 
                 <!-- Preview Grid para múltiples archivos -->
@@ -306,6 +306,9 @@
                         <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
                     </svg>
                     Guardar Borrador
+                </button>
+                <button type="button" class="btn btn-warning" id="btnDiagnostico" style="display:none;">
+                    Diagnosticar Upload
                 </button>
                 <a href="/Contenido" class="btn btn-outline">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -2045,6 +2048,7 @@
             const descripcionTextarea = document.getElementById('descripcionTextarea');
             const charCount = document.getElementById('charCount');
             const btnBorrador = document.getElementById('btnBorrador');
+            const btnDiagnostico = document.getElementById('btnDiagnostico');
             const formContenido = document.getElementById('formContenido');
             const esBorradorInput = document.getElementById('esBorradorInput');
             const loadingOverlay = document.getElementById('loadingOverlay');
@@ -2053,6 +2057,52 @@
 
             // Array para almacenar archivos seleccionados
             let selectedFiles = [];
+
+            // Mostrar botón de diagnóstico si hay archivos seleccionados (para debug)
+            function mostrarDiagnostico() {
+                if (selectedFiles.length > 0) {
+                    btnDiagnostico.style.display = 'inline-block';
+                } else {
+                    btnDiagnostico.style.display = 'none';
+                }
+            }
+
+            // Handler para diagnóstico
+            btnDiagnostico.addEventListener('click', async function() {
+                if (selectedFiles.length === 0) {
+                    alert('No hay archivos seleccionados');
+                    return;
+                }
+
+                const formData = new FormData();
+                const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+                formData.append('__RequestVerificationToken', token);
+
+                selectedFiles.forEach(file => {
+                    formData.append('archivos', file);
+                    console.log('[Diagnostico] Enviando:', file.name, 'Type:', file.type, 'Size:', file.size);
+                });
+
+                try {
+                    btnDiagnostico.disabled = true;
+                    btnDiagnostico.textContent = 'Enviando...';
+
+                    const response = await fetch('/Contenido/DiagnosticoUpload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    console.log('[Diagnostico] Respuesta:', data);
+                    alert('Diagnóstico enviado. Revisa /Admin/Logs\n\n' + JSON.stringify(data, null, 2));
+                } catch (error) {
+                    console.error('[Diagnostico] Error:', error);
+                    alert('Error: ' + error.message);
+                } finally {
+                    btnDiagnostico.disabled = false;
+                    btnDiagnostico.textContent = 'Diagnosticar Upload';
+                }
+            });
 
             // Selector de Lado
             ladoOptions.forEach(option => {
@@ -2323,7 +2373,7 @@
                 // Extensiones permitidas (para iOS que a veces no tiene MIME type)
                 // Incluye formatos RAW que serán convertidos a JPEG en el servidor
                 const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.bmp', '.avif', '.dng', '.raw', '.cr2', '.nef', '.arw', '.tiff', '.tif'];
-                const videoExtensions = ['.mp4', '.mov', '.avi', '.webm', '.m4v', '.3gp'];
+                const videoExtensions = ['.mp4', '.mov', '.avi', '.webm', '.m4v', '.3gp', '.3gpp', '.mkv', '.mpg', '.mpeg', '.wmv', '.flv', '.mxf'];
                 const allExtensions = [...imageExtensions, ...videoExtensions];
 
                 // Log para diagnóstico
@@ -2334,9 +2384,9 @@
 
                 // Filtrar archivos válidos
                 const validFiles = filesArray.filter(file => {
-                    // Verificar por MIME type
+                    // Verificar por MIME type (iOS puede enviar application/octet-stream para videos RAW)
                     const isImageMime = file.type && (file.type.startsWith('image/') || file.type === 'application/octet-stream');
-                    const isVideoMime = file.type && file.type.startsWith('video/');
+                    const isVideoMime = file.type && (file.type.startsWith('video/') || file.type === 'application/octet-stream');
 
                     // Verificar por extensión (fallback para iOS con HEIC)
                     const fileName = file.name.toLowerCase();
@@ -2381,7 +2431,7 @@
                 }
 
                 if (filesToAdd.length === 0 && filesArray.length > 0) {
-                    alert('Los archivos seleccionados no son válidos. Formatos permitidos: JPG, PNG, GIF, HEIC, MP4, MOV');
+                    alert('Los archivos seleccionados no son válidos. Formatos permitidos: JPG, PNG, GIF, HEIC, DNG, MP4, MOV, AVI, MKV');
                     return;
                 }
 
@@ -2395,6 +2445,9 @@
 
                 // Auto-detectar tipo de contenido
                 actualizarTipoContenido();
+
+                // Mostrar/ocultar botón de diagnóstico
+                mostrarDiagnostico();
 
                 if (selectedFiles.length === 0) {
                     previewGrid.style.display = 'none';
@@ -2413,7 +2466,7 @@
                 function isVideoFile(file) {
                     if (file.type && file.type.startsWith('video/')) return true;
                     const ext = '.' + file.name.toLowerCase().split('.').pop();
-                    return ['.mp4', '.mov', '.avi', '.webm', '.m4v', '.3gp'].includes(ext);
+                    return ['.mp4', '.mov', '.avi', '.webm', '.m4v', '.3gp', '.3gpp', '.mkv', '.mpg', '.mpeg', '.wmv', '.flv', '.mxf'].includes(ext);
                 }
 
                 selectedFiles.forEach((file, index) => {
@@ -2502,7 +2555,7 @@
             function isVideoFileGlobal(file) {
                 if (file.type && file.type.startsWith('video/')) return true;
                 const ext = '.' + file.name.toLowerCase().split('.').pop();
-                return ['.mp4', '.mov', '.avi', '.webm', '.m4v', '.3gp'].includes(ext);
+                return ['.mp4', '.mov', '.avi', '.webm', '.m4v', '.3gp', '.3gpp', '.mkv', '.mpg', '.mpeg', '.wmv', '.flv', '.mxf'].includes(ext);
             }
 
             // Character counter

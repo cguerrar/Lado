@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Lado.Controllers
 {
@@ -24,11 +25,22 @@ namespace Lado.Controllers
         private readonly IRateLimitService _rateLimitService;
         private readonly IBulkEmailService _bulkEmailService;
         private readonly IMediaIntegrityService _mediaIntegrity;
+        private readonly IMediaConversionService _mediaConversion;
+        private readonly ILogger<AdminController> _logger;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         // Lista de IDs de contenidos que fallaron durante la clasificación por lotes
         // Se limpia cuando se inicia una nueva reclasificación masiva
         private static HashSet<int> _contenidosFallidosClasificacion = new();
         private static readonly object _lockFallidos = new();
+
+        // Estado de migración de medios
+        private static bool _migracionEnProgreso = false;
+        private static int _migracionTotal = 0;
+        private static int _migracionProcesados = 0;
+        private static int _migracionExitosos = 0;
+        private static int _migracionFallidos = 0;
+        private static string _migracionMensaje = "";
 
         public AdminController(
             ApplicationDbContext context,
@@ -42,7 +54,10 @@ namespace Lado.Controllers
             IWebHostEnvironment hostEnvironment,
             IRateLimitService rateLimitService,
             IBulkEmailService bulkEmailService,
-            IMediaIntegrityService mediaIntegrity)
+            IMediaIntegrityService mediaIntegrity,
+            IMediaConversionService mediaConversion,
+            ILogger<AdminController> logger,
+            IServiceScopeFactory serviceScopeFactory)
         {
             _context = context;
             _userManager = userManager;
@@ -56,6 +71,9 @@ namespace Lado.Controllers
             _rateLimitService = rateLimitService;
             _bulkEmailService = bulkEmailService;
             _mediaIntegrity = mediaIntegrity;
+            _mediaConversion = mediaConversion;
+            _logger = logger;
+            _serviceScopeFactory = serviceScopeFactory;
         }
 
         public override void OnActionExecuting(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext context)
@@ -555,8 +573,7 @@ namespace Lado.Controllers
         {
             var contenidos = await _context.Contenidos
                 .Include(c => c.Usuario)
-                .Include(c => c.Likes)
-                .Include(c => c.Comentarios)
+                .Include(c => c.Archivos)
                 .Include(c => c.CategoriaInteres)
                 .Include(c => c.ObjetosDetectados)
                 .OrderByDescending(c => c.FechaPublicacion)
@@ -7208,6 +7225,2019 @@ Este email fue enviado a {{{{email}}}}
 
             return Json(new { success = true, message = "Métricas reseteadas" });
         }
+
+        // ========================================
+        // MIGRACIÓN DE MEDIOS A FORMATOS ESTÁNDAR
+        // ========================================
+
+        /// <summary>
+        /// Vista para migrar medios existentes a formatos estándar (JPEG + MP4)
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> MigracionMedias()
+        {
+            // Extensiones no estándar para imágenes (incluyendo RAW)
+            var extensionesImagenNoEstandar = new[] { ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif", ".heic", ".heif", ".dng", ".raw", ".cr2", ".nef", ".arw", ".orf", ".rw2", ".avif" };
+            var extensionesVideoNoEstandar = new[] { ".mov", ".avi", ".mkv", ".webm", ".wmv", ".flv", ".m4v", ".3gp", ".mpeg", ".mpg" };
+
+            // Contar contenidos con formatos no estándar
+            var contenidosImagen = await _context.Contenidos
+                .Where(c => c.EstaActivo && c.TipoContenido == TipoContenido.Foto && c.RutaArchivo != null)
+                .ToListAsync();
+
+            var imagenesNoEstandar = contenidosImagen
+                .Where(c => extensionesImagenNoEstandar.Contains(Path.GetExtension(c.RutaArchivo ?? "").ToLower()))
+                .Count();
+
+            var contenidosVideo = await _context.Contenidos
+                .Where(c => c.EstaActivo && c.TipoContenido == TipoContenido.Video && c.RutaArchivo != null)
+                .ToListAsync();
+
+            var videosNoEstandar = contenidosVideo
+                .Where(c => extensionesVideoNoEstandar.Contains(Path.GetExtension(c.RutaArchivo ?? "").ToLower()))
+                .Count();
+
+            // Contar archivos de carrusel no estándar
+            var archivosCarrusel = await _context.ArchivosContenido.ToListAsync();
+
+            var archivosImagenNoEstandar = archivosCarrusel
+                .Where(a => a.TipoArchivo == TipoArchivo.Foto &&
+                           extensionesImagenNoEstandar.Contains(Path.GetExtension(a.RutaArchivo ?? "").ToLower()))
+                .Count();
+
+            var archivosVideoNoEstandar = archivosCarrusel
+                .Where(a => a.TipoArchivo == TipoArchivo.Video &&
+                           extensionesVideoNoEstandar.Contains(Path.GetExtension(a.RutaArchivo ?? "").ToLower()))
+                .Count();
+
+            // Contar stories no estándar
+            var stories = await _context.Stories.Where(s => s.EstaActivo).ToListAsync();
+
+            var storiesImagenNoEstandar = stories
+                .Where(s => s.TipoContenido == TipoContenido.Imagen &&
+                           extensionesImagenNoEstandar.Contains(Path.GetExtension(s.RutaArchivo ?? "").ToLower()))
+                .Count();
+
+            var storiesVideoNoEstandar = stories
+                .Where(s => s.TipoContenido == TipoContenido.Video &&
+                           extensionesVideoNoEstandar.Contains(Path.GetExtension(s.RutaArchivo ?? "").ToLower()))
+                .Count();
+
+            ViewBag.ImagenesNoEstandar = imagenesNoEstandar;
+            ViewBag.VideosNoEstandar = videosNoEstandar;
+            ViewBag.ArchivosImagenNoEstandar = archivosImagenNoEstandar;
+            ViewBag.ArchivosVideoNoEstandar = archivosVideoNoEstandar;
+            ViewBag.StoriesImagenNoEstandar = storiesImagenNoEstandar;
+            ViewBag.StoriesVideoNoEstandar = storiesVideoNoEstandar;
+            ViewBag.TotalNoEstandar = imagenesNoEstandar + videosNoEstandar + archivosImagenNoEstandar +
+                                      archivosVideoNoEstandar + storiesImagenNoEstandar + storiesVideoNoEstandar;
+
+            // Contar videos MP4 existentes (para opción de reconvertir)
+            var videosMp4Contenidos = contenidosVideo
+                .Where(c => Path.GetExtension(c.RutaArchivo ?? "").ToLower() == ".mp4")
+                .Count();
+            var videosMp4Archivos = archivosCarrusel
+                .Where(a => a.TipoArchivo == TipoArchivo.Video &&
+                           Path.GetExtension(a.RutaArchivo ?? "").ToLower() == ".mp4")
+                .Count();
+            var videosMp4Stories = stories
+                .Where(s => s.TipoContenido == TipoContenido.Video &&
+                           Path.GetExtension(s.RutaArchivo ?? "").ToLower() == ".mp4")
+                .Count();
+            ViewBag.VideosMp4Total = videosMp4Contenidos + videosMp4Archivos + videosMp4Stories;
+
+            ViewBag.MigracionEnProgreso = _migracionEnProgreso;
+            ViewBag.MigracionTotal = _migracionTotal;
+            ViewBag.MigracionProcesados = _migracionProcesados;
+            ViewBag.MigracionExitosos = _migracionExitosos;
+            ViewBag.MigracionFallidos = _migracionFallidos;
+            ViewBag.MigracionMensaje = _migracionMensaje;
+
+            return View();
+        }
+
+        /// <summary>
+        /// Iniciar migración de medios en segundo plano
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> IniciarMigracionMedias(bool soloImagenes = false, bool soloVideos = false, bool reconvertirMp4 = false)
+        {
+            if (_migracionEnProgreso)
+            {
+                return Json(new { success = false, message = "Ya hay una migración en progreso" });
+            }
+
+            _migracionEnProgreso = true;
+            _migracionTotal = 0;
+            _migracionProcesados = 0;
+            _migracionExitosos = 0;
+            _migracionFallidos = 0;
+            _migracionMensaje = "Iniciando migración...";
+
+            // Ejecutar en segundo plano con scope independiente para logging
+            _ = Task.Run(async () =>
+            {
+                using var scopeLog = _serviceScopeFactory.CreateScope();
+                var logServiceTask = scopeLog.ServiceProvider.GetRequiredService<ILogEventoService>();
+
+                await logServiceTask.RegistrarEventoAsync(
+                    $"[MigracionMedias] Task.Run iniciado. SoloImagenes={soloImagenes}, SoloVideos={soloVideos}, ReconvertirMp4={reconvertirMp4}",
+                    CategoriaEvento.Sistema, TipoLogEvento.Evento);
+
+                try
+                {
+                    await EjecutarMigracionAsync(soloImagenes, soloVideos, reconvertirMp4);
+                    await logServiceTask.RegistrarEventoAsync(
+                        "[MigracionMedias] EjecutarMigracionAsync completado",
+                        CategoriaEvento.Sistema, TipoLogEvento.Evento);
+                }
+                catch (Exception ex)
+                {
+                    _migracionMensaje = $"Error: {ex.Message}";
+                    await logServiceTask.RegistrarEventoAsync(
+                        $"[MigracionMedias] Error durante migración: {ex.Message}",
+                        CategoriaEvento.Sistema, TipoLogEvento.Error,
+                        detalle: ex.StackTrace);
+                }
+                finally
+                {
+                    _migracionEnProgreso = false;
+                    await logServiceTask.RegistrarEventoAsync(
+                        "[MigracionMedias] Task.Run finalizado. EnProgreso=false",
+                        CategoriaEvento.Sistema, TipoLogEvento.Evento);
+                }
+            });
+
+            return Json(new { success = true, message = "Migración iniciada en segundo plano" });
+        }
+
+        /// <summary>
+        /// Obtener estado de la migración
+        /// </summary>
+        [HttpGet]
+        public IActionResult EstadoMigracion()
+        {
+            return Json(new
+            {
+                enProgreso = _migracionEnProgreso,
+                total = _migracionTotal,
+                procesados = _migracionProcesados,
+                exitosos = _migracionExitosos,
+                fallidos = _migracionFallidos,
+                mensaje = _migracionMensaje,
+                porcentaje = _migracionTotal > 0 ? (_migracionProcesados * 100 / _migracionTotal) : 0
+            });
+        }
+
+        /// <summary>
+        /// Cancelar migración en progreso
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult CancelarMigracion()
+        {
+            if (_migracionEnProgreso)
+            {
+                _migracionEnProgreso = false;
+                _migracionMensaje = "Migración cancelada por el usuario";
+                return Json(new { success = true, message = "Migración cancelada" });
+            }
+
+            return Json(new { success = false, message = "No hay migración en progreso" });
+        }
+
+        private async Task EjecutarMigracionAsync(bool soloImagenes, bool soloVideos, bool reconvertirMp4 = false)
+        {
+            // Incluir TODOS los formatos de imagen no estándar (incluyendo RAW)
+            var extensionesImagenNoEstandar = new[] { ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif", ".heic", ".heif", ".dng", ".raw", ".cr2", ".nef", ".arw", ".orf", ".rw2", ".avif" };
+            var extensionesVideoNoEstandar = new[] { ".mov", ".avi", ".mkv", ".webm", ".wmv", ".flv", ".m4v", ".3gp", ".mpeg", ".mpg" };
+
+            // Crear scope independiente para operaciones de BD
+            using var scope = _serviceScopeFactory.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var mediaConversion = scope.ServiceProvider.GetRequiredService<IMediaConversionService>();
+            var logService = scope.ServiceProvider.GetRequiredService<ILogEventoService>();
+
+            await logService.RegistrarEventoAsync(
+                $"[MigracionMedias] Iniciando migración. SoloImagenes={soloImagenes}, SoloVideos={soloVideos}, ReconvertirMp4={reconvertirMp4}",
+                CategoriaEvento.Sistema, TipoLogEvento.Evento);
+
+            // Verificar disponibilidad de herramientas
+            var ffmpegDisponible = await VerificarHerramientaAsync("ffmpeg", "-version");
+            var ffprobeDisponible = await VerificarHerramientaAsync("ffprobe", "-version");
+
+            await logService.RegistrarEventoAsync(
+                $"[MigracionMedias] Herramientas: FFmpeg={ffmpegDisponible}, FFprobe={ffprobeDisponible}",
+                CategoriaEvento.Sistema, ffmpegDisponible ? TipoLogEvento.Evento : TipoLogEvento.Warning);
+
+            await logService.RegistrarEventoAsync(
+                $"[MigracionMedias] WebRootPath: {_hostEnvironment.WebRootPath}",
+                CategoriaEvento.Sistema, TipoLogEvento.Evento);
+
+            // Obtener archivos a migrar
+            var archivosAMigrar = new List<(string tipo, int id, string rutaActual, string carpeta)>();
+
+            _migracionMensaje = "Recopilando archivos a migrar...";
+
+            // Contenidos principales
+            var contenidos = await context.Contenidos
+                .Where(c => c.EstaActivo && c.RutaArchivo != null)
+                .Select(c => new { c.Id, c.RutaArchivo, c.TipoContenido })
+                .ToListAsync();
+
+            await logService.RegistrarEventoAsync(
+                $"[MigracionMedias] Encontrados {contenidos.Count} contenidos",
+                CategoriaEvento.Sistema, TipoLogEvento.Evento);
+
+            foreach (var c in contenidos)
+            {
+                var ext = Path.GetExtension(c.RutaArchivo ?? "").ToLower();
+                if (!soloVideos && c.TipoContenido == TipoContenido.Foto && extensionesImagenNoEstandar.Contains(ext))
+                {
+                    archivosAMigrar.Add(("contenido_img", c.Id, c.RutaArchivo!, "uploads"));
+                }
+                else if (!soloImagenes && c.TipoContenido == TipoContenido.Video && extensionesVideoNoEstandar.Contains(ext))
+                {
+                    archivosAMigrar.Add(("contenido_vid", c.Id, c.RutaArchivo!, "uploads"));
+                }
+                // Incluir videos MP4 existentes si reconvertirMp4 está activo
+                else if (!soloImagenes && reconvertirMp4 && c.TipoContenido == TipoContenido.Video && ext == ".mp4")
+                {
+                    archivosAMigrar.Add(("contenido_vid_mp4", c.Id, c.RutaArchivo!, "uploads"));
+                }
+            }
+
+            // Archivos de carrusel
+            var archivos = await context.ArchivosContenido
+                .Select(a => new { a.Id, a.RutaArchivo, a.TipoArchivo })
+                .ToListAsync();
+
+            foreach (var a in archivos)
+            {
+                var ext = Path.GetExtension(a.RutaArchivo ?? "").ToLower();
+                if (!soloVideos && a.TipoArchivo == TipoArchivo.Foto && extensionesImagenNoEstandar.Contains(ext))
+                {
+                    archivosAMigrar.Add(("archivo_img", a.Id, a.RutaArchivo!, "uploads"));
+                }
+                else if (!soloImagenes && a.TipoArchivo == TipoArchivo.Video && extensionesVideoNoEstandar.Contains(ext))
+                {
+                    archivosAMigrar.Add(("archivo_vid", a.Id, a.RutaArchivo!, "uploads"));
+                }
+                // Incluir videos MP4 existentes si reconvertirMp4 está activo
+                else if (!soloImagenes && reconvertirMp4 && a.TipoArchivo == TipoArchivo.Video && ext == ".mp4")
+                {
+                    archivosAMigrar.Add(("archivo_vid_mp4", a.Id, a.RutaArchivo!, "uploads"));
+                }
+            }
+
+            // Stories
+            var stories = await context.Stories
+                .Where(s => s.EstaActivo)
+                .Select(s => new { s.Id, s.RutaArchivo, s.TipoContenido })
+                .ToListAsync();
+
+            foreach (var s in stories)
+            {
+                var ext = Path.GetExtension(s.RutaArchivo ?? "").ToLower();
+                if (!soloVideos && s.TipoContenido == TipoContenido.Imagen && extensionesImagenNoEstandar.Contains(ext))
+                {
+                    archivosAMigrar.Add(("story_img", s.Id, s.RutaArchivo!, "stories"));
+                }
+                else if (!soloImagenes && s.TipoContenido == TipoContenido.Video && extensionesVideoNoEstandar.Contains(ext))
+                {
+                    archivosAMigrar.Add(("story_vid", s.Id, s.RutaArchivo!, "stories"));
+                }
+                // Incluir videos MP4 existentes si reconvertirMp4 está activo
+                else if (!soloImagenes && reconvertirMp4 && s.TipoContenido == TipoContenido.Video && ext == ".mp4")
+                {
+                    archivosAMigrar.Add(("story_vid_mp4", s.Id, s.RutaArchivo!, "stories"));
+                }
+            }
+
+            _migracionTotal = archivosAMigrar.Count;
+            _migracionMensaje = $"Migrando {_migracionTotal} archivos...";
+
+            await logService.RegistrarEventoAsync(
+                $"[MigracionMedias] Total archivos a migrar: {_migracionTotal}",
+                CategoriaEvento.Sistema, TipoLogEvento.Evento);
+
+            if (_migracionTotal == 0)
+            {
+                _migracionMensaje = "No hay archivos para migrar";
+                await logService.RegistrarEventoAsync(
+                    "[MigracionMedias] No hay archivos para migrar, terminando",
+                    CategoriaEvento.Sistema, TipoLogEvento.Warning);
+                return;
+            }
+
+            // Procesar cada archivo
+            foreach (var (tipo, id, rutaActual, carpetaBase) in archivosAMigrar)
+            {
+                if (!_migracionEnProgreso)
+                {
+                    await logService.RegistrarEventoAsync(
+                        "[MigracionMedias] Migración cancelada por usuario",
+                        CategoriaEvento.Sistema, TipoLogEvento.Warning);
+                    break;
+                }
+
+                try
+                {
+                    var rutaCompleta = Path.Combine(_hostEnvironment.WebRootPath, rutaActual.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+
+                    await logService.RegistrarEventoAsync(
+                        $"[MigracionMedias] Procesando [{_migracionProcesados + 1}/{_migracionTotal}]: {tipo} ID={id}",
+                        CategoriaEvento.Sistema, TipoLogEvento.Evento,
+                        detalle: $"Ruta BD: {rutaActual}\nRuta Completa: {rutaCompleta}");
+
+                    if (!System.IO.File.Exists(rutaCompleta))
+                    {
+                        // Eliminar registro huérfano de la BD
+                        var eliminado = false;
+                        var tablaAfectada = "";
+
+                        if (tipo.StartsWith("archivo"))
+                        {
+                            var archivo = await context.ArchivosContenido.FindAsync(id);
+                            if (archivo != null)
+                            {
+                                context.ArchivosContenido.Remove(archivo);
+                                await context.SaveChangesAsync();
+                                eliminado = true;
+                                tablaAfectada = "ArchivosContenido";
+                            }
+                        }
+                        else if (tipo.StartsWith("contenido"))
+                        {
+                            // Para contenidos principales, solo marcar como inactivo
+                            var contenido = await context.Contenidos.FindAsync(id);
+                            if (contenido != null)
+                            {
+                                contenido.EstaActivo = false;
+                                await context.SaveChangesAsync();
+                                eliminado = true;
+                                tablaAfectada = "Contenidos (desactivado)";
+                            }
+                        }
+                        else if (tipo.StartsWith("story"))
+                        {
+                            var story = await context.Stories.FindAsync(id);
+                            if (story != null)
+                            {
+                                story.EstaActivo = false;
+                                await context.SaveChangesAsync();
+                                eliminado = true;
+                                tablaAfectada = "Stories (desactivado)";
+                            }
+                        }
+
+                        await logService.RegistrarEventoAsync(
+                            $"[MigracionMedias] Archivo no existe - Registro {(eliminado ? "LIMPIADO" : "no eliminado")}",
+                            CategoriaEvento.Sistema, TipoLogEvento.Warning,
+                            detalle: $"Tipo: {tipo}\nID: {id}\nRuta BD: {rutaActual}\nRuta esperada: {rutaCompleta}\nTabla: {tablaAfectada}");
+
+                        _migracionFallidos++;
+                        _migracionProcesados++;
+                        continue;
+                    }
+
+                    var carpetaDestino = Path.GetDirectoryName(rutaCompleta)!;
+                    var nombreBase = Path.GetFileNameWithoutExtension(rutaCompleta);
+                    var extension = Path.GetExtension(rutaCompleta).ToLower();
+                    string? nuevaRuta = null;
+                    string tipoConversion = "";
+
+                    // Convertir según tipo
+                    if (tipo.EndsWith("_img"))
+                    {
+                        tipoConversion = "imagen";
+                        await logService.RegistrarEventoAsync(
+                            $"[MigracionMedias] Convirtiendo imagen {extension} a JPEG",
+                            CategoriaEvento.Sistema, TipoLogEvento.Evento,
+                            detalle: $"Origen: {rutaCompleta}\nDestino: {carpetaDestino}\nNombre: {nombreBase}");
+
+                        nuevaRuta = await mediaConversion.ConvertirImagenAsync(rutaCompleta, carpetaDestino, nombreBase, 2048, 90);
+                    }
+                    else if (tipo.EndsWith("_vid") || tipo.EndsWith("_vid_mp4"))
+                    {
+                        tipoConversion = tipo.EndsWith("_vid_mp4") ? "video (reconversión MP4)" : "video";
+                        await logService.RegistrarEventoAsync(
+                            $"[MigracionMedias] Convirtiendo {tipoConversion} {extension} a MP4 H.264",
+                            CategoriaEvento.Sistema, TipoLogEvento.Evento,
+                            detalle: $"Origen: {rutaCompleta}\nDestino: {carpetaDestino}\nNombre: {nombreBase}");
+
+                        nuevaRuta = await mediaConversion.ConvertirVideoAsync(rutaCompleta, carpetaDestino, nombreBase, 20, 1920);
+                    }
+
+                    if (!string.IsNullOrEmpty(nuevaRuta) && System.IO.File.Exists(nuevaRuta))
+                    {
+                        // Actualizar BD con nueva ruta
+                        var webRootLength = _hostEnvironment.WebRootPath.TrimEnd('\\', '/').Length;
+                        var nuevaRutaRelativa = "/" + nuevaRuta.Substring(webRootLength).Replace('\\', '/').TrimStart('/');
+                        var rutaAnterior = rutaActual;
+                        var actualizado = false;
+
+                        await logService.RegistrarEventoAsync(
+                            $"[MigracionMedias] Actualizando BD: {tipo} ID={id}",
+                            CategoriaEvento.Sistema, TipoLogEvento.Evento,
+                            detalle: $"Ruta anterior: {rutaAnterior}\nRuta nueva: {nuevaRutaRelativa}\nWebRootPath: {_hostEnvironment.WebRootPath}\nNuevaRuta absoluta: {nuevaRuta}");
+
+                        if (tipo.StartsWith("contenido"))
+                        {
+                            var contenido = await context.Contenidos.FindAsync(id);
+                            if (contenido != null)
+                            {
+                                contenido.RutaArchivo = nuevaRutaRelativa;
+                                await context.SaveChangesAsync();
+                                actualizado = true;
+
+                                // Verificar que se guardó correctamente
+                                context.Entry(contenido).Reload();
+                                if (contenido.RutaArchivo != nuevaRutaRelativa)
+                                {
+                                    await logService.RegistrarEventoAsync(
+                                        $"[MigracionMedias] ADVERTENCIA: La BD no se actualizó correctamente",
+                                        CategoriaEvento.Sistema, TipoLogEvento.Warning,
+                                        detalle: $"Esperado: {nuevaRutaRelativa}\nActual: {contenido.RutaArchivo}");
+                                    actualizado = false;
+                                }
+                            }
+                        }
+                        else if (tipo.StartsWith("archivo"))
+                        {
+                            var archivo = await context.ArchivosContenido.FindAsync(id);
+                            if (archivo != null)
+                            {
+                                archivo.RutaArchivo = nuevaRutaRelativa;
+                                await context.SaveChangesAsync();
+                                actualizado = true;
+
+                                // Verificar que se guardó correctamente
+                                context.Entry(archivo).Reload();
+                                if (archivo.RutaArchivo != nuevaRutaRelativa)
+                                {
+                                    await logService.RegistrarEventoAsync(
+                                        $"[MigracionMedias] ADVERTENCIA: La BD no se actualizó correctamente para archivo",
+                                        CategoriaEvento.Sistema, TipoLogEvento.Warning,
+                                        detalle: $"Esperado: {nuevaRutaRelativa}\nActual: {archivo.RutaArchivo}");
+                                    actualizado = false;
+                                }
+                            }
+                        }
+                        else if (tipo.StartsWith("story"))
+                        {
+                            var story = await context.Stories.FindAsync(id);
+                            if (story != null)
+                            {
+                                story.RutaArchivo = nuevaRutaRelativa;
+                                await context.SaveChangesAsync();
+                                actualizado = true;
+
+                                // Verificar que se guardó correctamente
+                                context.Entry(story).Reload();
+                                if (story.RutaArchivo != nuevaRutaRelativa)
+                                {
+                                    await logService.RegistrarEventoAsync(
+                                        $"[MigracionMedias] ADVERTENCIA: La BD no se actualizó correctamente para story",
+                                        CategoriaEvento.Sistema, TipoLogEvento.Warning,
+                                        detalle: $"Esperado: {nuevaRutaRelativa}\nActual: {story.RutaArchivo}");
+                                    actualizado = false;
+                                }
+                            }
+                        }
+
+                        // Eliminar archivo original si es diferente (comparación case-insensitive para Windows)
+                        if (!nuevaRuta.Equals(rutaCompleta, StringComparison.OrdinalIgnoreCase) && System.IO.File.Exists(rutaCompleta))
+                        {
+                            try
+                            {
+                                System.IO.File.Delete(rutaCompleta);
+                                await logService.RegistrarEventoAsync(
+                                    $"[MigracionMedias] Archivo original eliminado: {rutaCompleta}",
+                                    CategoriaEvento.Sistema, TipoLogEvento.Evento);
+                            }
+                            catch (Exception delEx)
+                            {
+                                await logService.RegistrarEventoAsync(
+                                    $"[MigracionMedias] No se pudo eliminar archivo original: {delEx.Message}",
+                                    CategoriaEvento.Sistema, TipoLogEvento.Warning,
+                                    detalle: $"Ruta: {rutaCompleta}");
+                            }
+                        }
+
+                        if (actualizado)
+                        {
+                            _migracionExitosos++;
+                            await logService.RegistrarEventoAsync(
+                                $"[MigracionMedias] ÉXITO: Convertido {tipoConversion}",
+                                CategoriaEvento.Sistema, TipoLogEvento.Evento,
+                                detalle: $"Original: {rutaAnterior}\nConvertido: {nuevaRutaRelativa}");
+                        }
+                        else
+                        {
+                            _migracionFallidos++;
+                            await logService.RegistrarEventoAsync(
+                                $"[MigracionMedias] ERROR: No se pudo actualizar la BD para {tipo} ID={id}",
+                                CategoriaEvento.Sistema, TipoLogEvento.Error);
+                        }
+                    }
+                    else
+                    {
+                        _migracionFallidos++;
+                        await logService.RegistrarEventoAsync(
+                            $"[MigracionMedias] ERROR: Conversión de {tipoConversion} retornó null o archivo no existe",
+                            CategoriaEvento.Sistema, TipoLogEvento.Error,
+                            detalle: $"Archivo original: {rutaCompleta}\nExtensión: {extension}\nNuevaRuta retornada: {nuevaRuta ?? "NULL"}\nArchivo existe: {(nuevaRuta != null ? System.IO.File.Exists(nuevaRuta).ToString() : "N/A")}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _migracionFallidos++;
+                    await logService.RegistrarEventoAsync(
+                        $"[MigracionMedias] Error procesando {tipo} ID={id}: {ex.Message}",
+                        CategoriaEvento.Sistema, TipoLogEvento.Error,
+                        detalle: $"Ruta: {rutaActual}\nException: {ex.GetType().Name}\nStack:\n{ex.StackTrace}");
+                }
+
+                _migracionProcesados++;
+                _migracionMensaje = $"Procesando {_migracionProcesados}/{_migracionTotal} ({_migracionExitosos} exitosos, {_migracionFallidos} fallidos)";
+
+                // Pequeña pausa para no saturar el servidor
+                await Task.Delay(100);
+            }
+
+            _migracionMensaje = $"Migración completada: {_migracionExitosos} exitosos, {_migracionFallidos} fallidos de {_migracionTotal} total";
+
+            await logService.RegistrarEventoAsync(
+                $"[MigracionMedias] {_migracionMensaje}",
+                CategoriaEvento.Sistema,
+                _migracionFallidos > 0 ? TipoLogEvento.Warning : TipoLogEvento.Evento);
+        }
+
+        private async Task<bool> VerificarHerramientaAsync(string comando, string argumentos)
+        {
+            // Intentar primero con el comando directo (en PATH)
+            var resultado = await IntentarEjecutarAsync(comando, argumentos);
+            if (resultado) return true;
+
+            // Intentar con rutas comunes de FFmpeg en Windows
+            var rutasComunes = new[]
+            {
+                @"C:\ffmpeg\bin\" + comando + ".exe",
+                @"C:\Program Files\ffmpeg\bin\" + comando + ".exe",
+                @"C:\tools\ffmpeg\bin\" + comando + ".exe",
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "ffmpeg", "bin", comando + ".exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ffmpeg", "bin", comando + ".exe")
+            };
+
+            foreach (var ruta in rutasComunes)
+            {
+                if (System.IO.File.Exists(ruta))
+                {
+                    resultado = await IntentarEjecutarAsync(ruta, argumentos);
+                    if (resultado) return true;
+                }
+            }
+
+            return false;
+        }
+
+        private async Task<bool> IntentarEjecutarAsync(string comando, string argumentos)
+        {
+            try
+            {
+                var processInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = comando,
+                    Arguments = argumentos,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = System.Diagnostics.Process.Start(processInfo);
+                if (process == null) return false;
+
+                var timeoutTask = Task.Delay(5000);
+                var processTask = process.WaitForExitAsync();
+
+                if (await Task.WhenAny(processTask, timeoutTask) == timeoutTask)
+                {
+                    try { process.Kill(); } catch { }
+                    return false;
+                }
+
+                return process.ExitCode == 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        #region Sincronizar Rutas de Medios
+
+        /// <summary>
+        /// Vista para sincronizar rutas de medios (cuando archivos fueron convertidos pero BD no se actualizó)
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> SincronizarRutasMedias()
+        {
+            var extensionesConvertibles = new[] { ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif", ".heic", ".heif", ".dng", ".raw", ".cr2", ".nef", ".arw", ".orf", ".rw2", ".avif" };
+            var extensionesVideoConvertibles = new[] { ".mov", ".avi", ".mkv", ".webm", ".wmv", ".flv", ".m4v", ".3gp", ".mpeg", ".mpg" };
+
+            var problemas = new List<(string tipo, int id, string rutaBD, string? rutaEncontrada, string estado)>();
+
+            // Revisar contenidos
+            var contenidos = await _context.Contenidos
+                .Where(c => c.EstaActivo && c.RutaArchivo != null)
+                .Select(c => new { c.Id, c.RutaArchivo, c.TipoContenido })
+                .ToListAsync();
+
+            foreach (var c in contenidos)
+            {
+                var resultado = AnalizarRutaArchivo(c.RutaArchivo!, extensionesConvertibles, extensionesVideoConvertibles);
+                if (resultado.estado != "ok")
+                {
+                    problemas.Add(("Contenido", c.Id, c.RutaArchivo!, resultado.rutaEncontrada, resultado.estado));
+                }
+            }
+
+            // Revisar archivos de carrusel
+            var archivos = await _context.ArchivosContenido
+                .Select(a => new { a.Id, a.RutaArchivo })
+                .ToListAsync();
+
+            foreach (var a in archivos)
+            {
+                if (string.IsNullOrEmpty(a.RutaArchivo)) continue;
+                var resultado = AnalizarRutaArchivo(a.RutaArchivo, extensionesConvertibles, extensionesVideoConvertibles);
+                if (resultado.estado != "ok")
+                {
+                    problemas.Add(("Archivo", a.Id, a.RutaArchivo, resultado.rutaEncontrada, resultado.estado));
+                }
+            }
+
+            // Revisar stories
+            var stories = await _context.Stories
+                .Where(s => s.EstaActivo)
+                .Select(s => new { s.Id, s.RutaArchivo })
+                .ToListAsync();
+
+            foreach (var s in stories)
+            {
+                if (string.IsNullOrEmpty(s.RutaArchivo)) continue;
+                var resultado = AnalizarRutaArchivo(s.RutaArchivo, extensionesConvertibles, extensionesVideoConvertibles);
+                if (resultado.estado != "ok")
+                {
+                    problemas.Add(("Story", s.Id, s.RutaArchivo, resultado.rutaEncontrada, resultado.estado));
+                }
+            }
+
+            ViewBag.Problemas = problemas;
+            ViewBag.TotalContenidos = contenidos.Count;
+            ViewBag.TotalArchivos = archivos.Count;
+            ViewBag.TotalStories = stories.Count;
+            ViewBag.ConProblemas = problemas.Count;
+            ViewBag.Reparables = problemas.Count(p => p.estado == "convertido_existe");
+            ViewBag.Huerfanos = problemas.Count(p => p.estado == "no_existe");
+
+            return View();
+        }
+
+        private (string? rutaEncontrada, string estado) AnalizarRutaArchivo(string rutaBD, string[] extImagenes, string[] extVideos)
+        {
+            var rutaFisica = Path.Combine(_hostEnvironment.WebRootPath, rutaBD.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+            var extension = Path.GetExtension(rutaBD).ToLower();
+
+            // Si el archivo existe, todo OK
+            if (System.IO.File.Exists(rutaFisica))
+            {
+                return (null, "ok");
+            }
+
+            // Si no existe, buscar versión convertida
+            var carpeta = Path.GetDirectoryName(rutaFisica);
+            var nombreBase = Path.GetFileNameWithoutExtension(rutaFisica);
+
+            if (carpeta == null) return (null, "no_existe");
+
+            // Buscar .jpg si era imagen
+            if (extImagenes.Contains(extension))
+            {
+                var rutaJpg = Path.Combine(carpeta, nombreBase + ".jpg");
+                if (System.IO.File.Exists(rutaJpg))
+                {
+                    var rutaRelativa = "/" + rutaJpg.Substring(_hostEnvironment.WebRootPath.TrimEnd('\\', '/').Length).Replace('\\', '/').TrimStart('/');
+                    return (rutaRelativa, "convertido_existe");
+                }
+            }
+
+            // Buscar .mp4 si era video
+            if (extVideos.Contains(extension))
+            {
+                var rutaMp4 = Path.Combine(carpeta, nombreBase + ".mp4");
+                if (System.IO.File.Exists(rutaMp4))
+                {
+                    var rutaRelativa = "/" + rutaMp4.Substring(_hostEnvironment.WebRootPath.TrimEnd('\\', '/').Length).Replace('\\', '/').TrimStart('/');
+                    return (rutaRelativa, "convertido_existe");
+                }
+            }
+
+            return (null, "no_existe");
+        }
+
+        /// <summary>
+        /// Ejecutar sincronización de rutas
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EjecutarSincronizacionRutas()
+        {
+            var extensionesConvertibles = new[] { ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif", ".heic", ".heif", ".dng", ".raw", ".cr2", ".nef", ".arw", ".orf", ".rw2", ".avif" };
+            var extensionesVideoConvertibles = new[] { ".mov", ".avi", ".mkv", ".webm", ".wmv", ".flv", ".m4v", ".3gp", ".mpeg", ".mpg" };
+
+            var reparados = 0;
+            var huerfanosDesactivados = 0;
+            var errores = 0;
+
+            // Reparar contenidos
+            var contenidos = await _context.Contenidos
+                .Where(c => c.EstaActivo && c.RutaArchivo != null)
+                .ToListAsync();
+
+            foreach (var c in contenidos)
+            {
+                var resultado = AnalizarRutaArchivo(c.RutaArchivo!, extensionesConvertibles, extensionesVideoConvertibles);
+
+                if (resultado.estado == "convertido_existe" && resultado.rutaEncontrada != null)
+                {
+                    c.RutaArchivo = resultado.rutaEncontrada;
+                    reparados++;
+                }
+                else if (resultado.estado == "no_existe")
+                {
+                    c.EstaActivo = false;
+                    huerfanosDesactivados++;
+                }
+            }
+
+            // Reparar archivos de carrusel
+            var archivos = await _context.ArchivosContenido.ToListAsync();
+
+            foreach (var a in archivos)
+            {
+                if (string.IsNullOrEmpty(a.RutaArchivo)) continue;
+
+                var resultado = AnalizarRutaArchivo(a.RutaArchivo, extensionesConvertibles, extensionesVideoConvertibles);
+
+                if (resultado.estado == "convertido_existe" && resultado.rutaEncontrada != null)
+                {
+                    a.RutaArchivo = resultado.rutaEncontrada;
+                    reparados++;
+                }
+                else if (resultado.estado == "no_existe")
+                {
+                    _context.ArchivosContenido.Remove(a);
+                    huerfanosDesactivados++;
+                }
+            }
+
+            // Reparar stories
+            var stories = await _context.Stories
+                .Where(s => s.EstaActivo)
+                .ToListAsync();
+
+            foreach (var s in stories)
+            {
+                if (string.IsNullOrEmpty(s.RutaArchivo)) continue;
+
+                var resultado = AnalizarRutaArchivo(s.RutaArchivo, extensionesConvertibles, extensionesVideoConvertibles);
+
+                if (resultado.estado == "convertido_existe" && resultado.rutaEncontrada != null)
+                {
+                    s.RutaArchivo = resultado.rutaEncontrada;
+                    reparados++;
+                }
+                else if (resultado.estado == "no_existe")
+                {
+                    s.EstaActivo = false;
+                    huerfanosDesactivados++;
+                }
+            }
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error guardando: {ex.Message}" });
+            }
+
+            await _logEventoService.RegistrarEventoAsync(
+                $"[SincronizarRutas] Completado: {reparados} reparados, {huerfanosDesactivados} huérfanos desactivados",
+                CategoriaEvento.Sistema, TipoLogEvento.Evento);
+
+            return Json(new
+            {
+                success = true,
+                reparados,
+                huerfanosDesactivados,
+                errores,
+                message = $"Sincronización completada: {reparados} rutas reparadas, {huerfanosDesactivados} huérfanos desactivados"
+            });
+        }
+
+        #endregion
+
+        #region Analizar y Reconvertir Videos
+
+        public class VideoAnalisis
+        {
+            public int Id { get; set; }
+            public string Tipo { get; set; } = ""; // Contenido, Archivo, Story
+            public string RutaArchivo { get; set; } = "";
+            public string? Usuario { get; set; }
+            public string? CodecReal { get; set; }
+            public string? Formato { get; set; }
+            public int Ancho { get; set; }
+            public int Alto { get; set; }
+            public double DuracionSegundos { get; set; }
+            public long PesoBytes { get; set; }
+            public string Estado { get; set; } = ""; // ok, necesita_conversion, muy_pesado, error
+            public string? Problema { get; set; }
+        }
+
+        public class ImagenAnalisis
+        {
+            public int Id { get; set; }
+            public string Tipo { get; set; } = ""; // Contenido, Archivo, Story
+            public string RutaArchivo { get; set; } = "";
+            public string? Usuario { get; set; }
+            public string? FormatoReal { get; set; } // PNG, WEBP, HEIC, etc.
+            public string Extension { get; set; } = "";
+            public int Ancho { get; set; }
+            public int Alto { get; set; }
+            public long PesoBytes { get; set; }
+            public string Estado { get; set; } = ""; // ok, necesita_conversion, error
+            public string? Problema { get; set; }
+        }
+
+        /// <summary>
+        /// Vista para analizar videos e imágenes y detectar cuáles necesitan reconversión
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> AnalizarVideos()
+        {
+            var videos = new List<VideoAnalisis>();
+            var imagenes = new List<ImagenAnalisis>();
+
+            // ========================================
+            // ANALIZAR VIDEOS
+            // ========================================
+
+            // Obtener videos de contenidos
+            var contenidosVideo = await _context.Contenidos
+                .Include(c => c.Usuario)
+                .Where(c => c.EstaActivo && c.TipoContenido == TipoContenido.Video && c.RutaArchivo != null)
+                .Select(c => new { c.Id, c.RutaArchivo, Usuario = c.Usuario != null ? c.Usuario.UserName : null })
+                .ToListAsync();
+
+            foreach (var c in contenidosVideo)
+            {
+                var analisis = await AnalizarVideoAsync(c.Id, "Contenido", c.RutaArchivo!, c.Usuario);
+                if (analisis != null)
+                    videos.Add(analisis);
+            }
+
+            // Obtener videos de archivos de carrusel
+            var archivosVideo = await _context.ArchivosContenido
+                .Include(a => a.Contenido)
+                    .ThenInclude(c => c!.Usuario)
+                .Where(a => a.TipoArchivo == TipoArchivo.Video && a.RutaArchivo != null)
+                .Select(a => new { a.Id, a.RutaArchivo, Usuario = a.Contenido != null && a.Contenido.Usuario != null ? a.Contenido.Usuario.UserName : null })
+                .ToListAsync();
+
+            foreach (var a in archivosVideo)
+            {
+                var analisis = await AnalizarVideoAsync(a.Id, "Archivo", a.RutaArchivo!, a.Usuario);
+                if (analisis != null)
+                    videos.Add(analisis);
+            }
+
+            // Obtener videos de stories
+            var storiesVideo = await _context.Stories
+                .Include(s => s.Creador)
+                .Where(s => s.EstaActivo && s.TipoContenido == TipoContenido.Video && s.RutaArchivo != null)
+                .Select(s => new { s.Id, s.RutaArchivo, Usuario = s.Creador != null ? s.Creador.UserName : null })
+                .ToListAsync();
+
+            foreach (var s in storiesVideo)
+            {
+                var analisis = await AnalizarVideoAsync(s.Id, "Story", s.RutaArchivo!, s.Usuario);
+                if (analisis != null)
+                    videos.Add(analisis);
+            }
+
+            // ========================================
+            // ANALIZAR IMÁGENES
+            // ========================================
+
+            // Obtener imágenes de contenidos
+            var contenidosImagen = await _context.Contenidos
+                .Include(c => c.Usuario)
+                .Where(c => c.EstaActivo && c.TipoContenido == TipoContenido.Foto && c.RutaArchivo != null)
+                .Select(c => new { c.Id, c.RutaArchivo, Usuario = c.Usuario != null ? c.Usuario.UserName : null })
+                .ToListAsync();
+
+            foreach (var c in contenidosImagen)
+            {
+                var analisis = AnalizarImagen(c.Id, "Contenido", c.RutaArchivo!, c.Usuario);
+                imagenes.Add(analisis);
+            }
+
+            // Obtener imágenes de archivos de carrusel
+            var archivosImagen = await _context.ArchivosContenido
+                .Include(a => a.Contenido)
+                    .ThenInclude(c => c!.Usuario)
+                .Where(a => a.TipoArchivo == TipoArchivo.Foto && a.RutaArchivo != null)
+                .Select(a => new { a.Id, a.RutaArchivo, Usuario = a.Contenido != null && a.Contenido.Usuario != null ? a.Contenido.Usuario.UserName : null })
+                .ToListAsync();
+
+            foreach (var a in archivosImagen)
+            {
+                var analisis = AnalizarImagen(a.Id, "Archivo", a.RutaArchivo!, a.Usuario);
+                imagenes.Add(analisis);
+            }
+
+            // Obtener imágenes de stories
+            var storiesImagen = await _context.Stories
+                .Include(s => s.Creador)
+                .Where(s => s.EstaActivo && s.TipoContenido == TipoContenido.Foto && s.RutaArchivo != null)
+                .Select(s => new { s.Id, s.RutaArchivo, Usuario = s.Creador != null ? s.Creador.UserName : null })
+                .ToListAsync();
+
+            foreach (var s in storiesImagen)
+            {
+                var analisis = AnalizarImagen(s.Id, "Story", s.RutaArchivo!, s.Usuario);
+                imagenes.Add(analisis);
+            }
+
+            // Ordenar videos: primero los problemáticos, luego por peso
+            videos = videos
+                .OrderByDescending(v => v.Estado == "necesita_conversion" ? 2 : (v.Estado == "muy_pesado" ? 1 : 0))
+                .ThenByDescending(v => v.PesoBytes)
+                .ToList();
+
+            // Ordenar imágenes: primero las que necesitan conversión
+            imagenes = imagenes
+                .OrderByDescending(i => i.Estado == "necesita_conversion" ? 1 : 0)
+                .ThenByDescending(i => i.PesoBytes)
+                .ToList();
+
+            // ViewBag para Videos
+            ViewBag.Videos = videos;
+            ViewBag.TotalVideos = videos.Count;
+            ViewBag.VideosNecesitanConversion = videos.Count(v => v.Estado == "necesita_conversion");
+            ViewBag.VideosMuyPesados = videos.Count(v => v.Estado == "muy_pesado");
+            ViewBag.VideosErrores = videos.Count(v => v.Estado == "error");
+            ViewBag.VideosOk = videos.Count(v => v.Estado == "ok");
+
+            // ViewBag para Imágenes
+            ViewBag.Imagenes = imagenes;
+            ViewBag.TotalImagenes = imagenes.Count;
+            ViewBag.ImagenesNecesitanConversion = imagenes.Count(i => i.Estado == "necesita_conversion");
+            ViewBag.ImagenesErrores = imagenes.Count(i => i.Estado == "error");
+            ViewBag.ImagenesOk = imagenes.Count(i => i.Estado == "ok");
+
+            // Mantener compatibilidad con vista anterior
+            ViewBag.NecesitanConversion = videos.Count(v => v.Estado == "necesita_conversion");
+            ViewBag.MuyPesados = videos.Count(v => v.Estado == "muy_pesado");
+            ViewBag.Errores = videos.Count(v => v.Estado == "error");
+            ViewBag.Ok = videos.Count(v => v.Estado == "ok");
+
+            // Info de diagnóstico
+            ViewBag.FFprobePath = BuscarFFprobe() ?? "No encontrado";
+            ViewBag.FFmpegPath = BuscarFFmpeg() ?? "No encontrado";
+
+            return View();
+        }
+
+        private async Task<VideoAnalisis?> AnalizarVideoAsync(int id, string tipo, string rutaArchivo, string? usuario)
+        {
+            var rutaFisica = Path.Combine(_hostEnvironment.WebRootPath, rutaArchivo.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+
+            if (!System.IO.File.Exists(rutaFisica))
+            {
+                return new VideoAnalisis
+                {
+                    Id = id,
+                    Tipo = tipo,
+                    RutaArchivo = rutaArchivo,
+                    Usuario = usuario,
+                    Estado = "error",
+                    Problema = "Archivo no existe"
+                };
+            }
+
+            var fileInfo = new FileInfo(rutaFisica);
+            var analisis = new VideoAnalisis
+            {
+                Id = id,
+                Tipo = tipo,
+                RutaArchivo = rutaArchivo,
+                Usuario = usuario,
+                PesoBytes = fileInfo.Length
+            };
+
+            // Usar ffprobe para obtener info real
+            try
+            {
+                // Buscar ffprobe en rutas comunes (IIS no siempre tiene el PATH del sistema)
+                var ffprobePath = BuscarFFprobe();
+                if (ffprobePath == null)
+                {
+                    analisis.Estado = "error";
+                    analisis.Problema = "ffprobe no encontrado en PATH ni rutas comunes";
+                    return analisis;
+                }
+
+                var processInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = ffprobePath,
+                    Arguments = $"-v quiet -print_format json -show_format -show_streams \"{rutaFisica}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = System.Diagnostics.Process.Start(processInfo);
+                if (process == null)
+                {
+                    analisis.Estado = "error";
+                    analisis.Problema = "No se pudo iniciar ffprobe";
+                    return analisis;
+                }
+
+                var output = await process.StandardOutput.ReadToEndAsync();
+                var completed = await Task.Run(() => process.WaitForExit(10000));
+
+                if (!completed || string.IsNullOrEmpty(output))
+                {
+                    analisis.Estado = "error";
+                    analisis.Problema = "ffprobe timeout o sin respuesta";
+                    return analisis;
+                }
+
+                // Parsear JSON para obtener codec
+                var codecMatch = System.Text.RegularExpressions.Regex.Match(output, "\"codec_name\"\\s*:\\s*\"([^\"]+)\"");
+                if (codecMatch.Success)
+                    analisis.CodecReal = codecMatch.Groups[1].Value;
+
+                var widthMatch = System.Text.RegularExpressions.Regex.Match(output, "\"width\"\\s*:\\s*(\\d+)");
+                var heightMatch = System.Text.RegularExpressions.Regex.Match(output, "\"height\"\\s*:\\s*(\\d+)");
+                if (widthMatch.Success) analisis.Ancho = int.Parse(widthMatch.Groups[1].Value);
+                if (heightMatch.Success) analisis.Alto = int.Parse(heightMatch.Groups[1].Value);
+
+                var durationMatch = System.Text.RegularExpressions.Regex.Match(output, "\"duration\"\\s*:\\s*\"([\\d.]+)\"");
+                if (durationMatch.Success)
+                    analisis.DuracionSegundos = double.Parse(durationMatch.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+
+                var formatMatch = System.Text.RegularExpressions.Regex.Match(output, "\"format_name\"\\s*:\\s*\"([^\"]+)\"");
+                if (formatMatch.Success)
+                    analisis.Formato = formatMatch.Groups[1].Value;
+
+                // Determinar estado
+                var codecLower = analisis.CodecReal?.ToLower() ?? "";
+                var pesoMB = analisis.PesoBytes / (1024.0 * 1024.0);
+
+                if (codecLower != "h264" && codecLower != "avc")
+                {
+                    analisis.Estado = "necesita_conversion";
+                    analisis.Problema = $"Codec {analisis.CodecReal} no es H.264";
+                }
+                else if (pesoMB > 50) // Más de 50MB
+                {
+                    analisis.Estado = "muy_pesado";
+                    analisis.Problema = $"Peso excesivo ({pesoMB:F1} MB)";
+                }
+                else
+                {
+                    analisis.Estado = "ok";
+                }
+            }
+            catch (Exception ex)
+            {
+                analisis.Estado = "error";
+                analisis.Problema = ex.Message;
+            }
+
+            return analisis;
+        }
+
+        private ImagenAnalisis AnalizarImagen(int id, string tipo, string rutaArchivo, string? usuario)
+        {
+            var rutaFisica = Path.Combine(_hostEnvironment.WebRootPath, rutaArchivo.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+            var extension = Path.GetExtension(rutaArchivo).ToLower();
+
+            if (!System.IO.File.Exists(rutaFisica))
+            {
+                return new ImagenAnalisis
+                {
+                    Id = id,
+                    Tipo = tipo,
+                    RutaArchivo = rutaArchivo,
+                    Usuario = usuario,
+                    Extension = extension,
+                    Estado = "error",
+                    Problema = "Archivo no existe"
+                };
+            }
+
+            var fileInfo = new FileInfo(rutaFisica);
+            var analisis = new ImagenAnalisis
+            {
+                Id = id,
+                Tipo = tipo,
+                RutaArchivo = rutaArchivo,
+                Usuario = usuario,
+                Extension = extension,
+                PesoBytes = fileInfo.Length
+            };
+
+            try
+            {
+                // Usar ImageMagick para obtener info real
+                using var image = new ImageMagick.MagickImage(rutaFisica);
+                analisis.Ancho = (int)image.Width;
+                analisis.Alto = (int)image.Height;
+                analisis.FormatoReal = image.Format.ToString().ToUpper();
+
+                // Extensiones que NO son JPEG estándar
+                var extensionesNoEstandar = new[] { ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif",
+                    ".heic", ".heif", ".dng", ".raw", ".cr2", ".nef", ".arw", ".orf", ".rw2", ".avif" };
+
+                if (extensionesNoEstandar.Contains(extension, StringComparer.OrdinalIgnoreCase))
+                {
+                    analisis.Estado = "necesita_conversion";
+                    analisis.Problema = $"Formato {analisis.FormatoReal} no es JPEG estándar";
+                }
+                else
+                {
+                    analisis.Estado = "ok";
+                }
+            }
+            catch (Exception ex)
+            {
+                analisis.Estado = "error";
+                analisis.Problema = ex.Message;
+            }
+
+            return analisis;
+        }
+
+        /// <summary>
+        /// Buscar ffprobe en rutas comunes (IIS no siempre tiene el PATH del sistema)
+        /// </summary>
+        private string? BuscarFFprobe()
+        {
+            // Primero intentar en PATH
+            try
+            {
+                var processInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "ffprobe",
+                    Arguments = "-version",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var process = System.Diagnostics.Process.Start(processInfo);
+                if (process != null)
+                {
+                    process.WaitForExit(5000);
+                    if (process.ExitCode == 0)
+                        return "ffprobe";
+                }
+            }
+            catch { }
+
+            // Buscar en rutas comunes de Windows
+            var rutasComunes = new[]
+            {
+                // Chocolatey (muy común en servidores Windows)
+                @"C:\ProgramData\chocolatey\bin\ffprobe.exe",
+                @"C:\ffmpeg\bin\ffprobe.exe",
+                @"C:\Program Files\ffmpeg\bin\ffprobe.exe",
+                @"C:\Program Files (x86)\ffmpeg\bin\ffprobe.exe",
+                @"C:\tools\ffmpeg\bin\ffprobe.exe",
+                @"C:\Users\Administrator\ffmpeg\bin\ffprobe.exe",
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "ffmpeg", "bin", "ffprobe.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ffmpeg", "bin", "ffprobe.exe"),
+                // Rutas comunes en servidores de hosting
+                @"C:\inetpub\ffmpeg\bin\ffprobe.exe",
+                @"D:\ffmpeg\bin\ffprobe.exe",
+            };
+
+            foreach (var ruta in rutasComunes)
+            {
+                if (System.IO.File.Exists(ruta))
+                    return ruta;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Buscar ffmpeg en rutas comunes
+        /// </summary>
+        private string? BuscarFFmpeg()
+        {
+            // Primero intentar en PATH
+            try
+            {
+                var processInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "ffmpeg",
+                    Arguments = "-version",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var process = System.Diagnostics.Process.Start(processInfo);
+                if (process != null)
+                {
+                    process.WaitForExit(5000);
+                    if (process.ExitCode == 0)
+                        return "ffmpeg";
+                }
+            }
+            catch { }
+
+            // Buscar en rutas comunes de Windows
+            var rutasComunes = new[]
+            {
+                // Chocolatey (muy común en servidores Windows)
+                @"C:\ProgramData\chocolatey\bin\ffmpeg.exe",
+                @"C:\ffmpeg\bin\ffmpeg.exe",
+                @"C:\Program Files\ffmpeg\bin\ffmpeg.exe",
+                @"C:\Program Files (x86)\ffmpeg\bin\ffmpeg.exe",
+                @"C:\tools\ffmpeg\bin\ffmpeg.exe",
+                @"C:\Users\Administrator\ffmpeg\bin\ffmpeg.exe",
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "ffmpeg", "bin", "ffmpeg.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ffmpeg", "bin", "ffmpeg.exe"),
+                // Rutas comunes en servidores de hosting
+                @"C:\inetpub\ffmpeg\bin\ffmpeg.exe",
+                @"D:\ffmpeg\bin\ffmpeg.exe",
+            };
+
+            foreach (var ruta in rutasComunes)
+            {
+                if (System.IO.File.Exists(ruta))
+                    return ruta;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Reconvertir un video específico a H.264
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReconvertirVideo(string tipo, int id)
+        {
+            try
+            {
+                string? rutaArchivo = null;
+
+                // Obtener ruta según tipo
+                if (tipo == "Contenido")
+                {
+                    var contenido = await _context.Contenidos.FindAsync(id);
+                    rutaArchivo = contenido?.RutaArchivo;
+                }
+                else if (tipo == "Archivo")
+                {
+                    var archivo = await _context.ArchivosContenido.FindAsync(id);
+                    rutaArchivo = archivo?.RutaArchivo;
+                }
+                else if (tipo == "Story")
+                {
+                    var story = await _context.Stories.FindAsync(id);
+                    rutaArchivo = story?.RutaArchivo;
+                }
+
+                if (string.IsNullOrEmpty(rutaArchivo))
+                {
+                    return Json(new { success = false, message = "No se encontró el archivo" });
+                }
+
+                var rutaFisica = Path.Combine(_hostEnvironment.WebRootPath, rutaArchivo.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+
+                if (!System.IO.File.Exists(rutaFisica))
+                {
+                    return Json(new { success = false, message = "El archivo no existe en disco" });
+                }
+
+                // Crear ruta temporal para el archivo convertido
+                var carpeta = Path.GetDirectoryName(rutaFisica)!;
+                var nombreBase = Path.GetFileNameWithoutExtension(rutaFisica);
+                var rutaTemporal = Path.Combine(carpeta, $"{nombreBase}_temp.mp4");
+                var rutaFinal = Path.Combine(carpeta, $"{nombreBase}.mp4");
+
+                // Buscar ffmpeg
+                var ffmpegPath = BuscarFFmpeg();
+                if (ffmpegPath == null)
+                {
+                    return Json(new { success = false, message = "ffmpeg no encontrado en PATH ni rutas comunes" });
+                }
+
+                // Convertir con ffmpeg
+                // Parámetros optimizados estilo TikTok: H.264, 30fps, AAC 192kbps
+                var arguments = $"-y -i \"{rutaFisica}\" -c:v libx264 -preset medium -crf 23 -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -movflags +faststart -vf \"scale='min(1920,iw)':-2\" \"{rutaTemporal}\"";
+
+                var processInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = ffmpegPath,
+                    Arguments = arguments,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = System.Diagnostics.Process.Start(processInfo);
+                if (process == null)
+                {
+                    return Json(new { success = false, message = "No se pudo iniciar ffmpeg" });
+                }
+
+                var errorOutput = await process.StandardError.ReadToEndAsync();
+                var completed = await Task.Run(() => process.WaitForExit(600000)); // 10 minutos máximo
+
+                if (!completed)
+                {
+                    try { process.Kill(); } catch { }
+                    return Json(new { success = false, message = "Timeout - el video es muy largo" });
+                }
+
+                if (process.ExitCode != 0 || !System.IO.File.Exists(rutaTemporal))
+                {
+                    return Json(new { success = false, message = $"Error en ffmpeg: {errorOutput.Substring(0, Math.Min(500, errorOutput.Length))}" });
+                }
+
+                // Verificar que el archivo temporal es válido
+                var tempInfo = new FileInfo(rutaTemporal);
+                if (tempInfo.Length < 1000)
+                {
+                    System.IO.File.Delete(rutaTemporal);
+                    return Json(new { success = false, message = "El archivo convertido es muy pequeño, posible error" });
+                }
+
+                // Reemplazar archivo original
+                var pesoOriginal = new FileInfo(rutaFisica).Length;
+                System.IO.File.Delete(rutaFisica);
+
+                // Si la ruta original no era .mp4, renombrar
+                if (!rutaFisica.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
+                {
+                    System.IO.File.Move(rutaTemporal, rutaFinal);
+
+                    // Actualizar BD con nueva extensión
+                    var nuevaRutaRelativa = "/" + rutaFinal.Substring(_hostEnvironment.WebRootPath.TrimEnd('\\', '/').Length).Replace('\\', '/').TrimStart('/');
+
+                    if (tipo == "Contenido")
+                    {
+                        var contenido = await _context.Contenidos.FindAsync(id);
+                        if (contenido != null) contenido.RutaArchivo = nuevaRutaRelativa;
+                    }
+                    else if (tipo == "Archivo")
+                    {
+                        var archivo = await _context.ArchivosContenido.FindAsync(id);
+                        if (archivo != null) archivo.RutaArchivo = nuevaRutaRelativa;
+                    }
+                    else if (tipo == "Story")
+                    {
+                        var story = await _context.Stories.FindAsync(id);
+                        if (story != null) story.RutaArchivo = nuevaRutaRelativa;
+                    }
+
+                    await _context.SaveChangesAsync();
+                }
+                else
+                {
+                    System.IO.File.Move(rutaTemporal, rutaFisica);
+                }
+
+                var pesoNuevo = new FileInfo(rutaFinal.EndsWith(".mp4") ? rutaFinal : rutaFisica).Length;
+                var reduccion = ((pesoOriginal - pesoNuevo) / (double)pesoOriginal * 100);
+
+                await _logEventoService.RegistrarEventoAsync(
+                    $"[ReconvertirVideo] {tipo} ID={id} convertido. {pesoOriginal / 1024 / 1024:F1}MB -> {pesoNuevo / 1024 / 1024:F1}MB ({reduccion:F0}% reducción)",
+                    CategoriaEvento.Sistema, TipoLogEvento.Evento);
+
+                return Json(new
+                {
+                    success = true,
+                    message = $"Convertido exitosamente. {pesoOriginal / 1024 / 1024:F1}MB → {pesoNuevo / 1024 / 1024:F1}MB ({reduccion:F0}% reducción)"
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Reconvertir una imagen específica a JPEG
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReconvertirImagen(string tipo, int id)
+        {
+            try
+            {
+                string? rutaArchivo = null;
+
+                // Obtener ruta según tipo
+                if (tipo == "Contenido")
+                {
+                    var contenido = await _context.Contenidos.FindAsync(id);
+                    rutaArchivo = contenido?.RutaArchivo;
+                }
+                else if (tipo == "Archivo")
+                {
+                    var archivo = await _context.ArchivosContenido.FindAsync(id);
+                    rutaArchivo = archivo?.RutaArchivo;
+                }
+                else if (tipo == "Story")
+                {
+                    var story = await _context.Stories.FindAsync(id);
+                    rutaArchivo = story?.RutaArchivo;
+                }
+
+                if (string.IsNullOrEmpty(rutaArchivo))
+                {
+                    return Json(new { success = false, message = "No se encontró el archivo" });
+                }
+
+                var rutaFisica = Path.Combine(_hostEnvironment.WebRootPath, rutaArchivo.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+
+                if (!System.IO.File.Exists(rutaFisica))
+                {
+                    return Json(new { success = false, message = "El archivo no existe en disco" });
+                }
+
+                var carpeta = Path.GetDirectoryName(rutaFisica)!;
+                var nombreBase = Path.GetFileNameWithoutExtension(rutaFisica);
+                var rutaFinal = Path.Combine(carpeta, $"{nombreBase}.jpg");
+
+                // Convertir imagen usando ImageMagick
+                var pesoOriginal = new FileInfo(rutaFisica).Length;
+
+                using (var image = new ImageMagick.MagickImage(rutaFisica))
+                {
+                    image.AutoOrient();
+
+                    // Redimensionar si es muy grande
+                    if (image.Width > 2048 || image.Height > 2048)
+                    {
+                        var geometry = new ImageMagick.MagickGeometry(2048, 2048)
+                        {
+                            IgnoreAspectRatio = false
+                        };
+                        image.Resize(geometry);
+                    }
+
+                    image.Format = ImageMagick.MagickFormat.Jpeg;
+                    image.Quality = 90;
+                    await image.WriteAsync(rutaFinal);
+                }
+
+                // Si la conversión fue exitosa, eliminar el original si es diferente
+                if (rutaFisica != rutaFinal && System.IO.File.Exists(rutaFinal))
+                {
+                    System.IO.File.Delete(rutaFisica);
+
+                    // Actualizar BD con nueva extensión
+                    var nuevaRutaRelativa = "/" + rutaFinal.Substring(_hostEnvironment.WebRootPath.TrimEnd('\\', '/').Length).Replace('\\', '/').TrimStart('/');
+
+                    if (tipo == "Contenido")
+                    {
+                        var contenido = await _context.Contenidos.FindAsync(id);
+                        if (contenido != null) contenido.RutaArchivo = nuevaRutaRelativa;
+                    }
+                    else if (tipo == "Archivo")
+                    {
+                        var archivo = await _context.ArchivosContenido.FindAsync(id);
+                        if (archivo != null) archivo.RutaArchivo = nuevaRutaRelativa;
+                    }
+                    else if (tipo == "Story")
+                    {
+                        var story = await _context.Stories.FindAsync(id);
+                        if (story != null) story.RutaArchivo = nuevaRutaRelativa;
+                    }
+
+                    await _context.SaveChangesAsync();
+                }
+
+                var pesoNuevo = new FileInfo(rutaFinal).Length;
+                var reduccion = ((pesoOriginal - pesoNuevo) / (double)pesoOriginal * 100);
+
+                await _logEventoService.RegistrarEventoAsync(
+                    $"[ReconvertirImagen] {tipo} ID={id} convertido a JPEG. {pesoOriginal / 1024:F0}KB -> {pesoNuevo / 1024:F0}KB ({reduccion:F0}% reducción)",
+                    CategoriaEvento.Sistema, TipoLogEvento.Evento);
+
+                return Json(new
+                {
+                    success = true,
+                    message = $"Convertido a JPEG. {pesoOriginal / 1024:F0}KB → {pesoNuevo / 1024:F0}KB ({reduccion:F0}% reducción)"
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Reconvertir todos los videos problemáticos
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReconvertirTodosVideos()
+        {
+            // Esta operación se hace de forma síncrona para mostrar progreso
+            // En producción debería ser un job en segundo plano
+
+            var convertidos = 0;
+            var errores = 0;
+            var mensajes = new List<string>();
+
+            // Obtener videos de contenidos que necesitan conversión
+            var contenidos = await _context.Contenidos
+                .Where(c => c.EstaActivo && c.TipoContenido == TipoContenido.Video && c.RutaArchivo != null)
+                .Select(c => new { c.Id, c.RutaArchivo })
+                .ToListAsync();
+
+            foreach (var c in contenidos)
+            {
+                var analisis = await AnalizarVideoAsync(c.Id, "Contenido", c.RutaArchivo!, null);
+                if (analisis != null && (analisis.Estado == "necesita_conversion" || analisis.Estado == "muy_pesado"))
+                {
+                    var resultado = await ReconvertirVideo("Contenido", c.Id) as JsonResult;
+                    var data = resultado?.Value as dynamic;
+                    if (data?.success == true)
+                        convertidos++;
+                    else
+                        errores++;
+                }
+            }
+
+            return Json(new
+            {
+                success = true,
+                convertidos,
+                errores,
+                message = $"Proceso completado: {convertidos} convertidos, {errores} errores"
+            });
+        }
+
+        /// <summary>
+        /// Diagnóstico rápido: Verificar estado de videos en BD vs archivos en disco
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> DiagnosticoVideos()
+        {
+            var resultados = new List<object>();
+            var totalVideos = 0;
+            var archivosExisten = 0;
+            var archivosNoExisten = 0;
+            var rutasIncorrectas = 0;
+
+            // Contenidos
+            var contenidos = await _context.Contenidos
+                .Where(c => c.EstaActivo && c.TipoContenido == TipoContenido.Video && c.RutaArchivo != null)
+                .Select(c => new { c.Id, c.RutaArchivo })
+                .Take(100)
+                .ToListAsync();
+
+            foreach (var c in contenidos)
+            {
+                totalVideos++;
+                var rutaFisica = Path.Combine(_hostEnvironment.WebRootPath, c.RutaArchivo!.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                var existe = System.IO.File.Exists(rutaFisica);
+                var extension = Path.GetExtension(c.RutaArchivo).ToLower();
+                var esMp4 = extension == ".mp4";
+
+                if (existe) archivosExisten++;
+                else archivosNoExisten++;
+
+                if (!esMp4) rutasIncorrectas++;
+
+                if (!existe || !esMp4)
+                {
+                    // Buscar si existe versión convertida
+                    var carpeta = Path.GetDirectoryName(rutaFisica);
+                    var nombreBase = Path.GetFileNameWithoutExtension(rutaFisica);
+                    var rutaMp4 = Path.Combine(carpeta!, $"{nombreBase}.mp4");
+                    var existeMp4 = System.IO.File.Exists(rutaMp4);
+
+                    resultados.Add(new
+                    {
+                        tipo = "Contenido",
+                        id = c.Id,
+                        rutaBD = c.RutaArchivo,
+                        extension = extension,
+                        archivoExiste = existe,
+                        esMp4 = esMp4,
+                        versionMp4Existe = existeMp4,
+                        problema = !existe ? "Archivo no existe" : (!esMp4 ? "Extensión no es .mp4" : "OK")
+                    });
+                }
+            }
+
+            // Archivos de carrusel
+            var archivos = await _context.ArchivosContenido
+                .Where(a => a.TipoArchivo == TipoArchivo.Video && a.RutaArchivo != null)
+                .Select(a => new { a.Id, a.RutaArchivo })
+                .Take(50)
+                .ToListAsync();
+
+            foreach (var a in archivos)
+            {
+                totalVideos++;
+                var rutaFisica = Path.Combine(_hostEnvironment.WebRootPath, a.RutaArchivo!.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                var existe = System.IO.File.Exists(rutaFisica);
+                var extension = Path.GetExtension(a.RutaArchivo).ToLower();
+                var esMp4 = extension == ".mp4";
+
+                if (existe) archivosExisten++;
+                else archivosNoExisten++;
+
+                if (!esMp4) rutasIncorrectas++;
+
+                if (!existe || !esMp4)
+                {
+                    var carpeta = Path.GetDirectoryName(rutaFisica);
+                    var nombreBase = Path.GetFileNameWithoutExtension(rutaFisica);
+                    var rutaMp4 = Path.Combine(carpeta!, $"{nombreBase}.mp4");
+                    var existeMp4 = System.IO.File.Exists(rutaMp4);
+
+                    resultados.Add(new
+                    {
+                        tipo = "Archivo",
+                        id = a.Id,
+                        rutaBD = a.RutaArchivo,
+                        extension = extension,
+                        archivoExiste = existe,
+                        esMp4 = esMp4,
+                        versionMp4Existe = existeMp4,
+                        problema = !existe ? "Archivo no existe" : (!esMp4 ? "Extensión no es .mp4" : "OK")
+                    });
+                }
+            }
+
+            return Json(new
+            {
+                resumen = new
+                {
+                    totalVideos,
+                    archivosExisten,
+                    archivosNoExisten,
+                    rutasNoMp4 = rutasIncorrectas,
+                    conProblemas = resultados.Count
+                },
+                problemas = resultados
+            });
+        }
+
+        #endregion
+
+        #region Actualizar Metadatos de Archivos
+
+        private static bool _metadatosEnProgreso = false;
+        private static int _metadatosTotal = 0;
+        private static int _metadatosProcesados = 0;
+        private static int _metadatosActualizados = 0;
+        private static int _metadatosFallidos = 0;
+        private static string _metadatosMensaje = "";
+
+        [HttpGet]
+        public async Task<IActionResult> ActualizarMetadatos()
+        {
+            // Contar archivos sin metadatos
+            var sinDimensiones = await _context.ArchivosContenido
+                .CountAsync(a => a.Ancho == null || a.Alto == null);
+            var sinTamano = await _context.ArchivosContenido
+                .CountAsync(a => a.TamanoBytes == null || a.TamanoBytes == 0);
+            var videosSinDuracion = await _context.ArchivosContenido
+                .CountAsync(a => a.TipoArchivo == TipoArchivo.Video && (a.DuracionSegundos == null || a.DuracionSegundos == 0));
+
+            var totalArchivos = await _context.ArchivosContenido.CountAsync();
+
+            // También contar contenidos que usan RutaArchivo directo (sin ArchivosContenido)
+            var contenidosSinArchivos = await _context.Contenidos
+                .CountAsync(c => !string.IsNullOrEmpty(c.RutaArchivo) && !c.Archivos.Any());
+
+            ViewBag.SinDimensiones = sinDimensiones;
+            ViewBag.SinTamano = sinTamano;
+            ViewBag.VideosSinDuracion = videosSinDuracion;
+            ViewBag.TotalArchivos = totalArchivos;
+            ViewBag.ContenidosSinArchivos = contenidosSinArchivos;
+            ViewBag.MetadatosEnProgreso = _metadatosEnProgreso;
+
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult IniciarActualizacionMetadatos()
+        {
+            if (_metadatosEnProgreso)
+            {
+                return Json(new { success = false, message = "Ya hay una actualización en progreso" });
+            }
+
+            _metadatosEnProgreso = true;
+            _metadatosTotal = 0;
+            _metadatosProcesados = 0;
+            _metadatosActualizados = 0;
+            _metadatosFallidos = 0;
+            _metadatosMensaje = "Iniciando...";
+
+            _ = Task.Run(async () =>
+            {
+                using var scope = _serviceScopeFactory.CreateScope();
+                var logService = scope.ServiceProvider.GetRequiredService<ILogEventoService>();
+
+                await logService.RegistrarEventoAsync(
+                    "[ActualizarMetadatos] Iniciando actualización de metadatos",
+                    CategoriaEvento.Sistema, TipoLogEvento.Evento);
+
+                try
+                {
+                    await EjecutarActualizacionMetadatosAsync();
+                    await logService.RegistrarEventoAsync(
+                        $"[ActualizarMetadatos] Completado: {_metadatosActualizados} actualizados, {_metadatosFallidos} fallidos",
+                        CategoriaEvento.Sistema, TipoLogEvento.Evento);
+                }
+                catch (Exception ex)
+                {
+                    _metadatosMensaje = $"Error: {ex.Message}";
+                    await logService.RegistrarEventoAsync(
+                        $"[ActualizarMetadatos] Error: {ex.Message}",
+                        CategoriaEvento.Sistema, TipoLogEvento.Error,
+                        detalle: ex.StackTrace);
+                }
+                finally
+                {
+                    _metadatosEnProgreso = false;
+                }
+            });
+
+            return Json(new { success = true, message = "Actualización iniciada" });
+        }
+
+        [HttpGet]
+        public IActionResult EstadoActualizacionMetadatos()
+        {
+            return Json(new
+            {
+                enProgreso = _metadatosEnProgreso,
+                total = _metadatosTotal,
+                procesados = _metadatosProcesados,
+                actualizados = _metadatosActualizados,
+                fallidos = _metadatosFallidos,
+                mensaje = _metadatosMensaje,
+                porcentaje = _metadatosTotal > 0 ? (int)((_metadatosProcesados / (double)_metadatosTotal) * 100) : 0
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult CancelarActualizacionMetadatos()
+        {
+            _metadatosEnProgreso = false;
+            _metadatosMensaje = "Cancelado por usuario";
+            return Json(new { success = true, message = "Actualización cancelada" });
+        }
+
+        private async Task EjecutarActualizacionMetadatosAsync()
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var logService = scope.ServiceProvider.GetRequiredService<ILogEventoService>();
+
+            var webRoot = _hostEnvironment.WebRootPath;
+
+            // PASO 1: Crear ArchivosContenido para Contenidos que no tienen
+            var contenidosSinArchivos = await context.Contenidos
+                .Include(c => c.Archivos)
+                .Where(c => !string.IsNullOrEmpty(c.RutaArchivo) && !c.Archivos.Any())
+                .ToListAsync();
+
+            await logService.RegistrarEventoAsync(
+                $"[ActualizarMetadatos] Creando {contenidosSinArchivos.Count} registros ArchivoContenido faltantes",
+                CategoriaEvento.Sistema, TipoLogEvento.Evento);
+
+            foreach (var contenido in contenidosSinArchivos)
+            {
+                var nuevoArchivo = new ArchivoContenido
+                {
+                    ContenidoId = contenido.Id,
+                    RutaArchivo = contenido.RutaArchivo!,
+                    TipoArchivo = contenido.TipoContenido == TipoContenido.Video ? TipoArchivo.Video : TipoArchivo.Foto,
+                    Thumbnail = contenido.Thumbnail,
+                    Orden = 0
+                };
+                context.ArchivosContenido.Add(nuevoArchivo);
+            }
+
+            if (contenidosSinArchivos.Any())
+            {
+                await context.SaveChangesAsync();
+            }
+
+            // PASO 2: Obtener TODOS los archivos (sin filtro de NULL para asegurar actualizacion completa)
+            var archivos = await context.ArchivosContenido.ToListAsync();
+
+            _metadatosTotal = archivos.Count;
+            _metadatosMensaje = $"Procesando {_metadatosTotal} archivos...";
+
+            await logService.RegistrarEventoAsync(
+                $"[ActualizarMetadatos] Procesando {_metadatosTotal} archivos totales",
+                CategoriaEvento.Sistema, TipoLogEvento.Evento);
+
+            foreach (var archivo in archivos)
+            {
+                if (!_metadatosEnProgreso) break;
+
+                _metadatosProcesados++;
+
+                try
+                {
+                    var rutaRelativa = archivo.RutaArchivo?.TrimStart('/') ?? "";
+                    var rutaCompleta = Path.Combine(webRoot, rutaRelativa.Replace('/', Path.DirectorySeparatorChar));
+
+                    _metadatosMensaje = $"[{_metadatosProcesados}/{_metadatosTotal}] {Path.GetFileName(rutaCompleta)}";
+
+                    if (!System.IO.File.Exists(rutaCompleta))
+                    {
+                        _metadatosFallidos++;
+                        await logService.RegistrarEventoAsync(
+                            $"[ActualizarMetadatos] Archivo no existe: {rutaCompleta}",
+                            CategoriaEvento.Sistema, TipoLogEvento.Warning);
+                        continue;
+                    }
+
+                    // Siempre obtener tamano del archivo
+                    var fileInfo = new FileInfo(rutaCompleta);
+                    archivo.TamanoBytes = fileInfo.Length;
+
+                    var extension = Path.GetExtension(rutaCompleta).ToLower();
+                    var esVideo = new[] { ".mp4", ".mov", ".avi", ".mkv", ".webm", ".wmv", ".flv", ".m4v", ".3gp" }.Contains(extension);
+
+                    if (esVideo)
+                    {
+                        // Usar FFprobe para obtener info del video
+                        var videoInfo = await ObtenerInfoVideoAsync(rutaCompleta);
+                        if (videoInfo != null)
+                        {
+                            archivo.Ancho = videoInfo.Ancho;
+                            archivo.Alto = videoInfo.Alto;
+                            archivo.DuracionSegundos = videoInfo.DuracionSegundos;
+                            archivo.TipoArchivo = TipoArchivo.Video;
+                        }
+                        else
+                        {
+                            await logService.RegistrarEventoAsync(
+                                $"[ActualizarMetadatos] FFprobe fallo para: {Path.GetFileName(rutaCompleta)}",
+                                CategoriaEvento.Sistema, TipoLogEvento.Warning);
+                        }
+                    }
+                    else
+                    {
+                        // Usar ImageSharp para obtener dimensiones de imagen
+                        try
+                        {
+                            using var image = await SixLabors.ImageSharp.Image.LoadAsync(rutaCompleta);
+                            archivo.Ancho = image.Width;
+                            archivo.Alto = image.Height;
+                            archivo.TipoArchivo = TipoArchivo.Foto;
+                        }
+                        catch (Exception imgEx)
+                        {
+                            await logService.RegistrarEventoAsync(
+                                $"[ActualizarMetadatos] ImageSharp fallo para {Path.GetFileName(rutaCompleta)}: {imgEx.Message}",
+                                CategoriaEvento.Sistema, TipoLogEvento.Warning);
+                        }
+                    }
+
+                    // Guardar despues de cada archivo
+                    context.ArchivosContenido.Update(archivo);
+                    await context.SaveChangesAsync();
+                    _metadatosActualizados++;
+                }
+                catch (Exception ex)
+                {
+                    _metadatosFallidos++;
+                    await logService.RegistrarEventoAsync(
+                        $"[ActualizarMetadatos] Error en archivo ID={archivo.Id}: {ex.Message}",
+                        CategoriaEvento.Sistema, TipoLogEvento.Error,
+                        detalle: ex.StackTrace);
+                }
+            }
+
+            _metadatosMensaje = $"Completado: {_metadatosActualizados} actualizados, {_metadatosFallidos} fallidos de {_metadatosTotal}";
+
+            await logService.RegistrarEventoAsync(
+                $"[ActualizarMetadatos] {_metadatosMensaje}",
+                CategoriaEvento.Sistema, TipoLogEvento.Evento);
+        }
+
+        private async Task<VideoInfoResult?> ObtenerInfoVideoAsync(string rutaVideo)
+        {
+            try
+            {
+                var ffprobePath = "ffprobe";
+                var args = $"-v quiet -print_format json -show_format -show_streams \"{rutaVideo}\"";
+
+                var processInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = ffprobePath,
+                    Arguments = args,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = System.Diagnostics.Process.Start(processInfo);
+                if (process == null) return null;
+
+                var output = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode != 0 || string.IsNullOrEmpty(output)) return null;
+
+                // Parsear JSON de ffprobe
+                using var doc = System.Text.Json.JsonDocument.Parse(output);
+                var root = doc.RootElement;
+
+                int? ancho = null, alto = null, duracion = null;
+
+                // Buscar stream de video
+                if (root.TryGetProperty("streams", out var streams))
+                {
+                    foreach (var stream in streams.EnumerateArray())
+                    {
+                        if (stream.TryGetProperty("codec_type", out var codecType) &&
+                            codecType.GetString() == "video")
+                        {
+                            if (stream.TryGetProperty("width", out var w)) ancho = w.GetInt32();
+                            if (stream.TryGetProperty("height", out var h)) alto = h.GetInt32();
+                            break;
+                        }
+                    }
+                }
+
+                // Obtener duración del formato
+                if (root.TryGetProperty("format", out var format))
+                {
+                    if (format.TryGetProperty("duration", out var dur))
+                    {
+                        if (double.TryParse(dur.GetString(), System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out var durSecs))
+                        {
+                            duracion = (int)durSecs;
+                        }
+                    }
+                }
+
+                return new VideoInfoResult { Ancho = ancho, Alto = alto, DuracionSegundos = duracion };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private class VideoInfoResult
+        {
+            public int? Ancho { get; set; }
+            public int? Alto { get; set; }
+            public int? DuracionSegundos { get; set; }
+        }
+
+        #endregion
     }
 
     public class ConfiguracionEmailViewModel

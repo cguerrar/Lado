@@ -64,6 +64,14 @@ namespace Lado.Controllers
         }
 
         // ========================================
+        // LADOCOINS - MONEDA VIRTUAL
+        // ========================================
+        public IActionResult LadoCoins()
+        {
+            return View();
+        }
+
+        // ========================================
         // FEEDBACK - GET
         // ========================================
         public async Task<IActionResult> Feedback()

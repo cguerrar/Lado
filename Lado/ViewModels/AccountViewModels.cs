@@ -51,6 +51,17 @@ namespace Lado.ViewModels
         [Display(Name = "Lado Preferido")]
         public TipoLado LadoPreferido { get; set; } = TipoLado.LadoA;
 
+        [StringLength(20, ErrorMessage = "Código inválido")]
+        [Display(Name = "Código de referido (opcional)")]
+        public string? CodigoReferido { get; set; }
+
+        /// <summary>
+        /// Zona horaria del usuario, detectada automáticamente por el navegador.
+        /// Formato IANA: "America/Santiago", "America/Bogota", etc.
+        /// </summary>
+        [StringLength(50)]
+        [Display(Name = "Zona Horaria")]
+        public string? ZonaHoraria { get; set; }
     }
 
     public class LoginViewModel

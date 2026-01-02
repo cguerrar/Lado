@@ -1701,6 +1701,65 @@
 
                         <div id="idiomaFeedback" style="margin-top: 20px; padding: 12px 16px; border-radius: 8px; display: none;">
                         </div>
+
+                        <!-- Separador -->
+                        <div style="height: 1px; background: var(--config-border); margin: 28px 0;"></div>
+
+                        <!-- Zona Horaria -->
+                        <h6 style="font-size: 1rem; font-weight: 600; color: var(--config-text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12,6 12,12 16,14"/>
+                            </svg>
+                            Zona Horaria
+                        </h6>
+                        <p style="font-size: 13px; color: var(--config-text-secondary); margin-bottom: 16px; line-height: 1.5;">
+                            Tu zona horaria afecta los contadores diarios de LadoCoins. Se resetean a medianoche en TU hora local.
+                        </p>
+
+                        @{
+                            var zonaActual = Model.ZonaHoraria ?? "America/Bogota";
+                        }
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; font-weight: 500; margin-bottom: 8px; color: var(--config-text-primary);">
+                                Tu zona horaria actual
+                            </label>
+                            <select id="zonaHorariaSelect"
+                                    style="width: 100%; padding: 12px 16px; border: 2px solid var(--config-border); border-radius: 10px; background: var(--config-bg-secondary); color: var(--config-text-primary); font-size: 14px; cursor: pointer;"
+                                    onchange="cambiarZonaHoraria(this.value)">
+                                <optgroup label="America">
+                                    <option value="America/Santiago" selected="@(zonaActual == "America/Santiago")">Chile (Santiago) - UTC-3/-4</option>
+                                    <option value="America/Bogota" selected="@(zonaActual == "America/Bogota")">Colombia (Bogota) - UTC-5</option>
+                                    <option value="America/Lima" selected="@(zonaActual == "America/Lima")">Peru (Lima) - UTC-5</option>
+                                    <option value="America/Mexico_City" selected="@(zonaActual == "America/Mexico_City")">Mexico (CDMX) - UTC-6</option>
+                                    <option value="America/Argentina/Buenos_Aires" selected="@(zonaActual == "America/Argentina/Buenos_Aires")">Argentina (Buenos Aires) - UTC-3</option>
+                                    <option value="America/Caracas" selected="@(zonaActual == "America/Caracas")">Venezuela (Caracas) - UTC-4</option>
+                                    <option value="America/New_York" selected="@(zonaActual == "America/New_York")">Estados Unidos (Nueva York) - UTC-5/-4</option>
+                                    <option value="America/Los_Angeles" selected="@(zonaActual == "America/Los_Angeles")">Estados Unidos (Los Angeles) - UTC-8/-7</option>
+                                    <option value="America/Sao_Paulo" selected="@(zonaActual == "America/Sao_Paulo")">Brasil (Sao Paulo) - UTC-3</option>
+                                </optgroup>
+                                <optgroup label="Europa">
+                                    <option value="Europe/Madrid" selected="@(zonaActual == "Europe/Madrid")">Espana (Madrid) - UTC+1/+2</option>
+                                    <option value="Europe/London" selected="@(zonaActual == "Europe/London")">Reino Unido (Londres) - UTC+0/+1</option>
+                                    <option value="Europe/Paris" selected="@(zonaActual == "Europe/Paris")">Francia (Paris) - UTC+1/+2</option>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <div id="zonaHorariaFeedback" style="margin-top: 12px; padding: 10px 14px; border-radius: 8px; display: none; font-size: 13px;">
+                        </div>
+
+                        <div style="background: rgba(70, 130, 180, 0.08); border-radius: 10px; padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4682B4" stroke-width="2" style="flex-shrink: 0; margin-top: 2px;">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="16" x2="12" y2="12"/>
+                                <line x1="12" y1="8" x2="12" y2="8"/>
+                            </svg>
+                            <p style="font-size: 12px; color: var(--config-text-secondary); line-height: 1.5; margin: 0;">
+                                Tu zona horaria detectada es: <strong id="zonaDetectada" style="color: var(--config-text-primary);"></strong>.
+                                Si es diferente a la seleccionada, considera actualizarla.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2465,4 +2524,66 @@
             feedback.innerHTML = '<strong>✗</strong> ' + error.message;
         }
     }
+
+    // Cambiar zona horaria
+    async function cambiarZonaHoraria(zona) {
+        const select = document.getElementById('zonaHorariaSelect');
+        const feedback = document.getElementById('zonaHorariaFeedback');
+        const valorAnterior = select.dataset.valorAnterior || '@Model.ZonaHoraria';
+
+        try {
+            const response = await fetch('/Usuario/CambiarZonaHoraria', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                },
+                body: JSON.stringify({ zonaHoraria: zona })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                select.dataset.valorAnterior = zona;
+
+                feedback.style.display = 'block';
+                feedback.style.background = 'rgba(16, 185, 129, 0.1)';
+                feedback.style.color = '#10b981';
+                feedback.innerHTML = '<strong>✓</strong> Zona horaria actualizada. Tus contadores de LadoCoins ahora se resetean a medianoche en tu hora local.';
+
+                setTimeout(() => {
+                    feedback.style.display = 'none';
+                }, 4000);
+            } else {
+                throw new Error(data.message || 'Error al cambiar zona horaria');
+            }
+        } catch (error) {
+            select.value = valorAnterior;
+
+            feedback.style.display = 'block';
+            feedback.style.background = 'rgba(239, 68, 68, 0.1)';
+            feedback.style.color = '#ef4444';
+            feedback.innerHTML = '<strong>✗</strong> ' + error.message;
+
+            setTimeout(() => {
+                feedback.style.display = 'none';
+            }, 3000);
+        }
+    }
+
+    // Detectar zona horaria del navegador al cargar
+    (function() {
+        try {
+            const zonaDetectada = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const elemento = document.getElementById('zonaDetectada');
+            if (elemento && zonaDetectada) {
+                elemento.textContent = zonaDetectada;
+            }
+        } catch (e) {
+            const elemento = document.getElementById('zonaDetectada');
+            if (elemento) {
+                elemento.textContent = 'No detectada';
+            }
+        }
+    })();
 </script>

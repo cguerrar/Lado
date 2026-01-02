@@ -103,7 +103,7 @@ namespace Lado.Services
             [TipoArchivoValidacion.Imagen] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".heic", ".heif", ".dng" },
             [TipoArchivoValidacion.Video] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                { ".mp4", ".webm", ".mov", ".avi", ".mkv", ".m4v" },
+                { ".mp4", ".webm", ".mov", ".avi", ".mkv", ".m4v", ".3gp", ".3gpp", ".mxf", ".mpg", ".mpeg", ".wmv", ".flv" },
             [TipoArchivoValidacion.Audio] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 { ".mp3", ".wav", ".ogg", ".aac", ".flac", ".m4a" }
         };
@@ -116,7 +116,9 @@ namespace Lado.Services
                   "image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence",
                   "image/avif", "image/tiff", "image/x-adobe-dng", "image/dng" },
             [TipoArchivoValidacion.Video] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                { "video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/x-matroska", "video/mpeg" },
+                { "video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/x-matroska", "video/mpeg",
+                  "video/3gpp", "video/3gpp2", "video/x-m4v", "video/x-flv", "video/x-ms-wmv", "video/mxf",
+                  "video/x-quicktime", "video/avi", "video/msvideo" },
             [TipoArchivoValidacion.Audio] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 { "audio/mpeg", "audio/wav", "audio/ogg", "audio/aac", "audio/flac", "audio/x-m4a", "audio/mp4" }
         };
@@ -208,8 +210,8 @@ namespace Lado.Services
                 };
 
                 // Permitir application/octet-stream para formatos que los navegadores no reconocen bien
-                // (HEIC, HEIF, AVIF, DNG) - la validación de magic bytes verificará el tipo real
-                var extensionesConOctetStream = new[] { ".heic", ".heif", ".avif", ".dng" };
+                // (HEIC, HEIF, AVIF, DNG, videos de iPhone) - la validación de magic bytes verificará el tipo real
+                var extensionesConOctetStream = new[] { ".heic", ".heif", ".avif", ".dng", ".mov", ".m4v", ".3gp" };
                 var esOctetStreamPermitido = contentType == "application/octet-stream" &&
                     extensionesConOctetStream.Contains(resultado.Extension);
 
@@ -229,16 +231,19 @@ namespace Lado.Services
             }
 
             // 4. CRÍTICO: Validar magic bytes (firma del archivo)
-            // Leer 64 bytes para asegurar detección de HEIC/HEIF (necesita ftyp + brands)
-            var header = await LeerHeaderAsync(archivo, 64);
+            // Leer 128 bytes para asegurar detección de todos los formatos (HEIC, ProRes, etc.)
+            var header = await LeerHeaderAsync(archivo, 128);
             var tipoDetectado = DetectarTipoPorMagicBytes(header);
 
             if (string.IsNullOrEmpty(tipoDetectado))
             {
                 resultado.EsValido = false;
                 resultado.MensajeError = "No se pudo verificar el tipo real del archivo. El archivo puede estar corrupto o no ser válido.";
-                _logger.LogWarning("[FileValidation] Magic bytes no reconocidos - Archivo: {FileName}, Extensión: {Extension}, ContentType: {ContentType}, Tamaño: {Size}MB, Header (hex): {Header}",
-                    archivo.FileName, resultado.Extension, archivo.ContentType, archivo.Length / (1024.0 * 1024.0), BitConverter.ToString(header.Take(20).ToArray()));
+                // Log detallado para diagnóstico de videos de iPhone
+                var headerHex = BitConverter.ToString(header.Take(32).ToArray());
+                var headerAscii = new string(header.Take(32).Select(b => b >= 32 && b < 127 ? (char)b : '.').ToArray());
+                _logger.LogWarning("[FileValidation] Magic bytes no reconocidos - Archivo: {FileName}, Extensión: {Extension}, ContentType: {ContentType}, Tamaño: {Size}MB\n  Header (hex): {HeaderHex}\n  Header (ascii): {HeaderAscii}",
+                    archivo.FileName, resultado.Extension, archivo.ContentType, archivo.Length / (1024.0 * 1024.0), headerHex, headerAscii);
                 return resultado;
             }
 
@@ -344,13 +349,21 @@ namespace Lado.Services
                     // Leer el major brand (4 bytes después de "ftyp")
                     var majorBrand = System.Text.Encoding.ASCII.GetString(header, ftypPos + 4, 4);
 
-                    // Brands de HEIC/HEIF/AVIF
-                    var heicBrands = new[] { "heic", "heix", "hevc", "hevx", "mif1", "msf1", "avif", "avis" };
+                    // Brands de HEIC/HEIF/AVIF (imagen)
+                    // NOTA: "hevc" y "hevx" son para VIDEO H.265, NO para imágenes
+                    var heicBrands = new[] { "heic", "heix", "mif1", "msf1", "avif", "avis" };
                     if (heicBrands.Any(b => majorBrand.Equals(b, StringComparison.OrdinalIgnoreCase)))
                     {
                         return majorBrand.StartsWith("avif", StringComparison.OrdinalIgnoreCase)
                             ? "image/avif"
                             : "image/heic";
+                    }
+
+                    // hevc/hevx son videos HEVC (H.265), no imágenes
+                    if (majorBrand.Equals("hevc", StringComparison.OrdinalIgnoreCase) ||
+                        majorBrand.Equals("hevx", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return "video/mp4";
                     }
 
                     // Si el major brand no es HEIC, verificar compatible brands (después de minor version)
@@ -371,16 +384,60 @@ namespace Lado.Services
                 }
             }
 
-            // MP4/M4V/MOV - Buscar "ftyp" en los primeros 32 bytes (cualquier tamaño de atom)
+            // MP4/M4V/MOV/ProRes - Buscar "ftyp" en los primeros 64 bytes (cualquier tamaño de atom)
+            // Incluye videos de iPhone en formato ProRes, QuickTime, etc.
             if (header.Length >= 8)
             {
-                for (int i = 0; i < Math.Min(header.Length - 4, 32); i++)
+                for (int i = 0; i < Math.Min(header.Length - 4, 60); i++)
                 {
                     // Buscar secuencia "ftyp" (0x66, 0x74, 0x79, 0x70)
                     if (header[i] == 0x66 && header[i + 1] == 0x74 &&
                         header[i + 2] == 0x79 && header[i + 3] == 0x70)
                     {
+                        // Verificar el major brand para determinar si es video
+                        if (i + 8 <= header.Length)
+                        {
+                            var majorBrand = System.Text.Encoding.ASCII.GetString(header, i + 4, 4).Trim();
+                            // Brands de video conocidos (iPhone, QuickTime, MP4, ProRes, HEVC, etc.)
+                            var videoBrands = new[] {
+                                "qt", "isom", "iso2", "iso3", "iso4", "iso5", "iso6",
+                                "mp41", "mp42", "mp71", "M4V", "M4VH", "M4VP", "m4v",
+                                "avc1", "hvc1", "hev1", "hevc", "hevx", // H.264 y H.265/HEVC
+                                "MSNV", "NDSC", "NDSH", "NDSM", "NDSP", "NDSS", "NDXC", "NDXH", "NDXM", "NDXP", "NDXS",
+                                "3g2a", "3g2b", "3g2c", "3gp1", "3gp2", "3gp3", "3gp4", "3gp5", "3gp6", "3gp7", "3gp8", "3gp9",
+                                "FACE", "f4a", "f4b", "f4p", "f4v",
+                                "pxn", "xavc", "icpf", "ipr",
+                                "apch", "apco", "apcn", "apcs", "ap4h", "ap4x", // ProRes 422/4444
+                                "aprh", "aprn", "acvh", "acvn" // ProRes RAW
+                            };
+                            if (videoBrands.Any(b => majorBrand.Equals(b, StringComparison.OrdinalIgnoreCase) ||
+                                                     majorBrand.StartsWith(b, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                return "video/mp4";
+                            }
+                        }
+                        // Si no se puede determinar el brand, asumir video genérico
                         return "video/mp4";
+                    }
+                }
+            }
+
+            // QuickTime sin ftyp (formato antiguo/ProRes RAW) - buscar atoms de video
+            // Los archivos QuickTime pueden empezar con: moov, mdat, wide, free, skip, pnot
+            if (header.Length >= 8)
+            {
+                // Buscar atoms de QuickTime en los primeros bytes
+                var qtAtoms = new[] { "moov", "mdat", "wide", "free", "skip", "pnot" };
+                for (int i = 0; i < Math.Min(header.Length - 8, 32); i += 4)
+                {
+                    if (i + 8 <= header.Length)
+                    {
+                        // Los atoms tienen: [4 bytes size][4 bytes type]
+                        var atomType = System.Text.Encoding.ASCII.GetString(header, i + 4, 4);
+                        if (qtAtoms.Any(a => atomType.Equals(a, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            return "video/quicktime";
+                        }
                     }
                 }
             }

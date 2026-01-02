@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Lado.Data;
 using Lado.Models;
+using Lado.Services;
 
 namespace Lado.Controllers
 {
@@ -14,8 +15,9 @@ namespace Lado.Controllers
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ApplicationDbContext _context;
         private readonly IWebHostEnvironment _environment;
-        private readonly Services.IInteresesService _interesesService;
-        private readonly Services.IFileValidationService _fileValidationService;
+        private readonly IInteresesService _interesesService;
+        private readonly IFileValidationService _fileValidationService;
+        private readonly ILadoCoinsService _ladoCoinsService;
         private readonly ILogger<UsuarioController> _logger;
 
         public UsuarioController(
@@ -23,8 +25,9 @@ namespace Lado.Controllers
             SignInManager<ApplicationUser> signInManager,
             ApplicationDbContext context,
             IWebHostEnvironment environment,
-            Services.IInteresesService interesesService,
-            Services.IFileValidationService fileValidationService,
+            IInteresesService interesesService,
+            IFileValidationService fileValidationService,
+            ILadoCoinsService ladoCoinsService,
             ILogger<UsuarioController> logger)
         {
             _userManager = userManager;
@@ -33,6 +36,7 @@ namespace Lado.Controllers
             _environment = environment;
             _interesesService = interesesService;
             _fileValidationService = fileValidationService;
+            _ladoCoinsService = ladoCoinsService;
             _logger = logger;
         }
 
@@ -94,6 +98,11 @@ namespace Lado.Controllers
             usuario.Email = model.Email;
             usuario.PhoneNumber = model.PhoneNumber;
 
+            // Actualizar campos para completar perfil (LadoCoins)
+            usuario.Pais = model.Pais;
+            usuario.FechaNacimiento = model.FechaNacimiento;
+            usuario.Genero = model.Genero;
+
             // Actualizar biografías
             usuario.Biografia = model.Biografia;
             usuario.BiografiaLadoB = model.BiografiaLadoB;
@@ -134,6 +143,32 @@ namespace Lado.Controllers
 
             if (result.Succeeded)
             {
+                // ⭐ LADOCOINS: Verificar y entregar bono de perfil completo
+                if (!usuario.BonoPerfilCompletoEntregado && usuario.PerfilCompletoParaBono())
+                {
+                    try
+                    {
+                        var bonoEntregado = await _ladoCoinsService.AcreditarBonoAsync(
+                            usuario.Id,
+                            TipoTransaccionLadoCoin.BonoCompletarPerfil,
+                            "Bono por completar tu perfil en LADO"
+                        );
+
+                        if (bonoEntregado)
+                        {
+                            usuario.BonoPerfilCompletoEntregado = true;
+                            await _userManager.UpdateAsync(usuario);
+                            _logger.LogInformation("⭐ Bono de perfil completo entregado a: {UserId}", usuario.Id);
+                            TempData["Success"] = "¡Perfil actualizado! Además, ganaste LadoCoins por completar tu perfil.";
+                            return RedirectToAction(nameof(Perfil));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error al entregar bono de perfil completo a: {UserId}", usuario.Id);
+                    }
+                }
+
                 TempData["Success"] = "Perfil actualizado correctamente";
                 return RedirectToAction(nameof(Perfil));
             }
@@ -634,6 +669,39 @@ namespace Lado.Controllers
             };
 
             return Json(new { success = true, message = $"Idioma cambiado a {nombreIdioma}" });
+        }
+
+        // POST: /Usuario/CambiarZonaHoraria
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CambiarZonaHoraria([FromBody] CambiarZonaHorariaRequest request)
+        {
+            // Validar zona horaria
+            var zonasValidas = new[]
+            {
+                "America/Santiago", "America/Bogota", "America/Lima", "America/Mexico_City",
+                "America/Argentina/Buenos_Aires", "America/Caracas", "America/New_York",
+                "America/Los_Angeles", "America/Sao_Paulo", "Europe/Madrid", "Europe/London", "Europe/Paris"
+            };
+
+            if (string.IsNullOrEmpty(request.ZonaHoraria) || !zonasValidas.Contains(request.ZonaHoraria))
+            {
+                return Json(new { success = false, message = "Zona horaria no válida" });
+            }
+
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            usuario.ZonaHoraria = request.ZonaHoraria;
+            await _userManager.UpdateAsync(usuario);
+
+            _logger.LogInformation("Zona horaria cambiada: Usuario={UserId}, Zona={ZonaHoraria}",
+                usuario.Id, request.ZonaHoraria);
+
+            return Json(new { success = true, message = "Zona horaria actualizada" });
         }
 
         // POST: /Usuario/ActualizarDeteccionUbicacion
@@ -1699,6 +1767,12 @@ namespace Lado.Controllers
     public class CambiarIdiomaRequest
     {
         public string Idioma { get; set; } = "es";
+    }
+
+    public class CambiarZonaHorariaRequest
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("zonaHoraria")]
+        public string ZonaHoraria { get; set; } = "America/Bogota";
     }
 
     public class ActualizarDeteccionUbicacionRequest

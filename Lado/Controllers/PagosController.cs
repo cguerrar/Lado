@@ -16,17 +16,23 @@ namespace Lado.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILogger<PagosController> _logger;
         private readonly IRateLimitService _rateLimitService;
+        private readonly ILadoCoinsService _ladoCoinsService;
+        private readonly IReferidosService _referidosService;
 
         public PagosController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             ILogger<PagosController> logger,
-            IRateLimitService rateLimitService)
+            IRateLimitService rateLimitService,
+            ILadoCoinsService ladoCoinsService,
+            IReferidosService referidosService)
         {
             _context = context;
             _userManager = userManager;
             _logger = logger;
             _rateLimitService = rateLimitService;
+            _ladoCoinsService = ladoCoinsService;
+            _referidosService = referidosService;
         }
 
         // ============================================
@@ -35,7 +41,7 @@ namespace Lado.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Suscribirse(string creadorId, int? tipoLado = null, int? duracion = null)
+        public async Task<IActionResult> Suscribirse(string creadorId, int? tipoLado = null, int? duracion = null, decimal? montoLadoCoins = null)
         {
             try
             {
@@ -93,10 +99,33 @@ namespace Lado.Controllers
                     return RedirectToAction("Perfil", "Feed", new { id = creadorId });
                 }
 
-                // Solo verificar saldo si es LadoB (tiene costo)
-                if (precio > 0 && usuario.Saldo < precio)
+                // ⭐ LADOCOINS: Calcular pago mixto
+                decimal usarLadoCoins = 0;
+                decimal montoReal = precio;
+                decimal montoQuemado = 0;
+
+                if (precio > 0 && montoLadoCoins.HasValue && montoLadoCoins.Value > 0)
                 {
-                    TempData["Error"] = $"Saldo insuficiente. Necesitas ${(precio - usuario.Saldo):N2} más";
+                    // Usar el porcentaje máximo configurado por el creador (default 30%)
+                    var maxPorcentaje = creador.PorcentajeMaxLadoCoinsSuscripcion / 100m;
+                    var maxLadoCoins = precio * maxPorcentaje;
+                    usarLadoCoins = Math.Min(montoLadoCoins.Value, maxLadoCoins);
+
+                    // Verificar si tiene suficientes LadoCoins
+                    var saldoLadoCoins = await _ladoCoinsService.ObtenerSaldoDisponibleAsync(usuarioId);
+                    if (saldoLadoCoins < usarLadoCoins)
+                    {
+                        usarLadoCoins = saldoLadoCoins;
+                    }
+
+                    // Recalcular monto real necesario
+                    montoReal = precio - usarLadoCoins;
+                }
+
+                // Verificar saldo real necesario
+                if (montoReal > 0 && usuario.Saldo < montoReal)
+                {
+                    TempData["Error"] = $"Saldo insuficiente. Necesitas ${(montoReal - usuario.Saldo):N2} más";
                     return RedirectToAction("Perfil", "Feed", new { id = creadorId });
                 }
 
@@ -104,29 +133,63 @@ namespace Lado.Controllers
 
                 try
                 {
-                    // Variables para transacciones (solo aplica si hay cobro)
-                    decimal comision = 0;
-                    decimal gananciaCreador = 0;
+                    // Variables para transacciones
+                    decimal comisionReal = 0;
+                    decimal comisionLC = 0;
+                    decimal gananciaCreadorReal = 0;
+                    decimal gananciaCreadorLC = 0;
 
                     // Solo procesar cobro si es LadoB (precio > 0)
                     if (precio > 0)
                     {
-                        // 1. Descontar saldo del fan
-                        usuario.Saldo -= precio;
+                        // ⭐ 1. Descontar LadoCoins si aplica
+                        if (usarLadoCoins > 0)
+                        {
+                            var (exitoLC, quemado) = await _ladoCoinsService.DebitarAsync(
+                                usuarioId,
+                                usarLadoCoins,
+                                TipoTransaccionLadoCoin.PagoSuscripcion,
+                                $"Pago parcial suscripción a {creador.Seudonimo ?? creador.NombreCompleto}"
+                            );
 
-                        // 2. Calcular comisión (20%)
-                        comision = precio * 0.20m;
-                        gananciaCreador = precio - comision;
+                            if (!exitoLC)
+                            {
+                                await transaction.RollbackAsync();
+                                TempData["Error"] = "Error al procesar LadoCoins";
+                                return RedirectToAction("Perfil", "Feed", new { id = creadorId });
+                            }
 
-                        // 3. Agregar ganancia al creador
-                        creador.Saldo += gananciaCreador;
-                        creador.TotalGanancias += gananciaCreador;
+                            montoQuemado = quemado;
+                            comisionLC = usarLadoCoins * 0.20m;
+                            gananciaCreadorLC = usarLadoCoins - comisionLC;
+
+                            // Creador recibe LadoCoins (NO dinero real)
+                            await _ladoCoinsService.AcreditarMontoAsync(
+                                creadorId,
+                                gananciaCreadorLC,
+                                TipoTransaccionLadoCoin.RecibirPago,
+                                $"Pago suscripción de @{usuario.UserName} (LadoCoins)"
+                            );
+
+                            // ⭐ Procesar comisión de referido si aplica
+                            await _referidosService.ProcesarComisionAsync(usuarioId, usarLadoCoins);
+                        }
+
+                        // 2. Descontar saldo real del fan
+                        if (montoReal > 0)
+                        {
+                            usuario.Saldo -= montoReal;
+                            comisionReal = montoReal * 0.20m;
+                            gananciaCreadorReal = montoReal - comisionReal;
+                            creador.Saldo += gananciaCreadorReal;
+                            creador.TotalGanancias += gananciaCreadorReal;
+                        }
                     }
 
                     // Incrementar seguidores siempre
                     creador.NumeroSeguidores++;
 
-                    // 4. Crear suscripción con duración
+                    // 3. Crear suscripción con duración
                     var fechaInicio = DateTime.Now;
                     var fechaFin = Suscripcion.CalcularFechaFin(fechaInicio, tipoDuracion);
 
@@ -142,32 +205,35 @@ namespace Lado.Controllers
                         EstaActiva = true,
                         TipoLado = tipo,
                         Duracion = tipoDuracion,
-                        RenovacionAutomatica = tipoDuracion == DuracionSuscripcion.Mes // Solo mensual renueva automático
+                        RenovacionAutomatica = tipoDuracion == DuracionSuscripcion.Mes
                     };
 
                     _context.Suscripciones.Add(suscripcion);
 
-                    // 5. Registrar transacciones solo si hubo cobro
-                    if (precio > 0)
+                    // 4. Registrar transacciones solo si hubo cobro real
+                    if (montoReal > 0)
                     {
                         var textoDuracion = Suscripcion.ObtenerTextoDuracion(tipoDuracion);
+                        var descripcionPago = usarLadoCoins > 0
+                            ? $"Suscripción Premium ({textoDuracion}) a {creador.Seudonimo ?? creador.NombreCompleto} (${montoReal:N2} + ${usarLadoCoins:N2} LC)"
+                            : $"Suscripción Premium ({textoDuracion}) a {creador.Seudonimo ?? creador.NombreCompleto}";
 
                         var transaccionFan = new Transaccion
                         {
                             UsuarioId = usuarioId,
                             TipoTransaccion = TipoTransaccion.Suscripcion,
-                            Monto = -precio,
+                            Monto = -montoReal,
                             FechaTransaccion = DateTime.Now,
-                            Descripcion = $"Suscripción Premium ({textoDuracion}) a {creador.Seudonimo ?? creador.NombreCompleto}"
+                            Descripcion = descripcionPago
                         };
 
                         var transaccionCreador = new Transaccion
                         {
                             UsuarioId = creadorId,
                             TipoTransaccion = TipoTransaccion.IngresoSuscripcion,
-                            Monto = gananciaCreador,
-                            Comision = comision,
-                            MontoNeto = gananciaCreador,
+                            Monto = gananciaCreadorReal,
+                            Comision = comisionReal,
+                            MontoNeto = gananciaCreadorReal,
                             FechaTransaccion = DateTime.Now,
                             Descripcion = $"Nueva suscripción premium ({textoDuracion}) de @{usuario.UserName}"
                         };
@@ -183,8 +249,13 @@ namespace Lado.Controllers
                         ? $"¡Te has suscrito por {textoDuracionMsg} al contenido premium de {creador.Seudonimo ?? creador.NombreCompleto}!"
                         : $"¡Ahora sigues a {creador.NombreCompleto}!";
 
-                    _logger.LogInformation("Suscripción creada: Fan {FanId} -> Creador {CreadorId}, Tipo: {Tipo}, Duración: {Duracion}, Precio: {Precio}",
-                        usuarioId, creadorId, tipo, tipoDuracion, precio);
+                    if (usarLadoCoins > 0)
+                    {
+                        mensaje += $" (Usaste ${usarLadoCoins:N2} en LadoCoins)";
+                    }
+
+                    _logger.LogInformation("Suscripción creada: Fan {FanId} -> Creador {CreadorId}, Tipo: {Tipo}, Duración: {Duracion}, Precio: {Precio}, LadoCoins: {LC}, Real: {Real}",
+                        usuarioId, creadorId, tipo, tipoDuracion, precio, usarLadoCoins, montoReal);
 
                     TempData["Success"] = mensaje;
                     return RedirectToAction("Perfil", "Feed", new { id = creadorId });
@@ -464,10 +535,35 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = $"El monto máximo es ${MONTO_MAXIMO_TIP:N0}" });
                 }
 
-                // Verificar saldo
-                if (usuario.Saldo < request.Monto)
+                // ⭐ LADOCOINS: Calcular pago mixto (100% LC permitido para propinas)
+                decimal usarLadoCoins = request.MontoLadoCoins ?? 0;
+                decimal montoReal = request.Monto - usarLadoCoins;
+
+                // Validar LadoCoins
+                if (usarLadoCoins > 0)
                 {
-                    var faltante = request.Monto - usuario.Saldo;
+                    var saldoLC = await _ladoCoinsService.ObtenerSaldoDisponibleAsync(usuarioId);
+                    if (saldoLC < usarLadoCoins)
+                    {
+                        return Json(new
+                        {
+                            success = false,
+                            message = $"No tienes suficientes LadoCoins. Disponible: ${saldoLC:N2}"
+                        });
+                    }
+
+                    // Ajustar si el usuario quiere usar más LC del monto total
+                    if (usarLadoCoins > request.Monto)
+                    {
+                        usarLadoCoins = request.Monto;
+                        montoReal = 0;
+                    }
+                }
+
+                // Verificar saldo real
+                if (montoReal > 0 && usuario.Saldo < montoReal)
+                {
+                    var faltante = montoReal - usuario.Saldo;
                     return Json(new
                     {
                         success = false,
@@ -480,18 +576,55 @@ namespace Lado.Controllers
 
                 try
                 {
-                    // 1. Descontar saldo del fan
-                    usuario.Saldo -= request.Monto;
+                    decimal comisionReal = 0;
+                    decimal comisionLC = 0;
+                    decimal gananciaCreadorReal = 0;
+                    decimal gananciaCreadorLC = 0;
+                    decimal montoQuemado = 0;
 
-                    // 2. Calcular comisión (10% para tips)
-                    var comision = request.Monto * 0.10m;
-                    var gananciaCreador = request.Monto - comision;
+                    // ⭐ 1. Procesar LadoCoins si aplica
+                    if (usarLadoCoins > 0)
+                    {
+                        var (exitoLC, quemado) = await _ladoCoinsService.DebitarAsync(
+                            usuarioId,
+                            usarLadoCoins,
+                            TipoTransaccionLadoCoin.PagoPropina,
+                            $"Propina a {creador.Seudonimo ?? creador.NombreCompleto}"
+                        );
 
-                    // 3. Agregar ganancia al creador
-                    creador.Saldo += gananciaCreador;
-                    creador.TotalGanancias += gananciaCreador;
+                        if (!exitoLC)
+                        {
+                            await transaction.RollbackAsync();
+                            return Json(new { success = false, message = "Error al procesar LadoCoins" });
+                        }
 
-                    // 4. Registrar tip
+                        montoQuemado = quemado;
+                        comisionLC = usarLadoCoins * 0.10m; // 10% comisión para tips
+                        gananciaCreadorLC = usarLadoCoins - comisionLC;
+
+                        // Creador recibe LadoCoins (NO dinero real)
+                        await _ladoCoinsService.AcreditarMontoAsync(
+                            request.CreadorId,
+                            gananciaCreadorLC,
+                            TipoTransaccionLadoCoin.RecibirPago,
+                            $"Propina de @{usuario.UserName} (LadoCoins)"
+                        );
+
+                        // Procesar comisión de referido
+                        await _referidosService.ProcesarComisionAsync(usuarioId, usarLadoCoins);
+                    }
+
+                    // 2. Descontar saldo real del fan
+                    if (montoReal > 0)
+                    {
+                        usuario.Saldo -= montoReal;
+                        comisionReal = montoReal * 0.10m;
+                        gananciaCreadorReal = montoReal - comisionReal;
+                        creador.Saldo += gananciaCreadorReal;
+                        creador.TotalGanancias += gananciaCreadorReal;
+                    }
+
+                    // 3. Registrar tip
                     var tip = new Tip
                     {
                         FanId = usuarioId,
@@ -503,39 +636,54 @@ namespace Lado.Controllers
 
                     _context.Tips.Add(tip);
 
-                    // 5. Registrar transacciones
-                    var transaccionFan = new Transaccion
+                    // 4. Registrar transacciones solo si hubo dinero real
+                    if (montoReal > 0)
                     {
-                        UsuarioId = usuarioId,
-                        TipoTransaccion = TipoTransaccion.Tip,
-                        Monto = -request.Monto,
-                        FechaTransaccion = DateTime.Now,
-                        Descripcion = $"Tip enviado a {creador.NombreCompleto}"
-                    };
+                        var descripcion = usarLadoCoins > 0
+                            ? $"Tip enviado a {creador.NombreCompleto} (${montoReal:N2} + ${usarLadoCoins:N2} LC)"
+                            : $"Tip enviado a {creador.NombreCompleto}";
 
-                    var transaccionCreador = new Transaccion
-                    {
-                        UsuarioId = request.CreadorId,
-                        TipoTransaccion = TipoTransaccion.IngresoPropina,
-                        Monto = gananciaCreador,
-                        Comision = comision,
-                        MontoNeto = gananciaCreador,
-                        FechaTransaccion = DateTime.Now,
-                        Descripcion = $"Tip recibido de @{usuario.UserName}"
-                    };
+                        var transaccionFan = new Transaccion
+                        {
+                            UsuarioId = usuarioId,
+                            TipoTransaccion = TipoTransaccion.Tip,
+                            Monto = -montoReal,
+                            FechaTransaccion = DateTime.Now,
+                            Descripcion = descripcion
+                        };
 
-                    _context.Transacciones.AddRange(transaccionFan, transaccionCreador);
+                        var transaccionCreador = new Transaccion
+                        {
+                            UsuarioId = request.CreadorId,
+                            TipoTransaccion = TipoTransaccion.IngresoPropina,
+                            Monto = gananciaCreadorReal,
+                            Comision = comisionReal,
+                            MontoNeto = gananciaCreadorReal,
+                            FechaTransaccion = DateTime.Now,
+                            Descripcion = $"Tip recibido de @{usuario.UserName}"
+                        };
+
+                        _context.Transacciones.AddRange(transaccionFan, transaccionCreador);
+                    }
 
                     await _context.SaveChangesAsync();
                     await transaction.CommitAsync();
 
-                    _logger.LogInformation($"Tip enviado: ${request.Monto} de {usuarioId} a {request.CreadorId}");
+                    var mensajeExito = usarLadoCoins > 0 && montoReal > 0
+                        ? $"¡Tip de ${request.Monto:N2} enviado! (${montoReal:N2} + ${usarLadoCoins:N2} LC)"
+                        : usarLadoCoins > 0
+                            ? $"¡Tip de ${usarLadoCoins:N2} LC enviado exitosamente!"
+                            : $"¡Tip de ${request.Monto:N2} enviado exitosamente!";
+
+                    _logger.LogInformation("Tip enviado: ${Monto} de {FanId} a {CreadorId} (Real: {Real}, LC: {LC})",
+                        request.Monto, usuarioId, request.CreadorId, montoReal, usarLadoCoins);
 
                     return Json(new
                     {
                         success = true,
-                        message = $"¡Tip de ${request.Monto:N2} enviado exitosamente!",
-                        nuevoSaldo = usuario.Saldo
+                        message = mensajeExito,
+                        nuevoSaldo = usuario.Saldo,
+                        nuevoSaldoLC = await _ladoCoinsService.ObtenerSaldoDisponibleAsync(usuarioId)
                     });
                 }
                 catch (Exception ex)
@@ -551,6 +699,43 @@ namespace Lado.Controllers
                 return Json(new { success = false, message = "Error al procesar el tip" });
             }
         }
+
+        /// <summary>
+        /// Obtener info de LadoCoins del usuario actual (AJAX)
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ObtenerInfoLadoCoins(string? creadorId = null)
+        {
+            var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(usuarioId))
+            {
+                return Json(new { success = false });
+            }
+
+            var saldo = await _ladoCoinsService.ObtenerSaldoDisponibleAsync(usuarioId);
+
+            // Si se especifica creadorId, obtener su configuración de LadoCoins
+            int porcentajeMaximo = 30; // Default
+            bool aceptaLadoCoins = true;
+
+            if (!string.IsNullOrEmpty(creadorId))
+            {
+                var creador = await _userManager.FindByIdAsync(creadorId);
+                if (creador != null)
+                {
+                    aceptaLadoCoins = creador.AceptaLadoCoins;
+                    porcentajeMaximo = creador.PorcentajeMaxLadoCoinsSuscripcion;
+                }
+            }
+
+            return Json(new
+            {
+                success = true,
+                saldoLadoCoins = saldo,
+                aceptaLadoCoins,
+                porcentajeMaximo
+            });
+        }
     }
 
     // ============================================
@@ -565,8 +750,9 @@ namespace Lado.Controllers
 
     public class EnviarTipRequest
     {
-        public string CreadorId { get; set; }
+        public string CreadorId { get; set; } = string.Empty;
         public decimal Monto { get; set; }
         public string? Mensaje { get; set; }
+        public decimal? MontoLadoCoins { get; set; }
     }
 }

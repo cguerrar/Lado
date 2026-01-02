@@ -146,6 +146,15 @@ namespace Lado.Data
         // ========================================
         public DbSet<Popup> Popups { get; set; }
 
+        // ========================================
+        // ⭐ DbSets NUEVOS - SISTEMA LADO COINS
+        // ========================================
+        public DbSet<LadoCoin> LadoCoins { get; set; }
+        public DbSet<TransaccionLadoCoin> TransaccionesLadoCoins { get; set; }
+        public DbSet<Referido> Referidos { get; set; }
+        public DbSet<RachaUsuario> RachasUsuarios { get; set; }
+        public DbSet<ConfiguracionLadoCoin> ConfiguracionesLadoCoins { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -1654,6 +1663,345 @@ namespace Lado.Data
                         Categoria = "General"
                     }
                 );
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE LADO COINS (SALDO)
+            // ========================================
+            modelBuilder.Entity<LadoCoin>(entity =>
+            {
+                entity.HasKey(l => l.Id);
+
+                entity.HasOne(l => l.Usuario)
+                    .WithOne(u => u.LadoCoin)
+                    .HasForeignKey<LadoCoin>(l => l.UsuarioId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(l => l.SaldoDisponible)
+                    .HasColumnType("decimal(18,2)")
+                    .HasDefaultValue(0);
+
+                entity.Property(l => l.SaldoPorVencer)
+                    .HasColumnType("decimal(18,2)")
+                    .HasDefaultValue(0);
+
+                entity.Property(l => l.TotalGanado)
+                    .HasColumnType("decimal(18,2)")
+                    .HasDefaultValue(0);
+
+                entity.Property(l => l.TotalGastado)
+                    .HasColumnType("decimal(18,2)")
+                    .HasDefaultValue(0);
+
+                entity.Property(l => l.TotalQuemado)
+                    .HasColumnType("decimal(18,2)")
+                    .HasDefaultValue(0);
+
+                entity.Property(l => l.TotalRecibido)
+                    .HasColumnType("decimal(18,2)")
+                    .HasDefaultValue(0);
+
+                // Índices
+                entity.HasIndex(l => l.UsuarioId)
+                    .IsUnique()
+                    .HasDatabaseName("IX_LadoCoins_UsuarioId");
+
+                entity.HasIndex(l => l.SaldoDisponible)
+                    .HasDatabaseName("IX_LadoCoins_SaldoDisponible");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE TRANSACCIONES LADO COINS
+            // ========================================
+            modelBuilder.Entity<TransaccionLadoCoin>(entity =>
+            {
+                entity.HasKey(t => t.Id);
+
+                entity.HasOne(t => t.Usuario)
+                    .WithMany()
+                    .HasForeignKey(t => t.UsuarioId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(t => t.Monto)
+                    .HasColumnType("decimal(18,2)")
+                    .IsRequired();
+
+                entity.Property(t => t.MontoQuemado)
+                    .HasColumnType("decimal(18,2)");
+
+                entity.Property(t => t.SaldoAnterior)
+                    .HasColumnType("decimal(18,2)")
+                    .IsRequired();
+
+                entity.Property(t => t.SaldoPosterior)
+                    .HasColumnType("decimal(18,2)")
+                    .IsRequired();
+
+                entity.Property(t => t.MontoRestante)
+                    .HasColumnType("decimal(18,2)")
+                    .HasDefaultValue(0);
+
+                entity.Property(t => t.Descripcion)
+                    .HasMaxLength(500)
+                    .IsRequired(false);
+
+                entity.Property(t => t.ReferenciaId)
+                    .HasMaxLength(100)
+                    .IsRequired(false);
+
+                entity.Property(t => t.TipoReferencia)
+                    .HasMaxLength(50)
+                    .IsRequired(false);
+
+                entity.Property(t => t.Vencido)
+                    .HasDefaultValue(false);
+
+                // Índices
+                entity.HasIndex(t => t.UsuarioId)
+                    .HasDatabaseName("IX_TransaccionesLadoCoins_UsuarioId");
+
+                entity.HasIndex(t => t.Tipo)
+                    .HasDatabaseName("IX_TransaccionesLadoCoins_Tipo");
+
+                entity.HasIndex(t => t.FechaTransaccion)
+                    .HasDatabaseName("IX_TransaccionesLadoCoins_FechaTransaccion");
+
+                entity.HasIndex(t => t.FechaVencimiento)
+                    .HasDatabaseName("IX_TransaccionesLadoCoins_FechaVencimiento");
+
+                entity.HasIndex(t => t.Vencido)
+                    .HasDatabaseName("IX_TransaccionesLadoCoins_Vencido");
+
+                // Índice compuesto para búsqueda de transacciones por vencer (FIFO)
+                entity.HasIndex(t => new { t.UsuarioId, t.Vencido, t.FechaVencimiento, t.MontoRestante })
+                    .HasDatabaseName("IX_TransaccionesLadoCoins_Vencimiento_FIFO");
+
+                // Índice para historial del usuario
+                entity.HasIndex(t => new { t.UsuarioId, t.FechaTransaccion })
+                    .HasDatabaseName("IX_TransaccionesLadoCoins_Usuario_Fecha");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE REFERIDOS
+            // ========================================
+            modelBuilder.Entity<Referido>(entity =>
+            {
+                entity.HasKey(r => r.Id);
+
+                entity.HasOne(r => r.Referidor)
+                    .WithMany(u => u.MisReferidos)
+                    .HasForeignKey(r => r.ReferidorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(r => r.ReferidoUsuario)
+                    .WithMany()
+                    .HasForeignKey(r => r.ReferidoUsuarioId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.Property(r => r.CodigoUsado)
+                    .HasMaxLength(20)
+                    .IsRequired();
+
+                entity.Property(r => r.TotalComisionGanada)
+                    .HasColumnType("decimal(18,2)")
+                    .HasDefaultValue(0);
+
+                entity.Property(r => r.BonoReferidorEntregado)
+                    .HasDefaultValue(false);
+
+                entity.Property(r => r.BonoReferidoEntregado)
+                    .HasDefaultValue(false);
+
+                entity.Property(r => r.BonoCreadorLadoBEntregado)
+                    .HasDefaultValue(false);
+
+                entity.Property(r => r.ComisionActiva)
+                    .HasDefaultValue(true);
+
+                // Índices
+                entity.HasIndex(r => r.ReferidorId)
+                    .HasDatabaseName("IX_Referidos_ReferidorId");
+
+                entity.HasIndex(r => r.ReferidoUsuarioId)
+                    .IsUnique()
+                    .HasDatabaseName("IX_Referidos_ReferidoUsuarioId");
+
+                entity.HasIndex(r => r.CodigoUsado)
+                    .HasDatabaseName("IX_Referidos_CodigoUsado");
+
+                entity.HasIndex(r => r.ComisionActiva)
+                    .HasDatabaseName("IX_Referidos_ComisionActiva");
+
+                entity.HasIndex(r => r.FechaExpiracionComision)
+                    .HasDatabaseName("IX_Referidos_FechaExpiracionComision");
+
+                // Índice compuesto para comisiones activas
+                entity.HasIndex(r => new { r.ReferidorId, r.ComisionActiva, r.FechaExpiracionComision })
+                    .HasDatabaseName("IX_Referidos_Comisiones_Activas");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE RACHAS USUARIO
+            // ========================================
+            modelBuilder.Entity<RachaUsuario>(entity =>
+            {
+                entity.HasKey(r => r.Id);
+
+                entity.HasOne(r => r.Usuario)
+                    .WithOne(u => u.Racha)
+                    .HasForeignKey<RachaUsuario>(r => r.UsuarioId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(r => r.RachaActual)
+                    .HasDefaultValue(0);
+
+                entity.Property(r => r.RachaMaxima)
+                    .HasDefaultValue(0);
+
+                entity.Property(r => r.LikesHoy)
+                    .HasDefaultValue(0);
+
+                entity.Property(r => r.ComentariosHoy)
+                    .HasDefaultValue(0);
+
+                entity.Property(r => r.ContenidosHoy)
+                    .HasDefaultValue(0);
+
+                entity.Property(r => r.Premio5LikesHoy)
+                    .HasDefaultValue(false);
+
+                entity.Property(r => r.Premio3ComentariosHoy)
+                    .HasDefaultValue(false);
+
+                entity.Property(r => r.PremioContenidoHoy)
+                    .HasDefaultValue(false);
+
+                entity.Property(r => r.PremioLoginHoy)
+                    .HasDefaultValue(false);
+
+                // Índices
+                entity.HasIndex(r => r.UsuarioId)
+                    .IsUnique()
+                    .HasDatabaseName("IX_RachasUsuarios_UsuarioId");
+
+                entity.HasIndex(r => r.FechaReset)
+                    .HasDatabaseName("IX_RachasUsuarios_FechaReset");
+
+                entity.HasIndex(r => r.RachaActual)
+                    .HasDatabaseName("IX_RachasUsuarios_RachaActual");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE CONFIGURACION LADO COINS
+            // ========================================
+            modelBuilder.Entity<ConfiguracionLadoCoin>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+
+                entity.Property(c => c.Clave)
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                entity.Property(c => c.Valor)
+                    .HasColumnType("decimal(18,2)")
+                    .IsRequired();
+
+                entity.Property(c => c.Descripcion)
+                    .HasMaxLength(200)
+                    .IsRequired(false);
+
+                entity.Property(c => c.Categoria)
+                    .HasMaxLength(50)
+                    .IsRequired(false);
+
+                entity.Property(c => c.ModificadoPor)
+                    .HasMaxLength(100)
+                    .IsRequired(false);
+
+                entity.Property(c => c.Activo)
+                    .HasDefaultValue(true);
+
+                // Índices
+                entity.HasIndex(c => c.Clave)
+                    .IsUnique()
+                    .HasDatabaseName("IX_ConfiguracionesLadoCoins_Clave");
+
+                entity.HasIndex(c => c.Categoria)
+                    .HasDatabaseName("IX_ConfiguracionesLadoCoins_Categoria");
+
+                entity.HasIndex(c => c.Activo)
+                    .HasDatabaseName("IX_ConfiguracionesLadoCoins_Activo");
+
+                // Seed de configuraciones por defecto
+                entity.HasData(
+                    // Bonos de registro
+                    new ConfiguracionLadoCoin { Id = 1, Clave = ConfiguracionLadoCoin.BONO_BIENVENIDA, Valor = 20, Descripcion = "Bono de bienvenida al registrarse", Categoria = "Registro", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 2, Clave = ConfiguracionLadoCoin.BONO_PRIMER_CONTENIDO, Valor = 5, Descripcion = "Bono por primera publicación", Categoria = "Registro", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 3, Clave = ConfiguracionLadoCoin.BONO_VERIFICAR_EMAIL, Valor = 2, Descripcion = "Bono por verificar email", Categoria = "Registro", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 4, Clave = ConfiguracionLadoCoin.BONO_COMPLETAR_PERFIL, Valor = 3, Descripcion = "Bono por completar perfil", Categoria = "Registro", FechaModificacion = new DateTime(2026, 1, 1) },
+
+                    // Bonos diarios
+                    new ConfiguracionLadoCoin { Id = 5, Clave = ConfiguracionLadoCoin.BONO_LOGIN_DIARIO, Valor = 0.50m, Descripcion = "Bono por login diario", Categoria = "Diario", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 6, Clave = ConfiguracionLadoCoin.BONO_CONTENIDO_DIARIO, Valor = 1, Descripcion = "Bono por subir contenido (1/día)", Categoria = "Diario", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 7, Clave = ConfiguracionLadoCoin.BONO_5_LIKES, Valor = 0.25m, Descripcion = "Bono por dar 5 likes", Categoria = "Diario", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 8, Clave = ConfiguracionLadoCoin.BONO_3_COMENTARIOS, Valor = 0.50m, Descripcion = "Bono por 3 comentarios", Categoria = "Diario", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 9, Clave = ConfiguracionLadoCoin.BONO_RACHA_7_DIAS, Valor = 5, Descripcion = "Bono por racha de 7 días", Categoria = "Diario", FechaModificacion = new DateTime(2026, 1, 1) },
+
+                    // Referidos
+                    new ConfiguracionLadoCoin { Id = 10, Clave = ConfiguracionLadoCoin.BONO_REFERIDOR, Valor = 10, Descripcion = "Bono para quien invita", Categoria = "Referidos", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 11, Clave = ConfiguracionLadoCoin.BONO_REFERIDO, Valor = 15, Descripcion = "Bono para quien es invitado", Categoria = "Referidos", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 12, Clave = ConfiguracionLadoCoin.BONO_REFERIDO_CREADOR, Valor = 50, Descripcion = "Bono cuando referido crea en LadoB", Categoria = "Referidos", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 13, Clave = ConfiguracionLadoCoin.COMISION_REFERIDO_PORCENTAJE, Valor = 10, Descripcion = "% de comisión de premios del referido", Categoria = "Referidos", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 14, Clave = ConfiguracionLadoCoin.COMISION_REFERIDO_MESES, Valor = 3, Descripcion = "Meses de duración de comisión", Categoria = "Referidos", FechaModificacion = new DateTime(2026, 1, 1) },
+
+                    // Sistema
+                    new ConfiguracionLadoCoin { Id = 15, Clave = ConfiguracionLadoCoin.PORCENTAJE_QUEMA, Valor = 5, Descripcion = "% de quema por transacción", Categoria = "Sistema", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 16, Clave = ConfiguracionLadoCoin.DIAS_VENCIMIENTO, Valor = 30, Descripcion = "Días hasta vencimiento", Categoria = "Sistema", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 17, Clave = ConfiguracionLadoCoin.MAX_PORCENTAJE_SUSCRIPCION, Valor = 30, Descripcion = "% máximo de LC en suscripciones", Categoria = "Sistema", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 18, Clave = ConfiguracionLadoCoin.MAX_PORCENTAJE_PROPINA, Valor = 100, Descripcion = "% máximo de LC en propinas", Categoria = "Sistema", FechaModificacion = new DateTime(2026, 1, 1) },
+
+                    // Multiplicadores
+                    new ConfiguracionLadoCoin { Id = 19, Clave = ConfiguracionLadoCoin.MULTIPLICADOR_PUBLICIDAD, Valor = 1.5m, Descripcion = "$1 LC = $1.50 en ads", Categoria = "Canje", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 20, Clave = ConfiguracionLadoCoin.MULTIPLICADOR_BOOST, Valor = 2, Descripcion = "$1 LC = $2 en boost", Categoria = "Canje", FechaModificacion = new DateTime(2026, 1, 1) },
+
+                    // Límites
+                    new ConfiguracionLadoCoin { Id = 21, Clave = ConfiguracionLadoCoin.MAX_PREMIO_DIARIO, Valor = 50, Descripcion = "Máximo LC ganables por día", Categoria = "Limites", FechaModificacion = new DateTime(2026, 1, 1) },
+                    new ConfiguracionLadoCoin { Id = 22, Clave = ConfiguracionLadoCoin.MAX_PREMIO_MENSUAL, Valor = 500, Descripcion = "Máximo LC ganables por mes", Categoria = "Limites", FechaModificacion = new DateTime(2026, 1, 1) }
+                );
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE APPLICATION USER - CÓDIGO REFERIDO
+            // ========================================
+            modelBuilder.Entity<ApplicationUser>(entity =>
+            {
+                entity.Property(e => e.CodigoReferido)
+                    .HasMaxLength(20)
+                    .IsRequired(false);
+
+                entity.Property(e => e.PorcentajeMaxLadoCoinsSuscripcion)
+                    .HasDefaultValue(30);
+
+                entity.Property(e => e.AceptaLadoCoins)
+                    .HasDefaultValue(true);
+
+                entity.Property(e => e.BonoBienvenidaEntregado)
+                    .HasDefaultValue(false);
+
+                entity.Property(e => e.BonoPrimerContenidoEntregado)
+                    .HasDefaultValue(false);
+
+                entity.Property(e => e.BonoEmailVerificadoEntregado)
+                    .HasDefaultValue(false);
+
+                entity.Property(e => e.BonoPerfilCompletoEntregado)
+                    .HasDefaultValue(false);
+
+                // Índice para búsqueda por código de referido
+                entity.HasIndex(e => e.CodigoReferido)
+                    .IsUnique()
+                    .HasFilter("[CodigoReferido] IS NOT NULL")
+                    .HasDatabaseName("IX_AspNetUsers_CodigoReferido");
             });
         }
     }

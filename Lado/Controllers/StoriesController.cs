@@ -21,6 +21,7 @@ namespace Lado.Controllers
         private readonly ILogger<StoriesController> _logger;
         private readonly IRateLimitService _rateLimitService;
         private readonly IFileValidationService _fileValidationService;
+        private readonly IMediaConversionService _mediaConversionService;
         private readonly IHubContext<ChatHub> _hubContext;
 
         public StoriesController(
@@ -29,6 +30,7 @@ namespace Lado.Controllers
             ILogger<StoriesController> logger,
             IRateLimitService rateLimitService,
             IFileValidationService fileValidationService,
+            IMediaConversionService mediaConversionService,
             IHubContext<ChatHub> hubContext)
         {
             _context = context;
@@ -36,6 +38,7 @@ namespace Lado.Controllers
             _logger = logger;
             _rateLimitService = rateLimitService;
             _fileValidationService = fileValidationService;
+            _mediaConversionService = mediaConversionService;
             _hubContext = hubContext;
         }
 
@@ -687,9 +690,6 @@ namespace Lado.Controllers
                 // Obtener usuario para la carpeta
                 var usuario = await _userManager.FindByIdAsync(usuarioId);
                 var nombreCarpeta = usuario?.UserName ?? usuarioId;
-
-                // Guardar archivo en carpeta de uploads
-                var nombreArchivo = $"{Guid.NewGuid()}{Path.GetExtension(archivo.FileName)}";
                 var carpeta = Path.Combine("wwwroot", "uploads", nombreCarpeta);
 
                 if (!Directory.Exists(carpeta))
@@ -697,14 +697,72 @@ namespace Lado.Controllers
                     Directory.CreateDirectory(carpeta);
                 }
 
-                var rutaCompleta = Path.Combine(carpeta, nombreArchivo);
+                var extension = Path.GetExtension(archivo.FileName).ToLowerInvariant();
+                var nombreBase = Guid.NewGuid().ToString();
+                string nombreArchivo;
+                string rutaArchivo;
 
-                using (var stream = new FileStream(rutaCompleta, FileMode.Create))
+                // Verificar si necesita conversión a formato estándar
+                var requiereConversionImg = tipoContenido == TipoContenido.Imagen && _mediaConversionService.ImagenRequiereConversion(extension);
+                var requiereConversionVideo = tipoContenido == TipoContenido.Video && _mediaConversionService.VideoRequiereConversion(extension);
+
+                if (requiereConversionImg)
                 {
-                    await archivo.CopyToAsync(stream);
-                }
+                    _logger.LogInformation("[Reel] Convirtiendo imagen {Extension} a JPEG", extension);
+                    using var stream = archivo.OpenReadStream();
+                    var rutaConvertida = await _mediaConversionService.ConvertirImagenAsync(stream, carpeta, extension, nombreBase, 1920, 90);
 
-                var rutaArchivo = $"/uploads/{nombreCarpeta}/{nombreArchivo}";
+                    if (!string.IsNullOrEmpty(rutaConvertida))
+                    {
+                        nombreArchivo = Path.GetFileName(rutaConvertida);
+                        rutaArchivo = $"/uploads/{nombreCarpeta}/{nombreArchivo}";
+                        _logger.LogInformation("[Reel] Imagen convertida: {Original} → {Convertido}", archivo.FileName, nombreArchivo);
+                    }
+                    else
+                    {
+                        nombreArchivo = $"{nombreBase}{extension}";
+                        var rutaCompleta = Path.Combine(carpeta, nombreArchivo);
+                        using (var stream2 = new FileStream(rutaCompleta, FileMode.Create))
+                        {
+                            await archivo.CopyToAsync(stream2);
+                        }
+                        rutaArchivo = $"/uploads/{nombreCarpeta}/{nombreArchivo}";
+                    }
+                }
+                else if (requiereConversionVideo)
+                {
+                    _logger.LogInformation("[Reel] Convirtiendo video {Extension} a MP4", extension);
+                    using var stream = archivo.OpenReadStream();
+                    var rutaConvertida = await _mediaConversionService.ConvertirVideoAsync(stream, carpeta, extension, nombreBase, 20, 1920);
+
+                    if (!string.IsNullOrEmpty(rutaConvertida))
+                    {
+                        nombreArchivo = Path.GetFileName(rutaConvertida);
+                        rutaArchivo = $"/uploads/{nombreCarpeta}/{nombreArchivo}";
+                        _logger.LogInformation("[Reel] Video convertido: {Original} → {Convertido}", archivo.FileName, nombreArchivo);
+                    }
+                    else
+                    {
+                        nombreArchivo = $"{nombreBase}{extension}";
+                        var rutaCompleta = Path.Combine(carpeta, nombreArchivo);
+                        using (var stream2 = new FileStream(rutaCompleta, FileMode.Create))
+                        {
+                            await archivo.CopyToAsync(stream2);
+                        }
+                        rutaArchivo = $"/uploads/{nombreCarpeta}/{nombreArchivo}";
+                    }
+                }
+                else
+                {
+                    // Archivo ya está en formato estándar
+                    nombreArchivo = $"{nombreBase}{extension}";
+                    var rutaCompleta = Path.Combine(carpeta, nombreArchivo);
+                    using (var stream = new FileStream(rutaCompleta, FileMode.Create))
+                    {
+                        await archivo.CopyToAsync(stream);
+                    }
+                    rutaArchivo = $"/uploads/{nombreCarpeta}/{nombreArchivo}";
+                }
 
                 // Determinar TipoLado
                 var tipoLadoFinal = TipoLado.LadoA;
@@ -853,7 +911,6 @@ namespace Lado.Controllers
         {
             var extension = Path.GetExtension(archivo.FileName).ToLowerInvariant();
             var nombreBase = Guid.NewGuid().ToString();
-            var nombreArchivo = $"{nombreBase}{extension}";
             var carpeta = Path.Combine("wwwroot", "stories", usuarioId);
 
             if (!Directory.Exists(carpeta))
@@ -861,29 +918,53 @@ namespace Lado.Controllers
                 Directory.CreateDirectory(carpeta);
             }
 
-            var rutaCompleta = Path.Combine(carpeta, nombreArchivo);
+            // Verificar si necesita conversión a formato estándar
+            var requiereConversionImg = _mediaConversionService.ImagenRequiereConversion(extension);
+            var requiereConversionVideo = _mediaConversionService.VideoRequiereConversion(extension);
+
+            if (requiereConversionImg)
+            {
+                // Convertir imagen a JPEG estándar
+                _logger.LogInformation("[Story] Convirtiendo imagen {Extension} a JPEG", extension);
+                using var stream = archivo.OpenReadStream();
+                var rutaConvertida = await _mediaConversionService.ConvertirImagenAsync(stream, carpeta, extension, nombreBase, 1920, 90);
+
+                if (!string.IsNullOrEmpty(rutaConvertida))
+                {
+                    var nombreArchivo = Path.GetFileName(rutaConvertida);
+                    _logger.LogInformation("[Story] Imagen convertida: {Original} → {Convertido}", archivo.FileName, nombreArchivo);
+                    return $"/stories/{usuarioId}/{nombreArchivo}";
+                }
+
+                _logger.LogWarning("[Story] Error convirtiendo imagen, usando original");
+            }
+            else if (requiereConversionVideo)
+            {
+                // Convertir video a MP4 H.264 estándar
+                _logger.LogInformation("[Story] Convirtiendo video {Extension} a MP4", extension);
+                using var stream = archivo.OpenReadStream();
+                var rutaConvertida = await _mediaConversionService.ConvertirVideoAsync(stream, carpeta, extension, nombreBase, 23, 1080);
+
+                if (!string.IsNullOrEmpty(rutaConvertida))
+                {
+                    var nombreArchivo = Path.GetFileName(rutaConvertida);
+                    _logger.LogInformation("[Story] Video convertido: {Original} → {Convertido}", archivo.FileName, nombreArchivo);
+                    return $"/stories/{usuarioId}/{nombreArchivo}";
+                }
+
+                _logger.LogWarning("[Story] Error convirtiendo video, usando original");
+            }
+
+            // Archivo ya está en formato estándar o conversión falló - guardar sin cambios
+            var nombreArchivoFinal = $"{nombreBase}{extension}";
+            var rutaCompleta = Path.Combine(carpeta, nombreArchivoFinal);
 
             using (var stream = new FileStream(rutaCompleta, FileMode.Create))
             {
                 await archivo.CopyToAsync(stream);
             }
 
-            // ========================================
-            // CONVERSIÓN WEBM → MP4 para compatibilidad iOS/Safari
-            // ========================================
-            if (extension == ".webm")
-            {
-                var rutaMp4 = await ConvertirWebmAMp4Async(rutaCompleta, carpeta, nombreBase);
-                if (!string.IsNullOrEmpty(rutaMp4))
-                {
-                    // Usar el archivo MP4 convertido
-                    nombreArchivo = Path.GetFileName(rutaMp4);
-                    _logger.LogInformation("Video WebM convertido a MP4: {Original} → {Convertido}",
-                        archivo.FileName, nombreArchivo);
-                }
-            }
-
-            return $"/stories/{usuarioId}/{nombreArchivo}";
+            return $"/stories/{usuarioId}/{nombreArchivoFinal}";
         }
 
         /// <summary>

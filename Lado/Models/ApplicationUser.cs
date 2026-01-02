@@ -204,11 +204,19 @@ namespace Lado.Models
         public bool DetectarUbicacionAutomaticamente { get; set; } = false;
 
         // ========================================
-        // PREFERENCIAS DE IDIOMA
+        // PREFERENCIAS DE IDIOMA Y ZONA HORARIA
         // ========================================
         [Display(Name = "Idioma Preferido")]
         [StringLength(5)]
         public string Idioma { get; set; } = "es"; // es = Español, en = English, pt = Português
+
+        /// <summary>
+        /// Zona horaria del usuario (formato IANA, ej: "America/Santiago", "America/Bogota")
+        /// Se detecta automáticamente al registrarse y puede cambiarse en configuración.
+        /// </summary>
+        [Display(Name = "Zona Horaria")]
+        [StringLength(50)]
+        public string? ZonaHoraria { get; set; }
 
         // ========================================
         // PREFERENCIA DE LADO (A o B)
@@ -260,6 +268,84 @@ namespace Lado.Models
         /// </summary>
         [Display(Name = "Recibir Comunicados")]
         public bool RecibirEmailsComunicados { get; set; } = true;
+
+        // ========================================
+        // SISTEMA LADO COINS (Dólares Premio)
+        // ========================================
+
+        /// <summary>
+        /// Código único de referido para invitar otros usuarios.
+        /// Se genera automáticamente al registrarse.
+        /// </summary>
+        [Display(Name = "Código de Referido")]
+        [StringLength(20)]
+        public string? CodigoReferido { get; set; }
+
+        /// <summary>
+        /// Si ya recibió el bono de bienvenida ($20)
+        /// </summary>
+        [Display(Name = "Bono Bienvenida Entregado")]
+        public bool BonoBienvenidaEntregado { get; set; } = false;
+
+        /// <summary>
+        /// Si ya recibió el bono por primer contenido ($5)
+        /// </summary>
+        [Display(Name = "Bono Primer Contenido Entregado")]
+        public bool BonoPrimerContenidoEntregado { get; set; } = false;
+
+        /// <summary>
+        /// Si ya recibió el bono por verificar email ($2)
+        /// </summary>
+        [Display(Name = "Bono Email Verificado Entregado")]
+        public bool BonoEmailVerificadoEntregado { get; set; } = false;
+
+        /// <summary>
+        /// Si ya recibió el bono por completar perfil ($3)
+        /// </summary>
+        [Display(Name = "Bono Perfil Completo Entregado")]
+        public bool BonoPerfilCompletoEntregado { get; set; } = false;
+
+        /// <summary>
+        /// Si el creador acepta pagos con LadoCoins.
+        /// Obligatorio para creadores LadoB (siempre true).
+        /// </summary>
+        [Display(Name = "Acepta Pago con LadoCoins")]
+        public bool AceptaLadoCoins { get; set; } = true;
+
+        /// <summary>
+        /// Porcentaje máximo de LadoCoins aceptado en suscripciones (0-30%).
+        /// Para propinas se permite hasta 100%.
+        /// </summary>
+        [Display(Name = "Porcentaje Máximo LadoCoins Suscripción")]
+        [Range(0, 30)]
+        public int PorcentajeMaxLadoCoinsSuscripcion { get; set; } = 30;
+
+        // Relación con LadoCoin (saldo)
+        public virtual LadoCoin? LadoCoin { get; set; }
+
+        // Relación con RachaUsuario
+        public virtual RachaUsuario? Racha { get; set; }
+
+        // Relación con Referidos (usuarios que invité)
+        public virtual ICollection<Referido> MisReferidos { get; set; } = new List<Referido>();
+
+        // ========================================
+        // MÉTODOS HELPER LADO COINS
+        // ========================================
+
+        /// <summary>
+        /// Verifica si el perfil está completo para el bono.
+        /// Requiere: Foto, Bio, Nombre, País, Fecha nacimiento, Género
+        /// </summary>
+        public bool PerfilCompletoParaBono()
+        {
+            return !string.IsNullOrEmpty(FotoPerfil) &&
+                   !string.IsNullOrEmpty(Biografia) &&
+                   !string.IsNullOrEmpty(NombreCompleto) &&
+                   !string.IsNullOrEmpty(Pais) &&
+                   FechaNacimiento.HasValue &&
+                   Genero != GeneroUsuario.NoEspecificado;
+        }
 
         // ========================================
         // ESTADO EN LÍNEA Y PRIVACIDAD

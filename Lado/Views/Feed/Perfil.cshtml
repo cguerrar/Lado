@@ -2487,6 +2487,31 @@
                                 <button type="button" class="monto-btn" data-monto="50">$50</button>
                             </div>
                             <input type="number" id="montoTip" name="monto" class="monto-input" placeholder="Otro monto..." min="1">
+
+                            <!-- Opción LadoCoins para propinas -->
+                            <div class="ladocoins-tip-section" id="ladocoinsTipSection" style="display: none; margin-top: 12px; padding: 10px; background: var(--surface); border-radius: 8px; border: 1px solid var(--border);">
+                                <label class="ladocoins-toggle" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="usarLadoCoinsTip" style="width: 18px; height: 18px; accent-color: #f5a623;">
+                                    <span style="font-size: 18px;">🪙</span>
+                                    <span style="font-size: 14px;">Pagar con LadoCoins</span>
+                                    <span class="badge bg-success" style="font-size: 11px; margin-left: auto;">100% permitido</span>
+                                </label>
+                                <div id="ladocoinsTipDetails" style="display: none; margin-top: 10px;">
+                                    <div style="font-size: 13px; color: var(--fg-muted); margin-bottom: 8px;">
+                                        Tu saldo: <strong id="saldoLCTipDisplay">$0.00</strong> LadoCoins
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <input type="range" id="ladocoinsTipSlider" min="0" max="0" value="0" step="0.5"
+                                               style="flex: 1; accent-color: #f5a623;">
+                                        <span style="min-width: 70px; text-align: right; font-weight: 600; color: #f5a623;">
+                                            $<span id="ladocoinsTipValue">0.00</span>
+                                        </span>
+                                    </div>
+                                    <div style="font-size: 12px; color: var(--fg-muted); margin-top: 6px;">
+                                        Pago real: $<span id="pagoRealTipDisplay">0.00</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     }
 
@@ -2642,17 +2667,77 @@ document.addEventListener('DOMContentLoaded', function() {
     const tipSection = document.getElementById('tipSection');
     const btnEnviarTexto = document.getElementById('btnEnviarTexto');
 
+    // Variables para LadoCoins en propinas
+    let saldoLCTip = 0;
+    const ladocoinsTipSection = document.getElementById('ladocoinsTipSection');
+    const usarLadoCoinsTip = document.getElementById('usarLadoCoinsTip');
+    const ladocoinsTipDetails = document.getElementById('ladocoinsTipDetails');
+    const ladocoinsTipSlider = document.getElementById('ladocoinsTipSlider');
+    const ladocoinsTipValue = document.getElementById('ladocoinsTipValue');
+    const saldoLCTipDisplay = document.getElementById('saldoLCTipDisplay');
+    const pagoRealTipDisplay = document.getElementById('pagoRealTipDisplay');
+
+    async function cargarSaldoLCTip() {
+        try {
+            const response = await fetch('/Pagos/ObtenerInfoLadoCoins?creadorId=@Model.Id');
+            const data = await response.json();
+            if (data.success && data.saldoLadoCoins > 0) {
+                saldoLCTip = data.saldoLadoCoins;
+                saldoLCTipDisplay.textContent = '$' + saldoLCTip.toFixed(2);
+                ladocoinsTipSection.style.display = 'block';
+            }
+        } catch (e) {
+            console.error('Error cargando LadoCoins:', e);
+        }
+    }
+
+    function actualizarSliderTip() {
+        const montoActual = parseFloat(document.getElementById('montoTip').value) || 0;
+        const maxLC = Math.min(saldoLCTip, montoActual);
+        ladocoinsTipSlider.max = maxLC.toFixed(2);
+        actualizarValoresLCTip();
+    }
+
+    function actualizarValoresLCTip() {
+        const usarLC = parseFloat(ladocoinsTipSlider.value) || 0;
+        ladocoinsTipValue.textContent = usarLC.toFixed(2);
+        const montoTotal = parseFloat(document.getElementById('montoTip').value) || 0;
+        const pagoReal = Math.max(0, montoTotal - usarLC);
+        pagoRealTipDisplay.textContent = pagoReal.toFixed(2);
+    }
+
+    if (usarLadoCoinsTip) {
+        usarLadoCoinsTip.addEventListener('change', function() {
+            ladocoinsTipDetails.style.display = this.checked ? 'block' : 'none';
+            if (this.checked) {
+                actualizarSliderTip();
+            } else {
+                ladocoinsTipSlider.value = 0;
+            }
+        });
+    }
+
+    if (ladocoinsTipSlider) {
+        ladocoinsTipSlider.addEventListener('input', actualizarValoresLCTip);
+    }
+
     if (tipCheckbox && tipSection) {
-        tipCheckbox.addEventListener('change', function() {
+        tipCheckbox.addEventListener('change', async function() {
             if (this.checked) {
                 tipSection.classList.add('active');
                 btnEnviarTexto.textContent = 'Enviar con Propina';
+                // Cargar saldo de LadoCoins
+                await cargarSaldoLCTip();
             } else {
                 tipSection.classList.remove('active');
                 btnEnviarTexto.textContent = 'Enviar Mensaje';
                 // Limpiar monto
                 document.getElementById('montoTip').value = '';
                 document.querySelectorAll('.monto-btn').forEach(b => b.classList.remove('active'));
+                // Resetear LadoCoins
+                if (usarLadoCoinsTip) usarLadoCoinsTip.checked = false;
+                if (ladocoinsTipDetails) ladocoinsTipDetails.style.display = 'none';
+                if (ladocoinsTipSlider) ladocoinsTipSlider.value = 0;
             }
         });
     }
@@ -2668,6 +2753,10 @@ document.addEventListener('DOMContentLoaded', function() {
             montoBtns.forEach(b => b.classList.remove('active'));
             this.classList.add('active');
             montoInput.value = this.dataset.monto;
+            // Actualizar slider de LadoCoins
+            if (usarLadoCoinsTip && usarLadoCoinsTip.checked) {
+                actualizarSliderTip();
+            }
         });
     });
 
@@ -2677,6 +2766,10 @@ document.addEventListener('DOMContentLoaded', function() {
             montoBtns.forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.monto === val);
             });
+            // Actualizar slider de LadoCoins
+            if (usarLadoCoinsTip && usarLadoCoinsTip.checked) {
+                actualizarSliderTip();
+            }
         });
     }
 
@@ -2697,7 +2790,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const mensaje = document.getElementById('mensajeTexto').value.trim();
             const creadorId = this.querySelector('input[name="creadorId"]').value;
             const incluyePropina = tipCheckbox && tipCheckbox.checked;
-            const monto = incluyePropina && montoInput ? parseFloat(montoInput.value) || 0 : 0;
+            const montoTotal = incluyePropina && montoInput ? parseFloat(montoInput.value) || 0 : 0;
+
+            // Calcular monto en LadoCoins
+            let montoLadoCoins = 0;
+            if (incluyePropina && usarLadoCoinsTip && usarLadoCoinsTip.checked && ladocoinsTipSlider) {
+                montoLadoCoins = parseFloat(ladocoinsTipSlider.value) || 0;
+            }
+            const montoReal = Math.max(0, montoTotal - montoLadoCoins);
 
             if (!mensaje) {
                 showToast('Por favor escribe un mensaje', 'warning');
@@ -2706,7 +2806,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            if (incluyePropina && monto < 1) {
+            if (incluyePropina && montoTotal < 1) {
                 showToast('El monto mínimo de propina es $1', 'warning');
                 submitBtn.innerHTML = originalHtml;
                 submitBtn.disabled = false;
@@ -2722,7 +2822,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: JSON.stringify({
                         receptorId: creadorId,
                         mensaje: mensaje,
-                        monto: monto
+                        monto: montoReal,
+                        montoLadoCoins: montoLadoCoins
                     })
                 });
 
@@ -2740,7 +2841,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (montoBtns) montoBtns.forEach(b => b.classList.remove('active'));
 
                     // Mostrar toast con opcion de ir a la conversacion
-                    showMessageSentToast(creadorId, monto > 0);
+                    showMessageSentToast(creadorId, montoTotal > 0);
                 } else {
                     if (result.requiereRecarga) {
                         const confirmed = await showConfirm('Saldo insuficiente', result.message + '\n\n¿Deseas recargar saldo?');
@@ -2856,10 +2957,11 @@ function showMessageSentToast(creadorId, conPropina) {
                     <input type="hidden" name="creadorId" value="@Model.Id" />
                     <input type="hidden" name="tipoLado" value="@((int)tipoLadoModal)" />
                     <input type="hidden" name="duracion" id="duracionInput" value="30" />
+                    <input type="hidden" name="montoLadoCoins" id="montoLadoCoinsInput" value="0" />
 
                     <div class="duration-options">
                         <!-- Opción 24 horas -->
-                        <div class="duration-option" data-duracion="1" data-precio="@precio24h">
+                        <div class="duration-option" data-duracion="1" data-precio="@precio24h.ToString(System.Globalization.CultureInfo.InvariantCulture)">
                             <div class="duration-radio"></div>
                             <div class="duration-info">
                                 <div class="duration-title">24 horas</div>
@@ -2871,7 +2973,7 @@ function showMessageSentToast(creadorId, conPropina) {
                         </div>
 
                         <!-- Opción 7 días (Popular) -->
-                        <div class="duration-option popular" data-duracion="7" data-precio="@precio7dias">
+                        <div class="duration-option popular" data-duracion="7" data-precio="@precio7dias.ToString(System.Globalization.CultureInfo.InvariantCulture)">
                             <div class="duration-radio"></div>
                             <div class="duration-info">
                                 <div class="duration-title">7 días</div>
@@ -2884,7 +2986,7 @@ function showMessageSentToast(creadorId, conPropina) {
                         </div>
 
                         <!-- Opción Mensual -->
-                        <div class="duration-option selected" data-duracion="30" data-precio="@precioMensualModal">
+                        <div class="duration-option selected" data-duracion="30" data-precio="@precioMensualModal.ToString(System.Globalization.CultureInfo.InvariantCulture)">
                             <div class="duration-radio"></div>
                             <div class="duration-info">
                                 <div class="duration-title">1 mes</div>
@@ -2894,6 +2996,29 @@ function showMessageSentToast(creadorId, conPropina) {
                                 <span class="price">$@precioMensualModal.ToString("N2")</span>
                                 <span class="savings">Mejor valor</span>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Sección LadoCoins -->
+                    <div class="ladocoins-section" id="ladocoinsSection" style="display: none; margin-top: 16px; padding: 12px; background: var(--surface); border-radius: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <span style="font-size: 20px;">🪙</span>
+                            <span style="font-weight: 500;">Pagar con LadoCoins</span>
+                            <span class="badge bg-secondary" style="font-size: 11px;">Hasta <span id="maxPorcentajeLC">30</span>%</span>
+                        </div>
+                        <div style="font-size: 13px; color: var(--fg-muted); margin-bottom: 10px;">
+                            Tu saldo: <strong id="saldoLCDisplay">$0.00</strong> LadoCoins
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="range" id="ladocoinsSlider" min="0" max="0" value="0" step="0.01"
+                                   style="flex: 1; accent-color: #f5a623;">
+                            <span style="min-width: 70px; text-align: right; font-weight: 600;">
+                                $<span id="ladocoinsValue">0.00</span>
+                            </span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--fg-muted); margin-top: 6px;">
+                            <span>Pago real: $<span id="pagoRealDisplay">0.00</span></span>
+                            <span style="color: #f5a623;" id="ahorroLC" style="display: none;">Ahorras $<span id="ahorroLCMonto">0.00</span></span>
                         </div>
                     </div>
 
@@ -2917,6 +3042,74 @@ function showMessageSentToast(creadorId, conPropina) {
         const durationOptions = document.querySelectorAll('.duration-option');
         const duracionInput = document.getElementById('duracionInput');
         const precioSpan = document.getElementById('precioSeleccionado');
+        const montoLadoCoinsInput = document.getElementById('montoLadoCoinsInput');
+        const ladocoinsSection = document.getElementById('ladocoinsSection');
+        const ladocoinsSlider = document.getElementById('ladocoinsSlider');
+        const ladocoinsValue = document.getElementById('ladocoinsValue');
+        const saldoLCDisplay = document.getElementById('saldoLCDisplay');
+        const maxPorcentajeLC = document.getElementById('maxPorcentajeLC');
+        const pagoRealDisplay = document.getElementById('pagoRealDisplay');
+        const ahorroLC = document.getElementById('ahorroLC');
+        const ahorroLCMonto = document.getElementById('ahorroLCMonto');
+
+        let precioActual = @precioMensualModal.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        let saldoLC = 0;
+        let porcentajeMax = 30;
+        let creadorAceptaLC = true;
+
+        // Cargar info de LadoCoins al abrir el modal
+        const subscribeModal = document.getElementById('subscribeModal');
+        if (subscribeModal) {
+            subscribeModal.addEventListener('show.bs.modal', async function() {
+                try {
+                    const response = await fetch('/Pagos/ObtenerInfoLadoCoins?creadorId=@Model.Id');
+                    const data = await response.json();
+                    if (data.success) {
+                        saldoLC = data.saldoLadoCoins || 0;
+                        porcentajeMax = data.porcentajeMaximo || 30;
+                        creadorAceptaLC = data.aceptaLadoCoins !== false;
+
+                        if (creadorAceptaLC && saldoLC > 0) {
+                            ladocoinsSection.style.display = 'block';
+                            saldoLCDisplay.textContent = '$' + saldoLC.toFixed(2);
+                            maxPorcentajeLC.textContent = porcentajeMax;
+                            actualizarSlider();
+                        } else {
+                            ladocoinsSection.style.display = 'none';
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error cargando info LadoCoins:', e);
+                }
+            });
+        }
+
+        function actualizarSlider() {
+            const maxLC = Math.min(saldoLC, precioActual * (porcentajeMax / 100));
+            ladocoinsSlider.max = maxLC.toFixed(2);
+            ladocoinsSlider.value = 0;
+            actualizarValoresLC();
+        }
+
+        function actualizarValoresLC() {
+            const usarLC = parseFloat(ladocoinsSlider.value) || 0;
+            ladocoinsValue.textContent = usarLC.toFixed(2);
+            montoLadoCoinsInput.value = usarLC.toFixed(2);
+
+            const pagoReal = precioActual - usarLC;
+            pagoRealDisplay.textContent = pagoReal.toFixed(2);
+
+            if (usarLC > 0) {
+                ahorroLC.style.display = 'inline';
+                ahorroLCMonto.textContent = usarLC.toFixed(2);
+            } else {
+                ahorroLC.style.display = 'none';
+            }
+        }
+
+        if (ladocoinsSlider) {
+            ladocoinsSlider.addEventListener('input', actualizarValoresLC);
+        }
 
         durationOptions.forEach(option => {
             option.addEventListener('click', function() {
@@ -2924,13 +3117,18 @@ function showMessageSentToast(creadorId, conPropina) {
                 this.classList.add('selected');
                 const duracion = this.dataset.duracion;
                 const precio = this.dataset.precio;
+                precioActual = parseFloat(precio);
                 if (duracionInput) duracionInput.value = duracion;
-                if (precioSpan) precioSpan.textContent = parseFloat(precio).toFixed(2);
+                if (precioSpan) precioSpan.textContent = precioActual.toFixed(2);
+
+                // Actualizar slider de LadoCoins
+                if (ladocoinsSection.style.display !== 'none') {
+                    actualizarSlider();
+                }
             });
         });
 
         // Mover modal al body para evitar problemas de z-index
-        const subscribeModal = document.getElementById('subscribeModal');
         if (subscribeModal && subscribeModal.parentElement !== document.body) {
             document.body.appendChild(subscribeModal);
         }

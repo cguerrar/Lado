@@ -1,0 +1,245 @@
+@{
+    ViewData["Title"] = "Actualizar Metadatos";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+@Html.AntiForgeryToken()
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">Actualizar Metadatos</h1>
+            <p class="text-muted mb-0">Escanear archivos y extraer dimensiones, tamano y duracion</p>
+        </div>
+        <a href="/Admin/Contenido" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Volver
+        </a>
+    </div>
+
+    <!-- Resumen de archivos -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-expand-arrows-alt fa-2x text-warning mb-2"></i>
+                    <h3 class="mb-0">@ViewBag.SinDimensiones</h3>
+                    <small class="text-muted">Sin dimensiones</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-weight fa-2x text-info mb-2"></i>
+                    <h3 class="mb-0">@ViewBag.SinTamano</h3>
+                    <small class="text-muted">Sin tamano</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-clock fa-2x text-primary mb-2"></i>
+                    <h3 class="mb-0">@ViewBag.VideosSinDuracion</h3>
+                    <small class="text-muted">Videos sin duracion</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-database fa-2x text-secondary mb-2"></i>
+                    <h3 class="mb-0">@ViewBag.TotalArchivos</h3>
+                    <small class="text-muted">Total archivos</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de control -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="fas fa-cogs"></i> Control</h5>
+        </div>
+        <div class="card-body">
+            @if (ViewBag.SinDimensiones == 0 && ViewBag.SinTamano == 0 && ViewBag.VideosSinDuracion == 0)
+            {
+                <div class="alert alert-success mb-0">
+                    <i class="fas fa-check-circle"></i> Todos los archivos tienen metadatos completos.
+                </div>
+            }
+            else
+            {
+                <div id="controles">
+                    <div class="row align-items-end mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2">
+                                Se actualizaran <strong>@(ViewBag.SinDimensiones + ViewBag.SinTamano)</strong> archivos:
+                            </p>
+                            <ul class="small text-muted mb-0">
+                                <li>Imagenes: Se extraen dimensiones (ancho x alto) y peso</li>
+                                <li>Videos: Se extraen dimensiones, duracion y peso usando FFprobe</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-3">
+                            <button id="btnIniciar" class="btn btn-primary btn-lg w-100" onclick="iniciarActualizacion()">
+                                <i class="fas fa-play"></i> Iniciar
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button id="btnCancelar" class="btn btn-danger btn-lg w-100" onclick="cancelarActualizacion()" disabled>
+                                <i class="fas fa-stop"></i> Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progreso -->
+                <div id="progreso" style="display: none;">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span id="mensaje">Preparando...</span>
+                            <span id="porcentaje">0%</span>
+                        </div>
+                        <div class="progress" style="height: 25px;">
+                            <div id="barra" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="row text-center">
+                        <div class="col-3">
+                            <div class="h4 mb-0" id="stat-procesados">0</div>
+                            <small class="text-muted">Procesados</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="h4 mb-0 text-success" id="stat-actualizados">0</div>
+                            <small class="text-muted">Actualizados</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="h4 mb-0 text-danger" id="stat-fallidos">0</div>
+                            <small class="text-muted">Fallidos</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="h4 mb-0" id="stat-total">0</div>
+                            <small class="text-muted">Total</small>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Info adicional -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="fas fa-info-circle"></i> Informacion</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="fas fa-image text-success"></i> Imagenes</h6>
+                    <ul class="small">
+                        <li><strong>Dimensiones:</strong> Usando ImageSharp</li>
+                        <li><strong>Peso:</strong> Desde sistema de archivos</li>
+                        <li>Formatos: JPG, PNG, GIF, WebP, HEIC, etc.</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6><i class="fas fa-video text-primary"></i> Videos</h6>
+                    <ul class="small">
+                        <li><strong>Dimensiones:</strong> Usando FFprobe</li>
+                        <li><strong>Duracion:</strong> Usando FFprobe</li>
+                        <li><strong>Peso:</strong> Desde sistema de archivos</li>
+                        <li>Formatos: MP4, MOV, AVI, MKV, WebM, etc.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    let intervalo = null;
+
+    function iniciarActualizacion() {
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+
+        if (!confirm('Iniciar actualizacion de metadatos?')) return;
+
+        fetch('/Admin/IniciarActualizacionMetadatos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `__RequestVerificationToken=${encodeURIComponent(token)}`
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('btnIniciar').disabled = true;
+                document.getElementById('btnCancelar').disabled = false;
+                document.getElementById('progreso').style.display = 'block';
+                intervalo = setInterval(actualizarEstado, 1500);
+                actualizarEstado();
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(err => alert('Error: ' + err.message));
+    }
+
+    function cancelarActualizacion() {
+        if (!confirm('Cancelar actualizacion?')) return;
+
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+
+        fetch('/Admin/CancelarActualizacionMetadatos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `__RequestVerificationToken=${encodeURIComponent(token)}`
+        })
+        .then(r => r.json())
+        .then(data => {
+            alert(data.message);
+            if (data.success) finalizar();
+        });
+    }
+
+    function actualizarEstado() {
+        fetch('/Admin/EstadoActualizacionMetadatos')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('mensaje').textContent = data.mensaje || '';
+            document.getElementById('porcentaje').textContent = (data.porcentaje || 0) + '%';
+            document.getElementById('barra').style.width = (data.porcentaje || 0) + '%';
+            document.getElementById('stat-procesados').textContent = data.procesados || 0;
+            document.getElementById('stat-actualizados').textContent = data.actualizados || 0;
+            document.getElementById('stat-fallidos').textContent = data.fallidos || 0;
+            document.getElementById('stat-total').textContent = data.total || 0;
+
+            if (!data.enProgreso) {
+                finalizar();
+            }
+        });
+    }
+
+    function finalizar() {
+        if (intervalo) {
+            clearInterval(intervalo);
+            intervalo = null;
+        }
+        document.getElementById('btnIniciar').disabled = false;
+        document.getElementById('btnCancelar').disabled = true;
+        document.getElementById('barra').classList.remove('progress-bar-animated');
+    }
+
+    @if (ViewBag.MetadatosEnProgreso)
+    {
+        <text>
+        document.getElementById('btnIniciar').disabled = true;
+        document.getElementById('btnCancelar').disabled = false;
+        document.getElementById('progreso').style.display = 'block';
+        intervalo = setInterval(actualizarEstado, 1500);
+        actualizarEstado();
+        </text>
+    }
+</script>
+}

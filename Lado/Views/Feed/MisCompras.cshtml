@@ -1,0 +1,462 @@
+@model IEnumerable<Lado.Models.CompraContenido>
+@using Lado.Models
+@{
+    ViewData["Title"] = "Mis Compras";
+    var totalCompras = ViewBag.TotalCompras as int? ?? 0;
+    var totalGastado = ViewBag.TotalGastado as decimal? ?? 0;
+    var creadoresUnicos = ViewBag.CreadoresUnicos as int? ?? 0;
+}
+
+<style>
+    .purchases-page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .purchases-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .purchases-header h1 {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--fg);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .purchases-header h1 svg {
+        width: 32px;
+        height: 32px;
+        color: var(--success);
+    }
+
+    /* Stats Cards */
+    .purchases-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+
+    .stat-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+    }
+
+    .stat-card .stat-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--fg);
+        margin-bottom: 4px;
+    }
+
+    .stat-card .stat-value.money {
+        color: var(--success);
+    }
+
+    .stat-card .stat-label {
+        font-size: 13px;
+        color: var(--muted);
+    }
+
+    /* Grid de compras */
+    .purchases-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 24px;
+    }
+
+    .purchase-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .purchase-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .purchase-media {
+        position: relative;
+        aspect-ratio: 1;
+        background: var(--bg-tertiary);
+        overflow: hidden;
+    }
+
+    .purchase-media img,
+    .purchase-media video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .purchase-media-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.3);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .purchase-card:hover .purchase-media-overlay {
+        opacity: 1;
+    }
+
+    .purchase-media-overlay a {
+        padding: 12px 24px;
+        background: var(--primary);
+        color: white;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: transform 0.2s ease;
+    }
+
+    .purchase-media-overlay a:hover {
+        transform: scale(1.05);
+    }
+
+    .purchase-type-badge {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        background: rgba(0,0,0,0.6);
+        color: white;
+    }
+
+    .purchase-type-badge.video {
+        background: rgba(239, 68, 68, 0.9);
+    }
+
+    .purchase-price-badge {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 700;
+        background: rgba(34, 197, 94, 0.9);
+        color: white;
+    }
+
+    .purchase-info {
+        padding: 16px;
+    }
+
+    .purchase-user {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        text-decoration: none;
+    }
+
+    .purchase-user-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .purchase-user-avatar-placeholder {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .purchase-user-info {
+        flex: 1;
+    }
+
+    .purchase-user-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg);
+    }
+
+    .purchase-user-name:hover {
+        color: var(--primary);
+    }
+
+    .purchase-date {
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .purchase-date svg {
+        width: 12px;
+        height: 12px;
+    }
+
+    .purchase-description {
+        font-size: 14px;
+        color: var(--fg-secondary);
+        line-height: 1.5;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .purchase-text-content {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        text-align: center;
+        font-size: 16px;
+        line-height: 1.5;
+        color: var(--fg);
+        background: linear-gradient(135deg, var(--success-light, #dcfce7) 0%, var(--surface) 100%);
+    }
+
+    .empty-purchases {
+        text-align: center;
+        padding: 80px 20px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+    }
+
+    .empty-purchases svg {
+        width: 80px;
+        height: 80px;
+        color: var(--muted);
+        margin-bottom: 20px;
+    }
+
+    .empty-purchases h3 {
+        font-size: 20px;
+        color: var(--fg);
+        margin-bottom: 8px;
+    }
+
+    .empty-purchases p {
+        color: var(--muted);
+        margin-bottom: 24px;
+    }
+
+    .empty-purchases a {
+        display: inline-block;
+        padding: 12px 28px;
+        background: var(--primary);
+        color: white;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: background 0.2s ease;
+    }
+
+    .empty-purchases a:hover {
+        background: var(--primary-dark);
+    }
+
+    /* Carrusel indicator */
+    .carrusel-indicator {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        display: flex;
+        gap: 4px;
+    }
+
+    .carrusel-indicator span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.5);
+    }
+
+    .carrusel-indicator span:first-child {
+        background: white;
+    }
+
+    @@media (max-width: 768px) {
+        .purchases-grid {
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 16px;
+        }
+
+        .purchases-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .purchases-stats {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .stat-card .stat-value {
+            font-size: 20px;
+        }
+    }
+</style>
+
+<div class="purchases-page">
+    <div class="purchases-header">
+        <h1>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                <line x1="7" y1="7" x2="7.01" y2="7"></line>
+            </svg>
+            Mis Compras
+        </h1>
+    </div>
+
+    <!-- Estadisticas -->
+    <div class="purchases-stats">
+        <div class="stat-card">
+            <div class="stat-value">@totalCompras</div>
+            <div class="stat-label">Contenidos comprados</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value money">$@totalGastado.ToString("N2")</div>
+            <div class="stat-label">Total invertido</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@creadoresUnicos</div>
+            <div class="stat-label">Creadores apoyados</div>
+        </div>
+    </div>
+
+    @if (Model.Any())
+    {
+        <div class="purchases-grid">
+            @foreach (var compra in Model)
+            {
+                var item = compra.Contenido;
+                if (item == null) continue;
+
+                var tipoMedia = item.TipoContenido;
+                var esImagen = tipoMedia == TipoContenido.Foto || tipoMedia == TipoContenido.Imagen;
+                var esVideo = tipoMedia == TipoContenido.Video;
+                var esPost = tipoMedia == TipoContenido.Post;
+                var tieneArchivo = !string.IsNullOrEmpty(item.RutaArchivo);
+                var tieneCarrusel = item.Archivos != null && item.Archivos.Count > 1;
+
+                <div class="purchase-card" data-id="@item.Id">
+                    <div class="purchase-media">
+                        @if (tieneArchivo && esImagen)
+                        {
+                            <img src="@item.RutaArchivo" alt="" loading="lazy">
+                        }
+                        else if (tieneArchivo && esVideo)
+                        {
+                            <video src="@item.RutaArchivo" muted preload="metadata"></video>
+                            <span class="purchase-type-badge video">Video</span>
+                        }
+                        else if (esPost || !tieneArchivo)
+                        {
+                            <div class="purchase-text-content">
+                                @(item.Descripcion?.Length > 150 ? item.Descripcion.Substring(0, 150) + "..." : item.Descripcion)
+                            </div>
+                        }
+                        else
+                        {
+                            <img src="@item.RutaArchivo" alt="" loading="lazy" onerror="this.style.display='none'">
+                        }
+
+                        @if (tieneCarrusel)
+                        {
+                            <div class="carrusel-indicator">
+                                @for (int i = 0; i < Math.Min(item.Archivos.Count, 5); i++)
+                                {
+                                    <span></span>
+                                }
+                            </div>
+                        }
+
+                        <span class="purchase-price-badge">$@compra.Monto.ToString("N2")</span>
+
+                        <div class="purchase-media-overlay">
+                            <a href="/Feed/Detalle/@item.Id">Ver contenido</a>
+                        </div>
+                    </div>
+
+                    <div class="purchase-info">
+                        <a href="/Feed/Perfil/@item.UsuarioId" class="purchase-user">
+                            @if (!string.IsNullOrEmpty(item.Usuario?.FotoPerfil))
+                            {
+                                <img src="@item.Usuario.FotoPerfil" alt="" class="purchase-user-avatar">
+                            }
+                            else
+                            {
+                                <div class="purchase-user-avatar-placeholder">
+                                    @(item.Usuario?.NombreCompleto?.Substring(0, 1).ToUpper() ?? "U")
+                                </div>
+                            }
+                            <div class="purchase-user-info">
+                                <span class="purchase-user-name">@(item.Usuario?.UserName ?? "usuario")</span>
+                                <span class="purchase-date">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                    </svg>
+                                    Comprado @compra.FechaCompra.ToString("dd MMM yyyy")
+                                </span>
+                            </div>
+                        </a>
+
+                        @if (!string.IsNullOrEmpty(item.Descripcion) && tieneArchivo)
+                        {
+                            <p class="purchase-description">@item.Descripcion</p>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="empty-purchases">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                <line x1="7" y1="7" x2="7.01" y2="7"></line>
+            </svg>
+            <h3>No tienes compras todavia</h3>
+            <p>Cuando compres contenido exclusivo de tus creadores favoritos, aparecera aqui</p>
+            <a href="/Feed">Explorar Feed</a>
+        </div>
+    }
+</div>

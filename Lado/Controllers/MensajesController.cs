@@ -21,6 +21,8 @@ namespace Lado.Controllers
         private readonly IDateTimeService _dateTimeService;
         private readonly IRateLimitService _rateLimitService;
         private readonly IFileValidationService _fileValidationService;
+        private readonly ILadoCoinsService _ladoCoinsService;
+        private readonly IReferidosService _referidosService;
 
         // Límite de archivo: 10 MB
         private const long MaxFileSize = 10 * 1024 * 1024;
@@ -33,7 +35,9 @@ namespace Lado.Controllers
             IWebHostEnvironment environment,
             IDateTimeService dateTimeService,
             IRateLimitService rateLimitService,
-            IFileValidationService fileValidationService)
+            IFileValidationService fileValidationService,
+            ILadoCoinsService ladoCoinsService,
+            IReferidosService referidosService)
         {
             _context = context;
             _userManager = userManager;
@@ -43,6 +47,8 @@ namespace Lado.Controllers
             _dateTimeService = dateTimeService;
             _rateLimitService = rateLimitService;
             _fileValidationService = fileValidationService;
+            _ladoCoinsService = ladoCoinsService;
+            _referidosService = referidosService;
         }
 
         // ========================================
@@ -1007,8 +1013,12 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "No puedes enviar mensajes a este usuario" });
                 }
 
-                // Si hay propina, procesarla con transacción atómica
-                if (request.Monto > 0)
+                // Si hay propina (real o LadoCoins), procesarla con transacción atómica
+                var montoReal = request.Monto;
+                var usarLadoCoins = request.MontoLadoCoins;
+                var montoTotal = montoReal + usarLadoCoins;
+
+                if (montoTotal > 0)
                 {
                     // Verificar si el receptor puede recibir propinas (tiene contenido LadoB o es creador verificado)
                     var puedeRecibirPropinas = await _context.Contenidos
@@ -1023,70 +1033,126 @@ namespace Lado.Controllers
                         return Json(new { success = false, message = "Este usuario no puede recibir propinas" });
                     }
 
-                    if (usuario.Saldo < request.Monto)
+                    // Validar saldo de LadoCoins
+                    if (usarLadoCoins > 0)
+                    {
+                        var saldoLC = await _ladoCoinsService.ObtenerSaldoDisponibleAsync(usuario.Id);
+                        if (saldoLC < usarLadoCoins)
+                        {
+                            return Json(new { success = false, message = $"Saldo insuficiente de LadoCoins. Tienes ${saldoLC:N2}" });
+                        }
+                    }
+
+                    // Validar saldo real
+                    if (montoReal > 0 && usuario.Saldo < montoReal)
                     {
                         return Json(new
                         {
                             success = false,
                             requiereRecarga = true,
-                            message = $"Saldo insuficiente. Necesitas ${request.Monto - usuario.Saldo:N2} más."
+                            message = $"Saldo insuficiente. Necesitas ${montoReal - usuario.Saldo:N2} más."
                         });
                     }
 
-                    // Calcular comisión (10%)
-                    var comision = request.Monto * 0.10m;
-                    var gananciaReceptor = request.Monto - comision;
+                    // Variables para ganancias
+                    decimal comisionReal = 0, gananciaCreadorReal = 0;
+                    decimal comisionLC = 0, gananciaCreadorLC = 0;
+                    decimal montoQuemado = 0;
 
                     // TRANSACCIÓN ATÓMICA - todas las operaciones o ninguna
                     using var transaction = await _context.Database.BeginTransactionAsync();
 
                     try
                     {
-                        // Descontar saldo
-                        usuario.Saldo -= request.Monto;
+                        // 1. Procesar LadoCoins (100% permitido para tips)
+                        if (usarLadoCoins > 0)
+                        {
+                            var (exitoLC, quemado) = await _ladoCoinsService.DebitarAsync(
+                                usuario.Id,
+                                usarLadoCoins,
+                                TipoTransaccionLadoCoin.PagoPropina,
+                                $"Propina a @{receptor.UserName}"
+                            );
 
-                        // Agregar al receptor
-                        receptor.Saldo += gananciaReceptor;
-                        receptor.TotalGanancias += gananciaReceptor;
+                            if (!exitoLC)
+                            {
+                                await transaction.RollbackAsync();
+                                return Json(new { success = false, message = "Error al procesar LadoCoins" });
+                            }
 
-                        // Registrar tip
+                            montoQuemado = quemado;
+                            comisionLC = usarLadoCoins * 0.10m;
+                            gananciaCreadorLC = usarLadoCoins - comisionLC;
+
+                            // Creador recibe LadoCoins (NO dinero real)
+                            await _ladoCoinsService.AcreditarMontoAsync(
+                                receptor.Id,
+                                gananciaCreadorLC,
+                                TipoTransaccionLadoCoin.RecibirPago,
+                                $"Propina de @{usuario.UserName} (LadoCoins)"
+                            );
+
+                            // Procesar comisión de referido
+                            await _referidosService.ProcesarComisionAsync(usuario.Id, usarLadoCoins);
+                        }
+
+                        // 2. Procesar dinero real
+                        if (montoReal > 0)
+                        {
+                            usuario.Saldo -= montoReal;
+                            comisionReal = montoReal * 0.10m;
+                            gananciaCreadorReal = montoReal - comisionReal;
+                            receptor.Saldo += gananciaCreadorReal;
+                            receptor.TotalGanancias += gananciaCreadorReal;
+                        }
+
+                        // 3. Registrar tip (con monto total)
                         var tip = new Tip
                         {
                             FanId = usuario.Id,
                             CreadorId = receptor.Id,
-                            Monto = request.Monto,
+                            Monto = montoTotal,
                             Mensaje = request.Mensaje,
                             FechaEnvio = DateTime.Now
                         };
                         _context.Tips.Add(tip);
 
-                        // Registrar transacciones
-                        _context.Transacciones.Add(new Transaccion
+                        // 4. Registrar transacciones de dinero real
+                        if (montoReal > 0)
                         {
-                            UsuarioId = usuario.Id,
-                            TipoTransaccion = TipoTransaccion.Tip,
-                            Monto = -request.Monto,
-                            FechaTransaccion = DateTime.Now,
-                            Descripcion = $"Propina enviada a {receptor.NombreCompleto}"
-                        });
+                            _context.Transacciones.Add(new Transaccion
+                            {
+                                UsuarioId = usuario.Id,
+                                TipoTransaccion = TipoTransaccion.Tip,
+                                Monto = -montoReal,
+                                FechaTransaccion = DateTime.Now,
+                                Descripcion = $"Propina enviada a {receptor.NombreCompleto}"
+                            });
 
-                        _context.Transacciones.Add(new Transaccion
-                        {
-                            UsuarioId = receptor.Id,
-                            TipoTransaccion = TipoTransaccion.IngresoPropina,
-                            Monto = gananciaReceptor,
-                            Comision = comision,
-                            MontoNeto = gananciaReceptor,
-                            FechaTransaccion = DateTime.Now,
-                            Descripcion = $"Propina de @{usuario.UserName}"
-                        });
+                            _context.Transacciones.Add(new Transaccion
+                            {
+                                UsuarioId = receptor.Id,
+                                TipoTransaccion = TipoTransaccion.IngresoPropina,
+                                Monto = gananciaCreadorReal,
+                                Comision = comisionReal,
+                                MontoNeto = gananciaCreadorReal,
+                                FechaTransaccion = DateTime.Now,
+                                Descripcion = $"Propina de @{usuario.UserName}"
+                            });
+                        }
 
-                        // Crear el mensaje con indicador de propina
+                        // 5. Crear el mensaje con indicador de propina
+                        var descripcionPropina = usarLadoCoins > 0 && montoReal > 0
+                            ? $"💰 Propina de ${montoTotal:N0} (${montoReal:N0} + ${usarLadoCoins:N0} LadoCoins)"
+                            : usarLadoCoins > 0
+                                ? $"🪙 Propina de ${usarLadoCoins:N0} LadoCoins"
+                                : $"💰 Propina de ${montoReal:N0}";
+
                         var mensaje = new MensajePrivado
                         {
                             RemitenteId = usuario.Id,
                             DestinatarioId = receptor.Id,
-                            Contenido = $"💰 Propina de ${request.Monto:N0}\n\n{request.Mensaje.Trim()}",
+                            Contenido = $"{descripcionPropina}\n\n{request.Mensaje.Trim()}",
                             FechaEnvio = DateTime.Now,
                             Leido = false
                         };
@@ -1095,8 +1161,8 @@ namespace Lado.Controllers
                         await _context.SaveChangesAsync();
                         await transaction.CommitAsync();
 
-                        _logger.LogInformation("Mensaje con propina enviado de {Remitente} a {Destinatario}, monto: ${Monto} (comisión: ${Comision})",
-                            usuario.UserName, receptor.UserName, request.Monto, comision);
+                        _logger.LogInformation("Mensaje con propina enviado de {Remitente} a {Destinatario}, monto: ${MontoReal} + ${MontoLC} LC",
+                            usuario.UserName, receptor.UserName, montoReal, usarLadoCoins);
 
                         return Json(new { success = true });
                     }
@@ -1236,6 +1302,7 @@ namespace Lado.Controllers
         public string ReceptorId { get; set; } = string.Empty;
         public string Mensaje { get; set; } = string.Empty;
         public decimal Monto { get; set; } = 0;
+        public decimal MontoLadoCoins { get; set; } = 0;
     }
 
     public class ConversacionViewModel

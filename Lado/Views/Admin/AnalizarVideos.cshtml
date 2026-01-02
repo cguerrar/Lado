@@ -1,0 +1,717 @@
+@using Lado.Controllers
+@{
+    ViewData["Title"] = "Analizar Medios";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    var videos = ViewBag.Videos as List<AdminController.VideoAnalisis> ?? new();
+    var imagenes = ViewBag.Imagenes as List<AdminController.ImagenAnalisis> ?? new();
+
+    string FormatearPeso(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F1} MB";
+    }
+
+    string FormatearDuracion(double segundos)
+    {
+        if (segundos <= 0) return "-";
+        var mins = (int)(segundos / 60);
+        var secs = (int)(segundos % 60);
+        return mins > 0 ? $"{mins}:{secs:D2}" : $"0:{secs:D2}";
+    }
+}
+
+@Html.AntiForgeryToken()
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">Analizar Medios</h1>
+            <p class="text-muted mb-0">Detectar videos e imágenes que necesitan conversión a formatos estándar</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/Admin/MigracionMedias" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Migracion
+            </a>
+            <a href="/Admin/Contenido" class="btn btn-outline-secondary">
+                <i class="fas fa-photo-video"></i> Contenido
+            </a>
+        </div>
+    </div>
+
+    <!-- Diagnóstico FFmpeg -->
+    <div class="alert @(ViewBag.FFprobePath != "No encontrado" ? "alert-success" : "alert-danger") mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <strong>FFprobe:</strong> @ViewBag.FFprobePath
+                <br>
+                <strong>FFmpeg:</strong> @ViewBag.FFmpegPath
+            </div>
+            @if (ViewBag.FFprobePath == "No encontrado")
+            {
+                <div>
+                    <i class="fas fa-exclamation-triangle"></i> FFmpeg no encontrado.
+                    <a href="https://ffmpeg.org/download.html" target="_blank">Descargar FFmpeg</a> e instalarlo en una ruta como <code>C:\ffmpeg\bin\</code>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Tabs para Videos e Imágenes -->
+    <ul class="nav nav-tabs mb-4" id="mediaTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="videos-tab" data-bs-toggle="tab" data-bs-target="#videos-panel" type="button" role="tab">
+                <i class="fas fa-video"></i> Videos
+                <span class="badge bg-primary ms-1">@ViewBag.TotalVideos</span>
+                @if (ViewBag.VideosNecesitanConversion + ViewBag.VideosMuyPesados > 0)
+                {
+                    <span class="badge bg-danger ms-1">@(ViewBag.VideosNecesitanConversion + ViewBag.VideosMuyPesados) pendientes</span>
+                }
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="imagenes-tab" data-bs-toggle="tab" data-bs-target="#imagenes-panel" type="button" role="tab">
+                <i class="fas fa-image"></i> Imágenes
+                <span class="badge bg-primary ms-1">@ViewBag.TotalImagenes</span>
+                @if (ViewBag.ImagenesNecesitanConversion > 0)
+                {
+                    <span class="badge bg-danger ms-1">@ViewBag.ImagenesNecesitanConversion pendientes</span>
+                }
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="mediaTabContent">
+        <!-- Panel de Videos -->
+        <div class="tab-pane fade show active" id="videos-panel" role="tabpanel">
+            <!-- Resumen Videos -->
+            <div class="row mb-4">
+                <div class="col-md-2">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body text-center py-3">
+                            <h5 class="text-muted mb-1">Total</h5>
+                            <h2 class="mb-0">@ViewBag.TotalVideos</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card border-0 shadow-sm border-success" style="border-left: 4px solid !important;">
+                        <div class="card-body text-center py-3">
+                            <h5 class="text-muted mb-1">OK</h5>
+                            <h2 class="mb-0 text-success">@ViewBag.VideosOk</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card border-0 shadow-sm border-danger" style="border-left: 4px solid !important;">
+                        <div class="card-body text-center py-3">
+                            <h5 class="text-muted mb-1">Codec Malo</h5>
+                            <h2 class="mb-0 text-danger">@ViewBag.VideosNecesitanConversion</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card border-0 shadow-sm border-warning" style="border-left: 4px solid !important;">
+                        <div class="card-body text-center py-3">
+                            <h5 class="text-muted mb-1">Muy Pesados</h5>
+                            <h2 class="mb-0 text-warning">@ViewBag.VideosMuyPesados</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card border-0 shadow-sm border-secondary" style="border-left: 4px solid !important;">
+                        <div class="card-body text-center py-3">
+                            <h5 class="text-muted mb-1">Errores</h5>
+                            <h2 class="mb-0 text-secondary">@ViewBag.VideosErrores</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card border-0 shadow-sm bg-primary text-white">
+                        <div class="card-body text-center py-3">
+                            <h5 class="mb-1">A Convertir</h5>
+                            <h2 class="mb-0">@(ViewBag.VideosNecesitanConversion + ViewBag.VideosMuyPesados)</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones Videos -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        @if (ViewBag.VideosNecesitanConversion + ViewBag.VideosMuyPesados > 0)
+                        {
+                            <button id="btnConvertirProblematicos" class="btn btn-danger" onclick="convertirVideos('problematicos')">
+                                <i class="fas fa-exclamation-triangle"></i> Convertir Problematicos (@(ViewBag.VideosNecesitanConversion + ViewBag.VideosMuyPesados))
+                            </button>
+                        }
+                        <button id="btnConvertirTodos" class="btn btn-warning" onclick="convertirVideos('todos')">
+                            <i class="fas fa-sync-alt"></i> Reconvertir TODOS (@ViewBag.TotalVideos)
+                        </button>
+                        <span class="text-muted small">Uniforma todos los videos a H.264, CRF 23, max 1920px, faststart</span>
+                    </div>
+                    <div id="progresoGlobalVideos" class="mt-3" style="display: none;">
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+                        </div>
+                        <small class="text-muted" id="mensajeProgresoVideos">Iniciando...</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla de Videos -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-video text-primary"></i> Videos Analizados</h5>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary active" onclick="filtrarVideos('todos')">Todos</button>
+                        <button class="btn btn-outline-danger" onclick="filtrarVideos('necesita_conversion')">Codec Malo</button>
+                        <button class="btn btn-outline-warning" onclick="filtrarVideos('muy_pesado')">Pesados</button>
+                        <button class="btn btn-outline-success" onclick="filtrarVideos('ok')">OK</button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 80px;">Tipo</th>
+                                    <th style="width: 60px;">ID</th>
+                                    <th>Usuario</th>
+                                    <th>Codec</th>
+                                    <th>Resolucion</th>
+                                    <th>Duracion</th>
+                                    <th>Peso</th>
+                                    <th>Estado</th>
+                                    <th style="width: 120px;">Accion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var v in videos)
+                                {
+                                    var rowClass = v.Estado switch
+                                    {
+                                        "necesita_conversion" => "table-danger",
+                                        "muy_pesado" => "table-warning",
+                                        "error" => "table-secondary",
+                                        _ => ""
+                                    };
+                                    <tr class="video-row @rowClass" data-estado="@v.Estado" data-tipo="@v.Tipo" data-id="@v.Id">
+                                        <td><span class="badge bg-secondary">@v.Tipo</span></td>
+                                        <td>@v.Id</td>
+                                        <td>@(v.Usuario ?? "-")</td>
+                                        <td>
+                                            @if (v.CodecReal != null)
+                                            {
+                                                var codecClass = v.CodecReal.ToLower() == "h264" ? "text-success" : "text-danger fw-bold";
+                                                <span class="@codecClass">@v.CodecReal.ToUpper()</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (v.Ancho > 0 && v.Alto > 0)
+                                            {
+                                                <span>@v.Ancho x @v.Alto</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                        <td>@FormatearDuracion(v.DuracionSegundos)</td>
+                                        <td>
+                                            @{
+                                                var pesoMB = v.PesoBytes / (1024.0 * 1024.0);
+                                                var pesoClass = pesoMB > 50 ? "text-danger fw-bold" : (pesoMB > 20 ? "text-warning" : "");
+                                            }
+                                            <span class="@pesoClass">@FormatearPeso(v.PesoBytes)</span>
+                                        </td>
+                                        <td>
+                                            @switch (v.Estado)
+                                            {
+                                                case "ok":
+                                                    <span class="badge bg-success"><i class="fas fa-check"></i> OK</span>
+                                                    break;
+                                                case "necesita_conversion":
+                                                    <span class="badge bg-danger" title="@v.Problema"><i class="fas fa-exclamation-triangle"></i> Convertir</span>
+                                                    break;
+                                                case "muy_pesado":
+                                                    <span class="badge bg-warning text-dark" title="@v.Problema"><i class="fas fa-weight-hanging"></i> Pesado</span>
+                                                    break;
+                                                case "error":
+                                                    <span class="badge bg-secondary" title="@v.Problema"><i class="fas fa-times"></i> Error</span>
+                                                    break;
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (v.Estado != "error")
+                                            {
+                                                <button class="btn btn-sm @(v.Estado == "ok" ? "btn-outline-secondary" : "btn-primary") btn-convertir-video"
+                                                        onclick="convertirVideo('@v.Tipo', @v.Id, this)"
+                                                        data-estado="@v.Estado">
+                                                    <i class="fas fa-sync-alt"></i> @(v.Estado == "ok" ? "Reconv." : "Convertir")
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">-</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel de Imágenes -->
+        <div class="tab-pane fade" id="imagenes-panel" role="tabpanel">
+            <!-- Resumen Imágenes -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body text-center py-3">
+                            <h5 class="text-muted mb-1">Total</h5>
+                            <h2 class="mb-0">@ViewBag.TotalImagenes</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm border-success" style="border-left: 4px solid !important;">
+                        <div class="card-body text-center py-3">
+                            <h5 class="text-muted mb-1">OK (JPEG)</h5>
+                            <h2 class="mb-0 text-success">@ViewBag.ImagenesOk</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm border-danger" style="border-left: 4px solid !important;">
+                        <div class="card-body text-center py-3">
+                            <h5 class="text-muted mb-1">No Estándar</h5>
+                            <h2 class="mb-0 text-danger">@ViewBag.ImagenesNecesitanConversion</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm border-secondary" style="border-left: 4px solid !important;">
+                        <div class="card-body text-center py-3">
+                            <h5 class="text-muted mb-1">Errores</h5>
+                            <h2 class="mb-0 text-secondary">@ViewBag.ImagenesErrores</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones Imágenes -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        @if (ViewBag.ImagenesNecesitanConversion > 0)
+                        {
+                            <button id="btnConvertirImagenesProblematicas" class="btn btn-danger" onclick="convertirImagenes('problematicas')">
+                                <i class="fas fa-exclamation-triangle"></i> Convertir No Estándar (@ViewBag.ImagenesNecesitanConversion)
+                            </button>
+                        }
+                        <button id="btnConvertirTodasImagenes" class="btn btn-warning" onclick="convertirImagenes('todas')">
+                            <i class="fas fa-sync-alt"></i> Reconvertir TODAS (@ViewBag.TotalImagenes)
+                        </button>
+                        <span class="text-muted small">Uniforma todas las imágenes a JPEG, max 2048px, calidad 90</span>
+                    </div>
+                    <div id="progresoGlobalImagenes" class="mt-3" style="display: none;">
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" style="width: 0%"></div>
+                        </div>
+                        <small class="text-muted" id="mensajeProgresoImagenes">Iniciando...</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla de Imágenes -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-image text-info"></i> Imágenes Analizadas</h5>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary active" onclick="filtrarImagenes('todos')">Todas</button>
+                        <button class="btn btn-outline-danger" onclick="filtrarImagenes('necesita_conversion')">No Estándar</button>
+                        <button class="btn btn-outline-success" onclick="filtrarImagenes('ok')">OK</button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 80px;">Tipo</th>
+                                    <th style="width: 60px;">ID</th>
+                                    <th>Usuario</th>
+                                    <th>Formato</th>
+                                    <th>Extension</th>
+                                    <th>Resolucion</th>
+                                    <th>Peso</th>
+                                    <th>Estado</th>
+                                    <th style="width: 120px;">Accion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var img in imagenes)
+                                {
+                                    var rowClass = img.Estado switch
+                                    {
+                                        "necesita_conversion" => "table-danger",
+                                        "error" => "table-secondary",
+                                        _ => ""
+                                    };
+                                    <tr class="imagen-row @rowClass" data-estado="@img.Estado" data-tipo="@img.Tipo" data-id="@img.Id">
+                                        <td><span class="badge bg-info">@img.Tipo</span></td>
+                                        <td>@img.Id</td>
+                                        <td>@(img.Usuario ?? "-")</td>
+                                        <td>
+                                            @if (img.FormatoReal != null)
+                                            {
+                                                var formatoClass = img.FormatoReal.ToUpper() == "JPEG" ? "text-success" : "text-danger fw-bold";
+                                                <span class="@formatoClass">@img.FormatoReal</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <code class="@(img.Extension == ".jpg" || img.Extension == ".jpeg" ? "text-success" : "text-warning")">@img.Extension</code>
+                                        </td>
+                                        <td>
+                                            @if (img.Ancho > 0 && img.Alto > 0)
+                                            {
+                                                <span>@img.Ancho x @img.Alto</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                        <td>@FormatearPeso(img.PesoBytes)</td>
+                                        <td>
+                                            @switch (img.Estado)
+                                            {
+                                                case "ok":
+                                                    <span class="badge bg-success"><i class="fas fa-check"></i> OK</span>
+                                                    break;
+                                                case "necesita_conversion":
+                                                    <span class="badge bg-danger" title="@img.Problema"><i class="fas fa-exclamation-triangle"></i> Convertir</span>
+                                                    break;
+                                                case "error":
+                                                    <span class="badge bg-secondary" title="@img.Problema"><i class="fas fa-times"></i> Error</span>
+                                                    break;
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (img.Estado != "error")
+                                            {
+                                                <button class="btn btn-sm @(img.Estado == "ok" ? "btn-outline-secondary" : "btn-info") btn-convertir-imagen"
+                                                        onclick="convertirImagen('@img.Tipo', @img.Id, this)"
+                                                        data-estado="@img.Estado">
+                                                    <i class="fas fa-sync-alt"></i> @(img.Estado == "ok" ? "Reconv." : "Convertir")
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">-</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // ========================================
+    // FILTROS
+    // ========================================
+    function filtrarVideos(estado) {
+        document.querySelectorAll('.video-row').forEach(row => {
+            if (estado === 'todos' || row.dataset.estado === estado) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        document.querySelectorAll('#videos-panel .btn-group .btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+    }
+
+    function filtrarImagenes(estado) {
+        document.querySelectorAll('.imagen-row').forEach(row => {
+            if (estado === 'todos' || row.dataset.estado === estado) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        document.querySelectorAll('#imagenes-panel .btn-group .btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+    }
+
+    // ========================================
+    // CONVERSIÓN INDIVIDUAL
+    // ========================================
+    async function convertirVideo(tipo, id, btn) {
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+        const originalHtml = btn.innerHTML;
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        try {
+            const response = await fetch('/Admin/ReconvertirVideo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `__RequestVerificationToken=${encodeURIComponent(token)}&tipo=${tipo}&id=${id}`
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                btn.innerHTML = '<i class="fas fa-check"></i>';
+                btn.className = 'btn btn-sm btn-success';
+                btn.disabled = true;
+
+                const row = btn.closest('tr');
+                row.className = 'video-row';
+                row.querySelector('td:nth-child(8)').innerHTML = '<span class="badge bg-success"><i class="fas fa-check"></i> OK</span>';
+
+                alert(data.message);
+            } else {
+                btn.innerHTML = '<i class="fas fa-times"></i>';
+                btn.className = 'btn btn-sm btn-danger';
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.className = 'btn btn-sm btn-primary btn-convertir-video';
+                    btn.disabled = false;
+                }, 2000);
+                alert('Error: ' + data.message);
+            }
+        } catch (err) {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+            alert('Error: ' + err.message);
+        }
+    }
+
+    async function convertirImagen(tipo, id, btn) {
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+        const originalHtml = btn.innerHTML;
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        try {
+            const response = await fetch('/Admin/ReconvertirImagen', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `__RequestVerificationToken=${encodeURIComponent(token)}&tipo=${tipo}&id=${id}`
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                btn.innerHTML = '<i class="fas fa-check"></i>';
+                btn.className = 'btn btn-sm btn-success';
+                btn.disabled = true;
+
+                const row = btn.closest('tr');
+                row.className = 'imagen-row';
+                row.querySelector('td:nth-child(8)').innerHTML = '<span class="badge bg-success"><i class="fas fa-check"></i> OK</span>';
+
+                alert(data.message);
+            } else {
+                btn.innerHTML = '<i class="fas fa-times"></i>';
+                btn.className = 'btn btn-sm btn-danger';
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.className = 'btn btn-sm btn-info btn-convertir-imagen';
+                    btn.disabled = false;
+                }, 2000);
+                alert('Error: ' + data.message);
+            }
+        } catch (err) {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+            alert('Error: ' + err.message);
+        }
+    }
+
+    // ========================================
+    // CONVERSIÓN MASIVA
+    // ========================================
+    async function convertirVideos(modo) {
+        const esProblematicos = modo === 'problematicos';
+        const mensajeConfirm = esProblematicos
+            ? 'Esto convertirá los videos problemáticos. Puede tomar varios minutos. ¿Continuar?'
+            : 'Esto RECONVERTIRÁ TODOS los videos (incluso los que ya están OK). Puede tomar MUCHO tiempo. ¿Continuar?';
+
+        if (!confirm(mensajeConfirm)) {
+            return;
+        }
+
+        const btnProb = document.getElementById('btnConvertirProblematicos');
+        const btnTodos = document.getElementById('btnConvertirTodos');
+        const progreso = document.getElementById('progresoGlobalVideos');
+        const barra = progreso.querySelector('.progress-bar');
+        const mensaje = document.getElementById('mensajeProgresoVideos');
+
+        if (btnProb) btnProb.disabled = true;
+        btnTodos.disabled = true;
+        progreso.style.display = 'block';
+
+        let botones;
+        if (esProblematicos) {
+            botones = document.querySelectorAll('.btn-convertir-video:not(:disabled)[data-estado="necesita_conversion"], .btn-convertir-video:not(:disabled)[data-estado="muy_pesado"]');
+        } else {
+            botones = document.querySelectorAll('.btn-convertir-video:not(:disabled)');
+        }
+
+        const total = botones.length;
+        let procesados = 0;
+        let exitosos = 0;
+
+        for (const boton of botones) {
+            const row = boton.closest('tr');
+            const tipo = row.dataset.tipo;
+            const id = row.dataset.id;
+
+            mensaje.textContent = `Procesando ${procesados + 1} de ${total}... (${exitosos} exitosos)`;
+            barra.style.width = ((procesados / total) * 100) + '%';
+
+            try {
+                const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+                const response = await fetch('/Admin/ReconvertirVideo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `__RequestVerificationToken=${encodeURIComponent(token)}&tipo=${tipo}&id=${id}`
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    exitosos++;
+                    boton.innerHTML = '<i class="fas fa-check"></i>';
+                    boton.className = 'btn btn-sm btn-success btn-convertir-video';
+                    boton.disabled = true;
+                    row.className = 'video-row';
+                    row.querySelector('td:nth-child(8)').innerHTML = '<span class="badge bg-success"><i class="fas fa-check"></i> OK</span>';
+                } else {
+                    boton.innerHTML = '<i class="fas fa-times"></i>';
+                    boton.className = 'btn btn-sm btn-danger btn-convertir-video';
+                    console.error('Error:', data.message);
+                }
+            } catch (err) {
+                boton.innerHTML = '<i class="fas fa-times"></i>';
+                boton.className = 'btn btn-sm btn-danger btn-convertir-video';
+                console.error('Exception:', err);
+            }
+
+            procesados++;
+        }
+
+        barra.style.width = '100%';
+        barra.classList.remove('progress-bar-animated');
+        barra.classList.add('bg-success');
+        mensaje.textContent = `Completado: ${exitosos} de ${total} convertidos exitosamente`;
+
+        if (btnProb) btnProb.innerHTML = '<i class="fas fa-check"></i> Completado';
+        btnTodos.innerHTML = '<i class="fas fa-check"></i> Completado';
+    }
+
+    async function convertirImagenes(modo) {
+        const esProblematicas = modo === 'problematicas';
+        const mensajeConfirm = esProblematicas
+            ? 'Esto convertirá las imágenes no estándar a JPEG. ¿Continuar?'
+            : 'Esto RECONVERTIRÁ TODAS las imágenes a JPEG. ¿Continuar?';
+
+        if (!confirm(mensajeConfirm)) {
+            return;
+        }
+
+        const btnProb = document.getElementById('btnConvertirImagenesProblematicas');
+        const btnTodas = document.getElementById('btnConvertirTodasImagenes');
+        const progreso = document.getElementById('progresoGlobalImagenes');
+        const barra = progreso.querySelector('.progress-bar');
+        const mensaje = document.getElementById('mensajeProgresoImagenes');
+
+        if (btnProb) btnProb.disabled = true;
+        btnTodas.disabled = true;
+        progreso.style.display = 'block';
+
+        let botones;
+        if (esProblematicas) {
+            botones = document.querySelectorAll('.btn-convertir-imagen:not(:disabled)[data-estado="necesita_conversion"]');
+        } else {
+            botones = document.querySelectorAll('.btn-convertir-imagen:not(:disabled)');
+        }
+
+        const total = botones.length;
+        let procesados = 0;
+        let exitosos = 0;
+
+        for (const boton of botones) {
+            const row = boton.closest('tr');
+            const tipo = row.dataset.tipo;
+            const id = row.dataset.id;
+
+            mensaje.textContent = `Procesando ${procesados + 1} de ${total}... (${exitosos} exitosas)`;
+            barra.style.width = ((procesados / total) * 100) + '%';
+
+            try {
+                const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+                const response = await fetch('/Admin/ReconvertirImagen', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `__RequestVerificationToken=${encodeURIComponent(token)}&tipo=${tipo}&id=${id}`
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    exitosos++;
+                    boton.innerHTML = '<i class="fas fa-check"></i>';
+                    boton.className = 'btn btn-sm btn-success btn-convertir-imagen';
+                    boton.disabled = true;
+                    row.className = 'imagen-row';
+                    row.querySelector('td:nth-child(8)').innerHTML = '<span class="badge bg-success"><i class="fas fa-check"></i> OK</span>';
+                } else {
+                    boton.innerHTML = '<i class="fas fa-times"></i>';
+                    boton.className = 'btn btn-sm btn-danger btn-convertir-imagen';
+                    console.error('Error:', data.message);
+                }
+            } catch (err) {
+                boton.innerHTML = '<i class="fas fa-times"></i>';
+                boton.className = 'btn btn-sm btn-danger btn-convertir-imagen';
+                console.error('Exception:', err);
+            }
+
+            procesados++;
+        }
+
+        barra.style.width = '100%';
+        barra.classList.remove('progress-bar-animated');
+        barra.classList.add('bg-success');
+        mensaje.textContent = `Completado: ${exitosos} de ${total} convertidas exitosamente`;
+
+        if (btnProb) btnProb.innerHTML = '<i class="fas fa-check"></i> Completado';
+        btnTodas.innerHTML = '<i class="fas fa-check"></i> Completado';
+    }
+</script>
+}

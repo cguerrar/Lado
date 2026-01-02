@@ -17,6 +17,9 @@ namespace Lado.Controllers
         private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _environment;
         private readonly IRateLimitService _rateLimitService;
+        private readonly ILadoCoinsService _ladoCoinsService;
+        private readonly IReferidosService _referidosService;
+        private readonly IRachasService _rachasService;
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
@@ -25,7 +28,10 @@ namespace Lado.Controllers
             IEmailService emailService,
             IConfiguration configuration,
             IWebHostEnvironment environment,
-            IRateLimitService rateLimitService)
+            IRateLimitService rateLimitService,
+            ILadoCoinsService ladoCoinsService,
+            IReferidosService referidosService,
+            IRachasService rachasService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
@@ -34,6 +40,9 @@ namespace Lado.Controllers
             _configuration = configuration;
             _environment = environment;
             _rateLimitService = rateLimitService;
+            _ladoCoinsService = ladoCoinsService;
+            _referidosService = referidosService;
+            _rachasService = rachasService;
         }
 
         // ========================================
@@ -41,7 +50,7 @@ namespace Lado.Controllers
         // ========================================
 
         [HttpGet]
-        public IActionResult Register()
+        public IActionResult Register([FromQuery(Name = "ref")] string? refCode = null)
         {
             if (User.Identity.IsAuthenticated)
             {
@@ -49,7 +58,17 @@ namespace Lado.Controllers
                 return RedirectToAction("Index", "FeedPublico");
             }
 
-            return View();
+            var model = new RegisterViewModel
+            {
+                CodigoReferido = refCode
+            };
+
+            if (!string.IsNullOrEmpty(refCode))
+            {
+                _logger.LogInformation("Registro con código de referido: {RefCode}", refCode);
+            }
+
+            return View(model);
         }
 
         [HttpPost]
@@ -111,6 +130,7 @@ namespace Lado.Controllers
                     NombreCompleto = model.NombreCompleto,
                     Seudonimo = model.Seudonimo, // ⭐ NUEVO campo obligatorio
                     LadoPreferido = model.LadoPreferido, // ⭐ Lado preferido seleccionado por el usuario
+                    ZonaHoraria = model.ZonaHoraria, // ⭐ Zona horaria detectada automáticamente
                     FechaRegistro = DateTime.Now,
                     EstaActivo = true,
                     EmailConfirmed = false,
@@ -136,12 +156,51 @@ namespace Lado.Controllers
                 {
                     _logger.LogInformation("Usuario creado exitosamente: {Username}", usuario.UserName);
 
+                    // ⭐ Procesar LadoCoins - Bono de bienvenida
+                    try
+                    {
+                        await _ladoCoinsService.AcreditarBonoAsync(
+                            usuario.Id,
+                            TipoTransaccionLadoCoin.BonoBienvenida,
+                            "Bono de bienvenida por registrarte en LADO"
+                        );
+                        usuario.BonoBienvenidaEntregado = true;
+                        await _userManager.UpdateAsync(usuario);
+                        _logger.LogInformation("Bono de bienvenida entregado a: {Username}", usuario.UserName);
+
+                        // ⭐ Procesar código de referido si existe
+                        if (!string.IsNullOrEmpty(model.CodigoReferido))
+                        {
+                            var referidoRegistrado = await _referidosService.RegistrarReferidoAsync(
+                                usuario.Id,
+                                model.CodigoReferido
+                            );
+
+                            if (referidoRegistrado)
+                            {
+                                // Entregar bonos de referido (para el nuevo usuario y el referidor)
+                                await _referidosService.EntregarBonosRegistroAsync(usuario.Id);
+                                _logger.LogInformation("Referido registrado con código: {RefCode} para usuario: {Username}",
+                                    model.CodigoReferido, usuario.UserName);
+                            }
+                            else
+                            {
+                                _logger.LogWarning("Código de referido inválido: {RefCode}", model.CodigoReferido);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error al procesar LadoCoins en registro para: {Username}", usuario.UserName);
+                        // No bloqueamos el registro por errores de LadoCoins
+                    }
+
                     // Iniciar sesion automaticamente
                     await _signInManager.SignInAsync(usuario, isPersistent: false);
 
                     _logger.LogInformation("Sesion iniciada para: {Username}", usuario.UserName);
 
-                    TempData["Success"] = "Bienvenido a LADO! Tu cuenta ha sido creada exitosamente.";
+                    TempData["Success"] = "Bienvenido a LADO! Tu cuenta ha sido creada exitosamente. ¡Recibiste LadoCoins de bienvenida!";
 
                     // Redirigir al onboarding de intereses
                     return RedirectToAction("SeleccionarIntereses", "Usuario");
@@ -267,6 +326,21 @@ namespace Lado.Controllers
                     user.ContadorIngresos++;
                     user.UltimaActividad = DateTime.Now;
                     await _userManager.UpdateAsync(user);
+
+                    // ⭐ Registrar login diario para LadoCoins
+                    try
+                    {
+                        var bonoOtorgado = await _rachasService.RegistrarLoginAsync(user.Id);
+                        if (bonoOtorgado)
+                        {
+                            _logger.LogInformation("Bono de login diario otorgado a: {Username}", user.UserName);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error al registrar login diario para: {Username}", user.UserName);
+                        // No bloqueamos el login por errores de LadoCoins
+                    }
 
                     // ✅ Verificar si es Admin
                     var roles = await _userManager.GetRolesAsync(user);
@@ -554,6 +628,153 @@ namespace Lado.Controllers
         }
 
         // ========================================
+        // VERIFICACIÓN DE EMAIL
+        // ========================================
+
+        /// <summary>
+        /// Enviar email de verificación al usuario autenticado
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EnviarVerificacionEmail()
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "Debes iniciar sesión" });
+            }
+
+            if (usuario.EmailConfirmed)
+            {
+                return Json(new { success = false, message = "Tu email ya está verificado" });
+            }
+
+            // Rate limiting
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var rateLimitKey = $"verify_email_{usuario.Id}";
+            if (!await _rateLimitService.IsAllowedAsync(clientIp, rateLimitKey, 3, TimeSpan.FromHours(1),
+                TipoAtaque.SpamMensajes, "/Account/EnviarVerificacionEmail", usuario.UserName, null))
+            {
+                return Json(new { success = false, message = "Has solicitado demasiados correos. Espera 1 hora." });
+            }
+
+            try
+            {
+                // Generar token de confirmación
+                var token = await _userManager.GenerateEmailConfirmationTokenAsync(usuario);
+
+                // Crear link de confirmación
+                var baseUrl = _configuration["App:BaseUrl"] ?? $"{Request.Scheme}://{Request.Host}";
+                var confirmLink = $"{baseUrl}/Account/ConfirmarEmail?userId={Uri.EscapeDataString(usuario.Id)}&token={Uri.EscapeDataString(token)}";
+
+                // Enviar email
+                var enviado = await _emailService.SendConfirmationEmailAsync(
+                    usuario.Email!,
+                    usuario.NombreCompleto ?? usuario.UserName ?? "Usuario",
+                    confirmLink
+                );
+
+                if (enviado)
+                {
+                    _logger.LogInformation("Email de verificación enviado a: {Email}", usuario.Email);
+                    return Json(new { success = true, message = "Correo de verificación enviado. Revisa tu bandeja de entrada." });
+                }
+                else
+                {
+                    _logger.LogError("Error al enviar email de verificación a: {Email}", usuario.Email);
+                    return Json(new { success = false, message = "Error al enviar el correo. Inténtalo más tarde." });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al enviar verificación de email a: {Email}", usuario.Email);
+                return Json(new { success = false, message = "Error al enviar el correo. Inténtalo más tarde." });
+            }
+        }
+
+        /// <summary>
+        /// Confirmar email con token (cuando el usuario hace clic en el enlace)
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ConfirmarEmail(string userId, string token)
+        {
+            if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(token))
+            {
+                TempData["Error"] = "Enlace de verificación inválido";
+                return RedirectToAction("Login");
+            }
+
+            var usuario = await _userManager.FindByIdAsync(userId);
+            if (usuario == null)
+            {
+                TempData["Error"] = "Usuario no encontrado";
+                return RedirectToAction("Login");
+            }
+
+            if (usuario.EmailConfirmed)
+            {
+                TempData["Info"] = "Tu email ya estaba verificado";
+                return RedirectToAction("Index", "LadoCoins");
+            }
+
+            var result = await _userManager.ConfirmEmailAsync(usuario, token);
+
+            if (result.Succeeded)
+            {
+                _logger.LogInformation("Email verificado exitosamente para: {UserId}", userId);
+
+                // ⭐ LADOCOINS: Entregar bono de verificación de email
+                var mensajeBono = "";
+                if (!usuario.BonoEmailVerificadoEntregado)
+                {
+                    try
+                    {
+                        var bonoEntregado = await _ladoCoinsService.AcreditarBonoAsync(
+                            usuario.Id,
+                            TipoTransaccionLadoCoin.BonoVerificarEmail,
+                            "Bono por verificar tu email en LADO"
+                        );
+
+                        if (bonoEntregado)
+                        {
+                            usuario.BonoEmailVerificadoEntregado = true;
+                            await _userManager.UpdateAsync(usuario);
+                            _logger.LogInformation("⭐ Bono de verificación de email entregado a: {UserId}", userId);
+
+                            // Obtener monto del bono para el mensaje
+                            var montoBono = await _ladoCoinsService.ObtenerConfiguracionAsync(ConfiguracionLadoCoin.BONO_VERIFICAR_EMAIL);
+                            if (montoBono <= 0) montoBono = 2;
+                            mensajeBono = $" ¡Además, ganaste ${montoBono:N2} en LadoCoins!";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error al entregar bono de email verificado a: {UserId}", userId);
+                    }
+                }
+
+                TempData["Success"] = $"¡Tu email ha sido verificado correctamente!{mensajeBono}";
+                return RedirectToAction("Index", "LadoCoins");
+            }
+            else
+            {
+                var errores = string.Join(", ", result.Errors.Select(e => e.Description));
+                _logger.LogWarning("Error al verificar email para {UserId}: {Errores}", userId, errores);
+                TempData["Error"] = "El enlace de verificación ha expirado o es inválido. Solicita uno nuevo.";
+                return RedirectToAction("Index", "LadoCoins");
+            }
+        }
+
+        /// <summary>
+        /// Página de confirmación de email verificado
+        /// </summary>
+        [HttpGet]
+        public IActionResult EmailVerificado()
+        {
+            return View();
+        }
+
+        // ========================================
         // VERIFICAR DISPONIBILIDAD (AJAX)
         // ========================================
 
@@ -701,6 +922,16 @@ namespace Lado.Controllers
                         user.UltimaActividad = DateTime.Now;
                         await _userManager.UpdateAsync(user);
 
+                        // ⭐ Registrar login diario para LadoCoins
+                        try
+                        {
+                            await _rachasService.RegistrarLoginAsync(user.Id);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error al registrar login diario (Google) para: {UserId}", user.Id);
+                        }
+
                         var roles = await _userManager.GetRolesAsync(user);
                         if (roles.Contains("Admin"))
                         {
@@ -783,9 +1014,35 @@ namespace Lado.Controllers
                     var addLoginResult = await _userManager.AddLoginAsync(newUser, info);
                     if (addLoginResult.Succeeded)
                     {
+                        // ⭐ Procesar LadoCoins - Bono de bienvenida para usuarios de Google
+                        try
+                        {
+                            await _ladoCoinsService.AcreditarBonoAsync(
+                                newUser.Id,
+                                TipoTransaccionLadoCoin.BonoBienvenida,
+                                "Bono de bienvenida por registrarte en LADO"
+                            );
+
+                            // Marcar email verificado ya que Google lo verificó
+                            await _ladoCoinsService.AcreditarBonoAsync(
+                                newUser.Id,
+                                TipoTransaccionLadoCoin.BonoVerificarEmail,
+                                "Email verificado por Google"
+                            );
+
+                            newUser.BonoBienvenidaEntregado = true;
+                            newUser.BonoEmailVerificadoEntregado = true;
+                            await _userManager.UpdateAsync(newUser);
+                            _logger.LogInformation("Bonos de bienvenida entregados a usuario Google: {Email}", email);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error al procesar LadoCoins en registro Google para: {Email}", email);
+                        }
+
                         await _signInManager.SignInAsync(newUser, isPersistent: true);
                         _logger.LogInformation("Nuevo usuario creado con Google: {Email}", email);
-                        TempData["Success"] = "¡Bienvenido a LADO! Tu cuenta ha sido creada con Google.";
+                        TempData["Success"] = "¡Bienvenido a LADO! Tu cuenta ha sido creada con Google. ¡Recibiste LadoCoins de bienvenida!";
                         return RedirectToAction("Index", "FeedPublico");
                     }
                 }

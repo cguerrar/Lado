@@ -9,6 +9,10 @@
     var usuarioActual = ViewBag.UsuarioActual as ApplicationUser;
     var creadoresSugeridos = ViewBag.CreadoresSugeridos as List<ApplicationUser> ?? new List<ApplicationUser>();
     var contenidoBloqueadoIds = ViewBag.ContenidoBloqueadoIds as List<int> ?? new List<int>();
+    // DEBUG
+    var debugSuscripcionesLadoBIds = ViewBag.DEBUG_SuscripcionesLadoBIds as List<int> ?? new List<int>();
+    var debugCompradosIds = ViewBag.DEBUG_CompradosIds as List<int> ?? new List<int>();
+    var debugCreadoresLadoBIds = ViewBag.DEBUG_CreadoresLadoBIds as List<string> ?? new List<string>();
     var anuncios = ViewBag.Anuncios as List<Lado.Models.Anuncio> ?? new List<Lado.Models.Anuncio>();
     var anunciosIntervalo = ViewBag.AnunciosIntervalo as int? ?? 8;
     var algoritmoActual = ViewBag.AlgoritmoActual as AlgoritmoFeed;
@@ -1446,6 +1450,11 @@
         margin-left: 6px;
     }
 
+    .badge-ladoa {
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        color: white;
+    }
+
     .badge-ladob {
         background: linear-gradient(135deg, #a855f7, #7c3aed);
         color: white;
@@ -2431,6 +2440,22 @@
         color: var(--fg);
         margin-bottom: 4px;
         word-wrap: break-word;
+    }
+
+    /* Comentarios preview (agregados via JS) */
+    .comment-preview {
+        font-size: 14px;
+        line-height: 1.4;
+        padding: 4px 0;
+    }
+
+    .comment-preview-username {
+        font-weight: 600;
+        color: var(--fg);
+    }
+
+    .comment-preview-text {
+        color: var(--fg);
     }
 
     .feed-comment-actions {
@@ -6428,9 +6453,27 @@
                                 {
                                     <img src="/images/verified-badge.png" alt="Verificado" class="verified-icon" title="Creador verificado">
                                 }
-                                @if (post.TipoLado == TipoLado.LadoB)
+                                @if (post.TipoLado == TipoLado.LadoA)
                                 {
-                                    <span class="post-badge badge-ladob">B</span>
+                                    <span class="post-badge badge-ladoa" title="Contenido publico">A</span>
+                                }
+                                else if (post.TipoLado == TipoLado.LadoB)
+                                {
+                                    <span class="post-badge badge-ladob" title="Contenido premium">B</span>
+                                    @* DEBUG: Mostrar estado de bloqueo SIEMPRE *@
+                                    @if (estaBloqueado)
+                                    {
+                                        <span class="post-badge" style="background:#22c55e;color:white;font-size:8px;" title="DEBUG: Bloqueado correctamente">BLOQ</span>
+                                    }
+                                    else
+                                    {
+                                        var razon = debugSuscripcionesLadoBIds.Contains(post.Id) ? "SUSCRITO"
+                                            : debugCompradosIds.Contains(post.Id) ? "COMPRADO"
+                                            : post.UsuarioId == usuarioActual?.Id ? "PROPIO"
+                                            : debugCreadoresLadoBIds.Contains(post.UsuarioId) ? "CREADOR_SUSCRITO"
+                                            : "???";
+                                        <span class="post-badge" style="background:#ef4444;color:white;font-size:8px;" title="DEBUG: Desbloqueado - @razon">@razon</span>
+                                    }
                                 }
                                 @if (post.EsReel)
                                 {
@@ -8003,13 +8046,45 @@
             : `/Feed/Perfil/${post.usuarioId}`;
         const nombreMostrado = post.tipoLado === 1 ? (post.seudonimo || 'Anónimo') : post.nombreCompleto;
         const fotoPerfilMostrar = post.tipoLado === 1 ? (post.fotoPerfilLadoB || post.fotoPerfil) : post.fotoPerfil;
-        const usernameMostrado = post.tipoLado === 1 ? '******' : post.username;
+        const usernameMostrado = post.tipoLado === 1 ? (post.seudonimo || 'Anónimo') : post.username;
 
         // Limpiar rutas de archivos
         const rutaArchivoLimpia = limpiarRuta(post.rutaArchivo);
 
         let mediaHtml = '';
-        if (rutaArchivoLimpia) {
+
+        // Si está bloqueado, mostrar con blur y candado
+        if (post.estaBloqueado) {
+            const seudonimo = post.seudonimo || 'este creador';
+            mediaHtml = `
+                <div class="locked-content-wrapper" onclick="openSubscribeModal(this.closest('.post'))">
+                    <div class="locked-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        EXCLUSIVO
+                    </div>
+                    <div class="post-media" style="aspect-ratio:4/5;max-width:100%;overflow:hidden;">
+                        ${post.esVideo
+                            ? `<video class="feed-video" muted loop playsinline poster="${post.thumbnail || ''}" style="filter:blur(20px);transform:scale(1.1);">
+                                   <source src="${rutaArchivoLimpia}" type="video/mp4">
+                               </video>`
+                            : `<img src="${rutaArchivoLimpia}" alt="" loading="lazy" style="filter:blur(20px);transform:scale(1.1);max-width:100%;max-height:600px;width:100%;height:100%;object-fit:cover;display:block;">`
+                        }
+                    </div>
+                    <div class="locked-overlay">
+                        <div class="locked-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                            </svg>
+                        </div>
+                        <div class="locked-text">Contenido exclusivo de Lado B</div>
+                        <button class="locked-subscribe-btn">Suscribirse para ver</button>
+                    </div>
+                </div>`;
+        } else if (rutaArchivoLimpia) {
             if (post.esCarrusel && post.archivos.length > 1) {
                 const archivosJson = JSON.stringify(post.archivos).replace(/"/g, '&quot;');
 
@@ -8194,7 +8269,9 @@
                             <span class="post-username">
                                 ${usernameMostrado}
                                 ${post.verificado ? '<img src="/images/verified-badge.png" alt="Verificado" class="verified-icon" title="Creador verificado">' : ''}
-                                ${post.tipoLado === 1 ? '<span class="post-badge badge-ladob">B</span>' : ''}
+                                ${post.tipoLado === 0 ? '<span class="post-badge badge-ladoa" title="Contenido publico">A</span>' : ''}
+                                ${post.tipoLado === 1 ? '<span class="post-badge badge-ladob" title="Contenido premium">B</span>' : ''}
+                                ${post.estaBloqueado ? '<span class="post-badge" style="background:#f00;color:#fff;font-size:9px;" title="Bloqueado">BLOQ</span>' : '<span class="post-badge" style="background:#0f0;color:#000;font-size:9px;" title="Desbloqueado">OK</span>'}
                                 ${post.esReel ? '<span class="post-badge badge-reel" title="Reel"><i class="fas fa-film"></i></span>' : ''}
                                 ${post.pistaMusicalId ? '<span class="post-badge badge-musica" title="Con música"><img src="/images/music-badge.png" alt="Música"></span>' : ''}
                             </span>
@@ -8207,6 +8284,32 @@
                             <circle cx="6" cy="12" r="1.5"></circle>
                             <circle cx="18" cy="12" r="1.5"></circle>
                         </svg>
+                        <div class="post-menu-dropdown" data-post-id="${post.id}" data-user-id="${post.usuarioId}" data-tipo-lado="${post.tipoLado}">
+                            <button class="post-menu-item" onclick="window.location.href='/Feed/Detalle/${post.id}'">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="9" y1="3" x2="9" y2="21"></line>
+                                </svg>
+                                <span>Ver publicación</span>
+                            </button>
+                            <button class="post-menu-item" onclick="copiarEnlace(${post.id})">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                                </svg>
+                                <span>Copiar enlace</span>
+                            </button>
+                            <button class="post-menu-item" onclick="compartirContenido(${post.id})">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="18" cy="5" r="3"></circle>
+                                    <circle cx="6" cy="12" r="3"></circle>
+                                    <circle cx="18" cy="19" r="3"></circle>
+                                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                                </svg>
+                                <span>Compartir</span>
+                            </button>
+                        </div>
                     </div>
                 </header>
 
@@ -9258,34 +9361,38 @@
         }
     });
 
-    // Like (con debounce para evitar spam)
-    document.querySelectorAll('.like-btn').forEach(btn => {
-        btn.addEventListener('click', async function(e) {
-            e.preventDefault();
-            const postId = this.dataset.id;
+    // Like (con debounce para evitar spam) - Usando event delegation para soportar infinite scroll
+    document.addEventListener('click', async function(e) {
+        const btn = e.target.closest('.like-btn');
+        if (!btn) return;
 
-            // Debounce: evitar múltiples clicks simultáneos
-            if (likeInProgress.has(postId)) return;
-            likeInProgress.add(postId);
+        e.preventDefault();
+        const postId = btn.dataset.id;
+        if (!postId) return;
 
-            try {
-                const res = await fetch('/Feed/Like', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `id=${postId}`
-                });
-                const data = await res.json();
+        // Debounce: evitar múltiples clicks simultáneos
+        if (likeInProgress.has(postId)) return;
+        likeInProgress.add(postId);
 
-                if (data.success) {
-                    this.classList.toggle('liked', data.liked);
-                    document.getElementById(`likes-${postId}`).textContent = `${data.likes} Me gusta`;
-                }
-            } catch (err) {
-            } finally {
-                // Liberar después de 500ms para evitar spam
-                setTimeout(() => likeInProgress.delete(postId), 500);
+        try {
+            const res = await fetch('/Feed/Like', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `id=${postId}`
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                btn.classList.toggle('liked', data.liked);
+                const likesEl = document.getElementById(`likes-${postId}`);
+                if (likesEl) likesEl.textContent = `${data.likes} Me gusta`;
             }
-        });
+        } catch (err) {
+            console.error('Like error:', err);
+        } finally {
+            // Liberar después de 500ms para evitar spam
+            setTimeout(() => likeInProgress.delete(postId), 500);
+        }
     });
 
     // Bookmark (Favorito)
@@ -9311,80 +9418,90 @@
         });
     });
 
-    // Comment input enable/disable
-    document.querySelectorAll('.comment-input').forEach(input => {
-        const postId = input.dataset.postId;
+    // Comment input enable/disable - Event Delegation para infinite scroll
+    document.addEventListener('input', function(e) {
+        if (!e.target.classList.contains('comment-input')) return;
+        const postId = e.target.dataset.postId;
         const btn = document.querySelector(`.comment-post-btn[data-post-id="${postId}"]`);
-
-        input.addEventListener('input', function() {
-            btn.disabled = !this.value.trim();
-        });
-
-        input.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !btn.disabled) {
-                btn.click();
-            }
-        });
+        if (btn) btn.disabled = !e.target.value.trim();
     });
 
-    // Post Comment
-    document.querySelectorAll('.comment-post-btn').forEach(btn => {
-        btn.addEventListener('click', async function() {
-            const postId = this.dataset.postId;
-            const input = document.querySelector(`.comment-input[data-post-id="${postId}"]`);
-            const texto = input.value.trim();
+    document.addEventListener('keypress', function(e) {
+        if (!e.target.classList.contains('comment-input')) return;
+        if (e.key !== 'Enter') return;
+        const postId = e.target.dataset.postId;
+        const btn = document.querySelector(`.comment-post-btn[data-post-id="${postId}"]`);
+        if (btn && !btn.disabled) btn.click();
+    });
 
-            if (!texto) return;
+    // Post Comment - Event Delegation para infinite scroll
+    const commentInProgress = new Set();
+    document.addEventListener('click', async function(e) {
+        const btn = e.target.closest('.comment-post-btn');
+        if (!btn) return;
 
-            this.disabled = true;
+        const postId = btn.dataset.postId;
+        if (!postId) return;
 
-            try {
-                const formData = new FormData();
-                formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value);
-                formData.append('id', postId);
-                formData.append('texto', texto);
+        const input = document.querySelector(`.comment-input[data-post-id="${postId}"]`);
+        const texto = input?.value?.trim();
+        if (!texto) return;
 
-                const res = await fetch('/Feed/Comentar', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await res.json();
+        // Evitar doble click
+        if (commentInProgress.has(postId)) return;
+        commentInProgress.add(postId);
+        btn.disabled = true;
 
-                if (data.success) {
-                    input.value = '';
-                    showToast('Comentario publicado');
+        try {
+            const formData = new FormData();
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value || '');
+            formData.append('id', postId);
+            formData.append('texto', texto);
 
-                    // Add comment to preview
-                    const post = document.querySelector(`[data-post-id="${postId}"]`);
+            const res = await fetch('/Feed/Comentar', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                input.value = '';
+                showToast('Comentario publicado');
+
+                // Add comment to preview
+                const post = document.querySelector(`[data-post-id="${postId}"]`);
+                if (post) {
                     let preview = post.querySelector('.post-comments-preview');
                     if (!preview) {
                         preview = document.createElement('div');
                         preview.className = 'post-comments-preview';
-                        post.querySelector('.post-add-comment').before(preview);
+                        const addComment = post.querySelector('.post-add-comment');
+                        if (addComment) addComment.before(preview);
                     }
-
                     const newComment = document.createElement('div');
                     newComment.className = 'comment-preview';
-                    newComment.innerHTML = `<span class="comment-preview-username">${escapeHtml(data.comentario.username)}</span><span class="comment-preview-text">${escapeHtml(data.comentario.texto)}</span>`;
+                    newComment.innerHTML = `<span class="comment-preview-username">${escapeHtml(data.comentario.username)}</span> <span class="comment-preview-text">${escapeHtml(data.comentario.texto)}</span>`;
                     preview.appendChild(newComment);
-                } else {
-                    showToast(data.message || 'Error al comentar');
                 }
-            } catch (err) {
-                showToast('Error al publicar comentario');
+            } else {
+                showToast(data.message || 'Error al comentar');
             }
-
-            this.disabled = !input.value.trim();
-        });
+        } catch (err) {
+            console.error('Comment error:', err);
+            showToast('Error al publicar comentario');
+        } finally {
+            commentInProgress.delete(postId);
+            btn.disabled = !input?.value?.trim();
+        }
     });
 
-    // Focus comment input
-    document.querySelectorAll('.comment-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const postId = this.dataset.id;
-            const input = document.querySelector(`.comment-input[data-post-id="${postId}"]`);
-            input.focus();
-        });
+    // Focus comment input - Event Delegation
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.comment-btn');
+        if (!btn) return;
+        const postId = btn.dataset.id;
+        const input = document.querySelector(`.comment-input[data-post-id="${postId}"]`);
+        if (input) input.focus();
     });
 
     // Share - Abrir modal de compartir mejorado
@@ -10127,7 +10244,10 @@
             if (d !== dropdown) d.classList.remove('show');
         });
 
-        dropdown.classList.toggle('show');
+        // Solo toggle si dropdown existe
+        if (dropdown) {
+            dropdown.classList.toggle('show');
+        }
     };
 
     // Cerrar menus al hacer clic fuera

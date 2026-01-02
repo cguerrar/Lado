@@ -30,6 +30,44 @@ namespace Lado.Services
         /// Formatea una fecha para mostrar (considera si es hoy, ayer, etc.)
         /// </summary>
         string FormatForDisplay(DateTime dateTime, bool includeTime = true);
+
+        // ========================================
+        // MÉTODOS POR USUARIO (para LadoCoins) - ASÍNCRONOS
+        // ========================================
+
+        /// <summary>
+        /// Obtiene la zona horaria del usuario de forma asíncrona (evita conflictos de DbContext)
+        /// </summary>
+        Task<string> GetUserTimeZoneIdAsync(string? userId);
+
+        /// <summary>
+        /// Obtiene la hora actual en la zona horaria del usuario de forma asíncrona
+        /// </summary>
+        Task<DateTime> GetUserLocalNowAsync(string? userId);
+
+        /// <summary>
+        /// Convierte una fecha a la zona horaria del usuario de forma asíncrona
+        /// </summary>
+        Task<DateTime> ConvertToUserLocalAsync(DateTime dateTime, string? userId);
+
+        // ========================================
+        // MÉTODOS POR USUARIO - SÍNCRONOS (solo para contextos sin DbContext activo)
+        // ========================================
+
+        /// <summary>
+        /// Obtiene la zona horaria del usuario (SOLO usar fuera de operaciones async con DbContext)
+        /// </summary>
+        string GetUserTimeZoneId(string? userId);
+
+        /// <summary>
+        /// Obtiene la hora actual en la zona horaria del usuario
+        /// </summary>
+        DateTime GetUserLocalNow(string? userId);
+
+        /// <summary>
+        /// Convierte una fecha a la zona horaria del usuario
+        /// </summary>
+        DateTime ConvertToUserLocal(DateTime dateTime, string? userId);
     }
 
     public class DateTimeService : IDateTimeService
@@ -107,9 +145,18 @@ namespace Lado.Services
 
         public DateTime GetLocalNow()
         {
-            // Usar DateTime.Now ya que las fechas en la BD se guardan con DateTime.Now
-            // Esto garantiza consistencia en las comparaciones
-            return DateTime.Now;
+            try
+            {
+                // Convertir UTC a la zona horaria configurada de la plataforma
+                var timeZoneId = GetTimeZoneId();
+                var timeZone = TimeZoneInfo.FindSystemTimeZoneById(ConvertIanaToWindows(timeZoneId));
+                return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+            }
+            catch
+            {
+                // Si falla, usar hora del servidor
+                return DateTime.Now;
+            }
         }
 
         public string FormatForDisplay(DateTime dateTime, bool includeTime = true)
@@ -144,6 +191,122 @@ namespace Lado.Services
                 return includeTime ? localDate.ToString("dd/MM/yyyy HH:mm") : localDate.ToString("dd/MM/yyyy");
             }
         }
+
+        // ========================================
+        // MÉTODOS POR USUARIO - ASÍNCRONOS (usar en contextos async)
+        // ========================================
+
+        public async Task<string> GetUserTimeZoneIdAsync(string? userId)
+        {
+            if (string.IsNullOrEmpty(userId))
+            {
+                return GetTimeZoneId(); // Fallback a zona de la plataforma
+            }
+
+            // Buscar zona horaria del usuario con AsNoTracking para evitar conflictos
+            var userTimeZone = await _context.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => u.ZonaHoraria)
+                .FirstOrDefaultAsync();
+
+            // Si el usuario tiene zona configurada, usarla; sino, usar la de la plataforma
+            return !string.IsNullOrEmpty(userTimeZone) ? userTimeZone : GetTimeZoneId();
+        }
+
+        public async Task<DateTime> GetUserLocalNowAsync(string? userId)
+        {
+            try
+            {
+                var timeZoneId = await GetUserTimeZoneIdAsync(userId);
+                var timeZone = TimeZoneInfo.FindSystemTimeZoneById(ConvertIanaToWindows(timeZoneId));
+                return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+            }
+            catch
+            {
+                // Si falla, usar hora del servidor
+                return DateTime.Now;
+            }
+        }
+
+        public async Task<DateTime> ConvertToUserLocalAsync(DateTime dateTime, string? userId)
+        {
+            try
+            {
+                if (dateTime.Kind == DateTimeKind.Unspecified || dateTime.Kind == DateTimeKind.Local)
+                {
+                    return dateTime;
+                }
+
+                var timeZoneId = await GetUserTimeZoneIdAsync(userId);
+                var timeZone = TimeZoneInfo.FindSystemTimeZoneById(ConvertIanaToWindows(timeZoneId));
+                return TimeZoneInfo.ConvertTimeFromUtc(dateTime, timeZone);
+            }
+            catch
+            {
+                return dateTime;
+            }
+        }
+
+        // ========================================
+        // MÉTODOS POR USUARIO - SÍNCRONOS (solo para contextos sin DbContext activo)
+        // ========================================
+
+        public string GetUserTimeZoneId(string? userId)
+        {
+            if (string.IsNullOrEmpty(userId))
+            {
+                return GetTimeZoneId(); // Fallback a zona de la plataforma
+            }
+
+            // Buscar zona horaria del usuario
+            var userTimeZone = _context.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => u.ZonaHoraria)
+                .FirstOrDefault();
+
+            // Si el usuario tiene zona configurada, usarla; sino, usar la de la plataforma
+            return !string.IsNullOrEmpty(userTimeZone) ? userTimeZone : GetTimeZoneId();
+        }
+
+        public DateTime GetUserLocalNow(string? userId)
+        {
+            try
+            {
+                var timeZoneId = GetUserTimeZoneId(userId);
+                var timeZone = TimeZoneInfo.FindSystemTimeZoneById(ConvertIanaToWindows(timeZoneId));
+                return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+            }
+            catch
+            {
+                // Si falla, usar hora del servidor
+                return DateTime.Now;
+            }
+        }
+
+        public DateTime ConvertToUserLocal(DateTime dateTime, string? userId)
+        {
+            try
+            {
+                if (dateTime.Kind == DateTimeKind.Unspecified || dateTime.Kind == DateTimeKind.Local)
+                {
+                    return dateTime;
+                }
+
+                var timeZoneId = GetUserTimeZoneId(userId);
+                var timeZone = TimeZoneInfo.FindSystemTimeZoneById(ConvertIanaToWindows(timeZoneId));
+                return TimeZoneInfo.ConvertTimeFromUtc(dateTime, timeZone);
+            }
+            catch
+            {
+                return dateTime;
+            }
+        }
+
+        // ========================================
+        // CONVERSIÓN DE ZONAS HORARIAS
+        // ========================================
 
         /// <summary>
         /// Convierte IDs de zona horaria IANA a Windows

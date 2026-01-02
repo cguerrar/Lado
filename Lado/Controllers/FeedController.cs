@@ -22,6 +22,8 @@ namespace Lado.Controllers
         private readonly IInteresesService _interesesService;
         private readonly IRateLimitService _rateLimitService;
         private readonly IMemoryCache _cache;
+        private readonly IRachasService _rachasService;
+        private readonly IServiceProvider _serviceProvider;
 
         public FeedController(
             ApplicationDbContext context,
@@ -32,7 +34,9 @@ namespace Lado.Controllers
             IFeedAlgorithmService feedAlgorithmService,
             IInteresesService interesesService,
             IRateLimitService rateLimitService,
-            IMemoryCache cache)
+            IMemoryCache cache,
+            IRachasService rachasService,
+            IServiceProvider serviceProvider)
         {
             _context = context;
             _userManager = userManager;
@@ -43,6 +47,8 @@ namespace Lado.Controllers
             _interesesService = interesesService;
             _rateLimitService = rateLimitService;
             _cache = cache;
+            _rachasService = rachasService;
+            _serviceProvider = serviceProvider;
         }
 
         // ⚡ Método helper para obtener usuarios bloqueados con cache
@@ -964,6 +970,11 @@ namespace Lado.Controllers
                 var contenidoBloqueadoIds = contenidoLadoBBloqueado.Select(c => c.Id).ToList();
                 ViewBag.ContenidoBloqueadoIds = contenidoBloqueadoIds;
 
+                // DEBUG: Pasar IDs de cada categoría para diagnóstico
+                ViewBag.DEBUG_SuscripcionesLadoBIds = contenidoPremiumSuscripciones.Select(c => c.Id).ToList();
+                ViewBag.DEBUG_CompradosIds = contenidosCompradosIds;
+                ViewBag.DEBUG_CreadoresLadoBIds = creadoresLadoBIds;
+
                 // 9.5 ⚡ NUEVO: DESCUBRIMIENTO LadoA - Contenido trending de creadores NO seguidos
                 var contenidoDescubrimientoLadoA = new List<Contenido>();
                 if (descubrimientoLadoACant > 0)
@@ -1395,6 +1406,9 @@ namespace Lado.Controllers
                     _context);
 
                 // ⚡ NUEVO: Intercalar contenido LadoB bloqueado con distribución configurable
+                // Guardar IDs de contenido bloqueado ANTES de intercalar
+                var contenidoBloqueadoIds = contenidoLadoBBloqueado.Select(c => c.Id).ToHashSet();
+
                 if (contenidoLadoBBloqueado.Any())
                 {
                     var (cantidadPreview, intervaloPreview) = await ObtenerConfigDistribucionLadoBAsync();
@@ -1426,6 +1440,8 @@ namespace Lado.Controllers
                     var esVideo = post.TipoContenido == TipoContenido.Video;
                     var esAudio = post.TipoContenido == TipoContenido.Audio;
                     var archivos = post.TodosLosArchivos;
+                    // Determinar si está bloqueado (LadoB de creador no suscrito y no comprado)
+                    var estaBloqueado = contenidoBloqueadoIds.Contains(post.Id);
 
                     return new
                     {
@@ -1438,6 +1454,7 @@ namespace Lado.Controllers
                         fotoPerfilLadoB = post.Usuario?.FotoPerfilLadoB,
                         verificado = post.Usuario?.CreadorVerificado ?? false,
                         tipoLado = (int)post.TipoLado,
+                        estaBloqueado = estaBloqueado,
                         descripcion = post.Descripcion,
                         rutaArchivo = post.RutaArchivo,
                         thumbnail = post.Thumbnail,
@@ -1774,10 +1791,22 @@ namespace Lado.Controllers
 
                 await _context.SaveChangesAsync();
 
-                // Registrar interaccion para clasificacion de intereses
+                // Registrar interacciones (secuencialmente para evitar conflictos de DbContext)
                 if (!string.IsNullOrEmpty(usuarioId))
                 {
-                    _ = _interesesService.RegistrarInteraccionAsync(usuarioId, id, TipoInteraccion.Comentario);
+                    // ⭐ Registrar comentario para LadoCoins PRIMERO (racha de 3 comentarios diarios)
+                    try
+                    {
+                        var bonoComentario = await _rachasService.RegistrarComentarioAsync(usuarioId);
+                        _logger.LogDebug("⭐ Comentario registrado para LadoCoins: {UserId}, Bono: {Bono}", usuarioId, bonoComentario);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error al registrar comentario para LadoCoins: {UserId}", usuarioId);
+                    }
+
+                    // Registrar interaccion para clasificacion de intereses DESPUÉS
+                    await _interesesService.RegistrarInteraccionAsync(usuarioId, id, TipoInteraccion.Comentario);
                 }
 
                 var usuario = await _userManager.FindByIdAsync(usuarioId);
@@ -3631,6 +3660,7 @@ namespace Lado.Controllers
         {
             try
             {
+                _logger.LogInformation("⭐ Like iniciado: ContenidoId={Id}", id);
                 var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 var contenido = await _context.Contenidos.FindAsync(id);
 
@@ -3676,10 +3706,22 @@ namespace Lado.Controllers
 
                 await _context.SaveChangesAsync();
 
-                // Registrar interaccion para clasificacion de intereses (en segundo plano)
+                // Registrar interacciones (secuencialmente para evitar conflictos de DbContext)
                 if (liked && !string.IsNullOrEmpty(usuarioId))
                 {
-                    _ = _interesesService.RegistrarInteraccionAsync(usuarioId, id, TipoInteraccion.Like);
+                    // ⭐ Registrar like para LadoCoins PRIMERO (racha de 5 likes diarios)
+                    try
+                    {
+                        var bonoLike = await _rachasService.RegistrarLikeAsync(usuarioId);
+                        _logger.LogDebug("⭐ Like registrado para LadoCoins: {UserId}, Bono: {Bono}", usuarioId, bonoLike);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error al registrar like para LadoCoins: {UserId}", usuarioId);
+                    }
+
+                    // Registrar interaccion para clasificacion de intereses DESPUÉS
+                    await _interesesService.RegistrarInteraccionAsync(usuarioId, id, TipoInteraccion.Like);
                 }
 
                 // Notificar en segundo plano (no bloquea la respuesta)
@@ -3701,6 +3743,9 @@ namespace Lado.Controllers
                     });
                 }
 
+                _logger.LogInformation("⭐ Like completado: ContenidoId={Id}, Liked={Liked}, TotalLikes={Likes}",
+                    id, liked, contenido.NumeroLikes);
+
                 return Json(new
                 {
                     success = true,
@@ -3710,8 +3755,8 @@ namespace Lado.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al procesar like para contenido {Id}", id);
-                return Json(new { success = false, message = "Error al procesar el like" });
+                _logger.LogError(ex, "❌ Error al procesar like para contenido {Id}: {Error}", id, ex.Message);
+                return Json(new { success = false, message = "Error al procesar el like: " + ex.Message });
             }
         }
 
@@ -3727,9 +3772,12 @@ namespace Lado.Controllers
             if (contenido.TipoLado == TipoLado.LadoA)
                 return true;
 
+            // IMPORTANTE: Verificar suscripción específica a LadoB
+            // Una suscripción a LadoA NO da acceso a contenido LadoB
             var estaSuscrito = await _context.Suscripciones
                 .AnyAsync(s => s.FanId == usuarioId
                             && s.CreadorId == contenido.UsuarioId
+                            && s.TipoLado == TipoLado.LadoB
                             && s.EstaActiva);
 
             if (estaSuscrito)
@@ -3820,6 +3868,62 @@ namespace Lado.Controllers
             ViewBag.FavoritosIds = favoritosIds;
 
             return View(favoritos);
+        }
+
+        // ========================================
+        // MIS COMPRAS (Contenido individual comprado)
+        // ========================================
+
+        public async Task<IActionResult> MisCompras()
+        {
+            var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrEmpty(usuarioId))
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            // Obtener todas las compras de contenido individual
+            var compras = await _context.ComprasContenido
+                .Where(cc => cc.UsuarioId == usuarioId)
+                .Include(cc => cc.Contenido)
+                    .ThenInclude(c => c.Usuario)
+                .Include(cc => cc.Contenido)
+                    .ThenInclude(c => c.Archivos.OrderBy(a => a.Orden))
+                .OrderByDescending(cc => cc.FechaCompra)
+                .ToListAsync();
+
+            // Filtrar solo contenido activo
+            var comprasActivas = compras
+                .Where(cc => cc.Contenido != null
+                          && cc.Contenido.EstaActivo
+                          && !cc.Contenido.EsBorrador
+                          && !cc.Contenido.Censurado)
+                .ToList();
+
+            // Estadísticas
+            ViewBag.TotalCompras = comprasActivas.Count;
+            ViewBag.TotalGastado = comprasActivas.Sum(cc => cc.Monto);
+            ViewBag.CreadoresUnicos = comprasActivas
+                .Select(cc => cc.Contenido.UsuarioId)
+                .Distinct()
+                .Count();
+
+            // Agrupar por creador para la vista
+            ViewBag.ComprasPorCreador = comprasActivas
+                .GroupBy(cc => cc.Contenido.Usuario)
+                .Select(g => new {
+                    Creador = g.Key,
+                    Compras = g.OrderByDescending(cc => cc.FechaCompra).ToList(),
+                    Total = g.Sum(cc => cc.Monto)
+                })
+                .OrderByDescending(g => g.Compras.First().FechaCompra)
+                .ToList();
+
+            _logger.LogInformation("Usuario {UserId} consultó sus {Count} compras de contenido",
+                usuarioId, comprasActivas.Count);
+
+            return View(comprasActivas);
         }
 
         // ========================================

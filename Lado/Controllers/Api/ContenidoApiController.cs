@@ -22,17 +22,20 @@ namespace Lado.Controllers.Api
         private readonly IWebHostEnvironment _environment;
         private readonly IImageService _imageService;
         private readonly ILogger<ContenidoApiController> _logger;
+        private readonly IRachasService _rachasService;
 
         public ContenidoApiController(
             ApplicationDbContext context,
             IWebHostEnvironment environment,
             IImageService imageService,
-            ILogger<ContenidoApiController> logger)
+            ILogger<ContenidoApiController> logger,
+            IRachasService rachasService)
         {
             _context = context;
             _environment = environment;
             _imageService = imageService;
             _logger = logger;
+            _rachasService = rachasService;
         }
 
         /// <summary>
@@ -125,6 +128,16 @@ namespace Lado.Controllers.Api
                     });
                     contenido.NumeroLikes++;
                     meGusta = true;
+
+                    // Registrar like para LadoCoins
+                    try
+                    {
+                        await _rachasService.RegistrarLikeAsync(userId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error al registrar like para LadoCoins");
+                    }
                 }
 
                 await _context.SaveChangesAsync();
@@ -382,6 +395,16 @@ namespace Lado.Controllers.Api
                 _context.Comentarios.Add(comentario);
                 contenido.NumeroComentarios++;
                 await _context.SaveChangesAsync();
+
+                // Registrar comentario para LadoCoins
+                try
+                {
+                    await _rachasService.RegistrarComentarioAsync(userId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error al registrar comentario para LadoCoins");
+                }
 
                 var dto = new ComentarioDto
                 {

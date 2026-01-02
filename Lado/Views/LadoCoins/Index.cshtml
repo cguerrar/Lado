@@ -1,0 +1,554 @@
+@model Lado.Controllers.LadoCoinsDashboardViewModel
+@{
+    ViewData["Title"] = "LadoCoins";
+}
+
+<div class="container-fluid py-4">
+    @Html.AntiForgeryToken()
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-coins text-warning me-2"></i>LadoCoins
+            </h2>
+        </div>
+    </div>
+
+    <!-- Saldo Principal -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-gradient-warning text-dark h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-1">Saldo Disponible</h6>
+                            <h2 class="mb-0 fw-bold">$@Model.SaldoDisponible.ToString("N2")</h2>
+                        </div>
+                        <div class="icon icon-shape bg-white text-warning rounded-circle shadow">
+                            <i class="fas fa-coins fa-2x"></i>
+                        </div>
+                    </div>
+                    @if (Model.MontoPorVencer7Dias > 0)
+                    {
+                        <p class="text-dark mt-3 mb-0">
+                            <i class="fas fa-clock me-1"></i>
+                            <small>$@Model.MontoPorVencer7Dias.ToString("N2") vencen en 7 días</small>
+                        </p>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-1">Total Ganado</h6>
+                            <h2 class="mb-0 fw-bold">$@Model.TotalGanado.ToString("N2")</h2>
+                        </div>
+                        <div class="icon icon-shape bg-white text-success rounded-circle shadow">
+                            <i class="fas fa-arrow-up fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-1">Total Usado</h6>
+                            <h2 class="mb-0 fw-bold">$@Model.TotalGastado.ToString("N2")</h2>
+                        </div>
+                        <div class="icon icon-shape bg-white text-info rounded-circle shadow">
+                            <i class="fas fa-shopping-cart fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Racha y Actividad Diaria -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-fire me-2"></i>Tu Racha</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <h1 class="display-3 fw-bold text-primary">@Model.RachaActual</h1>
+                        <p class="text-muted">días consecutivos</p>
+                    </div>
+                    @if (Model.RachaMaxima > 0)
+                    {
+                        <p class="text-center">
+                            <i class="fas fa-trophy text-warning"></i>
+                            Tu récord: <strong>@Model.RachaMaxima días</strong>
+                        </p>
+                    }
+                    <div class="alert alert-light">
+                        <small>
+                            <i class="fas fa-info-circle text-primary me-1"></i>
+                            Mantén tu racha conectándote diariamente. A los 7 días recibes un bono extra de $5.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="fas fa-tasks me-2"></i>Actividad de Hoy</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Login Diario -->
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <div>
+                            <i class="fas fa-sign-in-alt me-2 @(Model.PremioLoginHoy ? "text-success" : "text-muted")"></i>
+                            Login Diario
+                        </div>
+                        <span class="badge @(Model.PremioLoginHoy ? "bg-success" : "bg-secondary")">
+                            @(Model.PremioLoginHoy ? "Completado" : "Pendiente")
+                        </span>
+                    </div>
+
+                    <!-- 5 Likes -->
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <div>
+                            <i class="fas fa-heart me-2 @(Model.Premio5LikesHoy ? "text-success" : "text-muted")"></i>
+                            Dar 5 Likes <small class="text-muted">(@Model.LikesHoy/5)</small>
+                        </div>
+                        <span class="badge @(Model.Premio5LikesHoy ? "bg-success" : "bg-secondary")">
+                            @(Model.Premio5LikesHoy ? "Completado" : $"{Model.LikesHoy}/5")
+                        </span>
+                    </div>
+
+                    <!-- 3 Comentarios -->
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <div>
+                            <i class="fas fa-comment me-2 @(Model.Premio3ComentariosHoy ? "text-success" : "text-muted")"></i>
+                            3 Comentarios <small class="text-muted">(@Model.ComentariosHoy/3)</small>
+                        </div>
+                        <span class="badge @(Model.Premio3ComentariosHoy ? "bg-success" : "bg-secondary")">
+                            @(Model.Premio3ComentariosHoy ? "Completado" : $"{Model.ComentariosHoy}/3")
+                        </span>
+                    </div>
+
+                    <!-- Subir Contenido -->
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-upload me-2 @(Model.PremioContenidoHoy ? "text-success" : "text-muted")"></i>
+                            Subir Contenido
+                        </div>
+                        <span class="badge @(Model.PremioContenidoHoy ? "bg-success" : "bg-secondary")">
+                            @(Model.PremioContenidoHoy ? "Completado" : "Pendiente")
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bonos de Registro/Perfil -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-gift me-2"></i>Bonos Disponibles</h5>
+                    @if (!Model.BonoBienvenidaEntregado || !Model.BonoEmailVerificadoEntregado || !Model.BonoPerfilCompletoEntregado || !Model.BonoPrimerContenidoEntregado)
+                    {
+                        <button type="button" class="btn btn-sm btn-warning" id="btnReclamarBonos" onclick="reclamarBonosPendientes()">
+                            <i class="fas fa-hand-holding-usd me-1"></i>Reclamar Bonos Pendientes
+                        </button>
+                    }
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <div class="card h-100 @(Model.BonoBienvenidaEntregado ? "bg-light" : "border-warning")">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-user-plus fa-2x @(Model.BonoBienvenidaEntregado ? "text-muted" : "text-warning") mb-2"></i>
+                                    <h6>Bono Bienvenida</h6>
+                                    <h4 class="text-success">$20</h4>
+                                    <span class="badge @(Model.BonoBienvenidaEntregado ? "bg-success" : "bg-warning")">
+                                        @(Model.BonoBienvenidaEntregado ? "Recibido" : "Al registrarte")
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card h-100 @(Model.BonoEmailVerificadoEntregado ? "bg-light" : "border-warning")">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-envelope fa-2x @(Model.BonoEmailVerificadoEntregado ? "text-muted" : "text-warning") mb-2"></i>
+                                    <h6>Verificar Email</h6>
+                                    <h4 class="text-success">$2</h4>
+                                    @if (Model.BonoEmailVerificadoEntregado)
+                                    {
+                                        <span class="badge bg-success">Recibido</span>
+                                    }
+                                    else if (Model.EmailConfirmado)
+                                    {
+                                        <span class="badge bg-info">Email Verificado</span>
+                                        <small class="d-block text-muted mt-1">Bono pendiente</small>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-sm btn-warning" id="btnEnviarVerificacion" onclick="enviarVerificacionEmail()">
+                                            <i class="fas fa-paper-plane me-1"></i>Enviar Email
+                                        </button>
+                                        <small class="d-block text-muted mt-1">Revisa tu bandeja</small>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card h-100 @(Model.BonoPerfilCompletoEntregado ? "bg-light" : (Model.PerfilCompleto ? "border-success" : "border-warning"))">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-user-check fa-2x @(Model.BonoPerfilCompletoEntregado ? "text-muted" : "text-warning") mb-2"></i>
+                                    <h6>Completar Perfil</h6>
+                                    <h4 class="text-success">$3</h4>
+                                    @if (Model.BonoPerfilCompletoEntregado)
+                                    {
+                                        <span class="badge bg-success">Recibido</span>
+                                    }
+                                    else if (Model.PerfilCompleto)
+                                    {
+                                        <span class="badge bg-warning">Pendiente</span>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#modalPerfilIncompleto">
+                                            Ver qué falta
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card h-100 @(Model.BonoPrimerContenidoEntregado ? "bg-light" : "border-warning")">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-camera fa-2x @(Model.BonoPrimerContenidoEntregado ? "text-muted" : "text-warning") mb-2"></i>
+                                    <h6>Primera Publicación</h6>
+                                    <h4 class="text-success">$5</h4>
+                                    @if (Model.BonoPrimerContenidoEntregado)
+                                    {
+                                        <span class="badge bg-success">Recibido</span>
+                                    }
+                                    else
+                                    {
+                                        <a href="/Contenido/Crear" class="btn btn-sm btn-warning">Publicar</a>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Canjear LadoCoins -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-bullhorn me-2"></i>Crédito Publicitario</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        Canjea tus LadoCoins por crédito publicitario con un <strong>@(Model.MultiplicadorPublicidad)x</strong> de valor.
+                    </p>
+                    <p class="h5">$1 LadoCoin = $@Model.MultiplicadorPublicidad.ToString("N2") en publicidad</p>
+                    <hr>
+                    <form id="formPublicidad">
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" id="montoPublicidad" min="1" step="0.01" placeholder="Monto">
+                            <button type="submit" class="btn btn-primary" @(Model.SaldoDisponible <= 0 ? "disabled" : "")>
+                                Canjear
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-rocket me-2"></i>Boost de Algoritmo</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        Impulsa tu contenido con boost de algoritmo. <strong>@(Model.MultiplicadorBoost)x</strong> de valor.
+                    </p>
+                    <p class="h5">$1 LadoCoin = $@Model.MultiplicadorBoost.ToString("N2") en boost</p>
+                    <hr>
+                    <form id="formBoost">
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" id="montoBoost" min="1" step="0.01" placeholder="Monto">
+                            <button type="submit" class="btn btn-success" @(Model.SaldoDisponible <= 0 ? "disabled" : "")>
+                                Canjear
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Referidos -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-users me-2"></i>Programa de Referidos</h5>
+                    <a href="/LadoCoins/Referidos" class="btn btn-sm btn-outline-primary">Ver Detalles</a>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="alert alert-warning">
+                                <h6 class="mb-2">Tu código de referido:</h6>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="codigoReferido" value="@Model.CodigoReferido" readonly>
+                                    <button class="btn btn-warning" onclick="copiarCodigo()">
+                                        <i class="fas fa-copy"></i> Copiar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <h3 class="text-primary">@Model.TotalReferidos</h3>
+                            <p class="text-muted">Referidos</p>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <h3 class="text-success">$@Model.TotalComisiones.ToString("N2")</h3>
+                            <p class="text-muted">Comisiones</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enlace a Historial -->
+    <div class="row">
+        <div class="col-12 text-center">
+            <a href="/LadoCoins/Historial" class="btn btn-outline-secondary">
+                <i class="fas fa-history me-2"></i>Ver Historial Completo
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Perfil Incompleto -->
+<div class="modal fade" id="modalPerfilIncompleto" tabindex="-1" aria-labelledby="modalPerfilIncompletoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="modalPerfilIncompletoLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Completa tu perfil para ganar $3
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">Te faltan los siguientes campos:</p>
+                <ul class="list-group mb-3">
+                    @if (!Model.TieneFotoPerfil)
+                    {
+                        <li class="list-group-item d-flex align-items-center">
+                            <i class="fas fa-times-circle text-danger me-2"></i>
+                            <span>Foto de perfil</span>
+                        </li>
+                    }
+                    @if (!Model.TieneNombreCompleto)
+                    {
+                        <li class="list-group-item d-flex align-items-center">
+                            <i class="fas fa-times-circle text-danger me-2"></i>
+                            <span>Nombre completo</span>
+                        </li>
+                    }
+                    @if (!Model.TieneBiografia)
+                    {
+                        <li class="list-group-item d-flex align-items-center">
+                            <i class="fas fa-times-circle text-danger me-2"></i>
+                            <span>Biografia</span>
+                        </li>
+                    }
+                    @if (!Model.TienePais)
+                    {
+                        <li class="list-group-item d-flex align-items-center">
+                            <i class="fas fa-times-circle text-danger me-2"></i>
+                            <span>Pais</span>
+                        </li>
+                    }
+                    @if (!Model.TieneFechaNacimiento)
+                    {
+                        <li class="list-group-item d-flex align-items-center">
+                            <i class="fas fa-times-circle text-danger me-2"></i>
+                            <span>Fecha de nacimiento</span>
+                        </li>
+                    }
+                    @if (!Model.TieneGenero)
+                    {
+                        <li class="list-group-item d-flex align-items-center">
+                            <i class="fas fa-times-circle text-danger me-2"></i>
+                            <span>Genero</span>
+                        </li>
+                    }
+                </ul>
+                <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Completa todos los campos y vuelve aqui para reclamar tu bono de <strong>$3 LadoCoins</strong>.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <a href="/Usuario/EditarPerfil" class="btn btn-warning">
+                    <i class="fas fa-edit me-1"></i>Ir a Editar Perfil
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function copiarCodigo() {
+            var input = document.getElementById('codigoReferido');
+            input.select();
+            document.execCommand('copy');
+            alert('Codigo copiado: ' + input.value);
+        }
+
+        async function reclamarBonosPendientes() {
+            var btn = document.getElementById('btnReclamarBonos');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Procesando...';
+
+            try {
+                var token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+                var response = await fetch('/LadoCoins/ReclamarBonosPendientes', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: '__RequestVerificationToken=' + encodeURIComponent(token)
+                });
+                var data = await response.json();
+
+                if (data.success) {
+                    alert(data.mensaje);
+                    if (data.bonosEntregados && data.bonosEntregados.length > 0) {
+                        location.reload();
+                    } else {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-hand-holding-usd me-1"></i>Reclamar Bonos Pendientes';
+                    }
+                } else {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-hand-holding-usd me-1"></i>Reclamar Bonos Pendientes';
+                    alert('Error: ' + data.error);
+                }
+            } catch (err) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-hand-holding-usd me-1"></i>Reclamar Bonos Pendientes';
+                alert('Error al procesar. Intentalo mas tarde.');
+            }
+        }
+
+        async function enviarVerificacionEmail() {
+            var btn = document.getElementById('btnEnviarVerificacion');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Enviando...';
+
+            try {
+                var token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+                var response = await fetch('/Account/EnviarVerificacionEmail', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: '__RequestVerificationToken=' + encodeURIComponent(token)
+                });
+                var data = await response.json();
+
+                if (data.success) {
+                    btn.innerHTML = '<i class="fas fa-check me-1"></i>Enviado';
+                    btn.classList.remove('btn-warning');
+                    btn.classList.add('btn-success');
+                    alert(data.message);
+                } else {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Enviar Email';
+                    alert('Error: ' + data.message);
+                }
+            } catch (err) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Enviar Email';
+                alert('Error al enviar. Intentalo mas tarde.');
+            }
+        }
+
+        document.getElementById('formPublicidad').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            var monto = document.getElementById('montoPublicidad').value;
+            if (!monto || monto <= 0) {
+                alert('Ingresa un monto válido');
+                return;
+            }
+
+            try {
+                var response = await fetch('/LadoCoins/CanjearPublicidad', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    },
+                    body: 'monto=' + monto
+                });
+                var data = await response.json();
+                if (data.success) {
+                    alert(data.mensaje);
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (err) {
+                alert('Error al procesar');
+            }
+        });
+
+        document.getElementById('formBoost').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            var monto = document.getElementById('montoBoost').value;
+            if (!monto || monto <= 0) {
+                alert('Ingresa un monto válido');
+                return;
+            }
+
+            try {
+                var response = await fetch('/LadoCoins/CanjearBoost', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    },
+                    body: 'monto=' + monto
+                });
+                var data = await response.json();
+                if (data.success) {
+                    alert(data.mensaje);
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (err) {
+                alert('Error al procesar');
+            }
+        });
+    </script>
+}

@@ -1,0 +1,200 @@
+@model Lado.Controllers.LadoCoinsHistorialViewModel
+@using Lado.Models
+@{
+    ViewData["Title"] = "Historial de LadoCoins";
+}
+
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/LadoCoins">LadoCoins</a></li>
+                    <li class="breadcrumb-item active">Historial</li>
+                </ol>
+            </nav>
+            <h2>
+                <i class="fas fa-history text-secondary me-2"></i>Historial de Transacciones
+            </h2>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body p-0">
+                    @if (Model.Transacciones.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Tipo</th>
+                                        <th>Descripción</th>
+                                        <th class="text-end">Monto</th>
+                                        <th class="text-end">Saldo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var t in Model.Transacciones)
+                                    {
+                                        var esIngreso = t.Monto > 0;
+                                        var colorMonto = esIngreso ? "text-success" : "text-danger";
+                                        var iconoTipo = ObtenerIconoTipo(t.Tipo);
+                                        var nombreTipo = ObtenerNombreTipo(t.Tipo);
+
+                                        <tr>
+                                            <td>
+                                                <small class="text-muted">
+                                                    @t.FechaTransaccion.ToString("dd/MM/yyyy HH:mm")
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <i class="@iconoTipo me-1"></i>
+                                                @nombreTipo
+                                            </td>
+                                            <td>
+                                                @(t.Descripcion ?? "-")
+                                                @if (t.FechaVencimiento.HasValue && t.MontoRestante > 0 && !t.Vencido)
+                                                {
+                                                    <br>
+                                                    <small class="text-warning">
+                                                        <i class="fas fa-clock"></i> Vence: @t.FechaVencimiento.Value.ToString("dd/MM/yyyy")
+                                                    </small>
+                                                }
+                                                @if (t.Vencido)
+                                                {
+                                                    <br>
+                                                    <small class="text-danger">
+                                                        <i class="fas fa-times-circle"></i> Vencido
+                                                    </small>
+                                                }
+                                            </td>
+                                            <td class="text-end @colorMonto fw-bold">
+                                                @(esIngreso ? "+" : "")$@t.Monto.ToString("N2")
+                                                @if (t.MontoQuemado.HasValue && t.MontoQuemado.Value > 0)
+                                                {
+                                                    <br>
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-fire"></i> -$@t.MontoQuemado.Value.ToString("N2") quemado
+                                                    </small>
+                                                }
+                                            </td>
+                                            <td class="text-end">
+                                                $@t.SaldoPosterior.ToString("N2")
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Paginación -->
+                        @if (Model.TotalPaginas > 1)
+                        {
+                            <nav class="d-flex justify-content-center py-3">
+                                <ul class="pagination mb-0">
+                                    @if (Model.PaginaActual > 1)
+                                    {
+                                        <li class="page-item">
+                                            <a class="page-link" href="/LadoCoins/Historial?pagina=@(Model.PaginaActual - 1)">
+                                                <i class="fas fa-chevron-left"></i>
+                                            </a>
+                                        </li>
+                                    }
+
+                                    @for (int i = Math.Max(1, Model.PaginaActual - 2); i <= Math.Min(Model.TotalPaginas, Model.PaginaActual + 2); i++)
+                                    {
+                                        <li class="page-item @(i == Model.PaginaActual ? "active" : "")">
+                                            <a class="page-link" href="/LadoCoins/Historial?pagina=@i">@i</a>
+                                        </li>
+                                    }
+
+                                    @if (Model.PaginaActual < Model.TotalPaginas)
+                                    {
+                                        <li class="page-item">
+                                            <a class="page-link" href="/LadoCoins/Historial?pagina=@(Model.PaginaActual + 1)">
+                                                <i class="fas fa-chevron-right"></i>
+                                            </a>
+                                        </li>
+                                    }
+                                </ul>
+                            </nav>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No tienes transacciones aún</p>
+                            <a href="/LadoCoins" class="btn btn-primary">Ver cómo ganar LadoCoins</a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    string ObtenerIconoTipo(TipoTransaccionLadoCoin tipo)
+    {
+        return tipo switch
+        {
+            TipoTransaccionLadoCoin.BonoBienvenida => "fas fa-gift text-success",
+            TipoTransaccionLadoCoin.BonoPrimerContenido => "fas fa-camera text-success",
+            TipoTransaccionLadoCoin.BonoVerificarEmail => "fas fa-envelope-check text-success",
+            TipoTransaccionLadoCoin.BonoCompletarPerfil => "fas fa-user-check text-success",
+            TipoTransaccionLadoCoin.BonoLoginDiario => "fas fa-sign-in-alt text-success",
+            TipoTransaccionLadoCoin.BonoSubirContenido => "fas fa-upload text-success",
+            TipoTransaccionLadoCoin.BonoDarLikes => "fas fa-heart text-success",
+            TipoTransaccionLadoCoin.BonoComentar => "fas fa-comment text-success",
+            TipoTransaccionLadoCoin.BonoRacha7Dias => "fas fa-fire text-warning",
+            TipoTransaccionLadoCoin.BonoReferidor => "fas fa-user-plus text-success",
+            TipoTransaccionLadoCoin.BonoReferido => "fas fa-handshake text-success",
+            TipoTransaccionLadoCoin.BonoReferidoCreadorLadoB => "fas fa-star text-warning",
+            TipoTransaccionLadoCoin.ComisionReferido => "fas fa-percentage text-success",
+            TipoTransaccionLadoCoin.RecibirPago => "fas fa-hand-holding-usd text-success",
+            TipoTransaccionLadoCoin.AjusteAdmin => "fas fa-cog text-info",
+            TipoTransaccionLadoCoin.PagoSuscripcion => "fas fa-credit-card text-danger",
+            TipoTransaccionLadoCoin.PagoPropina => "fas fa-donate text-danger",
+            TipoTransaccionLadoCoin.CompraPublicidad => "fas fa-bullhorn text-danger",
+            TipoTransaccionLadoCoin.BoostAlgoritmo => "fas fa-rocket text-danger",
+            TipoTransaccionLadoCoin.CompraContenido => "fas fa-shopping-bag text-danger",
+            TipoTransaccionLadoCoin.Quema5Porciento => "fas fa-fire-alt text-secondary",
+            TipoTransaccionLadoCoin.Vencimiento => "fas fa-hourglass-end text-secondary",
+            _ => "fas fa-coins text-muted"
+        };
+    }
+
+    string ObtenerNombreTipo(TipoTransaccionLadoCoin tipo)
+    {
+        return tipo switch
+        {
+            TipoTransaccionLadoCoin.BonoBienvenida => "Bono Bienvenida",
+            TipoTransaccionLadoCoin.BonoPrimerContenido => "Primer Contenido",
+            TipoTransaccionLadoCoin.BonoVerificarEmail => "Verificar Email",
+            TipoTransaccionLadoCoin.BonoCompletarPerfil => "Perfil Completo",
+            TipoTransaccionLadoCoin.BonoLoginDiario => "Login Diario",
+            TipoTransaccionLadoCoin.BonoSubirContenido => "Contenido Diario",
+            TipoTransaccionLadoCoin.BonoDarLikes => "5 Likes",
+            TipoTransaccionLadoCoin.BonoComentar => "3 Comentarios",
+            TipoTransaccionLadoCoin.BonoRacha7Dias => "Racha 7 Días",
+            TipoTransaccionLadoCoin.BonoReferidor => "Bono Referidor",
+            TipoTransaccionLadoCoin.BonoReferido => "Bono Referido",
+            TipoTransaccionLadoCoin.BonoReferidoCreadorLadoB => "Referido Creador",
+            TipoTransaccionLadoCoin.ComisionReferido => "Comisión Referido",
+            TipoTransaccionLadoCoin.RecibirPago => "Pago Recibido",
+            TipoTransaccionLadoCoin.AjusteAdmin => "Ajuste Admin",
+            TipoTransaccionLadoCoin.PagoSuscripcion => "Pago Suscripción",
+            TipoTransaccionLadoCoin.PagoPropina => "Propina",
+            TipoTransaccionLadoCoin.CompraPublicidad => "Publicidad",
+            TipoTransaccionLadoCoin.BoostAlgoritmo => "Boost",
+            TipoTransaccionLadoCoin.CompraContenido => "Compra Contenido",
+            TipoTransaccionLadoCoin.Quema5Porciento => "Quema 5%",
+            TipoTransaccionLadoCoin.Vencimiento => "Vencimiento",
+            _ => tipo.ToString()
+        };
+    }
+}

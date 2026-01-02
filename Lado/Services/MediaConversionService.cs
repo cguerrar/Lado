@@ -1,0 +1,792 @@
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using ImageMagick;
+using System.Diagnostics;
+using Lado.Models;
+
+namespace Lado.Services
+{
+    public interface IMediaConversionService
+    {
+        /// <summary>
+        /// Convierte cualquier imagen a JPEG estándar
+        /// </summary>
+        /// <param name="rutaOrigen">Ruta del archivo origen</param>
+        /// <param name="carpetaDestino">Carpeta donde guardar el resultado</param>
+        /// <param name="nombreBase">Nombre base sin extensión (opcional, usa GUID si es null)</param>
+        /// <param name="maxDimension">Dimensión máxima (2048 por defecto)</param>
+        /// <param name="quality">Calidad JPEG (90 por defecto)</param>
+        /// <returns>Ruta del archivo JPEG convertido o null si falla</returns>
+        Task<string?> ConvertirImagenAsync(string rutaOrigen, string carpetaDestino, string? nombreBase = null, int maxDimension = 2048, int quality = 90);
+
+        /// <summary>
+        /// Convierte cualquier imagen desde stream a JPEG estándar
+        /// </summary>
+        Task<string?> ConvertirImagenAsync(Stream inputStream, string carpetaDestino, string extensionOriginal, string? nombreBase = null, int maxDimension = 2048, int quality = 90);
+
+        /// <summary>
+        /// Convierte cualquier video a MP4 H.264 estándar
+        /// </summary>
+        /// <param name="rutaOrigen">Ruta del archivo origen</param>
+        /// <param name="carpetaDestino">Carpeta donde guardar el resultado</param>
+        /// <param name="nombreBase">Nombre base sin extensión (opcional)</param>
+        /// <param name="crf">Constant Rate Factor para calidad (20 por defecto, menor = mejor)</param>
+        /// <param name="maxWidth">Ancho máximo (1920 por defecto)</param>
+        /// <returns>Ruta del archivo MP4 convertido o null si falla</returns>
+        Task<string?> ConvertirVideoAsync(string rutaOrigen, string carpetaDestino, string? nombreBase = null, int crf = 20, int maxWidth = 1920);
+
+        /// <summary>
+        /// Convierte video desde stream a MP4 H.264
+        /// </summary>
+        Task<string?> ConvertirVideoAsync(Stream inputStream, string carpetaDestino, string extensionOriginal, string? nombreBase = null, int crf = 20, int maxWidth = 1920);
+
+        /// <summary>
+        /// Verifica si una imagen necesita conversión (no es JPEG)
+        /// </summary>
+        bool ImagenRequiereConversion(string extension);
+
+        /// <summary>
+        /// Verifica si un video necesita conversión (no es MP4 H.264)
+        /// </summary>
+        bool VideoRequiereConversion(string extension);
+
+        /// <summary>
+        /// Obtiene información de un archivo multimedia
+        /// </summary>
+        Task<MediaInfo?> ObtenerInfoAsync(string rutaArchivo);
+    }
+
+    public class MediaInfo
+    {
+        public string? Codec { get; set; }
+        public string? Format { get; set; }
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public double Duration { get; set; }
+        public long FileSize { get; set; }
+        public bool EsCompatible { get; set; }
+    }
+
+    public class MediaConversionService : IMediaConversionService
+    {
+        private readonly ILogger<MediaConversionService> _logger;
+        private readonly IWebHostEnvironment _environment;
+        private readonly ILogEventoService? _logEventoService;
+        private readonly string _ffmpegPath;
+        private readonly string _ffprobePath;
+        private string? _ultimoErrorFFmpeg;
+
+        // Extensiones de imagen que YA están en formato estándar
+        private static readonly HashSet<string> ImagenesEstandar = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".jpg", ".jpeg"
+        };
+
+        // Extensiones de imagen que pueden convertirse
+        private static readonly HashSet<string> ImagenesSoportadas = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif",
+            ".heic", ".heif", ".dng", ".raw", ".cr2", ".nef", ".arw", ".orf", ".rw2", ".avif"
+        };
+
+        // Extensiones de video que YA están en formato estándar
+        private static readonly HashSet<string> VideosEstandar = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".mp4"
+        };
+
+        // Extensiones de video que pueden convertirse
+        private static readonly HashSet<string> VideosSoportados = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".mp4", ".mov", ".avi", ".mkv", ".webm", ".wmv", ".flv", ".m4v", ".3gp", ".3gpp", ".mpeg", ".mpg", ".mxf"
+        };
+
+        // Formatos RAW que requieren exiftool
+        private static readonly HashSet<string> FormatosRaw = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".dng", ".raw", ".cr2", ".nef", ".arw", ".orf", ".rw2"
+        };
+
+        public MediaConversionService(ILogger<MediaConversionService> logger, IWebHostEnvironment environment, ILogEventoService? logEventoService = null)
+        {
+            _logger = logger;
+            _environment = environment;
+            _logEventoService = logEventoService;
+
+            // Buscar FFmpeg en múltiples ubicaciones conocidas
+            var ubicacionesPosibles = new[]
+            {
+                // 1. Tools del proyecto (desarrollo local)
+                Path.Combine(_environment.ContentRootPath, "Tools", "ffmpeg", "ffmpeg.exe"),
+                // 2. Chocolatey (producción Windows)
+                @"C:\ProgramData\chocolatey\bin\ffmpeg.exe",
+                // 3. Ubicación común en Windows
+                @"C:\ffmpeg\bin\ffmpeg.exe",
+            };
+
+            _ffmpegPath = "ffmpeg"; // Default: usar PATH del sistema
+            _ffprobePath = "ffprobe";
+
+            foreach (var ruta in ubicacionesPosibles)
+            {
+                if (File.Exists(ruta))
+                {
+                    _ffmpegPath = ruta;
+                    _ffprobePath = Path.Combine(Path.GetDirectoryName(ruta)!, "ffprobe.exe");
+                    _logger.LogInformation("[MediaConversion] FFmpeg encontrado: {Path}", _ffmpegPath);
+                    break;
+                }
+            }
+
+            if (_ffmpegPath == "ffmpeg")
+            {
+                _logger.LogWarning("[MediaConversion] FFmpeg no encontrado en ubicaciones conocidas, usando PATH del sistema");
+            }
+        }
+
+        /// <summary>
+        /// Obtiene el último error de FFmpeg (útil para diagnóstico)
+        /// </summary>
+        public string? ObtenerUltimoError() => _ultimoErrorFFmpeg;
+
+        public bool ImagenRequiereConversion(string extension)
+        {
+            if (string.IsNullOrEmpty(extension)) return false;
+            extension = extension.StartsWith(".") ? extension : "." + extension;
+            return ImagenesSoportadas.Contains(extension) && !ImagenesEstandar.Contains(extension);
+        }
+
+        public bool VideoRequiereConversion(string extension)
+        {
+            if (string.IsNullOrEmpty(extension)) return false;
+            extension = extension.StartsWith(".") ? extension : "." + extension;
+            // MP4 podría necesitar re-encoding si no es H.264, pero por ahora asumimos que sí
+            return VideosSoportados.Contains(extension) && !VideosEstandar.Contains(extension);
+        }
+
+        #region Conversión de Imágenes
+
+        public async Task<string?> ConvertirImagenAsync(string rutaOrigen, string carpetaDestino, string? nombreBase = null, int maxDimension = 2048, int quality = 90)
+        {
+            try
+            {
+                if (!File.Exists(rutaOrigen))
+                {
+                    _logger.LogWarning("[MediaConversion] Archivo no encontrado: {Ruta}", rutaOrigen);
+                    return null;
+                }
+
+                var extension = Path.GetExtension(rutaOrigen).ToLower();
+                nombreBase ??= Guid.NewGuid().ToString();
+
+                using var stream = new FileStream(rutaOrigen, FileMode.Open, FileAccess.Read);
+                return await ConvertirImagenAsync(stream, carpetaDestino, extension, nombreBase, maxDimension, quality);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[MediaConversion] Error convirtiendo imagen: {Ruta}", rutaOrigen);
+                return null;
+            }
+        }
+
+        public async Task<string?> ConvertirImagenAsync(Stream inputStream, string carpetaDestino, string extensionOriginal, string? nombreBase = null, int maxDimension = 2048, int quality = 90)
+        {
+            try
+            {
+                Directory.CreateDirectory(carpetaDestino);
+                nombreBase ??= Guid.NewGuid().ToString();
+                var rutaDestino = Path.Combine(carpetaDestino, $"{nombreBase}.jpg");
+
+                extensionOriginal = extensionOriginal.StartsWith(".") ? extensionOriginal : "." + extensionOriginal;
+                _logger.LogInformation("[MediaConversion] Convirtiendo imagen {Extension} a JPEG", extensionOriginal);
+
+                // Si es formato RAW, usar exiftool para extraer preview
+                if (FormatosRaw.Contains(extensionOriginal))
+                {
+                    var resultado = await ConvertirRawAJpegAsync(inputStream, carpetaDestino, nombreBase, maxDimension, quality);
+                    return resultado;
+                }
+
+                // Si es HEIC/HEIF, usar Magick.NET
+                if (extensionOriginal.Equals(".heic", StringComparison.OrdinalIgnoreCase) ||
+                    extensionOriginal.Equals(".heif", StringComparison.OrdinalIgnoreCase))
+                {
+                    return await ConvertirHeicAJpegAsync(inputStream, rutaDestino, maxDimension, quality);
+                }
+
+                // Para formatos estándar, usar ImageSharp
+                return await ConvertirImagenEstandarAsync(inputStream, rutaDestino, maxDimension, quality);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[MediaConversion] Error convirtiendo imagen desde stream");
+                return null;
+            }
+        }
+
+        private async Task<string?> ConvertirImagenEstandarAsync(Stream inputStream, string rutaDestino, int maxDimension, int quality)
+        {
+            try
+            {
+                if (inputStream.CanSeek)
+                    inputStream.Position = 0;
+
+                using var image = await Image.LoadAsync(inputStream);
+
+                // Redimensionar si excede el máximo
+                if (image.Width > maxDimension || image.Height > maxDimension)
+                {
+                    image.Mutate(x => x.Resize(new ResizeOptions
+                    {
+                        Size = new Size(maxDimension, maxDimension),
+                        Mode = ResizeMode.Max
+                    }));
+                }
+
+                // Guardar como JPEG
+                var encoder = new JpegEncoder { Quality = quality };
+                await image.SaveAsJpegAsync(rutaDestino, encoder);
+
+                var fileInfo = new FileInfo(rutaDestino);
+                _logger.LogInformation("[MediaConversion] Imagen convertida: {Ruta}, {Size}KB", rutaDestino, fileInfo.Length / 1024);
+
+                return rutaDestino;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[MediaConversion] Error en conversión estándar de imagen");
+                return null;
+            }
+        }
+
+        private async Task<string?> ConvertirHeicAJpegAsync(Stream inputStream, string rutaDestino, int maxDimension, int quality)
+        {
+            try
+            {
+                if (inputStream.CanSeek)
+                    inputStream.Position = 0;
+
+                using var image = new MagickImage(inputStream);
+
+                image.AutoOrient();
+
+                if (image.Width > maxDimension || image.Height > maxDimension)
+                {
+                    var geometry = new MagickGeometry((uint)maxDimension, (uint)maxDimension)
+                    {
+                        IgnoreAspectRatio = false
+                    };
+                    image.Resize(geometry);
+                }
+
+                image.Format = MagickFormat.Jpeg;
+                image.Quality = (uint)quality;
+                await image.WriteAsync(rutaDestino);
+
+                var fileInfo = new FileInfo(rutaDestino);
+                _logger.LogInformation("[MediaConversion] HEIC convertido: {Ruta}, {Size}KB", rutaDestino, fileInfo.Length / 1024);
+
+                return rutaDestino;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[MediaConversion] Error convirtiendo HEIC");
+                return null;
+            }
+        }
+
+        private async Task<string?> ConvertirRawAJpegAsync(Stream inputStream, string carpetaDestino, string nombreBase, int maxDimension, int quality)
+        {
+            var rutaDestino = Path.Combine(carpetaDestino, $"{nombreBase}.jpg");
+            var rutaTemporal = Path.Combine(carpetaDestino, $"{nombreBase}_temp.raw");
+
+            try
+            {
+                // Guardar temporalmente para procesar con exiftool
+                using (var fileStream = new FileStream(rutaTemporal, FileMode.Create))
+                {
+                    if (inputStream.CanSeek)
+                        inputStream.Position = 0;
+                    await inputStream.CopyToAsync(fileStream);
+                }
+
+                // Intentar extraer preview con exiftool
+                var previewExtraida = await ExtraerPreviewConExiftool(rutaTemporal, rutaDestino);
+
+                if (previewExtraida && File.Exists(rutaDestino))
+                {
+                    // Redimensionar si es necesario
+                    await RedimensionarImagenAsync(rutaDestino, maxDimension, quality);
+
+                    var fileInfo = new FileInfo(rutaDestino);
+                    _logger.LogInformation("[MediaConversion] RAW convertido via exiftool: {Ruta}, {Size}KB", rutaDestino, fileInfo.Length / 1024);
+
+                    return rutaDestino;
+                }
+
+                // Fallback: Magick.NET
+                _logger.LogWarning("[MediaConversion] Exiftool falló, usando Magick.NET...");
+                return await ConvertirRawConMagickAsync(rutaTemporal, rutaDestino, maxDimension, quality);
+            }
+            finally
+            {
+                // Limpiar archivo temporal
+                try { if (File.Exists(rutaTemporal)) File.Delete(rutaTemporal); } catch { }
+            }
+        }
+
+        private async Task<bool> ExtraerPreviewConExiftool(string rutaOrigen, string rutaDestino)
+        {
+            try
+            {
+                // Intentar JpgFromRaw primero (mejor calidad)
+                var resultado = await EjecutarExiftool($"-b -JpgFromRaw \"{rutaOrigen}\"", rutaDestino);
+                if (resultado) return true;
+
+                // Intentar PreviewImage
+                return await EjecutarExiftool($"-b -PreviewImage \"{rutaOrigen}\"", rutaDestino);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[MediaConversion] Error con exiftool");
+                return false;
+            }
+        }
+
+        private async Task<bool> EjecutarExiftool(string argumentos, string rutaDestino)
+        {
+            try
+            {
+                var processInfo = new ProcessStartInfo
+                {
+                    FileName = "exiftool",
+                    Arguments = argumentos,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = Process.Start(processInfo);
+                if (process == null) return false;
+
+                using (var outputStream = new FileStream(rutaDestino, FileMode.Create))
+                {
+                    await process.StandardOutput.BaseStream.CopyToAsync(outputStream);
+                }
+
+                await process.WaitForExitAsync();
+
+                var fileInfo = new FileInfo(rutaDestino);
+                if (fileInfo.Exists && fileInfo.Length > 10000)
+                {
+                    _logger.LogInformation("[MediaConversion] Exiftool extrajo: {Size}KB", fileInfo.Length / 1024);
+                    return true;
+                }
+
+                if (File.Exists(rutaDestino)) File.Delete(rutaDestino);
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private async Task<string?> ConvertirRawConMagickAsync(string rutaOrigen, string rutaDestino, int maxDimension, int quality)
+        {
+            try
+            {
+                using var images = new MagickImageCollection(rutaOrigen);
+
+                MagickImage? imagenFinal = null;
+
+                if (images.Count > 1)
+                {
+                    // Buscar la mejor preview
+                    MagickImage? mejorPreview = null;
+                    long mejorPixeles = 0;
+
+                    foreach (var img in images)
+                    {
+                        var pixeles = (long)img.Width * img.Height;
+                        if (pixeles > mejorPixeles && img.Width < 5000)
+                        {
+                            mejorPixeles = pixeles;
+                            mejorPreview = (MagickImage)img;
+                        }
+                    }
+
+                    if (mejorPreview != null)
+                        imagenFinal = (MagickImage)mejorPreview.Clone();
+                }
+
+                imagenFinal ??= (MagickImage)images[0].Clone();
+
+                imagenFinal.AutoOrient();
+
+                if (imagenFinal.Width > maxDimension || imagenFinal.Height > maxDimension)
+                {
+                    var geometry = new MagickGeometry((uint)maxDimension, (uint)maxDimension)
+                    {
+                        IgnoreAspectRatio = false
+                    };
+                    imagenFinal.Resize(geometry);
+                }
+
+                imagenFinal.Format = MagickFormat.Jpeg;
+                imagenFinal.Quality = (uint)quality;
+                await imagenFinal.WriteAsync(rutaDestino);
+                imagenFinal.Dispose();
+
+                return rutaDestino;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[MediaConversion] Error con Magick.NET");
+                return null;
+            }
+        }
+
+        private async Task RedimensionarImagenAsync(string rutaImagen, int maxDimension, int quality)
+        {
+            try
+            {
+                using var image = new MagickImage(rutaImagen);
+
+                image.AutoOrient();
+
+                if (image.Width > maxDimension || image.Height > maxDimension)
+                {
+                    var geometry = new MagickGeometry((uint)maxDimension, (uint)maxDimension)
+                    {
+                        IgnoreAspectRatio = false
+                    };
+                    image.Resize(geometry);
+                    image.Quality = (uint)quality;
+                    await image.WriteAsync(rutaImagen);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[MediaConversion] Error redimensionando imagen");
+            }
+        }
+
+        #endregion
+
+        #region Conversión de Videos
+
+        public async Task<string?> ConvertirVideoAsync(string rutaOrigen, string carpetaDestino, string? nombreBase = null, int crf = 20, int maxWidth = 1920)
+        {
+            try
+            {
+                if (!File.Exists(rutaOrigen))
+                {
+                    _logger.LogWarning("[MediaConversion] Video no encontrado: {Ruta}", rutaOrigen);
+                    return null;
+                }
+
+                Directory.CreateDirectory(carpetaDestino);
+                nombreBase ??= Guid.NewGuid().ToString();
+                var rutaDestino = Path.Combine(carpetaDestino, $"{nombreBase}.mp4");
+
+                _logger.LogInformation("[MediaConversion] Convirtiendo video a MP4 H.264: {Origen}", rutaOrigen);
+
+                // Verificar si el video ya es MP4 H.264 compatible
+                var info = await ObtenerInfoAsync(rutaOrigen);
+                if (info?.EsCompatible == true && Path.GetExtension(rutaOrigen).Equals(".mp4", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Solo copiar si ya es compatible
+                    File.Copy(rutaOrigen, rutaDestino, true);
+                    _logger.LogInformation("[MediaConversion] Video ya compatible, copiado: {Ruta}", rutaDestino);
+                    return rutaDestino;
+                }
+
+                // Construir comando FFmpeg (parámetros optimizados estilo TikTok)
+                // -y: sobrescribir sin preguntar
+                // -i: input
+                // -c:v libx264: codec video H.264
+                // -preset medium: balance calidad/velocidad
+                // -crf: calidad (menor = mejor, 18-28 rango típico, TikTok ~23)
+                // -pix_fmt yuv420p: formato de pixel compatible con todos los dispositivos
+                // -r 30: frame rate 30fps (estándar TikTok)
+                // -c:a aac: codec audio AAC
+                // -b:a 192k: bitrate audio 192kbps (estándar TikTok)
+                // -movflags +faststart: optimizar para streaming web
+                // -vf scale: escalar si excede maxWidth (altura divisible por 2)
+                var scaleFilter = $"scale='min({maxWidth},iw)':-2";
+                var arguments = $"-y -i \"{rutaOrigen}\" -c:v libx264 -preset medium -crf {crf} -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -movflags +faststart -vf \"{scaleFilter}\" \"{rutaDestino}\"";
+
+                var resultado = await EjecutarFFmpegAsync(arguments);
+
+                if (resultado && File.Exists(rutaDestino))
+                {
+                    var fileInfo = new FileInfo(rutaDestino);
+                    _logger.LogInformation("[MediaConversion] Video convertido: {Ruta}, {Size}MB", rutaDestino, (fileInfo.Length / 1024.0 / 1024.0).ToString("F2"));
+                    return rutaDestino;
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[MediaConversion] Error convirtiendo video: {Ruta}", rutaOrigen);
+                return null;
+            }
+        }
+
+        public async Task<string?> ConvertirVideoAsync(Stream inputStream, string carpetaDestino, string extensionOriginal, string? nombreBase = null, int crf = 20, int maxWidth = 1920)
+        {
+            var rutaTemporal = Path.Combine(carpetaDestino, $"temp_{Guid.NewGuid()}{extensionOriginal}");
+
+            try
+            {
+                Directory.CreateDirectory(carpetaDestino);
+                _logger.LogInformation("[MediaConversion] Guardando stream a archivo temporal: {Ruta}", rutaTemporal);
+
+                // Guardar stream a archivo temporal
+                long bytesCopiados = 0;
+                using (var fileStream = new FileStream(rutaTemporal, FileMode.Create))
+                {
+                    if (inputStream.CanSeek)
+                        inputStream.Position = 0;
+                    await inputStream.CopyToAsync(fileStream);
+                    bytesCopiados = fileStream.Length;
+                }
+
+                _logger.LogInformation("[MediaConversion] Archivo temporal creado: {Size}MB", (bytesCopiados / 1024.0 / 1024.0).ToString("F2"));
+
+                if (!File.Exists(rutaTemporal))
+                {
+                    _logger.LogError("[MediaConversion] ERROR: Archivo temporal no existe después de escribir");
+                    await RegistrarErrorAsync("Archivo temporal no creado", rutaTemporal);
+                    return null;
+                }
+
+                var resultado = await ConvertirVideoAsync(rutaTemporal, carpetaDestino, nombreBase, crf, maxWidth);
+
+                if (resultado == null)
+                {
+                    _logger.LogWarning("[MediaConversion] Conversión falló. Último error: {Error}", _ultimoErrorFFmpeg ?? "desconocido");
+                }
+
+                return resultado;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[MediaConversion] Error procesando stream de video");
+                await RegistrarErrorAsync("Error procesando stream", ex.Message);
+                return null;
+            }
+            finally
+            {
+                // Limpiar archivo temporal
+                try { if (File.Exists(rutaTemporal)) File.Delete(rutaTemporal); } catch { }
+            }
+        }
+
+        private async Task<bool> EjecutarFFmpegAsync(string argumentos, int timeoutSeconds = 300)
+        {
+            _ultimoErrorFFmpeg = null;
+
+            try
+            {
+                _logger.LogInformation("[MediaConversion] Ejecutando FFmpeg: {Path}", _ffmpegPath);
+                _logger.LogInformation("[MediaConversion] Argumentos: {Args}", argumentos);
+
+                var processInfo = new ProcessStartInfo
+                {
+                    FileName = _ffmpegPath,
+                    Arguments = argumentos,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = Process.Start(processInfo);
+                if (process == null)
+                {
+                    _ultimoErrorFFmpeg = "No se pudo iniciar el proceso FFmpeg";
+                    _logger.LogError("[MediaConversion] {Error}", _ultimoErrorFFmpeg);
+                    await RegistrarErrorAsync(_ultimoErrorFFmpeg, "FFmpeg no disponible");
+                    return false;
+                }
+
+                var errorOutput = await process.StandardError.ReadToEndAsync();
+
+                var completed = await Task.Run(() => process.WaitForExit(timeoutSeconds * 1000));
+                if (!completed)
+                {
+                    process.Kill();
+                    _ultimoErrorFFmpeg = $"FFmpeg timeout después de {timeoutSeconds}s";
+                    _logger.LogError("[MediaConversion] {Error}", _ultimoErrorFFmpeg);
+                    await RegistrarErrorAsync(_ultimoErrorFFmpeg, errorOutput);
+                    return false;
+                }
+
+                if (process.ExitCode != 0)
+                {
+                    // Extraer las últimas líneas relevantes del error
+                    var errorLines = errorOutput?.Split('\n').Where(l => !string.IsNullOrWhiteSpace(l)).ToArray() ?? Array.Empty<string>();
+                    var errorResumen = errorLines.Length > 5
+                        ? string.Join("\n", errorLines.TakeLast(5))
+                        : errorOutput ?? "Sin detalles";
+
+                    _ultimoErrorFFmpeg = $"FFmpeg error (código {process.ExitCode}): {errorResumen}";
+                    _logger.LogError("[MediaConversion] FFmpeg error (código {Code}): {Error}", process.ExitCode, errorOutput);
+                    await RegistrarErrorAsync($"FFmpeg falló con código {process.ExitCode}", errorResumen);
+                    return false;
+                }
+
+                _logger.LogInformation("[MediaConversion] FFmpeg completado exitosamente");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _ultimoErrorFFmpeg = $"Excepción ejecutando FFmpeg: {ex.Message}";
+                _logger.LogError(ex, "[MediaConversion] Error ejecutando FFmpeg");
+                await RegistrarErrorAsync("Excepción en FFmpeg", ex.Message);
+                return false;
+            }
+        }
+
+        private async Task RegistrarErrorAsync(string mensaje, string? detalle)
+        {
+            if (_logEventoService == null) return;
+
+            try
+            {
+                await _logEventoService.RegistrarEventoAsync(
+                    $"[MediaConversion] {mensaje}",
+                    CategoriaEvento.Sistema,
+                    TipoLogEvento.Error,
+                    detalle: detalle
+                );
+            }
+            catch { /* Ignorar errores de logging */ }
+        }
+
+        #endregion
+
+        #region Información de Medios
+
+        public async Task<MediaInfo?> ObtenerInfoAsync(string rutaArchivo)
+        {
+            try
+            {
+                if (!File.Exists(rutaArchivo)) return null;
+
+                var extension = Path.GetExtension(rutaArchivo).ToLower();
+                var fileInfo = new FileInfo(rutaArchivo);
+
+                // Para imágenes, usar Magick.NET
+                if (ImagenesSoportadas.Contains(extension))
+                {
+                    return await ObtenerInfoImagenAsync(rutaArchivo, fileInfo.Length);
+                }
+
+                // Para videos, usar FFprobe
+                if (VideosSoportados.Contains(extension))
+                {
+                    return await ObtenerInfoVideoAsync(rutaArchivo, fileInfo.Length);
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[MediaConversion] Error obteniendo info de: {Ruta}", rutaArchivo);
+                return null;
+            }
+        }
+
+        private async Task<MediaInfo?> ObtenerInfoImagenAsync(string rutaArchivo, long fileSize)
+        {
+            try
+            {
+                using var image = new MagickImage(rutaArchivo);
+                var extension = Path.GetExtension(rutaArchivo).ToLower();
+
+                return new MediaInfo
+                {
+                    Format = image.Format.ToString(),
+                    Codec = image.Format.ToString(),
+                    Width = (int)image.Width,
+                    Height = (int)image.Height,
+                    FileSize = fileSize,
+                    EsCompatible = ImagenesEstandar.Contains(extension)
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private async Task<MediaInfo?> ObtenerInfoVideoAsync(string rutaArchivo, long fileSize)
+        {
+            try
+            {
+                // Usar ffprobe para obtener información del video
+                var processInfo = new ProcessStartInfo
+                {
+                    FileName = _ffprobePath,
+                    Arguments = $"-v quiet -print_format json -show_format -show_streams \"{rutaArchivo}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = Process.Start(processInfo);
+                if (process == null) return null;
+
+                var output = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                if (string.IsNullOrEmpty(output)) return null;
+
+                // Parsear JSON básico para obtener codec
+                var info = new MediaInfo { FileSize = fileSize };
+
+                // Buscar codec de video
+                if (output.Contains("\"codec_name\""))
+                {
+                    var codecMatch = System.Text.RegularExpressions.Regex.Match(output, "\"codec_name\"\\s*:\\s*\"([^\"]+)\"");
+                    if (codecMatch.Success)
+                        info.Codec = codecMatch.Groups[1].Value;
+                }
+
+                // Buscar dimensiones
+                var widthMatch = System.Text.RegularExpressions.Regex.Match(output, "\"width\"\\s*:\\s*(\\d+)");
+                var heightMatch = System.Text.RegularExpressions.Regex.Match(output, "\"height\"\\s*:\\s*(\\d+)");
+                if (widthMatch.Success) info.Width = int.Parse(widthMatch.Groups[1].Value);
+                if (heightMatch.Success) info.Height = int.Parse(heightMatch.Groups[1].Value);
+
+                // Buscar duración
+                var durationMatch = System.Text.RegularExpressions.Regex.Match(output, "\"duration\"\\s*:\\s*\"([\\d.]+)\"");
+                if (durationMatch.Success) info.Duration = double.Parse(durationMatch.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+
+                // Buscar formato
+                var formatMatch = System.Text.RegularExpressions.Regex.Match(output, "\"format_name\"\\s*:\\s*\"([^\"]+)\"");
+                if (formatMatch.Success) info.Format = formatMatch.Groups[1].Value;
+
+                // Verificar si es compatible (H.264 en MP4)
+                info.EsCompatible = info.Codec?.Equals("h264", StringComparison.OrdinalIgnoreCase) == true &&
+                                   (info.Format?.Contains("mp4") == true || info.Format?.Contains("mov") == true);
+
+                return info;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[MediaConversion] Error obteniendo info de video");
+                return null;
+            }
+        }
+
+        #endregion
+    }
+}

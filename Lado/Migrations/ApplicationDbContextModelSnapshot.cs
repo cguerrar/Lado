@@ -398,6 +398,11 @@ namespace Lado.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("int");
 
+                    b.Property<bool>("AceptaLadoCoins")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
                     b.Property<bool>("AgeVerified")
                         .HasColumnType("bit");
 
@@ -415,6 +420,26 @@ namespace Lado.Migrations
                     b.Property<bool>("BloquearLadoB")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("BonoBienvenidaEntregado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("BonoEmailVerificadoEntregado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("BonoPerfilCompletoEntregado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("BonoPrimerContenidoEntregado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Categoria")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -422,6 +447,10 @@ namespace Lado.Migrations
                     b.Property<string>("Ciudad")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("CodigoReferido")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<decimal>("ComisionRetiro")
                         .HasColumnType("decimal(18,2)");
@@ -558,6 +587,11 @@ namespace Lado.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<int>("PorcentajeMaxLadoCoinsSuscripcion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(30);
+
                     b.Property<decimal>("PrecioSuscripcion")
                         .HasColumnType("decimal(18,2)");
 
@@ -627,7 +661,16 @@ namespace Lado.Migrations
                     b.Property<int>("VisitasPerfil")
                         .HasColumnType("int");
 
+                    b.Property<string>("ZonaHoraria")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("CodigoReferido")
+                        .IsUnique()
+                        .HasDatabaseName("IX_AspNetUsers_CodigoReferido")
+                        .HasFilter("[CodigoReferido] IS NOT NULL");
 
                     b.HasIndex("EsCreador")
                         .HasDatabaseName("IX_AspNetUsers_EsCreador");
@@ -1251,6 +1294,279 @@ namespace Lado.Migrations
                     b.ToTable("ConfiguracionesConfianza");
                 });
 
+            modelBuilder.Entity("Lado.Models.ConfiguracionLadoCoin", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Activo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Categoria")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Clave")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Descripcion")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("FechaModificacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ModificadoPor")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal>("Valor")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Activo")
+                        .HasDatabaseName("IX_ConfiguracionesLadoCoins_Activo");
+
+                    b.HasIndex("Categoria")
+                        .HasDatabaseName("IX_ConfiguracionesLadoCoins_Categoria");
+
+                    b.HasIndex("Clave")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ConfiguracionesLadoCoins_Clave");
+
+                    b.ToTable("ConfiguracionesLadoCoins");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Activo = true,
+                            Categoria = "Registro",
+                            Clave = "BonoBienvenida",
+                            Descripcion = "Bono de bienvenida al registrarse",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 20m
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Activo = true,
+                            Categoria = "Registro",
+                            Clave = "BonoPrimerContenido",
+                            Descripcion = "Bono por primera publicación",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 5m
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Activo = true,
+                            Categoria = "Registro",
+                            Clave = "BonoVerificarEmail",
+                            Descripcion = "Bono por verificar email",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 2m
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Activo = true,
+                            Categoria = "Registro",
+                            Clave = "BonoCompletarPerfil",
+                            Descripcion = "Bono por completar perfil",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 3m
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Activo = true,
+                            Categoria = "Diario",
+                            Clave = "BonoLoginDiario",
+                            Descripcion = "Bono por login diario",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 0.50m
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Activo = true,
+                            Categoria = "Diario",
+                            Clave = "BonoContenidoDiario",
+                            Descripcion = "Bono por subir contenido (1/día)",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 1m
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Activo = true,
+                            Categoria = "Diario",
+                            Clave = "Bono5Likes",
+                            Descripcion = "Bono por dar 5 likes",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 0.25m
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Activo = true,
+                            Categoria = "Diario",
+                            Clave = "Bono3Comentarios",
+                            Descripcion = "Bono por 3 comentarios",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 0.50m
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Activo = true,
+                            Categoria = "Diario",
+                            Clave = "BonoRacha7Dias",
+                            Descripcion = "Bono por racha de 7 días",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 5m
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Activo = true,
+                            Categoria = "Referidos",
+                            Clave = "BonoReferidor",
+                            Descripcion = "Bono para quien invita",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 10m
+                        },
+                        new
+                        {
+                            Id = 11,
+                            Activo = true,
+                            Categoria = "Referidos",
+                            Clave = "BonoReferido",
+                            Descripcion = "Bono para quien es invitado",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 15m
+                        },
+                        new
+                        {
+                            Id = 12,
+                            Activo = true,
+                            Categoria = "Referidos",
+                            Clave = "BonoReferidoCreador",
+                            Descripcion = "Bono cuando referido crea en LadoB",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 50m
+                        },
+                        new
+                        {
+                            Id = 13,
+                            Activo = true,
+                            Categoria = "Referidos",
+                            Clave = "ComisionReferidoPorcentaje",
+                            Descripcion = "% de comisión de premios del referido",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 10m
+                        },
+                        new
+                        {
+                            Id = 14,
+                            Activo = true,
+                            Categoria = "Referidos",
+                            Clave = "ComisionReferidoMeses",
+                            Descripcion = "Meses de duración de comisión",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 3m
+                        },
+                        new
+                        {
+                            Id = 15,
+                            Activo = true,
+                            Categoria = "Sistema",
+                            Clave = "PorcentajeQuema",
+                            Descripcion = "% de quema por transacción",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 5m
+                        },
+                        new
+                        {
+                            Id = 16,
+                            Activo = true,
+                            Categoria = "Sistema",
+                            Clave = "DiasVencimiento",
+                            Descripcion = "Días hasta vencimiento",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 30m
+                        },
+                        new
+                        {
+                            Id = 17,
+                            Activo = true,
+                            Categoria = "Sistema",
+                            Clave = "MaxPorcentajeSuscripcion",
+                            Descripcion = "% máximo de LC en suscripciones",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 30m
+                        },
+                        new
+                        {
+                            Id = 18,
+                            Activo = true,
+                            Categoria = "Sistema",
+                            Clave = "MaxPorcentajePropina",
+                            Descripcion = "% máximo de LC en propinas",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 100m
+                        },
+                        new
+                        {
+                            Id = 19,
+                            Activo = true,
+                            Categoria = "Canje",
+                            Clave = "MultiplicadorPublicidad",
+                            Descripcion = "$1 LC = $1.50 en ads",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 1.5m
+                        },
+                        new
+                        {
+                            Id = 20,
+                            Activo = true,
+                            Categoria = "Canje",
+                            Clave = "MultiplicadorBoost",
+                            Descripcion = "$1 LC = $2 en boost",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 2m
+                        },
+                        new
+                        {
+                            Id = 21,
+                            Activo = true,
+                            Categoria = "Limites",
+                            Clave = "MaxPremioDiario",
+                            Descripcion = "Máximo LC ganables por día",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 50m
+                        },
+                        new
+                        {
+                            Id = 22,
+                            Activo = true,
+                            Categoria = "Limites",
+                            Clave = "MaxPremioMensual",
+                            Descripcion = "Máximo LC ganables por mes",
+                            FechaModificacion = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Valor = 500m
+                        });
+                });
+
             modelBuilder.Entity("Lado.Models.ConfiguracionPlataforma", b =>
                 {
                     b.Property<int>("Id")
@@ -1299,7 +1615,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "ComisionBilleteraElectronica",
                             Descripcion = "Comision por usar billetera electronica (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 28, 22, 40, 17, 687, DateTimeKind.Local).AddTicks(9618),
+                            UltimaModificacion = new DateTime(2026, 1, 1, 22, 44, 51, 328, DateTimeKind.Local).AddTicks(3303),
                             Valor = "2.5"
                         },
                         new
@@ -1308,7 +1624,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "TiempoProcesoRetiro",
                             Descripcion = "Tiempo estimado para procesar retiros",
-                            UltimaModificacion = new DateTime(2025, 12, 28, 22, 40, 17, 687, DateTimeKind.Local).AddTicks(9740),
+                            UltimaModificacion = new DateTime(2026, 1, 1, 22, 44, 51, 328, DateTimeKind.Local).AddTicks(3366),
                             Valor = "3-5 dias habiles"
                         },
                         new
@@ -1317,7 +1633,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMinimoRecarga",
                             Descripcion = "Monto minimo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 28, 22, 40, 17, 687, DateTimeKind.Local).AddTicks(9741),
+                            UltimaModificacion = new DateTime(2026, 1, 1, 22, 44, 51, 328, DateTimeKind.Local).AddTicks(3368),
                             Valor = "5"
                         },
                         new
@@ -1326,7 +1642,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMaximoRecarga",
                             Descripcion = "Monto maximo para recargar saldo",
-                            UltimaModificacion = new DateTime(2025, 12, 28, 22, 40, 17, 687, DateTimeKind.Local).AddTicks(9743),
+                            UltimaModificacion = new DateTime(2026, 1, 1, 22, 44, 51, 328, DateTimeKind.Local).AddTicks(3369),
                             Valor = "1000"
                         },
                         new
@@ -1335,7 +1651,7 @@ namespace Lado.Migrations
                             Categoria = "General",
                             Clave = "ComisionPlataforma",
                             Descripcion = "Comision general de la plataforma (%)",
-                            UltimaModificacion = new DateTime(2025, 12, 28, 22, 40, 17, 687, DateTimeKind.Local).AddTicks(9744),
+                            UltimaModificacion = new DateTime(2026, 1, 1, 22, 44, 51, 328, DateTimeKind.Local).AddTicks(3371),
                             Valor = "20"
                         });
                 });
@@ -2069,6 +2385,66 @@ namespace Lado.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("IpsBloqueadas");
+                });
+
+            modelBuilder.Entity("Lado.Models.LadoCoin", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("SaldoDisponible")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal>("SaldoPorVencer")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal>("TotalGanado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal>("TotalGastado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal>("TotalQuemado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal>("TotalRecibido")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<DateTime>("UltimaActualizacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SaldoDisponible")
+                        .HasDatabaseName("IX_LadoCoins_SaldoDisponible");
+
+                    b.HasIndex("UsuarioId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_LadoCoins_UsuarioId");
+
+                    b.ToTable("LadoCoins");
                 });
 
             modelBuilder.Entity("Lado.Models.Like", b =>
@@ -2810,6 +3186,87 @@ namespace Lado.Migrations
                     b.ToTable("PropuestasDesafios");
                 });
 
+            modelBuilder.Entity("Lado.Models.RachaUsuario", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ComentariosHoy")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("ContenidosHoy")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaReset")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("LikesHoy")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<bool>("Premio3ComentariosHoy")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("Premio5LikesHoy")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("PremioContenidoHoy")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("PremioLoginHoy")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("RachaActual")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("RachaMaxima")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTime?>("UltimoLoginPremio")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FechaReset")
+                        .HasDatabaseName("IX_RachasUsuarios_FechaReset");
+
+                    b.HasIndex("RachaActual")
+                        .HasDatabaseName("IX_RachasUsuarios_RachaActual");
+
+                    b.HasIndex("UsuarioId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RachasUsuarios_UsuarioId");
+
+                    b.ToTable("RachasUsuarios");
+                });
+
             modelBuilder.Entity("Lado.Models.Reaccion", b =>
                 {
                     b.Property<int>("Id")
@@ -2847,6 +3304,85 @@ namespace Lado.Migrations
                         .HasDatabaseName("IX_Reacciones_Usuario_Contenido_Unique");
 
                     b.ToTable("Reacciones");
+                });
+
+            modelBuilder.Entity("Lado.Models.Referido", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("BonoCreadorLadoBEntregado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("BonoReferidoEntregado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("BonoReferidorEntregado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("CodigoUsado")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<bool>("ComisionActiva")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime>("FechaExpiracionComision")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaRegistro")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReferidoUsuarioId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ReferidorId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<decimal>("TotalComisionGanada")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<DateTime?>("UltimaComision")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CodigoUsado")
+                        .HasDatabaseName("IX_Referidos_CodigoUsado");
+
+                    b.HasIndex("ComisionActiva")
+                        .HasDatabaseName("IX_Referidos_ComisionActiva");
+
+                    b.HasIndex("FechaExpiracionComision")
+                        .HasDatabaseName("IX_Referidos_FechaExpiracionComision");
+
+                    b.HasIndex("ReferidoUsuarioId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Referidos_ReferidoUsuarioId");
+
+                    b.HasIndex("ReferidorId")
+                        .HasDatabaseName("IX_Referidos_ReferidorId");
+
+                    b.HasIndex("ReferidorId", "ComisionActiva", "FechaExpiracionComision")
+                        .HasDatabaseName("IX_Referidos_Comisiones_Activas");
+
+                    b.ToTable("Referidos");
                 });
 
             modelBuilder.Entity("Lado.Models.RefreshToken", b =>
@@ -3458,6 +3994,87 @@ namespace Lado.Migrations
                     b.ToTable("TransaccionesAgencias");
                 });
 
+            modelBuilder.Entity("Lado.Models.TransaccionLadoCoin", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Descripcion")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("FechaTransaccion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FechaVencimiento")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("Monto")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("MontoQuemado")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("MontoRestante")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<string>("ReferenciaId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal>("SaldoAnterior")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("SaldoPosterior")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("Tipo")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TipoReferencia")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("Vencido")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FechaTransaccion")
+                        .HasDatabaseName("IX_TransaccionesLadoCoins_FechaTransaccion");
+
+                    b.HasIndex("FechaVencimiento")
+                        .HasDatabaseName("IX_TransaccionesLadoCoins_FechaVencimiento");
+
+                    b.HasIndex("Tipo")
+                        .HasDatabaseName("IX_TransaccionesLadoCoins_Tipo");
+
+                    b.HasIndex("UsuarioId")
+                        .HasDatabaseName("IX_TransaccionesLadoCoins_UsuarioId");
+
+                    b.HasIndex("Vencido")
+                        .HasDatabaseName("IX_TransaccionesLadoCoins_Vencido");
+
+                    b.HasIndex("UsuarioId", "FechaTransaccion")
+                        .HasDatabaseName("IX_TransaccionesLadoCoins_Usuario_Fecha");
+
+                    b.HasIndex("UsuarioId", "Vencido", "FechaVencimiento", "MontoRestante")
+                        .HasDatabaseName("IX_TransaccionesLadoCoins_Vencimiento_FIFO");
+
+                    b.ToTable("TransaccionesLadoCoins");
+                });
+
             modelBuilder.Entity("Lado.Models.VisitaApp", b =>
                 {
                     b.Property<int>("Id")
@@ -4041,6 +4658,17 @@ namespace Lado.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("Lado.Models.LadoCoin", b =>
+                {
+                    b.HasOne("Lado.Models.ApplicationUser", "Usuario")
+                        .WithOne("LadoCoin")
+                        .HasForeignKey("Lado.Models.LadoCoin", "UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("Lado.Models.Like", b =>
                 {
                     b.HasOne("Lado.Models.Contenido", "Contenido")
@@ -4186,6 +4814,17 @@ namespace Lado.Migrations
                     b.Navigation("Desafio");
                 });
 
+            modelBuilder.Entity("Lado.Models.RachaUsuario", b =>
+                {
+                    b.HasOne("Lado.Models.ApplicationUser", "Usuario")
+                        .WithOne("Racha")
+                        .HasForeignKey("Lado.Models.RachaUsuario", "UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("Lado.Models.Reaccion", b =>
                 {
                     b.HasOne("Lado.Models.Contenido", "Contenido")
@@ -4203,6 +4842,25 @@ namespace Lado.Migrations
                     b.Navigation("Contenido");
 
                     b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("Lado.Models.Referido", b =>
+                {
+                    b.HasOne("Lado.Models.ApplicationUser", "ReferidoUsuario")
+                        .WithMany()
+                        .HasForeignKey("ReferidoUsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Lado.Models.ApplicationUser", "Referidor")
+                        .WithMany("MisReferidos")
+                        .HasForeignKey("ReferidorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ReferidoUsuario");
+
+                    b.Navigation("Referidor");
                 });
 
             modelBuilder.Entity("Lado.Models.RefreshToken", b =>
@@ -4380,6 +5038,17 @@ namespace Lado.Migrations
                     b.Navigation("Anuncio");
                 });
 
+            modelBuilder.Entity("Lado.Models.TransaccionLadoCoin", b =>
+                {
+                    b.HasOne("Lado.Models.ApplicationUser", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -4452,6 +5121,12 @@ namespace Lado.Migrations
                     b.Navigation("Agencia");
 
                     b.Navigation("Intereses");
+
+                    b.Navigation("LadoCoin");
+
+                    b.Navigation("MisReferidos");
+
+                    b.Navigation("Racha");
 
                     b.Navigation("Suscripciones");
 
