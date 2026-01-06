@@ -13,18 +13,15 @@ namespace Lado.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
-        private readonly StripeSimuladoService _stripeService;
         private readonly ILogger<FanBilleteraController> _logger;
 
         public FanBilleteraController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
-            StripeSimuladoService stripeService,
             ILogger<FanBilleteraController> logger)
         {
             _context = context;
             _userManager = userManager;
-            _stripeService = stripeService;
             _logger = logger;
         }
 
@@ -34,10 +31,15 @@ namespace Lado.Controllers
             return RedirectToAction("Index", "Billetera");
         }
 
-        // POST: /FanBilletera/CargarSaldo
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CargarSaldo(decimal monto, string metodoPago)
+        // GET: /FanBilletera/CargarSaldo - Redirige a PayPal
+        public IActionResult CargarSaldo()
+        {
+            // Redirigir a la página de recarga con PayPal
+            return RedirectToAction("Recargar", "PayPal");
+        }
+
+        // GET: /FanBilletera/MiBilletera - Vista de billetera del fan
+        public async Task<IActionResult> MiBilletera()
         {
             var usuario = await _userManager.GetUserAsync(User);
             if (usuario == null)
@@ -45,69 +47,24 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-           
+            // Obtener transacciones recientes
+            var transacciones = await _context.Transacciones
+                .Where(t => t.UsuarioId == usuario.Id)
+                .OrderByDescending(t => t.FechaTransaccion)
+                .Take(10)
+                .ToListAsync();
 
-            if (monto < 5)
-            {
-                TempData["Error"] = "El monto mínimo de recarga es $5.00";
-                return RedirectToAction("Index", "Billetera");
-            }
+            // Obtener suscripciones activas
+            var suscripciones = await _context.Suscripciones
+                .Include(s => s.Creador)
+                .Where(s => s.FanId == usuario.Id && s.EstaActiva)
+                .ToListAsync();
 
-            if (monto > 1000)
-            {
-                TempData["Error"] = "El monto máximo de recarga es $1,000.00";
-                return RedirectToAction("Index", "Billetera");
-            }
+            ViewBag.Saldo = usuario.Saldo;
+            ViewBag.Transacciones = transacciones;
+            ViewBag.Suscripciones = suscripciones;
 
-            try
-            {
-                // 🎭 SIMULACIÓN DE PAGO CON STRIPE
-                var pagoExitoso = await _stripeService.ProcesarPagoSimulado(
-                    usuario.Email,
-                    monto,
-                    metodoPago
-                );
-
-                if (!pagoExitoso)
-                {
-                    TempData["Error"] = "Error al procesar el pago. Por favor intenta nuevamente.";
-                    return RedirectToAction("Index", "Billetera");
-                }
-
-                // Crear transacción de recarga
-                var recarga = new Transaccion
-                {
-                    UsuarioId = usuario.Id,
-                    TipoTransaccion = TipoTransaccion.Recarga,
-                    Monto = monto,
-                    MontoNeto = monto, // En recarga no hay comisión para el fan
-                    Comision = 0,
-                    Descripcion = $"Recarga de saldo vía {metodoPago}",
-                    EstadoPago = "Completado",
-                    MetodoPago = metodoPago,
-                    FechaTransaccion = DateTime.Now,
-                    Notas = "Pago simulado - Listo para integración real"
-                };
-
-                _context.Transacciones.Add(recarga);
-
-                // Actualizar saldo del usuario
-                usuario.Saldo += monto;
-                await _userManager.UpdateAsync(usuario);
-
-                await _context.SaveChangesAsync();
-
-                _logger.LogInformation($"Recarga exitosa: Usuario {usuario.Id}, Monto ${monto}");
-
-                TempData["Success"] = $"¡Recarga exitosa! Se agregaron ${monto:N2} a tu billetera.";
-                return RedirectToAction("Index", "Billetera");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error al procesar recarga de saldo");
-                TempData["Error"] = "Error al procesar la recarga. Por favor, intenta de nuevo.";
-                return RedirectToAction("Index", "Billetera");
-            }
+            return View();
         }
 
         // POST: /FanBilletera/CancelarSuscripcion

@@ -1,0 +1,425 @@
+@{
+    ViewData["Title"] = "Recargar Saldo";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var saldoActual = ViewBag.SaldoActual ?? 0m;
+    var paypalClientId = ViewBag.PayPalClientId as string;
+    var isSandbox = ViewBag.IsSandbox ?? true;
+}
+
+<style>
+    .recargar-container {
+        max-width: 500px;
+        margin: 40px auto;
+        padding: 0 20px;
+    }
+
+    .recargar-card {
+        background: var(--card-bg);
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: var(--shadow-md);
+    }
+
+    .recargar-header {
+        text-align: center;
+        margin-bottom: 32px;
+    }
+
+    .recargar-header h1 {
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        color: var(--text-primary);
+    }
+
+    .saldo-actual {
+        font-size: 14px;
+        color: var(--text-secondary);
+    }
+
+    .saldo-actual strong {
+        color: var(--success);
+        font-size: 18px;
+    }
+
+    .monto-section {
+        margin-bottom: 24px;
+    }
+
+    .monto-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        margin-bottom: 12px;
+        display: block;
+    }
+
+    .monto-presets {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .monto-preset {
+        padding: 12px 8px;
+        border: 2px solid var(--border-color);
+        border-radius: 10px;
+        background: transparent;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-primary);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .monto-preset:hover {
+        border-color: var(--primary);
+        background: rgba(var(--primary-rgb), 0.05);
+    }
+
+    .monto-preset.selected {
+        border-color: var(--primary);
+        background: var(--primary);
+        color: white;
+    }
+
+    .monto-custom {
+        position: relative;
+    }
+
+    .monto-custom input {
+        width: 100%;
+        padding: 14px 16px 14px 36px;
+        border: 2px solid var(--border-color);
+        border-radius: 10px;
+        font-size: 18px;
+        font-weight: 600;
+        background: var(--input-bg);
+        color: var(--text-primary);
+        transition: border-color 0.2s;
+    }
+
+    .monto-custom input:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+
+    .monto-custom .currency-symbol {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+
+    .monto-info {
+        font-size: 12px;
+        color: var(--text-secondary);
+        text-align: center;
+        margin-top: 8px;
+    }
+
+    .paypal-container {
+        margin-top: 24px;
+    }
+
+    .paypal-loading {
+        text-align: center;
+        padding: 20px;
+        color: var(--text-secondary);
+    }
+
+    .paypal-loading .spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid var(--border-color);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 12px;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .sandbox-badge {
+        background: #fef3c7;
+        color: #92400e;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .error-message {
+        background: #fef2f2;
+        color: #991b1b;
+        padding: 12px 16px;
+        border-radius: 10px;
+        font-size: 14px;
+        margin-top: 16px;
+        display: none;
+    }
+
+    .success-message {
+        background: #f0fdf4;
+        color: #166534;
+        padding: 12px 16px;
+        border-radius: 10px;
+        font-size: 14px;
+        margin-top: 16px;
+        display: none;
+    }
+
+    /* Dark mode */
+    [data-theme="dark"] .sandbox-badge {
+        background: #78350f;
+        color: #fef3c7;
+    }
+
+    [data-theme="dark"] .error-message {
+        background: #450a0a;
+        color: #fca5a5;
+    }
+
+    [data-theme="dark"] .success-message {
+        background: #052e16;
+        color: #86efac;
+    }
+
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-size: 14px;
+        margin-bottom: 20px;
+    }
+
+    .back-link:hover {
+        color: var(--primary);
+    }
+</style>
+
+@* Token anti-forgery para las peticiones AJAX *@
+<form id="tokenForm" style="display:none;">
+    @Html.AntiForgeryToken()
+</form>
+
+<div class="recargar-container">
+    <a href="@Url.Action("MiBilletera", "FanBilletera")" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Volver a Mi Billetera
+    </a>
+
+    <div class="recargar-card">
+        <div class="recargar-header">
+            <h1>Recargar Saldo</h1>
+            <p class="saldo-actual">
+                Saldo actual: <strong>$@saldoActual.ToString("N2")</strong>
+            </p>
+        </div>
+
+        @if ((bool)isSandbox)
+        {
+            <div class="sandbox-badge">
+                MODO SANDBOX - Los pagos son de prueba
+            </div>
+        }
+
+        <div class="monto-section">
+            <label class="monto-label">Selecciona un monto</label>
+            <div class="monto-presets">
+                <button class="monto-preset" data-monto="10">$10</button>
+                <button class="monto-preset" data-monto="25">$25</button>
+                <button class="monto-preset selected" data-monto="50">$50</button>
+                <button class="monto-preset" data-monto="100">$100</button>
+            </div>
+
+            <div class="monto-custom">
+                <span class="currency-symbol">$</span>
+                <input type="number" id="montoInput" value="50" min="5" max="1000" step="0.01" placeholder="Otro monto">
+            </div>
+
+            <p class="monto-info">Monto minimo: $5 USD | Monto maximo: $1,000 USD</p>
+        </div>
+
+        <div class="paypal-container">
+            <div class="paypal-loading" id="paypalLoading">
+                <div class="spinner"></div>
+                <p>Cargando PayPal...</p>
+            </div>
+            <div id="paypal-button-container"></div>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+        <div class="success-message" id="successMessage"></div>
+    </div>
+</div>
+
+@section Scripts {
+    @if (string.IsNullOrEmpty(paypalClientId))
+    {
+        <script>
+            document.getElementById('paypalLoading').innerHTML = '<p style="color: #ef4444;">Error: PayPal no esta configurado. Contacta al administrador.</p>';
+        </script>
+    }
+    else
+    {
+        <script>
+            // Configurar handlers de botones antes de cargar PayPal
+            const montoInput = document.getElementById('montoInput');
+            const montoPresets = document.querySelectorAll('.monto-preset');
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
+            const paypalLoading = document.getElementById('paypalLoading');
+
+            // Seleccionar preset
+            montoPresets.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    montoPresets.forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    montoInput.value = btn.dataset.monto;
+                });
+            });
+
+            // Input personalizado
+            montoInput.addEventListener('input', () => {
+                montoPresets.forEach(b => {
+                    b.classList.toggle('selected', b.dataset.monto === montoInput.value);
+                });
+            });
+
+            function getMonto() {
+                return parseFloat(montoInput.value) || 0;
+            }
+
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+                successMessage.style.display = 'none';
+            }
+
+            function showSuccess(message) {
+                successMessage.textContent = message;
+                successMessage.style.display = 'block';
+                errorMessage.style.display = 'none';
+            }
+
+            // Funcion que se ejecuta cuando PayPal SDK carga
+            function initPayPal() {
+                const csrfToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+
+                paypal.Buttons({
+                    style: {
+                        layout: 'vertical',
+                        color: 'gold',
+                        shape: 'rect',
+                        label: 'paypal',
+                        height: 50
+                    },
+
+                    createOrder: async function(data, actions) {
+                        const monto = getMonto();
+
+                        if (monto < 5) {
+                            showError('El monto minimo es $5 USD');
+                            throw new Error('Monto invalido');
+                        }
+
+                        if (monto > 1000) {
+                            showError('El monto maximo es $1,000 USD');
+                            throw new Error('Monto invalido');
+                        }
+
+                        try {
+                            const response = await fetch('/PayPal/CrearOrden', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': csrfToken
+                                },
+                                body: JSON.stringify({ monto: monto })
+                            });
+
+                            const result = await response.json();
+
+                            if (!result.success) {
+                                showError(result.error || 'Error al crear la orden');
+                                throw new Error(result.error);
+                            }
+
+                            return result.orderId;
+                        } catch (error) {
+                            console.error('Error al crear orden:', error);
+                            showError('Error al procesar el pago. Intenta de nuevo.');
+                            throw error;
+                        }
+                    },
+
+                    onApprove: async function(data, actions) {
+                        try {
+                            const response = await fetch('/PayPal/CapturarOrden', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': csrfToken
+                                },
+                                body: JSON.stringify({ orderId: data.orderID })
+                            });
+
+                            const result = await response.json();
+
+                            if (result.success) {
+                                showSuccess(result.mensaje);
+                                document.querySelector('.saldo-actual strong').textContent =
+                                    '$' + result.nuevoSaldo.toFixed(2);
+
+                                setTimeout(() => {
+                                    window.location.href = '/Finanzas';
+                                }, 2000);
+                            } else {
+                                showError(result.error || 'Error al confirmar el pago');
+                            }
+                        } catch (error) {
+                            console.error('Error al capturar pago:', error);
+                            showError('Error al confirmar el pago. Contacta a soporte.');
+                        }
+                    },
+
+                    onCancel: function(data) {
+                        showError('Pago cancelado. Puedes intentar de nuevo cuando quieras.');
+                    },
+
+                    onError: function(err) {
+                        console.error('Error de PayPal:', err);
+                        showError('Error al procesar el pago. Intenta de nuevo.');
+                    }
+
+                }).render('#paypal-button-container').then(() => {
+                    paypalLoading.style.display = 'none';
+                });
+            }
+
+            // Cargar SDK de PayPal dinamicamente
+            var script = document.createElement('script');
+            script.src = 'https://www.paypal.com/sdk/js?client-id=@paypalClientId&currency=USD&intent=capture';
+            script.onload = function() {
+                initPayPal();
+            };
+            script.onerror = function() {
+                paypalLoading.innerHTML = '<p style="color: #ef4444;">Error al cargar PayPal. Verifica tu conexion a internet.</p>';
+            };
+            document.head.appendChild(script);
+        </script>
+    }
+}

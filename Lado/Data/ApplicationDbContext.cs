@@ -167,6 +167,11 @@ namespace Lado.Data
         // ========================================
         public DbSet<FotoDestacada> FotosDestacadas { get; set; }
 
+        // ========================================
+        // ⭐ DbSets NUEVOS - PAYPAL
+        // ========================================
+        public DbSet<OrdenPayPalPendiente> OrdenesPayPalPendientes { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

@@ -200,7 +200,8 @@ builder.Services.AddAntiforgery(options =>
 });
 
 // Registrar servicios personalizados
-builder.Services.AddScoped<Lado.Services.MercadoPagoService>();
+// builder.Services.AddScoped<Lado.Services.MercadoPagoService>(); // Deprecado - Usar PayPal
+builder.Services.AddScoped<Lado.Services.IPayPalService, Lado.Services.PayPalService>(); // PayPal
 
 // Configurar tamaño máximo de archivos (100 MB)
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
@@ -228,7 +229,7 @@ builder.Services.AddSession(options =>
     }
 });
 
-builder.Services.AddScoped<Lado.Services.StripeSimuladoService>();
+// builder.Services.AddScoped<Lado.Services.StripeSimuladoService>(); // Deprecado - Usar PayPal
 builder.Services.AddScoped<Lado.Services.IAdService, Lado.Services.AdService>();
 builder.Services.AddSingleton<Lado.Services.IServerMetricsService, Lado.Services.ServerMetricsService>();
 builder.Services.AddScoped<Lado.Services.IEmailService, Lado.Services.EmailService>();
@@ -394,13 +395,13 @@ app.Use(async (context, next) =>
         !path.StartsWith("/uploads") && !path.StartsWith("/audio"))
     {
         var csp = "default-src 'self'; " +
-                  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://ajax.aspnetcdn.com https://unpkg.com https://d3js.org https://www.google.com https://www.gstatic.com https://accounts.google.com; " +
+                  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://ajax.aspnetcdn.com https://unpkg.com https://d3js.org https://www.google.com https://www.gstatic.com https://accounts.google.com https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com; " +
                   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://accounts.google.com; " +
                   "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; " +
-                  "img-src 'self' data: blob: https://i.giphy.com https://media.giphy.com https://*.googleusercontent.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org https:; " +
+                  "img-src 'self' data: blob: https://i.giphy.com https://media.giphy.com https://*.googleusercontent.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.paypal.com https://*.paypalobjects.com https:; " +
                   "media-src 'self' data: blob: https://i.giphy.com https://media.giphy.com https:; " +
-                  "connect-src 'self' wss: ws: https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://api.openstreetmap.org https://nominatim.openstreetmap.org https://api.giphy.com https://accounts.google.com https://oauth2.googleapis.com; " +
-                  "frame-src 'self' https://www.google.com https://www.youtube.com https://accounts.google.com; " +
+                  "connect-src 'self' wss: ws: https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://api.openstreetmap.org https://nominatim.openstreetmap.org https://api.giphy.com https://accounts.google.com https://oauth2.googleapis.com https://www.paypal.com https://*.paypal.com; " +
+                  "frame-src 'self' https://www.google.com https://www.youtube.com https://accounts.google.com https://www.paypal.com https://*.paypal.com; " +
                   "worker-src 'self' blob:; " +
                   "manifest-src 'self'; " +
                   "base-uri 'self'; " +
