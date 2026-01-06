@@ -1,0 +1,136 @@
+@*
+    Partial de SEO con Structured Data (JSON-LD)
+    Incluye Schema.org para Organization, WebSite y datos dinamicos
+*@
+
+@{
+    var baseUrl = "https://ladoapp.com";
+    var siteName = "Lado";
+    var siteDescription = ViewData["MetaDescription"]?.ToString() ?? "Lado - Plataforma de contenido exclusivo donde los creadores muestran su lado autentico.";
+    var logoUrl = $"{baseUrl}/images/logo-lado.png";
+
+    // Datos dinamicos para schemas especificos
+    var schemaType = ViewData["SchemaType"]?.ToString();
+    var schemaName = ViewData["SchemaName"]?.ToString();
+    var schemaImage = ViewData["OgImage"]?.ToString();
+    var schemaDescription = ViewData["SchemaDescription"]?.ToString() ?? siteDescription;
+    var schemaUrl = ViewData["CanonicalUrl"]?.ToString() ?? ViewData["OgUrl"]?.ToString();
+
+    // Datos para Article schema
+    var articleTitle = ViewData["ArticleTitle"]?.ToString();
+    var articleAuthor = ViewData["ArticleAuthor"]?.ToString();
+    var articleDatePublished = ViewData["ArticleDatePublished"]?.ToString();
+}
+
+<!-- Schema Organization -->
+<script type="application/ld+json">
+{
+    "@@context": "https://schema.org",
+    "@@type": "Organization",
+    "name": "@siteName",
+    "url": "@baseUrl",
+    "logo": {
+        "@@type": "ImageObject",
+        "url": "@logoUrl",
+        "width": 512,
+        "height": 512
+    },
+    "description": "Lado es la plataforma donde los creadores de contenido muestran su lado autentico y exclusivo.",
+    "foundingDate": "2024",
+    "sameAs": [
+        "https://twitter.com/ladoapp",
+        "https://instagram.com/ladoapp"
+    ],
+    "contactPoint": {
+        "@@type": "ContactPoint",
+        "contactType": "customer service",
+        "email": "soporte@ladoapp.com",
+        "availableLanguage": ["Spanish"]
+    }
+}
+</script>
+
+<!-- Schema WebSite con SearchAction -->
+<script type="application/ld+json">
+{
+    "@@context": "https://schema.org",
+    "@@type": "WebSite",
+    "name": "@siteName",
+    "url": "@baseUrl",
+    "description": "@siteDescription",
+    "inLanguage": "es",
+    "potentialAction": {
+        "@@type": "SearchAction",
+        "target": {
+            "@@type": "EntryPoint",
+            "urlTemplate": "@(baseUrl)/FeedPublico?buscar={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+    }
+}
+</script>
+
+@* Schema dinamico segun tipo de pagina *@
+@if (schemaType == "Person" && !string.IsNullOrEmpty(schemaName))
+{
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "ProfilePage",
+        "mainEntity": {
+            "@@type": "Person",
+            "name": "@schemaName",
+            "url": "@(schemaUrl ?? baseUrl)",
+            "image": "@(schemaImage ?? $"{baseUrl}/images/default-avatar.svg")",
+            "description": "@schemaDescription"
+        },
+        "dateModified": "@DateTime.UtcNow.ToString("yyyy-MM-dd")"
+    }
+    </script>
+}
+else if (schemaType == "Article" && !string.IsNullOrEmpty(articleTitle))
+{
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "Article",
+        "headline": "@articleTitle",
+        "image": ["@(schemaImage ?? $"{baseUrl}/images/og-default.jpg")"],
+        "datePublished": "@(articleDatePublished ?? DateTime.UtcNow.ToString("yyyy-MM-dd"))",
+        "dateModified": "@(articleDatePublished ?? DateTime.UtcNow.ToString("yyyy-MM-dd"))",
+        "author": {
+            "@@type": "Person",
+            "name": "@(articleAuthor ?? "Lado")"
+        },
+        "publisher": {
+            "@@type": "Organization",
+            "name": "@siteName",
+            "logo": {
+                "@@type": "ImageObject",
+                "url": "@logoUrl"
+            }
+        },
+        "mainEntityOfPage": {
+            "@@type": "WebPage",
+            "@@id": "@(schemaUrl ?? baseUrl)"
+        }
+    }
+    </script>
+}
+else if (schemaType == "CollectionPage")
+{
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "CollectionPage",
+        "name": "@(ViewData["Title"] ?? "Explorar Contenido")",
+        "description": "@schemaDescription",
+        "url": "@(schemaUrl ?? baseUrl)",
+        "isPartOf": {
+            "@@type": "WebSite",
+            "name": "@siteName",
+            "url": "@baseUrl"
+        }
+    }
+    </script>
+}

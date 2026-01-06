@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Lado.Controllers
@@ -28,6 +29,8 @@ namespace Lado.Controllers
         private readonly IMediaConversionService _mediaConversion;
         private readonly ILogger<AdminController> _logger;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly ILadoCoinsService _ladoCoinsService;
+        private readonly IMemoryCache _cache;
 
         // Lista de IDs de contenidos que fallaron durante la clasificación por lotes
         // Se limpia cuando se inicia una nueva reclasificación masiva
@@ -57,7 +60,9 @@ namespace Lado.Controllers
             IMediaIntegrityService mediaIntegrity,
             IMediaConversionService mediaConversion,
             ILogger<AdminController> logger,
-            IServiceScopeFactory serviceScopeFactory)
+            IServiceScopeFactory serviceScopeFactory,
+            ILadoCoinsService ladoCoinsService,
+            IMemoryCache cache)
         {
             _context = context;
             _userManager = userManager;
@@ -74,6 +79,8 @@ namespace Lado.Controllers
             _mediaConversion = mediaConversion;
             _logger = logger;
             _serviceScopeFactory = serviceScopeFactory;
+            _ladoCoinsService = ladoCoinsService;
+            _cache = cache;
         }
 
         public override void OnActionExecuting(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext context)
@@ -350,104 +357,334 @@ namespace Lado.Controllers
 
             try
             {
-                // 1. Eliminar contenidos del usuario
+                // ========================================
+                // FASE 1: Eliminar entidades con FK Restrict (orden importante)
+                // ========================================
+
+                // 1. Eliminar likes en comentarios del usuario
+                var likesComentarios = await _context.LikesComentarios
+                    .Where(lc => lc.UsuarioId == id)
+                    .ToListAsync();
+                if (likesComentarios.Any())
+                    _context.LikesComentarios.RemoveRange(likesComentarios);
+
+                // 2. Eliminar reacciones del usuario
+                var reacciones = await _context.Reacciones
+                    .Where(r => r.UsuarioId == id)
+                    .ToListAsync();
+                if (reacciones.Any())
+                    _context.Reacciones.RemoveRange(reacciones);
+
+                // 3. Eliminar vistas de stories del usuario
+                var storyVistas = await _context.StoryVistas
+                    .Where(sv => sv.UsuarioId == id)
+                    .ToListAsync();
+                if (storyVistas.Any())
+                    _context.StoryVistas.RemoveRange(storyVistas);
+
+                // 4. Eliminar likes de stories del usuario
+                var storyLikes = await _context.StoryLikes
+                    .Where(sl => sl.UsuarioId == id)
+                    .ToListAsync();
+                if (storyLikes.Any())
+                    _context.StoryLikes.RemoveRange(storyLikes);
+
+                // 5. Eliminar compras de contenido del usuario
+                var comprasContenido = await _context.ComprasContenido
+                    .Where(cc => cc.UsuarioId == id)
+                    .ToListAsync();
+                if (comprasContenido.Any())
+                    _context.ComprasContenido.RemoveRange(comprasContenido);
+
+                // 6. Eliminar compras de colecciones del usuario
+                var comprasColeccion = await _context.ComprasColeccion
+                    .Where(cc => cc.CompradorId == id)
+                    .ToListAsync();
+                if (comprasColeccion.Any())
+                    _context.ComprasColeccion.RemoveRange(comprasColeccion);
+
+                // 7. Eliminar propinas donde es fan o creador
+                var tipsFan = await _context.Tips
+                    .Where(t => t.FanId == id)
+                    .ToListAsync();
+                if (tipsFan.Any())
+                    _context.Tips.RemoveRange(tipsFan);
+
+                var tipsCreador = await _context.Tips
+                    .Where(t => t.CreadorId == id)
+                    .ToListAsync();
+                if (tipsCreador.Any())
+                    _context.Tips.RemoveRange(tipsCreador);
+
+                // 8. Eliminar fotos destacadas del usuario
+                var fotosDestacadas = await _context.FotosDestacadas
+                    .Where(f => f.UsuarioId == id)
+                    .ToListAsync();
+                if (fotosDestacadas.Any())
+                    _context.FotosDestacadas.RemoveRange(fotosDestacadas);
+
+                // 9. Eliminar mensajes privados (remitente y destinatario)
+                var mensajesRemitente = await _context.MensajesPrivados
+                    .Where(m => m.RemitenteId == id)
+                    .ToListAsync();
+                if (mensajesRemitente.Any())
+                    _context.MensajesPrivados.RemoveRange(mensajesRemitente);
+
+                var mensajesDestinatario = await _context.MensajesPrivados
+                    .Where(m => m.DestinatarioId == id)
+                    .ToListAsync();
+                if (mensajesDestinatario.Any())
+                    _context.MensajesPrivados.RemoveRange(mensajesDestinatario);
+
+                // 10. Eliminar chat mensajes (remitente y destinatario)
+                var chatRemitente = await _context.ChatMensajes
+                    .Where(m => m.RemitenteId == id)
+                    .ToListAsync();
+                if (chatRemitente.Any())
+                    _context.ChatMensajes.RemoveRange(chatRemitente);
+
+                var chatDestinatario = await _context.ChatMensajes
+                    .Where(m => m.DestinatarioId == id)
+                    .ToListAsync();
+                if (chatDestinatario.Any())
+                    _context.ChatMensajes.RemoveRange(chatDestinatario);
+
+                // 11. Eliminar propuestas de desafíos del usuario (como creador)
+                var propuestas = await _context.PropuestasDesafios
+                    .Where(p => p.CreadorId == id)
+                    .ToListAsync();
+                if (propuestas.Any())
+                    _context.PropuestasDesafios.RemoveRange(propuestas);
+
+                // 12. Eliminar desafíos donde participa (fan, creador objetivo o asignado)
+                var desafiosFan = await _context.Desafios
+                    .Where(d => d.FanId == id)
+                    .ToListAsync();
+                if (desafiosFan.Any())
+                    _context.Desafios.RemoveRange(desafiosFan);
+
+                var desafiosCreadorObj = await _context.Desafios
+                    .Where(d => d.CreadorObjetivoId == id)
+                    .ToListAsync();
+                if (desafiosCreadorObj.Any())
+                    _context.Desafios.RemoveRange(desafiosCreadorObj);
+
+                var desafiosCreadorAsig = await _context.Desafios
+                    .Where(d => d.CreadorAsignadoId == id)
+                    .ToListAsync();
+                if (desafiosCreadorAsig.Any())
+                    _context.Desafios.RemoveRange(desafiosCreadorAsig);
+
+                // 13. Eliminar bloqueos de usuario (bloqueador y bloqueado)
+                var bloqueosBloqueador = await _context.BloqueosUsuarios
+                    .Where(b => b.BloqueadorId == id)
+                    .ToListAsync();
+                if (bloqueosBloqueador.Any())
+                    _context.BloqueosUsuarios.RemoveRange(bloqueosBloqueador);
+
+                var bloqueosBloqueado = await _context.BloqueosUsuarios
+                    .Where(b => b.BloqueadoId == id)
+                    .ToListAsync();
+                if (bloqueosBloqueado.Any())
+                    _context.BloqueosUsuarios.RemoveRange(bloqueosBloqueado);
+
+                // 14. Eliminar historias silenciadas
+                var silenciadosUsuario = await _context.HistoriasSilenciadas
+                    .Where(h => h.UsuarioId == id)
+                    .ToListAsync();
+                if (silenciadosUsuario.Any())
+                    _context.HistoriasSilenciadas.RemoveRange(silenciadosUsuario);
+
+                var silenciadosComo = await _context.HistoriasSilenciadas
+                    .Where(h => h.SilenciadoId == id)
+                    .ToListAsync();
+                if (silenciadosComo.Any())
+                    _context.HistoriasSilenciadas.RemoveRange(silenciadosComo);
+
+                // 15. Eliminar referidos (referidor y referido)
+                var referidosComoReferidor = await _context.Referidos
+                    .Where(r => r.ReferidorId == id)
+                    .ToListAsync();
+                if (referidosComoReferidor.Any())
+                    _context.Referidos.RemoveRange(referidosComoReferidor);
+
+                var referidosComoReferido = await _context.Referidos
+                    .Where(r => r.ReferidoUsuarioId == id)
+                    .ToListAsync();
+                if (referidosComoReferido.Any())
+                    _context.Referidos.RemoveRange(referidosComoReferido);
+
+                // 16. Eliminar agencia del usuario (y sus anuncios en cascada)
+                var agencia = await _context.Agencias
+                    .FirstOrDefaultAsync(a => a.UsuarioId == id);
+                if (agencia != null)
+                    _context.Agencias.Remove(agencia);
+
+                // ========================================
+                // FASE 2: Eliminar entidades con FK Cascade (explícito por seguridad)
+                // ========================================
+
+                // 17. Eliminar stories del usuario (vistas y likes se eliminan en cascada)
+                var stories = await _context.Stories
+                    .Where(s => s.CreadorId == id)
+                    .ToListAsync();
+                if (stories.Any())
+                    _context.Stories.RemoveRange(stories);
+
+                // 18. Eliminar story drafts del usuario
+                var storyDrafts = await _context.StoryDrafts
+                    .Where(sd => sd.UsuarioId == id)
+                    .ToListAsync();
+                if (storyDrafts.Any())
+                    _context.StoryDrafts.RemoveRange(storyDrafts);
+
+                // 19. Eliminar colecciones del usuario
+                var colecciones = await _context.Colecciones
+                    .Where(c => c.CreadorId == id)
+                    .ToListAsync();
+                if (colecciones.Any())
+                    _context.Colecciones.RemoveRange(colecciones);
+
+                // 20. Eliminar favoritos del usuario
+                var favoritos = await _context.Favoritos
+                    .Where(f => f.UsuarioId == id)
+                    .ToListAsync();
+                if (favoritos.Any())
+                    _context.Favoritos.RemoveRange(favoritos);
+
+                // 21. Eliminar notificaciones del usuario
+                var notificaciones = await _context.Notificaciones
+                    .Where(n => n.UsuarioId == id)
+                    .ToListAsync();
+                if (notificaciones.Any())
+                    _context.Notificaciones.RemoveRange(notificaciones);
+
+                // 22. Eliminar intereses del usuario
+                var intereses = await _context.InteresesUsuarios
+                    .Where(i => i.UsuarioId == id)
+                    .ToListAsync();
+                if (intereses.Any())
+                    _context.InteresesUsuarios.RemoveRange(intereses);
+
+                // 23. Eliminar preferencias de algoritmo
+                var prefAlgoritmo = await _context.PreferenciasAlgoritmoUsuario
+                    .Where(p => p.UsuarioId == id)
+                    .ToListAsync();
+                if (prefAlgoritmo.Any())
+                    _context.PreferenciasAlgoritmoUsuario.RemoveRange(prefAlgoritmo);
+
+                // 24. Eliminar LadoCoins del usuario
+                var ladoCoin = await _context.LadoCoins
+                    .FirstOrDefaultAsync(l => l.UsuarioId == id);
+                if (ladoCoin != null)
+                    _context.LadoCoins.Remove(ladoCoin);
+
+                // 25. Eliminar transacciones de LadoCoins
+                var transaccionesLC = await _context.TransaccionesLadoCoins
+                    .Where(t => t.UsuarioId == id)
+                    .ToListAsync();
+                if (transaccionesLC.Any())
+                    _context.TransaccionesLadoCoins.RemoveRange(transaccionesLC);
+
+                // 26. Eliminar racha del usuario
+                var racha = await _context.RachasUsuarios
+                    .FirstOrDefaultAsync(r => r.UsuarioId == id);
+                if (racha != null)
+                    _context.RachasUsuarios.Remove(racha);
+
+                // 27. Eliminar refresh tokens
+                var refreshTokens = await _context.RefreshTokens
+                    .Where(r => r.UserId == id)
+                    .ToListAsync();
+                if (refreshTokens.Any())
+                    _context.RefreshTokens.RemoveRange(refreshTokens);
+
+                // 28. Eliminar active tokens
+                var activeTokens = await _context.ActiveTokens
+                    .Where(a => a.UserId == id)
+                    .ToListAsync();
+                if (activeTokens.Any())
+                    _context.ActiveTokens.RemoveRange(activeTokens);
+
+                // 29. Eliminar feedbacks del usuario
+                var feedbacks = await _context.Feedbacks
+                    .Where(f => f.UsuarioId == id)
+                    .ToListAsync();
+                if (feedbacks.Any())
+                    _context.Feedbacks.RemoveRange(feedbacks);
+
+                // ========================================
+                // FASE 3: Eliminar entidades originales
+                // ========================================
+
+                // 30. Eliminar contenidos del usuario (archivos, objetos detectados, etc. en cascada)
                 var contenidos = await _context.Contenidos
                     .Where(c => c.UsuarioId == id)
                     .ToListAsync();
                 if (contenidos.Any())
-                {
                     _context.Contenidos.RemoveRange(contenidos);
-                }
 
-                // 2. Eliminar suscripciones donde es creador
+                // 31. Eliminar suscripciones donde es creador
                 var suscripcionesCreador = await _context.Suscripciones
                     .Where(s => s.CreadorId == id)
                     .ToListAsync();
                 if (suscripcionesCreador.Any())
-                {
                     _context.Suscripciones.RemoveRange(suscripcionesCreador);
-                }
 
-                // 3. Eliminar suscripciones donde es fan
+                // 32. Eliminar suscripciones donde es fan
                 var suscripcionesFan = await _context.Suscripciones
                     .Where(s => s.FanId == id)
                     .ToListAsync();
                 if (suscripcionesFan.Any())
-                {
                     _context.Suscripciones.RemoveRange(suscripcionesFan);
-                }
 
-                // 4. Eliminar transacciones
+                // 33. Eliminar transacciones
                 var transacciones = await _context.Transacciones
                     .Where(t => t.UsuarioId == id)
                     .ToListAsync();
                 if (transacciones.Any())
-                {
                     _context.Transacciones.RemoveRange(transacciones);
-                }
 
-                // 5. Eliminar likes
+                // 34. Eliminar likes
                 var likes = await _context.Likes
                     .Where(l => l.UsuarioId == id)
                     .ToListAsync();
                 if (likes.Any())
-                {
                     _context.Likes.RemoveRange(likes);
-                }
 
-                // 6. Eliminar comentarios
+                // 35. Eliminar comentarios
                 var comentarios = await _context.Comentarios
                     .Where(c => c.UsuarioId == id)
                     .ToListAsync();
                 if (comentarios.Any())
-                {
                     _context.Comentarios.RemoveRange(comentarios);
-                }
 
-                // 7. Eliminar reportes hechos por el usuario
+                // 36. Eliminar reportes hechos por el usuario
                 var reportesHechos = await _context.Reportes
                     .Where(r => r.UsuarioReportadorId == id)
                     .ToListAsync();
                 if (reportesHechos.Any())
-                {
                     _context.Reportes.RemoveRange(reportesHechos);
-                }
 
-                // 8. Eliminar reportes contra el usuario (si existe la propiedad)
-                try
-                {
-                    var reportesContra = await _context.Reportes
-                        .Where(r => r.UsuarioReportadoId == id)
-                        .ToListAsync();
-                    if (reportesContra.Any())
-                    {
-                        _context.Reportes.RemoveRange(reportesContra);
-                    }
-                }
-                catch
-                {
-                    // Si no existe la propiedad UsuarioReportadoId, continuar
-                }
+                // 37. Eliminar reportes contra el usuario
+                var reportesContra = await _context.Reportes
+                    .Where(r => r.UsuarioReportadoId == id)
+                    .ToListAsync();
+                if (reportesContra.Any())
+                    _context.Reportes.RemoveRange(reportesContra);
 
-                // 9. Eliminar solicitud de verificaci�n si existe
-                try
-                {
-                    var verificacion = await _context.CreatorVerificationRequests
-                        .FirstOrDefaultAsync(v => v.UserId == id);
-                    if (verificacion != null)
-                    {
-                        _context.CreatorVerificationRequests.Remove(verificacion);
-                    }
-                }
-                catch
-                {
-                    // Si no existe la tabla, continuar
-                }
+                // 38. Eliminar solicitud de verificación
+                var verificacion = await _context.CreatorVerificationRequests
+                    .FirstOrDefaultAsync(v => v.UserId == id);
+                if (verificacion != null)
+                    _context.CreatorVerificationRequests.Remove(verificacion);
 
-                // 10. Guardar cambios antes de eliminar el usuario
+                // ========================================
+                // FASE 4: Guardar cambios y eliminar usuario
+                // ========================================
                 await _context.SaveChangesAsync();
 
-                // 11. Finalmente, eliminar el usuario con UserManager
+                // Finalmente, eliminar el usuario con UserManager
                 var result = await _userManager.DeleteAsync(usuario);
 
                 if (result.Succeeded)
@@ -1519,6 +1756,9 @@ namespace Lado.Controllers
 
                 await _context.SaveChangesAsync();
 
+                // ⚡ Invalidar cache de configuración del Feed para aplicar cambios inmediatamente
+                _cache.Remove("feed_config_all");
+
                 TempData["Success"] = $"Distribucion actualizada: {ladoBPreviewCantidad} preview(s) cada {ladoBPreviewIntervalo} posts, {anunciosCantidad} anuncio(s) cada {anunciosIntervalo} posts";
             }
             catch (Exception)
@@ -1556,6 +1796,9 @@ namespace Lado.Controllers
 
                 await _context.SaveChangesAsync();
 
+                // ⚡ Invalidar cache de configuración del Feed para aplicar cambios inmediatamente
+                _cache.Remove("feed_config_all");
+
                 TempData["Success"] = "Limites del Feed actualizados correctamente";
             }
             catch (Exception)
@@ -1589,6 +1832,9 @@ namespace Lado.Controllers
                 await ActualizarConfiguracionAsync(ConfiguracionPlataforma.FEED_MAX_POSTS_CONSECUTIVOS_CREADOR, maxPostsConsecutivos.ToString(), ahora, "Feed");
 
                 await _context.SaveChangesAsync();
+
+                // ⚡ Invalidar cache de configuración del Feed para aplicar cambios inmediatamente
+                _cache.Remove("feed_config_all");
 
                 TempData["Success"] = $"Descubrimiento actualizado: LadoA={descubrimientoLadoA}, LadoB={descubrimientoLadoB}, Usuarios={descubrimientoUsuarios}, MaxConsecutivos={maxPostsConsecutivos}";
             }
@@ -9238,6 +9484,460 @@ Este email fue enviado a {{{{email}}}}
         }
 
         #endregion
+
+        // ========================================
+        // LADOCOINS - PANEL DE ADMINISTRACIÓN
+        // ========================================
+
+        #region LadoCoins
+
+        /// <summary>
+        /// Dashboard principal de LadoCoins
+        /// </summary>
+        public async Task<IActionResult> LadoCoins()
+        {
+            // Estadísticas globales
+            var totalEnCirculacion = await _context.LadoCoins.SumAsync(l => l.SaldoDisponible);
+            var totalGanado = await _context.LadoCoins.SumAsync(l => l.TotalGanado);
+            var totalGastado = await _context.LadoCoins.SumAsync(l => l.TotalGastado);
+            var totalQuemado = await _context.LadoCoins.SumAsync(l => l.TotalQuemado);
+
+            // Contar vencidos
+            var totalVencido = await _context.TransaccionesLadoCoins
+                .Where(t => t.Tipo == TipoTransaccionLadoCoin.Vencimiento)
+                .SumAsync(t => Math.Abs(t.Monto));
+
+            // Usuarios con LadoCoins
+            var usuariosConSaldo = await _context.LadoCoins.CountAsync(l => l.SaldoDisponible > 0);
+            var totalUsuarios = await _context.LadoCoins.CountAsync();
+
+            // Top 10 usuarios con más saldo
+            var topUsuarios = await _context.LadoCoins
+                .Include(l => l.Usuario)
+                .Where(l => l.SaldoDisponible > 0)
+                .OrderByDescending(l => l.SaldoDisponible)
+                .Take(10)
+                .Select(l => new LadoCoinsUsuarioViewModel
+                {
+                    UsuarioId = l.UsuarioId,
+                    Username = l.Usuario != null ? l.Usuario.UserName : "?",
+                    Email = l.Usuario != null ? l.Usuario.Email : "",
+                    SaldoDisponible = l.SaldoDisponible,
+                    TotalGanado = l.TotalGanado,
+                    TotalGastado = l.TotalGastado
+                })
+                .ToListAsync();
+
+            // Transacciones recientes (últimas 20)
+            var transaccionesRecientes = await _context.TransaccionesLadoCoins
+                .Include(t => t.Usuario)
+                .OrderByDescending(t => t.FechaTransaccion)
+                .Take(20)
+                .ToListAsync();
+
+            // Estadísticas por tipo de transacción
+            var statsPorTipo = await _context.TransaccionesLadoCoins
+                .Where(t => t.Monto > 0)
+                .GroupBy(t => t.Tipo)
+                .Select(g => new { Tipo = g.Key, Total = g.Sum(t => t.Monto), Count = g.Count() })
+                .ToListAsync();
+
+            var viewModel = new LadoCoinsDashboardAdminViewModel
+            {
+                TotalEnCirculacion = totalEnCirculacion,
+                TotalGanado = totalGanado,
+                TotalGastado = totalGastado,
+                TotalQuemado = totalQuemado,
+                TotalVencido = totalVencido,
+                UsuariosConSaldo = usuariosConSaldo,
+                TotalUsuarios = totalUsuarios,
+                TopUsuarios = topUsuarios,
+                TransaccionesRecientes = transaccionesRecientes,
+                EstadisticasPorTipo = statsPorTipo.ToDictionary(
+                    x => x.Tipo.ToString(),
+                    x => new LadoCoinsStatTipo { Total = x.Total, Count = x.Count }
+                )
+            };
+
+            return View(viewModel);
+        }
+
+        /// <summary>
+        /// Configuración de LadoCoins (bonos, quema, vencimiento, etc.)
+        /// </summary>
+        public async Task<IActionResult> LadoCoinsConfiguracion()
+        {
+            var configuraciones = await _context.ConfiguracionesLadoCoins
+                .OrderBy(c => c.Categoria)
+                .ThenBy(c => c.Clave)
+                .ToListAsync();
+
+            // Si no hay configuraciones, insertar los valores por defecto
+            if (!configuraciones.Any())
+            {
+                var valoresDefault = ConfiguracionLadoCoin.ObtenerValoresDefault();
+                _context.ConfiguracionesLadoCoins.AddRange(valoresDefault);
+                await _context.SaveChangesAsync();
+
+                configuraciones = await _context.ConfiguracionesLadoCoins
+                    .OrderBy(c => c.Categoria)
+                    .ThenBy(c => c.Clave)
+                    .ToListAsync();
+            }
+
+            return View(configuraciones);
+        }
+
+        /// <summary>
+        /// Guardar configuración de LadoCoins
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> GuardarConfiguracionLadoCoins(int id, decimal valor)
+        {
+            try
+            {
+                var config = await _context.ConfiguracionesLadoCoins.FindAsync(id);
+                if (config == null)
+                {
+                    return Json(new { success = false, message = "Configuración no encontrada" });
+                }
+
+                var valorAnterior = config.Valor;
+                config.Valor = valor;
+                config.FechaModificacion = DateTime.Now;
+                config.ModificadoPor = User.Identity?.Name;
+
+                await _context.SaveChangesAsync();
+
+                await _logEventoService.RegistrarEventoAsync(
+                    $"Configuración LadoCoins modificada: {config.Clave}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Evento,
+                    null,
+                    User.Identity?.Name,
+                    $"Valor anterior: {valorAnterior}, Nuevo valor: {valor}"
+                );
+
+                return Json(new { success = true, message = "Configuración actualizada", modificadoPor = config.ModificadoPor });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Toggle activo/inactivo de una configuración LadoCoins
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleConfiguracionLadoCoins(int id, bool activo)
+        {
+            try
+            {
+                var config = await _context.ConfiguracionesLadoCoins.FindAsync(id);
+                if (config == null)
+                {
+                    return Json(new { success = false, message = "Configuración no encontrada" });
+                }
+
+                config.Activo = activo;
+                config.FechaModificacion = DateTime.Now;
+                config.ModificadoPor = User.Identity?.Name;
+
+                await _context.SaveChangesAsync();
+
+                await _logEventoService.RegistrarEventoAsync(
+                    $"Configuración LadoCoins {(activo ? "activada" : "desactivada")}: {config.Clave}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Evento,
+                    null,
+                    User.Identity?.Name,
+                    null
+                );
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Buscar usuario para gestionar sus LadoCoins
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> BuscarUsuarioLadoCoins(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+            {
+                return Json(new { success = false, message = "Ingresa al menos 2 caracteres" });
+            }
+
+            var usuarios = await _context.Users
+                .Where(u => u.UserName!.Contains(query) || u.Email!.Contains(query) || u.NombreCompleto!.Contains(query))
+                .Take(10)
+                .Select(u => new
+                {
+                    usuarioId = u.Id,
+                    username = u.UserName,
+                    email = u.Email,
+                    nombreCompleto = u.NombreCompleto,
+                    fotoPerfil = u.FotoPerfil
+                })
+                .ToListAsync();
+
+            // Obtener saldos de LadoCoins
+            var userIds = usuarios.Select(u => u.usuarioId).ToList();
+            var saldos = await _context.LadoCoins
+                .Where(l => userIds.Contains(l.UsuarioId))
+                .ToDictionaryAsync(l => l.UsuarioId, l => l.SaldoDisponible);
+
+            var resultado = usuarios.Select(u => new
+            {
+                u.usuarioId,
+                u.username,
+                u.email,
+                u.nombreCompleto,
+                u.fotoPerfil,
+                saldoDisponible = saldos.TryGetValue(u.usuarioId, out var s) ? s : 0m
+            });
+
+            return Json(new { success = true, usuarios = resultado });
+        }
+
+        /// <summary>
+        /// Ver detalle de LadoCoins de un usuario
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> DetalleUsuarioLadoCoins(string usuarioId)
+        {
+            var usuario = await _userManager.FindByIdAsync(usuarioId);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "Usuario no encontrado" });
+            }
+
+            var saldo = await _context.LadoCoins.FirstOrDefaultAsync(l => l.UsuarioId == usuarioId);
+
+            return Json(new
+            {
+                success = true,
+                usuario = new
+                {
+                    usuarioId = usuario.Id,
+                    username = usuario.UserName,
+                    email = usuario.Email,
+                    nombreCompleto = usuario.NombreCompleto,
+                    fotoPerfil = usuario.FotoPerfil,
+                    saldoDisponible = saldo?.SaldoDisponible ?? 0,
+                    totalGanado = saldo?.TotalGanado ?? 0,
+                    totalGastado = saldo?.TotalGastado ?? 0,
+                    totalQuemado = saldo?.TotalQuemado ?? 0
+                }
+            });
+        }
+
+        /// <summary>
+        /// Acreditar LadoCoins manualmente a un usuario
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AcreditarLadoCoins(string usuarioId, decimal monto, string razon)
+        {
+            try
+            {
+                if (monto <= 0)
+                {
+                    return Json(new { success = false, message = "El monto debe ser mayor a 0" });
+                }
+
+                if (string.IsNullOrWhiteSpace(razon))
+                {
+                    return Json(new { success = false, message = "Debes especificar una razón" });
+                }
+
+                var usuario = await _userManager.FindByIdAsync(usuarioId);
+                if (usuario == null)
+                {
+                    return Json(new { success = false, message = "Usuario no encontrado" });
+                }
+
+                var descripcion = $"[ADMIN] {razon} - Por: {User.Identity?.Name}";
+
+                var exito = await _ladoCoinsService.AcreditarMontoAsync(
+                    usuarioId,
+                    monto,
+                    TipoTransaccionLadoCoin.BonoAdmin,
+                    descripcion,
+                    null,
+                    "Admin"
+                );
+
+                if (!exito)
+                {
+                    return Json(new { success = false, message = "Error al acreditar LadoCoins" });
+                }
+
+                await _logEventoService.RegistrarEventoAsync(
+                    $"LadoCoins acreditados manualmente: ${monto:F2} a @{usuario.UserName}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Evento,
+                    usuarioId,
+                    User.Identity?.Name,
+                    razon
+                );
+
+                var nuevoSaldo = await _ladoCoinsService.ObtenerSaldoDisponibleAsync(usuarioId);
+
+                return Json(new { success = true, message = $"${monto:F2} acreditados a @{usuario.UserName}", nuevoSaldo });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Debitar LadoCoins manualmente de un usuario
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DebitarLadoCoins(string usuarioId, decimal monto, string razon)
+        {
+            try
+            {
+                if (monto <= 0)
+                {
+                    return Json(new { success = false, message = "El monto debe ser mayor a 0" });
+                }
+
+                if (string.IsNullOrWhiteSpace(razon))
+                {
+                    return Json(new { success = false, message = "Debes especificar una razón" });
+                }
+
+                var usuario = await _userManager.FindByIdAsync(usuarioId);
+                if (usuario == null)
+                {
+                    return Json(new { success = false, message = "Usuario no encontrado" });
+                }
+
+                var saldoActual = await _ladoCoinsService.ObtenerSaldoDisponibleAsync(usuarioId);
+                if (saldoActual < monto)
+                {
+                    return Json(new { success = false, message = $"El usuario solo tiene ${saldoActual:F2} disponibles" });
+                }
+
+                var descripcion = $"[ADMIN] {razon} - Por: {User.Identity?.Name}";
+
+                var (exito, _) = await _ladoCoinsService.DebitarAsync(
+                    usuarioId,
+                    monto,
+                    TipoTransaccionLadoCoin.DebitoAdmin,
+                    descripcion,
+                    null,
+                    "Admin"
+                );
+
+                if (!exito)
+                {
+                    return Json(new { success = false, message = "Error al debitar LadoCoins" });
+                }
+
+                await _logEventoService.RegistrarEventoAsync(
+                    $"LadoCoins debitados manualmente: ${monto:F2} de @{usuario.UserName}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Warning,
+                    usuarioId,
+                    User.Identity?.Name,
+                    razon
+                );
+
+                var nuevoSaldo = await _ladoCoinsService.ObtenerSaldoDisponibleAsync(usuarioId);
+
+                return Json(new { success = true, message = $"${monto:F2} debitados de @{usuario.UserName}", nuevoSaldo });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Historial global de transacciones LadoCoins
+        /// </summary>
+        public async Task<IActionResult> HistorialLadoCoins(int pagina = 1, string? tipo = null, string? usuario = null)
+        {
+            var query = _context.TransaccionesLadoCoins
+                .Include(t => t.Usuario)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(tipo) && Enum.TryParse<TipoTransaccionLadoCoin>(tipo, out var tipoEnum))
+            {
+                query = query.Where(t => t.Tipo == tipoEnum);
+            }
+
+            if (!string.IsNullOrEmpty(usuario))
+            {
+                query = query.Where(t => t.Usuario != null &&
+                    (t.Usuario.UserName!.Contains(usuario) || t.Usuario.Email!.Contains(usuario)));
+            }
+
+            var total = await query.CountAsync();
+            var porPagina = 50;
+            var totalPaginas = (int)Math.Ceiling(total / (double)porPagina);
+
+            var transacciones = await query
+                .OrderByDescending(t => t.FechaTransaccion)
+                .Skip((pagina - 1) * porPagina)
+                .Take(porPagina)
+                .ToListAsync();
+
+            ViewBag.Pagina = pagina;
+            ViewBag.TotalPaginas = totalPaginas;
+            ViewBag.Total = total;
+            ViewBag.TipoFiltro = tipo;
+            ViewBag.UsuarioFiltro = usuario;
+            ViewBag.TiposTransaccion = Enum.GetNames(typeof(TipoTransaccionLadoCoin));
+
+            return View(transacciones);
+        }
+
+        #endregion
+    }
+
+    // ViewModels para LadoCoins Admin
+    public class LadoCoinsDashboardAdminViewModel
+    {
+        public decimal TotalEnCirculacion { get; set; }
+        public decimal TotalGanado { get; set; }
+        public decimal TotalGastado { get; set; }
+        public decimal TotalQuemado { get; set; }
+        public decimal TotalVencido { get; set; }
+        public int UsuariosConSaldo { get; set; }
+        public int TotalUsuarios { get; set; }
+        public List<LadoCoinsUsuarioViewModel> TopUsuarios { get; set; } = new();
+        public List<TransaccionLadoCoin> TransaccionesRecientes { get; set; } = new();
+        public Dictionary<string, LadoCoinsStatTipo> EstadisticasPorTipo { get; set; } = new();
+    }
+
+    public class LadoCoinsUsuarioViewModel
+    {
+        public string UsuarioId { get; set; } = "";
+        public string? Username { get; set; }
+        public string? Email { get; set; }
+        public decimal SaldoDisponible { get; set; }
+        public decimal TotalGanado { get; set; }
+        public decimal TotalGastado { get; set; }
+    }
+
+    public class LadoCoinsStatTipo
+    {
+        public decimal Total { get; set; }
+        public int Count { get; set; }
     }
 
     public class ConfiguracionEmailViewModel

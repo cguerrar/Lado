@@ -348,6 +348,34 @@ namespace Lado.Models
         }
 
         // ========================================
+        // REDES SOCIALES
+        // ========================================
+
+        [Display(Name = "Instagram")]
+        [StringLength(100)]
+        public string? Instagram { get; set; }
+
+        [Display(Name = "Twitter/X")]
+        [StringLength(100)]
+        public string? Twitter { get; set; }
+
+        [Display(Name = "Facebook")]
+        [StringLength(200)]
+        public string? Facebook { get; set; }
+
+        [Display(Name = "YouTube")]
+        [StringLength(200)]
+        public string? YouTube { get; set; }
+
+        [Display(Name = "TikTok")]
+        [StringLength(100)]
+        public string? TikTok { get; set; }
+
+        [Display(Name = "OnlyFans")]
+        [StringLength(100)]
+        public string? OnlyFans { get; set; }
+
+        // ========================================
         // ESTADO EN LÍNEA Y PRIVACIDAD
         // ========================================
 

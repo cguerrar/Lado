@@ -242,4 +242,17 @@
         CadaSesion = 2,     // Una vez por sesion
         CadaXDias = 3       // Cada X dias
     }
+
+    // ====================================
+    // ENUMS PARA SISTEMA PHOTOWALL (MURO)
+    // ====================================
+
+    public enum NivelDestacado
+    {
+        Normal = 0,     // Gratis, ~20px
+        Bronce = 1,     // 5 coins, ~40px (2x)
+        Plata = 2,      // 15 coins, ~60px (3x)
+        Oro = 3,        // 30 coins, ~80px (4x)
+        Diamante = 4    // 50 coins, ~100px (5x) + brillo
+    }
 }

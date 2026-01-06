@@ -1135,72 +1135,13 @@
                 </svg>
             </button>
         </div>
-        <form asp-action="GuardarPista" method="post" enctype="multipart/form-data" id="trackForm">
+        <form asp-action="GuardarPista" method="post" enctype="multipart/form-data" id="trackForm" onsubmit="return handleFormSubmit(event)">
             @Html.AntiForgeryToken()
             <input type="hidden" name="Id" id="trackId" value="0" />
+            <input type="hidden" name="Energia" id="trackEnergia" value="" />
+            <input type="hidden" name="EstadoAnimo" id="trackEstadoAnimo" value="" />
             <div class="modal-body">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Titulo *</label>
-                        <input type="text" name="Titulo" id="trackTitulo" required placeholder="Nombre de la pista">
-                    </div>
-                    <div class="form-group">
-                        <label>Artista *</label>
-                        <input type="text" name="Artista" id="trackArtista" required placeholder="Nombre del artista">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Album</label>
-                        <input type="text" name="Album" id="trackAlbum" placeholder="Nombre del album">
-                    </div>
-                    <div class="form-group">
-                        <label>Genero *</label>
-                        <select name="Genero" id="trackGenero" required>
-                            @foreach (var genero in Lado.Models.GenerosMusica.Todos)
-                            {
-                                <option value="@genero">@genero</option>
-                            }
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Duracion (segundos) *</label>
-                        <input type="number" name="Duracion" id="trackDuracion" required min="1" placeholder="180">
-                    </div>
-                    <div class="form-group">
-                        <label>BPM</label>
-                        <input type="number" name="Bpm" id="trackBpm" min="1" max="300" placeholder="120">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Energia</label>
-                        <select name="Energia" id="trackEnergia">
-                            <option value="">Seleccionar...</option>
-                            <option value="baja">Baja</option>
-                            <option value="media">Media</option>
-                            <option value="alta">Alta</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Estado de Animo</label>
-                        <select name="EstadoAnimo" id="trackEstadoAnimo">
-                            <option value="">Seleccionar...</option>
-                            <option value="alegre">Alegre</option>
-                            <option value="triste">Triste</option>
-                            <option value="relajado">Relajado</option>
-                            <option value="intenso">Intenso</option>
-                            <option value="romantico">Romantico</option>
-                            <option value="misterioso">Misterioso</option>
-                        </select>
-                    </div>
-                </div>
-
+                <!-- PASO 1: Archivo de Audio (primero) -->
                 <div class="form-group">
                     <label>Archivo de Audio (MP3) *</label>
                     <div class="file-upload-zone" id="audioDropzone" onclick="document.getElementById('audioFile').click()">
@@ -1211,19 +1152,67 @@
                         </svg>
                         <p>Arrastra un archivo MP3 o haz clic para seleccionar</p>
                         <p class="file-name" id="audioFileName"></p>
+                        <p id="metadataStatus" style="font-size: 0.75rem; color: var(--success); margin-top: 8px; display: none;"></p>
                     </div>
-                    <input type="file" name="ArchivoAudio" id="audioFile" accept=".mp3,audio/mpeg" style="display:none;" onchange="updateFileName(this, 'audioFileName')">
+                    <input type="file" name="ArchivoAudio" id="audioFile" accept=".mp3,audio/mpeg" style="display:none;" onchange="onAudioFileSelected(this)">
                 </div>
 
+                <!-- Campos de metadatos (se autocompletan del MP3) -->
+                <div id="metadataFields">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Titulo *</label>
+                            <input type="text" name="Titulo" id="trackTitulo" required placeholder="Se detecta del archivo">
+                        </div>
+                        <div class="form-group">
+                            <label>Artista *</label>
+                            <input type="text" name="Artista" id="trackArtista" required placeholder="Se detecta del archivo">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Genero *</label>
+                            <select name="Genero" id="trackGenero" required>
+                                @foreach (var genero in Lado.Models.GenerosMusica.Todos)
+                                {
+                                    <option value="@genero">@genero</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Duracion</label>
+                            <input type="text" id="trackDuracionDisplay" readonly placeholder="Auto-detectada" style="background: var(--bg-light);">
+                            <input type="hidden" name="Duracion" id="trackDuracion" value="0">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Album (opcional)</label>
+                            <input type="text" name="Album" id="trackAlbum" placeholder="Nombre del album">
+                        </div>
+                        <div class="form-group">
+                            <label>BPM (opcional)</label>
+                            <input type="number" name="Bpm" id="trackBpm" min="1" max="300" placeholder="Auto si disponible">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Imagen de Portada -->
                 <div class="form-group">
-                    <label>Imagen de Portada (opcional)</label>
-                    <div class="file-upload-zone" id="coverDropzone" onclick="document.getElementById('coverFile').click()">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <label>Imagen de Portada</label>
+                    <div class="file-upload-zone" id="coverDropzone" onclick="document.getElementById('coverFile').click()" style="padding: 20px;">
+                        <div id="coverPreview" style="display: none; margin-bottom: 10px;">
+                            <img id="coverPreviewImg" src="" alt="Portada" style="max-width: 100px; max-height: 100px; border-radius: 8px;">
+                            <p style="font-size: 0.75rem; color: var(--success); margin-top: 4px;">Extraida del MP3</p>
+                        </div>
+                        <svg id="coverUploadIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px;">
                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                             <circle cx="9" cy="9" r="2"></circle>
                             <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
                         </svg>
-                        <p>Arrastra una imagen o haz clic para seleccionar</p>
+                        <p style="font-size: 0.8rem;">Cambiar portada (opcional)</p>
                         <p class="file-name" id="coverFileName"></p>
                     </div>
                     <input type="file" name="ImagenPortada" id="coverFile" accept="image/*" style="display:none;" onchange="updateFileName(this, 'coverFileName')">
@@ -1231,14 +1220,323 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn-cancel" onclick="closeModal()">Cancelar</button>
-                <button type="submit" class="btn-save">Guardar Pista</button>
+                <button type="submit" class="btn-save" id="btnGuardar">
+                    <span id="btnGuardarText">Guardar Pista</span>
+                    <span id="btnGuardarLoading" style="display: none;">
+                        <svg class="spinner" width="20" height="20" viewBox="0 0 24 24" style="animation: spin 1s linear infinite; margin-right: 8px;">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+                        </svg>
+                        Guardando...
+                    </span>
+                </button>
             </div>
         </form>
     </div>
 </div>
 
 @section Scripts {
+<!-- jsmediatags para leer metadatos ID3 de MP3 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
 <script>
+    // ========================================
+    // SISTEMA DE LOGGING DE ERRORES
+    // ========================================
+
+    // Funcion para enviar errores al backend
+    async function logErrorToServer(tipo, mensaje, detalle = null) {
+        try {
+            await fetch('/Admin/RegistrarLogFrontend', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tipo: tipo,
+                    mensaje: '[Admin/Musica] ' + mensaje,
+                    detalle: detalle,
+                    url: window.location.href
+                })
+            });
+        } catch (e) {
+            console.error('Error enviando log:', e);
+        }
+    }
+
+    // Capturar errores globales de JavaScript
+    window.onerror = function(message, source, lineno, colno, error) {
+        const detalle = `Source: ${source}\nLine: ${lineno}:${colno}\nStack: ${error?.stack || 'N/A'}`;
+        logErrorToServer('error', message, detalle);
+        return false; // Permitir que el error se muestre en consola tambien
+    };
+
+    // Capturar promesas rechazadas sin manejar
+    window.addEventListener('unhandledrejection', function(event) {
+        const mensaje = event.reason?.message || String(event.reason);
+        const detalle = event.reason?.stack || 'Sin stack trace';
+        logErrorToServer('error', 'Unhandled Promise: ' + mensaje, detalle);
+    });
+
+    // Estado del formulario
+    let formSubmitting = false;
+
+    // ========================================
+    // EXTRACCION DE METADATOS MP3
+    // ========================================
+
+    // Cuando se selecciona un archivo de audio
+    async function onAudioFileSelected(input) {
+        try {
+            updateFileName(input, 'audioFileName');
+
+            if (!input.files || input.files.length === 0) return;
+
+            const file = input.files[0];
+            const statusEl = document.getElementById('metadataStatus');
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'Leyendo metadatos...';
+            statusEl.style.color = 'var(--primary)';
+
+            // Extraer duracion usando Web Audio API
+            extractDuration(file);
+
+            // Extraer metadatos ID3 usando jsmediatags
+            extractID3Tags(file);
+        } catch (error) {
+            logErrorToServer('error', 'onAudioFileSelected: ' + error.message, error.stack);
+            showToast('Error al procesar el archivo de audio', 'error');
+        }
+    }
+
+    // Extraer duracion del archivo de audio
+    function extractDuration(file) {
+        try {
+            const audio = new Audio();
+            audio.src = URL.createObjectURL(file);
+
+            audio.addEventListener('loadedmetadata', () => {
+                try {
+                    const duration = Math.round(audio.duration);
+                    document.getElementById('trackDuracion').value = duration;
+                    document.getElementById('trackDuracionDisplay').value = formatDuration(duration);
+                    URL.revokeObjectURL(audio.src);
+                } catch (e) {
+                    logErrorToServer('error', 'extractDuration/loadedmetadata: ' + e.message, e.stack);
+                }
+            });
+
+            audio.addEventListener('error', (e) => {
+                logErrorToServer('warning', 'extractDuration/error: Audio load failed', JSON.stringify({
+                    error: audio.error?.code,
+                    message: audio.error?.message
+                }));
+                URL.revokeObjectURL(audio.src);
+            });
+        } catch (error) {
+            logErrorToServer('error', 'extractDuration: ' + error.message, error.stack);
+        }
+    }
+
+    // Extraer tags ID3 del MP3
+    function extractID3Tags(file) {
+        try {
+            if (typeof jsmediatags === 'undefined') {
+                logErrorToServer('warning', 'jsmediatags library not loaded');
+                document.getElementById('metadataStatus').textContent = 'Completa los campos manualmente';
+                // Usar nombre del archivo como titulo
+                const fileName = file.name.replace(/\.[^/.]+$/, '');
+                document.getElementById('trackTitulo').value = fileName;
+                return;
+            }
+
+            jsmediatags.read(file, {
+                onSuccess: function(tag) {
+                    try {
+                        const tags = tag.tags;
+                        const statusEl = document.getElementById('metadataStatus');
+                        let fieldsFound = [];
+
+                        // Titulo
+                        if (tags.title) {
+                            document.getElementById('trackTitulo').value = tags.title;
+                            fieldsFound.push('titulo');
+                        } else {
+                            // Usar nombre del archivo sin extension
+                            const fileName = file.name.replace(/\.[^/.]+$/, '');
+                            document.getElementById('trackTitulo').value = fileName;
+                        }
+
+                        // Artista
+                        if (tags.artist) {
+                            document.getElementById('trackArtista').value = tags.artist;
+                            fieldsFound.push('artista');
+                        }
+
+                        // Album
+                        if (tags.album) {
+                            document.getElementById('trackAlbum').value = tags.album;
+                            fieldsFound.push('album');
+                        }
+
+                        // Genero - mapear a nuestros generos
+                        if (tags.genre) {
+                            const generoMapeado = mapearGenero(tags.genre);
+                            if (generoMapeado) {
+                                document.getElementById('trackGenero').value = generoMapeado;
+                                fieldsFound.push('genero');
+                            }
+                        }
+
+                        // BPM (si existe en ID3)
+                        if (tags.TBPM || tags.bpm) {
+                            const bpm = parseInt(tags.TBPM || tags.bpm);
+                            if (bpm > 0 && bpm < 300) {
+                                document.getElementById('trackBpm').value = bpm;
+                                fieldsFound.push('BPM');
+                            }
+                        }
+
+                        // Imagen de portada
+                        if (tags.picture) {
+                            extractCoverArt(tags.picture);
+                            fieldsFound.push('portada');
+                        }
+
+                        // Mostrar resumen
+                        if (fieldsFound.length > 0) {
+                            statusEl.textContent = 'Detectado: ' + fieldsFound.join(', ');
+                            statusEl.style.color = 'var(--success)';
+                        } else {
+                            statusEl.textContent = 'Sin metadatos - completa manualmente';
+                            statusEl.style.color = 'var(--warning)';
+                        }
+                    } catch (e) {
+                        logErrorToServer('error', 'extractID3Tags/onSuccess: ' + e.message, e.stack);
+                    }
+                },
+                onError: function(error) {
+                    logErrorToServer('warning', 'extractID3Tags/onError: ' + (error.type || error.message || String(error)));
+                    document.getElementById('metadataStatus').textContent = 'Completa los campos manualmente';
+                    document.getElementById('metadataStatus').style.color = 'var(--warning)';
+
+                    // Usar nombre del archivo como titulo
+                    const fileName = file.name.replace(/\.[^/.]+$/, '');
+                    if (!document.getElementById('trackTitulo').value) {
+                        document.getElementById('trackTitulo').value = fileName;
+                    }
+                }
+            });
+        } catch (error) {
+            logErrorToServer('error', 'extractID3Tags: ' + error.message, error.stack);
+            document.getElementById('metadataStatus').textContent = 'Error - completa manualmente';
+            document.getElementById('metadataStatus').style.color = 'var(--danger)';
+        }
+    }
+
+    // Extraer y mostrar portada del MP3
+    function extractCoverArt(picture) {
+        try {
+            const base64 = btoa(
+                picture.data.reduce((data, byte) => data + String.fromCharCode(byte), '')
+            );
+            const imageUrl = `data:${picture.format};base64,${base64}`;
+
+            document.getElementById('coverPreviewImg').src = imageUrl;
+            document.getElementById('coverPreview').style.display = 'block';
+            document.getElementById('coverUploadIcon').style.display = 'none';
+        } catch (e) {
+            console.warn('Error extrayendo portada:', e);
+        }
+    }
+
+    // Mapear generos ID3 a nuestros generos
+    function mapearGenero(generoID3) {
+        const genero = generoID3.toLowerCase();
+        const mapa = {
+            'pop': 'Pop',
+            'rock': 'Rock',
+            'hip-hop': 'Hip-Hop',
+            'hip hop': 'Hip-Hop',
+            'rap': 'Hip-Hop',
+            'r&b': 'R&B',
+            'rnb': 'R&B',
+            'electronic': 'Electronica',
+            'electronica': 'Electronica',
+            'dance': 'Electronica',
+            'edm': 'Electronica',
+            'house': 'Electronica',
+            'techno': 'Electronica',
+            'latin': 'Latino',
+            'latino': 'Latino',
+            'reggaeton': 'Reggaeton',
+            'reggaetón': 'Reggaeton',
+            'jazz': 'Jazz',
+            'classical': 'Clasica',
+            'clasica': 'Clasica',
+            'indie': 'Indie',
+            'alternative': 'Alternativo',
+            'alternativo': 'Alternativo',
+            'country': 'Country',
+            'folk': 'Folk',
+            'metal': 'Metal',
+            'punk': 'Punk',
+            'soul': 'Soul',
+            'funk': 'Funk',
+            'blues': 'Blues',
+            'reggae': 'Reggae',
+            'soundtrack': 'Cine/TV',
+            'ambient': 'Ambiente',
+            'chill': 'Chill',
+            'lofi': 'Lo-Fi',
+            'lo-fi': 'Lo-Fi'
+        };
+
+        for (const [key, value] of Object.entries(mapa)) {
+            if (genero.includes(key)) return value;
+        }
+        return null; // No encontrado, dejar el default
+    }
+
+    function formatDuration(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // ========================================
+    // FORMULARIO Y BOTONES
+    // ========================================
+
+    // Manejar submit del formulario
+    function handleFormSubmit(event) {
+        try {
+            if (formSubmitting) {
+                event.preventDefault();
+                return false;
+            }
+
+            // Validar duracion
+            const duracion = parseInt(document.getElementById('trackDuracion').value);
+            if (!duracion || duracion < 1) {
+                showToast('Selecciona un archivo de audio valido', 'error');
+                event.preventDefault();
+                return false;
+            }
+
+            // Mostrar estado de carga
+            formSubmitting = true;
+            document.getElementById('btnGuardarText').style.display = 'none';
+            document.getElementById('btnGuardarLoading').style.display = 'inline-flex';
+            document.getElementById('btnGuardar').disabled = true;
+
+            logErrorToServer('info', 'Formulario enviado: guardando pista');
+            return true;
+        } catch (error) {
+            logErrorToServer('error', 'handleFormSubmit: ' + error.message, error.stack);
+            showToast('Error al enviar el formulario', 'error');
+            formSubmitting = false;
+            event.preventDefault();
+            return false;
+        }
+    }
+
     // Filter tracks
     function filterTracks() {
         const search = document.getElementById('searchInput').value.toLowerCase();
@@ -1267,6 +1565,18 @@
         document.getElementById('trackForm').reset();
         document.getElementById('audioFileName').textContent = '';
         document.getElementById('coverFileName').textContent = '';
+        document.getElementById('metadataStatus').style.display = 'none';
+        document.getElementById('coverPreview').style.display = 'none';
+        document.getElementById('coverUploadIcon').style.display = 'block';
+        document.getElementById('trackDuracionDisplay').value = '';
+        document.getElementById('trackDuracion').value = '0';
+
+        // Reset boton
+        formSubmitting = false;
+        document.getElementById('btnGuardarText').style.display = 'inline';
+        document.getElementById('btnGuardarLoading').style.display = 'none';
+        document.getElementById('btnGuardar').disabled = false;
+
         document.getElementById('trackModal').classList.add('active');
     }
 
@@ -1284,11 +1594,22 @@
                 document.getElementById('trackAlbum').value = track.album || '';
                 document.getElementById('trackGenero').value = track.genero;
                 document.getElementById('trackDuracion').value = track.duracion;
+                document.getElementById('trackDuracionDisplay').value = formatDuration(track.duracion);
                 document.getElementById('trackBpm').value = track.bpm || '';
                 document.getElementById('trackEnergia').value = track.energia || '';
                 document.getElementById('trackEstadoAnimo').value = track.estadoAnimo || '';
                 document.getElementById('audioFileName').textContent = track.rutaArchivo ? 'Archivo existente' : '';
                 document.getElementById('coverFileName').textContent = track.rutaPortada ? 'Imagen existente' : '';
+                document.getElementById('metadataStatus').style.display = 'none';
+                document.getElementById('coverPreview').style.display = 'none';
+                document.getElementById('coverUploadIcon').style.display = 'block';
+
+                // Reset boton
+                formSubmitting = false;
+                document.getElementById('btnGuardarText').style.display = 'inline';
+                document.getElementById('btnGuardarLoading').style.display = 'none';
+                document.getElementById('btnGuardar').disabled = false;
+
                 document.getElementById('trackModal').classList.add('active');
             }
         } catch (err) {
@@ -1299,6 +1620,12 @@
     // Close modal
     function closeModal() {
         document.getElementById('trackModal').classList.remove('active');
+
+        // Reset estado del boton
+        formSubmitting = false;
+        document.getElementById('btnGuardarText').style.display = 'inline';
+        document.getElementById('btnGuardarLoading').style.display = 'none';
+        document.getElementById('btnGuardar').disabled = false;
     }
 
     // Toggle status

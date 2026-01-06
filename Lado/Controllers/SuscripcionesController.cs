@@ -30,13 +30,27 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
+            // Obtener configuración del usuario
+            var usuario = await _userManager.FindByIdAsync(usuarioId);
+            var enModoLadoA = usuario?.LadoPreferido == TipoLado.LadoA;
+            var ocultarLadoB = (usuario?.BloquearLadoB ?? false) || enModoLadoA;
+
             // ⭐ CARGAR SUSCRIPCIONES CON EL CREADOR
-            var suscripciones = await _context.Suscripciones
-                .Include(s => s.Creador) // IMPORTANTE: Incluir datos del creador
-                .Where(s => s.FanId == usuarioId && s.EstaActiva)
+            var query = _context.Suscripciones
+                .Include(s => s.Creador)
+                .Where(s => s.FanId == usuarioId && s.EstaActiva);
+
+            // Filtrar por modo: si está en LadoA, solo mostrar suscripciones LadoA
+            if (ocultarLadoB)
+            {
+                query = query.Where(s => s.TipoLado == TipoLado.LadoA);
+            }
+
+            var suscripciones = await query
                 .OrderByDescending(s => s.FechaInicio)
                 .ToListAsync();
 
+            ViewBag.ModoActual = enModoLadoA ? "LadoA" : "LadoB";
             return View(suscripciones);
         }
 

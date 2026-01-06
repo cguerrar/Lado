@@ -36,6 +36,13 @@ namespace Lado.Models
 
         public decimal? PrecioDesbloqueo { get; set; }
 
+        /// <summary>
+        /// Si es true, el contenido está incluido en el plan de suscripción.
+        /// Los suscriptores lo ven gratis. Si también tiene PrecioDesbloqueo > 0,
+        /// los no-suscriptores pueden comprarlo individualmente.
+        /// </summary>
+        public bool SoloSuscriptores { get; set; } = false;
+
         // ========================================
         // SISTEMA LADO A / LADO B
         // ========================================

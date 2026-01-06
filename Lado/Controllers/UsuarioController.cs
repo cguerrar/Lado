@@ -110,6 +110,14 @@ namespace Lado.Controllers
             // Actualizar seudónimo
             usuario.Seudonimo = model.Seudonimo;
 
+            // Actualizar redes sociales
+            usuario.Instagram = model.Instagram;
+            usuario.Twitter = model.Twitter;
+            usuario.Facebook = model.Facebook;
+            usuario.YouTube = model.YouTube;
+            usuario.TikTok = model.TikTok;
+            usuario.OnlyFans = model.OnlyFans;
+
             try
             {
                 // Procesar foto de perfil LadoA (público)

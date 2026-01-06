@@ -19,11 +19,13 @@ namespace Lado.Controllers
         private readonly IAdService _adService;
         private readonly INotificationService _notificationService;
         private readonly IFeedAlgorithmService _feedAlgorithmService;
+        private readonly IFeedContentService _feedContentService;
         private readonly IInteresesService _interesesService;
         private readonly IRateLimitService _rateLimitService;
         private readonly IMemoryCache _cache;
         private readonly IRachasService _rachasService;
         private readonly IServiceProvider _serviceProvider;
+        private readonly IPushNotificationService _pushService;
 
         public FeedController(
             ApplicationDbContext context,
@@ -32,11 +34,13 @@ namespace Lado.Controllers
             IAdService adService,
             INotificationService notificationService,
             IFeedAlgorithmService feedAlgorithmService,
+            IFeedContentService feedContentService,
             IInteresesService interesesService,
             IRateLimitService rateLimitService,
             IMemoryCache cache,
             IRachasService rachasService,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            IPushNotificationService pushService)
         {
             _context = context;
             _userManager = userManager;
@@ -44,11 +48,13 @@ namespace Lado.Controllers
             _adService = adService;
             _notificationService = notificationService;
             _feedAlgorithmService = feedAlgorithmService;
+            _feedContentService = feedContentService;
             _interesesService = interesesService;
             _rateLimitService = rateLimitService;
             _cache = cache;
             _rachasService = rachasService;
             _serviceProvider = serviceProvider;
+            _pushService = pushService;
         }
 
         // ⚡ Método helper para obtener usuarios bloqueados con cache
@@ -670,466 +676,74 @@ namespace Lado.Controllers
                     return RedirectToAction("Login", "Account");
                 }
 
-                // Obtener usuario actual para verificar configuración de bloqueo LadoB
-                var usuarioActualConfig = await _userManager.FindByIdAsync(usuarioId);
-                var bloquearLadoB = usuarioActualConfig?.BloquearLadoB ?? false;
+                // ========================================
+                // ⚡ REFACTORIZADO: Usar FeedContentService
+                // ========================================
 
-                // ⚡ NUEVO: Cargar TODAS las configuraciones del Feed
+                // Obtener semilla de sesión para consistencia
+                var semilla = _feedContentService.ObtenerOCrearSemilla(HttpContext.Session);
+
+                // Obtener configuración para límites
                 var configFeed = await ObtenerConfigFeedAsync();
-                var limiteLadoA = configFeed[ConfiguracionPlataforma.FEED_LIMITE_LADOA];
-                var limiteLadoBSuscriptos = configFeed[ConfiguracionPlataforma.FEED_LIMITE_LADOB_SUSCRIPTOS];
-                var limiteLadoBPropio = configFeed[ConfiguracionPlataforma.FEED_LIMITE_LADOB_PROPIO];
-                var limiteComprado = configFeed[ConfiguracionPlataforma.FEED_LIMITE_COMPRADO];
                 var limiteTotal = configFeed[ConfiguracionPlataforma.FEED_LIMITE_TOTAL];
-                var descubrimientoLadoACant = configFeed[ConfiguracionPlataforma.FEED_DESCUBRIMIENTO_LADOA_CANTIDAD];
-                var descubrimientoLadoBCant = configFeed[ConfiguracionPlataforma.FEED_DESCUBRIMIENTO_LADOB_CANTIDAD];
-                var descubrimientoUsuariosCant = configFeed[ConfiguracionPlataforma.FEED_DESCUBRIMIENTO_USUARIOS_CANTIDAD];
-                var maxPostsConsecutivos = configFeed[ConfiguracionPlataforma.FEED_MAX_POSTS_CONSECUTIVOS_CREADOR];
                 var anunciosIntervalo = configFeed[ConfiguracionPlataforma.FEED_ANUNCIOS_INTERVALO];
                 var anunciosCantidad = configFeed[ConfiguracionPlataforma.FEED_ANUNCIOS_CANTIDAD];
 
-                // 1. Obtener usuarios a los que está suscrito (separados por TipoLado)
-                var suscripcionesActivas = await _context.Suscripciones
-                    .Where(s => s.FanId == usuarioId && s.EstaActiva)
-                    .ToListAsync();
+                // Obtener contenido del feed usando el servicio
+                var feedResultado = await _feedContentService.ObtenerContenidoFeedAsync(
+                    usuarioId,
+                    limiteTotal,
+                    null, // Sin IDs ya vistos en carga inicial
+                    semilla);
 
-                // IDs de creadores suscritos en LadoA (contenido público)
-                var creadoresLadoAIds = suscripcionesActivas
-                    .Where(s => s.TipoLado == TipoLado.LadoA)
-                    .Select(s => s.CreadorId)
-                    .ToList();
+                // Extraer datos del resultado
+                var contenidoOrdenado = feedResultado.Contenidos;
+                var creadoresIds = feedResultado.CreadoresIds;
+                var creadoresLadoAIds = feedResultado.CreadoresLadoAIds;
+                var creadoresLadoBIds = feedResultado.CreadoresLadoBIds;
+                var contenidosCompradosIds = feedResultado.ContenidosCompradosIds;
+                var usuariosBloqueadosIds = feedResultado.UsuariosBloqueadosIds;
+                var ocultarLadoB = feedResultado.OcultarLadoB;
 
-                // IDs de creadores suscritos en LadoB (contenido premium)
-                var creadoresLadoBIds = suscripcionesActivas
-                    .Where(s => s.TipoLado == TipoLado.LadoB)
-                    .Select(s => s.CreadorId)
-                    .ToList();
-
-                // ========================================
-                // BLOQUEO DE LADOB (Control Parental)
-                // ========================================
-                if (bloquearLadoB)
-                {
-                    _logger.LogInformation("Usuario {UserId} tiene BloquearLadoB activo - no se mostrará contenido LadoB", usuarioId);
-                    creadoresLadoBIds.Clear(); // No cargar contenido LadoB
-                }
-
-                // Lista completa para otros usos (stories, colecciones, etc.)
-                var creadoresIds = suscripcionesActivas
-                    .Select(s => s.CreadorId)
-                    .Distinct()
-                    .ToList();
-
-                // ========================================
-                // FILTRAR USUARIOS BLOQUEADOS
-                // ========================================
-                var usuariosBloqueadosIds = await _context.BloqueosUsuarios
-                    .Where(b => b.BloqueadorId == usuarioId || b.BloqueadoId == usuarioId)
-                    .Select(b => b.BloqueadorId == usuarioId ? b.BloqueadoId : b.BloqueadorId)
-                    .Distinct()
-                    .ToListAsync();
-
-                // Remover usuarios bloqueados de las listas de creadores
-                creadoresLadoAIds = creadoresLadoAIds.Where(id => !usuariosBloqueadosIds.Contains(id)).ToList();
-                creadoresLadoBIds = creadoresLadoBIds.Where(id => !usuariosBloqueadosIds.Contains(id)).ToList();
-                creadoresIds = creadoresIds.Where(id => !usuariosBloqueadosIds.Contains(id)).ToList();
-
+                // ViewBag para la vista
+                ViewBag.ModoActual = ocultarLadoB ? "LadoA" : "LadoB";
+                ViewBag.ContenidoBloqueadoIds = feedResultado.ContenidoBloqueadoIds.ToList();
                 ViewBag.UsuariosBloqueadosIds = usuariosBloqueadosIds;
+                ViewBag.AlgoritmoActual = feedResultado.AlgoritmoUsuario;
+                ViewBag.AlgoritmosDisponibles = await _feedAlgorithmService.ObtenerAlgoritmosActivosAsync(_context);
 
-                _logger.LogInformation("Usuario {UserId} tiene {Count} suscripciones activas, {Blocked} usuarios bloqueados",
-                    usuarioId, creadoresIds.Count, usuariosBloqueadosIds.Count);
-
-                // 2. CREADORES FAVORITOS - Solo suscritos
-                // ⚡ Optimización: Pre-calcular conteo de suscriptores en una sola query agrupada
-                var suscriptoresPorCreador = await _context.Suscripciones
-                    .Where(s => creadoresIds.Contains(s.CreadorId) && s.EstaActiva)
-                    .GroupBy(s => s.CreadorId)
-                    .Select(g => new { CreadorId = g.Key, Count = g.Count() })
-                    .ToDictionaryAsync(x => x.CreadorId, x => x.Count);
-
-                var creadoresFavoritos = await _context.Users
-                    .Where(u => creadoresIds.Contains(u.Id) && u.EstaActivo)
-                    .Select(u => new
-                    {
-                        u.Id,
-                        u.NombreCompleto,
-                        u.UserName,
-                        u.FotoPerfil,
-                        u.CreadorVerificado
-                    })
-                    .ToListAsync();
-
-                // Combinar con conteos pre-calculados y ordenar
-                var creadoresFavoritosConConteo = creadoresFavoritos
-                    .Select(u => new
-                    {
-                        u.Id,
-                        u.NombreCompleto,
-                        u.UserName,
-                        u.FotoPerfil,
-                        u.CreadorVerificado,
-                        NumeroSuscriptores = suscriptoresPorCreador.GetValueOrDefault(u.Id, 0)
-                    })
-                    .OrderByDescending(u => u.NumeroSuscriptores)
-                    .ToList();
-
-                ViewBag.CreadoresFavoritos = creadoresFavoritosConConteo;
-
-                // 3. STORIES - Solo de creadores suscritos + propias
-                var ahoraStories = DateTime.Now;
-                var storiesCreadores = await _context.Stories
-                    .Include(s => s.Creador)
-                    .Where(s => (creadoresIds.Contains(s.CreadorId) || s.CreadorId == usuarioId)
-                            && s.FechaExpiracion > ahoraStories
-                            && s.EstaActivo)
-                    .ToListAsync();
-
-                var storiesVistosIds = await _context.StoryVistas
-                    .Where(sv => sv.UsuarioId == usuarioId)
-                    .Select(sv => sv.StoryId)
-                    .ToListAsync();
-
-                ViewBag.Stories = storiesCreadores
-                    .GroupBy(s => s.CreadorId)
-                    .Select(g => new
-                    {
-                        CreadorId = g.Key,
-                        Creador = g.First().Creador,
-                        TieneStorysSinVer = g.Any(s => !storiesVistosIds.Contains(s.Id)),
-                        UltimaFecha = g.Max(s => s.FechaPublicacion),
-                        TotalStories = g.Count()
-                    })
-                    .OrderByDescending(x => x.TieneStorysSinVer)
-                    .ThenByDescending(x => x.UltimaFecha)
-                    .ToList();
-
-                // 4. COLECCIONES - Solo de creadores suscritos + propias
-                ViewBag.Colecciones = await _context.Colecciones
-                    .Include(c => c.Creador)
-                    .Include(c => c.Contenidos)
-                    .Where(c => c.EstaActiva
-                            && (creadoresIds.Contains(c.CreadorId) || c.CreadorId == usuarioId))
-                    .OrderByDescending(c => c.FechaCreacion)
-                    .Take(5)
-                    .Select(c => new
-                    {
-                        c.Id,
-                        c.Nombre,
-                        c.Descripcion,
-                        c.Precio,
-                        c.PrecioOriginal,
-                        c.DescuentoPorcentaje,
-                        c.ImagenPortada,
-                        ItemCount = c.Contenidos.Count(),
-                        Creador = new
-                        {
-                            c.Creador.Id,
-                            c.Creador.NombreCompleto,
-                            c.Creador.UserName,
-                            c.Creador.FotoPerfil
-                        }
-                    })
-                    .ToListAsync();
-
-                // 5. ✅ CORREGIDO: Contenido público (LadoA) de TODOS los creadores suscritos (LadoA o LadoB) + propio
-                // Esto asegura que si sigues a alguien (sin importar a qué lado), veas su contenido público
-                var contenidoPublico = await _context.Contenidos
-                    .Include(c => c.Usuario)
-                    .Include(c => c.PistaMusical) // Incluir música asociada
-                    .Include(c => c.Archivos.OrderBy(a => a.Orden)) // Incluir archivos del carrusel
-                    .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
-                        .ThenInclude(com => com.Usuario)
-                    .Where(c => c.EstaActivo
-                            && !c.EsBorrador
-                            && !c.Censurado
-                            && (c.UsuarioId == usuarioId || !c.EsPrivado) // Mostrar privado solo si es propio
-                            && c.TipoLado == TipoLado.LadoA
-                            && c.Usuario != null
-                            && (creadoresIds.Contains(c.UsuarioId) || c.UsuarioId == usuarioId)) // ✅ Todos los seguidos
-                    .OrderByDescending(c => c.FechaPublicacion)
-                    .Take(limiteLadoA) // ⚡ Límite configurable
-                    .ToListAsync();
-
-                // 6. ✅ CORREGIDO: Contenido premium (LadoB) SOLO de creadores suscritos en LadoB
-                var contenidoPremiumSuscripciones = creadoresLadoBIds.Any()
-                    ? await _context.Contenidos
-                        .Include(c => c.Usuario)
-                        .Include(c => c.PistaMusical) // Incluir música asociada
-                        .Include(c => c.Archivos.OrderBy(a => a.Orden)) // Incluir archivos del carrusel
-                        .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
-                            .ThenInclude(com => com.Usuario)
-                        .Where(c => creadoresLadoBIds.Contains(c.UsuarioId) // ✅ Solo LadoB
-                                && c.EstaActivo
-                                && !c.EsBorrador
-                                && !c.Censurado
-                                && !c.EsPrivado
-                                && c.TipoLado == TipoLado.LadoB
-                                && c.Usuario != null)
-                        .OrderByDescending(c => c.FechaPublicacion)
-                        .Take(limiteLadoBSuscriptos) // ⚡ Límite configurable
-                        .ToListAsync()
-                    : new List<Contenido>();
-
-                // 7. Contenido premium (LadoB) PROPIO - Solo si no tiene BloquearLadoB activo
-                var contenidoPremiumPropio = !bloquearLadoB
-                    ? await _context.Contenidos
-                        .Include(c => c.Usuario)
-                        .Include(c => c.PistaMusical) // Incluir música asociada
-                        .Include(c => c.Archivos.OrderBy(a => a.Orden)) // Incluir archivos del carrusel
-                        .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
-                            .ThenInclude(com => com.Usuario)
-                        .Where(c => c.UsuarioId == usuarioId
-                                && c.EstaActivo
-                                && !c.EsBorrador
-                                && !c.Censurado
-                                && c.TipoLado == TipoLado.LadoB
-                                && c.Usuario != null)
-                        .OrderByDescending(c => c.FechaPublicacion)
-                        .Take(limiteLadoBPropio) // ⚡ Límite configurable
-                        .ToListAsync()
-                    : new List<Contenido>();
-
-                // 8. Contenido premium comprado individualmente - Filtrar LadoB si está bloqueado
-                var contenidosCompradosIds = await _context.ComprasContenido
-                    .Where(cc => cc.UsuarioId == usuarioId)
-                    .Select(cc => cc.ContenidoId)
-                    .ToListAsync();
-
-                var contenidoPremiumComprado = contenidosCompradosIds.Any()
-                    ? await _context.Contenidos
-                        .Include(c => c.Usuario)
-                        .Include(c => c.PistaMusical) // Incluir música asociada
-                        .Include(c => c.Archivos.OrderBy(a => a.Orden)) // Incluir archivos del carrusel
-                        .Include(c => c.Comentarios.OrderByDescending(com => com.FechaCreacion).Take(3))
-                            .ThenInclude(com => com.Usuario)
-                        .Where(c => contenidosCompradosIds.Contains(c.Id)
-                                && c.EstaActivo
-                                && !c.EsBorrador
-                                && !c.Censurado
-                                && !c.EsPrivado
-                                && c.Usuario != null
-                                && (!bloquearLadoB || c.TipoLado != TipoLado.LadoB)) // Filtrar LadoB si bloqueado
-                        .OrderByDescending(c => c.FechaPublicacion)
-                        .Take(limiteComprado) // ⚡ Límite configurable
-                        .ToListAsync()
-                    : new List<Contenido>();
-
-                // ⚡ NUEVO: Obtener intereses del usuario para descubrimiento inteligente
-                var interesesUsuario = await _context.InteresesUsuarios
-                    .Where(i => i.UsuarioId == usuarioId && i.PesoInteres > 0.3m)
-                    .ToDictionaryAsync(i => i.CategoriaInteresId, i => i.PesoInteres);
-
-                // 9. DESCUBRIMIENTO INTELIGENTE LadoB: Contenido de creadores NO suscritos (para mostrar con blur)
-                // IMPORTANTE: Ahora usa intereses del usuario para selección inteligente
-                var todosLosCreadores = creadoresLadoAIds.Union(creadoresLadoBIds).ToList();
-                var contenidoLadoBBloqueado = new List<Contenido>();
-
-                if (!bloquearLadoB)
-                {
-                    // Cargar candidatos de contenido LadoB para descubrimiento
-                    var candidatosLadoB = await _context.Contenidos
-                        .Include(c => c.Usuario)
-                        .Include(c => c.PistaMusical)
-                        .Include(c => c.Archivos.OrderBy(a => a.Orden))
-                        .Where(c => c.EstaActivo
-                                && !c.EsBorrador
-                                && !c.Censurado
-                                && !c.EsPrivado
-                                && c.TipoLado == TipoLado.LadoB
-                                && c.Usuario != null
-                                && c.UsuarioId != usuarioId
-                                && !creadoresLadoBIds.Contains(c.UsuarioId)
-                                && !contenidosCompradosIds.Contains(c.Id)
-                                && !usuariosBloqueadosIds.Contains(c.UsuarioId))
-                        .Take(descubrimientoLadoBCant * 5) // Cargar más para scoring
-                        .ToListAsync();
-
-                    // Aplicar scoring por intereses
-                    if (interesesUsuario.Any() && candidatosLadoB.Any())
-                    {
-                        contenidoLadoBBloqueado = candidatosLadoB
-                            .Select(c => new { Contenido = c, Score = CalcularScoreDescubrimiento(c, interesesUsuario) })
-                            .OrderByDescending(x => x.Score)
-                            .ThenBy(x => Guid.NewGuid()) // Desempate aleatorio
-                            .Take(descubrimientoLadoBCant)
-                            .Select(x => x.Contenido)
-                            .ToList();
-                    }
-                    else
-                    {
-                        // Fallback: ordenar por engagement si no hay intereses
-                        contenidoLadoBBloqueado = candidatosLadoB
-                            .OrderByDescending(c => c.NumeroLikes + c.NumeroComentarios * 2)
-                            .ThenBy(c => Guid.NewGuid())
-                            .Take(descubrimientoLadoBCant)
-                            .ToList();
-                    }
-                }
-
-                // Guardar IDs de contenido bloqueado para la vista
-                var contenidoBloqueadoIds = contenidoLadoBBloqueado.Select(c => c.Id).ToList();
-                ViewBag.ContenidoBloqueadoIds = contenidoBloqueadoIds;
-
-                // DEBUG: Pasar IDs de cada categoría para diagnóstico
-                ViewBag.DEBUG_SuscripcionesLadoBIds = contenidoPremiumSuscripciones.Select(c => c.Id).ToList();
+                // DEBUG
+                ViewBag.DEBUG_SuscripcionesLadoBIds = contenidoOrdenado.Where(c => c.TipoLado == TipoLado.LadoB && creadoresLadoBIds.Contains(c.UsuarioId)).Select(c => c.Id).ToList();
                 ViewBag.DEBUG_CompradosIds = contenidosCompradosIds;
                 ViewBag.DEBUG_CreadoresLadoBIds = creadoresLadoBIds;
 
-                // 9.5 ⚡ NUEVO: DESCUBRIMIENTO LadoA - Contenido trending de creadores NO seguidos
-                var contenidoDescubrimientoLadoA = new List<Contenido>();
-                if (descubrimientoLadoACant > 0)
-                {
-                    var candidatosLadoA = await _context.Contenidos
-                        .Include(c => c.Usuario)
-                        .Include(c => c.PistaMusical)
-                        .Include(c => c.Archivos.OrderBy(a => a.Orden))
-                        .Where(c => c.EstaActivo
-                                && !c.EsBorrador
-                                && !c.Censurado
-                                && !c.EsPrivado
-                                && c.TipoLado == TipoLado.LadoA
-                                && c.Usuario != null
-                                && c.UsuarioId != usuarioId
-                                && !creadoresIds.Contains(c.UsuarioId) // NO seguido
-                                && !usuariosBloqueadosIds.Contains(c.UsuarioId)
-                                && c.FechaPublicacion > DateTime.Now.AddDays(-7)) // Última semana
-                        .Take(descubrimientoLadoACant * 5)
-                        .ToListAsync();
-
-                    // Aplicar scoring por intereses + engagement
-                    if (interesesUsuario.Any() && candidatosLadoA.Any())
-                    {
-                        contenidoDescubrimientoLadoA = candidatosLadoA
-                            .Select(c => new { Contenido = c, Score = CalcularScoreDescubrimiento(c, interesesUsuario) })
-                            .OrderByDescending(x => x.Score)
-                            .ThenBy(x => Guid.NewGuid())
-                            .Take(descubrimientoLadoACant)
-                            .Select(x => x.Contenido)
-                            .ToList();
-                    }
-                    else
-                    {
-                        // Fallback: trending puro
-                        contenidoDescubrimientoLadoA = candidatosLadoA
-                            .OrderByDescending(c => c.NumeroLikes + c.NumeroComentarios * 2)
-                            .ThenBy(c => Guid.NewGuid())
-                            .Take(descubrimientoLadoACant)
-                            .ToList();
-                    }
-                }
-
-                // 10. Combinar contenido principal - SIN contenido LadoB bloqueado (se intercalará después)
-                var idsVistos = new HashSet<int>();
-                var todoContenido = new List<Contenido>();
-
-                // Agregar en orden de prioridad, evitando duplicados por ID
-                // IMPORTANTE: contenidoLadoBBloqueado NO se incluye aquí, se intercala después del algoritmo
-                // ⚡ NUEVO: Se incluye descubrimiento LadoA para fomentar crecimiento
-                foreach (var contenido in contenidoPublico
-                    .Concat(contenidoPremiumSuscripciones)
-                    .Concat(contenidoPremiumPropio)
-                    .Concat(contenidoPremiumComprado)
-                    .Concat(contenidoDescubrimientoLadoA)) // ⚡ Descubrimiento LadoA
-                {
-                    if (idsVistos.Add(contenido.Id)) // Add retorna false si ya existe
-                    {
-                        todoContenido.Add(contenido);
-                    }
-                }
-
-                _logger.LogInformation("Contenido total: {Total} (Público: {Publico}, Premium Subs: {PremiumSubs}, Premium Propio: {PremiumPropio}, Comprado: {Comprado})",
-                    todoContenido.Count, contenidoPublico.Count, contenidoPremiumSuscripciones.Count,
-                    contenidoPremiumPropio.Count, contenidoPremiumComprado.Count);
-
-                // 10. Obtener algoritmo del usuario y aplicarlo
-                var algoritmoUsuario = await _feedAlgorithmService.ObtenerAlgoritmoUsuarioAsync(usuarioId, _context);
-                var codigoAlgoritmo = algoritmoUsuario?.Codigo ?? "cronologico";
-
-                var contenidoOrdenado = await _feedAlgorithmService.AplicarAlgoritmoAsync(
-                    todoContenido,
-                    codigoAlgoritmo,
+                // ========================================
+                // DATOS AUXILIARES (usando servicio)
+                // ========================================
+                var datosAuxiliares = await _feedContentService.ObtenerDatosAuxiliaresAsync(
                     usuarioId,
-                    _context);
+                    creadoresIds,
+                    usuariosBloqueadosIds,
+                    ocultarLadoB);
 
-                // ⚡ NUEVO: Aplicar variedad de creadores (evitar posts consecutivos del mismo creador)
-                contenidoOrdenado = AplicarVariedadCreadores(contenidoOrdenado.ToList(), maxPostsConsecutivos);
+                ViewBag.CreadoresFavoritos = datosAuxiliares.CreadoresFavoritos;
+                ViewBag.Stories = datosAuxiliares.Stories;
+                ViewBag.Colecciones = datosAuxiliares.Colecciones;
+                ViewBag.CreadoresSugeridos = datosAuxiliares.CreadoresSugeridos;
+                ViewBag.UsuariosLadoBPorIntereses = datosAuxiliares.UsuariosLadoBPorIntereses;
 
-                // ⚡ Intercalar contenido LadoB bloqueado con distribución configurable
-                if (contenidoLadoBBloqueado.Any())
-                {
-                    var cantidadPreview = configFeed[ConfiguracionPlataforma.LADOB_PREVIEW_CANTIDAD];
-                    var intervaloPreview = configFeed[ConfiguracionPlataforma.LADOB_PREVIEW_INTERVALO];
-                    contenidoOrdenado = IntercalarPreviewLadoB(
-                        contenidoOrdenado.ToList(),
-                        contenidoLadoBBloqueado,
-                        cantidadPreview,
-                        intervaloPreview);
-
-                    _logger.LogInformation("Intercalado {CantidadPreview} preview(s) de LadoB cada {Intervalo} posts",
-                        cantidadPreview, intervaloPreview);
-                }
-
-                contenidoOrdenado = contenidoOrdenado.Take(limiteTotal).ToList(); // ⚡ Límite configurable
-
-                // Incrementar contador de uso del algoritmo
-                if (algoritmoUsuario != null)
-                {
-                    await _feedAlgorithmService.IncrementarUsoAsync(algoritmoUsuario.Id, _context);
-                }
-
-                // Pasar info del algoritmo a la vista
-                ViewBag.AlgoritmoActual = algoritmoUsuario;
-                ViewBag.AlgoritmosDisponibles = await _feedAlgorithmService.ObtenerAlgoritmosActivosAsync(_context);
-
-                // 13. ViewBag data
+                // ========================================
+                // DATOS ADICIONALES PARA LA VISTA
+                // ========================================
                 ViewBag.EstaSuscrito = true;
-                ViewBag.TotalLadoA = contenidoPublico.Count;
-                ViewBag.TotalLadoB = contenidoPremiumSuscripciones.Count + contenidoPremiumPropio.Count;
+                ViewBag.TotalLadoA = contenidoOrdenado.Count(c => c.TipoLado == TipoLado.LadoA);
+                ViewBag.TotalLadoB = contenidoOrdenado.Count(c => c.TipoLado == TipoLado.LadoB);
 
-                // 14. Sugerencias de usuarios NO suscritos (excluyendo admins)
-                var adminUsersIndex = await _userManager.GetUsersInRoleAsync("Admin");
-                var adminIdsIndex = adminUsersIndex.Select(u => u.Id).ToList();
-
-                var creadoresSugeridosQuery = _userManager.Users
-                    .Where(u => u.Id != usuarioId
-                            && u.EstaActivo
-                            && !creadoresIds.Contains(u.Id) // Excluye a los que ya está suscrito
-                            && !adminIdsIndex.Contains(u.Id)); // Excluir administradores
-
-                // Si BloquearLadoB está activo, excluir usuarios con contenido adulto
-                if (bloquearLadoB)
-                {
-                    // Excluir usuarios que tienen LadoB (CreadorVerificado con Seudonimo = contenido adulto)
-                    creadoresSugeridosQuery = creadoresSugeridosQuery
-                        .Where(u => !u.CreadorVerificado || string.IsNullOrEmpty(u.Seudonimo));
-                }
-
-                ViewBag.CreadoresSugeridos = await creadoresSugeridosQuery
-                    .OrderByDescending(u => u.NumeroSeguidores)
-                    .ThenBy(u => Guid.NewGuid())
-                    .Take(descubrimientoUsuariosCant) // ⚡ Límite configurable
-                    .ToListAsync();
-
-                // ⚡ NUEVO: Usuarios LadoB sugeridos por intereses comunes
-                if (!bloquearLadoB)
-                {
-                    var usuariosLadoBPorIntereses = await ObtenerUsuariosLadoBPorInteresesAsync(
-                        usuarioId,
-                        usuariosBloqueadosIds,
-                        creadoresIds.ToList(),
-                        descubrimientoUsuariosCant);
-                    ViewBag.UsuariosLadoBPorIntereses = usuariosLadoBPorIntereses;
-                }
-                else
-                {
-                    ViewBag.UsuariosLadoBPorIntereses = new List<ApplicationUser>();
-                }
-
-                // Obtener usuario actual para el sidebar
+                // Usuario actual
                 var usuarioActual = await _userManager.FindByIdAsync(usuarioId);
                 ViewBag.UsuarioActual = usuarioActual;
 
-                // Obtener los likes del usuario para marcarlos en el feed
+                // Likes y favoritos del usuario
                 var contenidoIds = contenidoOrdenado.Select(c => c.Id).ToList();
                 var likesUsuario = await _context.Likes
                     .Where(l => l.UsuarioId == usuarioId && contenidoIds.Contains(l.ContenidoId))
@@ -1137,36 +751,38 @@ namespace Lado.Controllers
                     .ToListAsync();
                 ViewBag.LikesUsuario = likesUsuario;
 
-                // Obtener los favoritos del usuario para marcarlos en el feed
                 var favoritosUsuario = await _context.Favoritos
                     .Where(f => f.UsuarioId == usuarioId && contenidoIds.Contains(f.ContenidoId))
                     .Select(f => f.ContenidoId)
                     .ToListAsync();
                 ViewBag.FavoritosIds = favoritosUsuario;
 
-                // Obtener los usuarios que el usuario actual sigue (para mostrar "Siguiendo" en fullscreen)
-                var usuariosSeguidos = await _context.Suscripciones
-                    .Where(s => s.FanId == usuarioId && s.EstaActiva)
-                    .Select(s => s.CreadorId)
-                    .ToListAsync();
-                ViewBag.UsuariosSeguidosIds = usuariosSeguidos;
+                // Usuarios seguidos (para mostrar "Siguiendo" en fullscreen)
+                ViewBag.UsuariosSeguidosIds = creadoresIds;
 
-                // ⚡ Cargar anuncios para el feed (cantidad configurable)
+                // Anuncios
                 var anuncios = await _adService.ObtenerAnunciosActivos(anunciosCantidad, usuarioId);
                 ViewBag.Anuncios = anuncios;
                 ViewBag.AnunciosIntervalo = anunciosIntervalo;
 
-                // Registrar impresiones de los anuncios
+                // Registrar impresiones
                 var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
                 foreach (var anuncio in anuncios)
                 {
                     await _adService.RegistrarImpresion(anuncio.Id, usuarioId, ipAddress);
                 }
 
-                // Si viene de un link compartido
+                // Incrementar contador de uso del algoritmo
+                if (feedResultado.AlgoritmoUsuario != null)
+                {
+                    await _feedAlgorithmService.IncrementarUsoAsync(feedResultado.AlgoritmoUsuario.Id, _context);
+                }
+
+                // ========================================
+                // MANEJO DE POST COMPARTIDO
+                // ========================================
                 if (post.HasValue)
                 {
-                    // Cargar el post compartido
                     var postCompartido = await _context.Contenidos
                         .Include(c => c.Usuario)
                         .Include(c => c.PistaMusical)
@@ -1239,13 +855,13 @@ namespace Lado.Controllers
 
         // ========================================
         // API: CARGAR MÁS POSTS (Infinite Scroll)
+        // ⚡ MEJORADO: Usa método unificado y acepta IDs ya vistos
         // ========================================
         [HttpGet]
-        public async Task<IActionResult> CargarMasPosts(int pagina = 0, int cantidad = 10)
+        public async Task<IActionResult> CargarMasPosts(int cantidad = 10, string? idsVistos = null)
         {
             // Limitar cantidad para prevenir DoS
             cantidad = Math.Clamp(cantidad, 1, 50);
-            pagina = Math.Max(0, pagina);
 
             try
             {
@@ -1255,193 +871,50 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "No autenticado" });
                 }
 
-                // Verificar configuración de bloqueo LadoB
-                var usuarioActualConfig = await _userManager.FindByIdAsync(usuarioId);
-                var bloquearLadoB = usuarioActualConfig?.BloquearLadoB ?? false;
-
-                // Obtener suscripciones
-                var suscripcionesActivas = await _context.Suscripciones
-                    .Where(s => s.FanId == usuarioId && s.EstaActiva)
-                    .ToListAsync();
-
-                var creadoresLadoAIds = suscripcionesActivas
-                    .Where(s => s.TipoLado == TipoLado.LadoA)
-                    .Select(s => s.CreadorId)
-                    .ToList();
-
-                var creadoresLadoBIds = suscripcionesActivas
-                    .Where(s => s.TipoLado == TipoLado.LadoB)
-                    .Select(s => s.CreadorId)
-                    .ToList();
-
-                // Si BloquearLadoB está activo, vaciar lista de creadores LadoB
-                if (bloquearLadoB)
+                // ⚡ NUEVO: Parsear IDs ya vistos para excluirlos
+                var idsYaVistos = new HashSet<int>();
+                if (!string.IsNullOrEmpty(idsVistos))
                 {
-                    creadoresLadoBIds.Clear();
+                    try
+                    {
+                        var ids = idsVistos.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var idStr in ids)
+                        {
+                            if (int.TryParse(idStr.Trim(), out int id))
+                            {
+                                idsYaVistos.Add(id);
+                            }
+                        }
+                        _logger.LogDebug("CargarMasPosts: {Count} IDs ya vistos recibidos", idsYaVistos.Count);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error parseando idsVistos: {IdsVistos}", idsVistos);
+                    }
                 }
 
-                // Usuarios bloqueados
-                var usuariosBloqueadosIds = await _context.BloqueosUsuarios
-                    .Where(b => b.BloqueadorId == usuarioId || b.BloqueadoId == usuarioId)
-                    .Select(b => b.BloqueadorId == usuarioId ? b.BloqueadoId : b.BloqueadorId)
-                    .Distinct()
-                    .ToListAsync();
-
-                creadoresLadoAIds = creadoresLadoAIds.Where(id => !usuariosBloqueadosIds.Contains(id)).ToList();
-                creadoresLadoBIds = creadoresLadoBIds.Where(id => !usuariosBloqueadosIds.Contains(id)).ToList();
-
-                // Contenidos comprados
-                var contenidosCompradosIds = await _context.ComprasContenido
-                    .Where(cc => cc.UsuarioId == usuarioId)
-                    .Select(cc => cc.ContenidoId)
-                    .ToListAsync();
-
-                // ⚡ Optimización: Limitar carga con tope máximo para evitar problemas de memoria
-                // Mínimo 50, máximo 100 posts por fuente independiente de la página
-                var limitePorFuente = Math.Min(100, Math.Max(50, (pagina + 2) * cantidad));
-
-                // Contenido público (LadoA)
-                var contenidoPublico = await _context.Contenidos
-                    .Include(c => c.Usuario)
-                    .Include(c => c.PistaMusical)
-                    .Include(c => c.Archivos.OrderBy(a => a.Orden))
-                    .Where(c => c.EstaActivo
-                            && !c.EsBorrador
-                            && !c.Censurado
-                            && (c.UsuarioId == usuarioId || !c.EsPrivado)
-                            && c.TipoLado == TipoLado.LadoA
-                            && c.Usuario != null
-                            && (creadoresLadoAIds.Contains(c.UsuarioId) || c.UsuarioId == usuarioId))
-                    .OrderByDescending(c => c.FechaPublicacion)
-                    .Take(limitePorFuente)
-                    .ToListAsync();
-
-                // Contenido premium (LadoB) de suscripciones
-                var contenidoPremiumSuscripciones = creadoresLadoBIds.Any()
-                    ? await _context.Contenidos
-                        .Include(c => c.Usuario)
-                        .Include(c => c.PistaMusical)
-                        .Include(c => c.Archivos.OrderBy(a => a.Orden))
-                        .Where(c => creadoresLadoBIds.Contains(c.UsuarioId)
-                                && c.EstaActivo
-                                && !c.EsBorrador
-                                && !c.Censurado
-                                && !c.EsPrivado
-                                && c.TipoLado == TipoLado.LadoB
-                                && c.Usuario != null)
-                        .OrderByDescending(c => c.FechaPublicacion)
-                        .Take(limitePorFuente)
-                        .ToListAsync()
-                    : new List<Contenido>();
-
-                // Contenido premium propio
-                var contenidoPremiumPropio = await _context.Contenidos
-                    .Include(c => c.Usuario)
-                    .Include(c => c.PistaMusical)
-                    .Include(c => c.Archivos.OrderBy(a => a.Orden))
-                    .Where(c => c.UsuarioId == usuarioId
-                            && c.EstaActivo
-                            && !c.EsBorrador
-                            && !c.Censurado
-                            && c.TipoLado == TipoLado.LadoB
-                            && c.Usuario != null)
-                    .OrderByDescending(c => c.FechaPublicacion)
-                    .Take(limitePorFuente)
-                    .ToListAsync();
-
-                // Contenido comprado
-                var contenidoPremiumComprado = contenidosCompradosIds.Any()
-                    ? await _context.Contenidos
-                        .Include(c => c.Usuario)
-                        .Include(c => c.PistaMusical)
-                        .Include(c => c.Archivos.OrderBy(a => a.Orden))
-                        .Where(c => contenidosCompradosIds.Contains(c.Id)
-                                && c.EstaActivo
-                                && !c.EsBorrador
-                                && !c.Censurado
-                                && !c.EsPrivado
-                                && c.Usuario != null)
-                        .OrderByDescending(c => c.FechaPublicacion)
-                        .Take(limitePorFuente)
-                        .ToListAsync()
-                    : new List<Contenido>();
-
-                // Contenido LadoB bloqueado (preview) - solo si BloquearLadoB NO está activo
-                var contenidoLadoBBloqueado = bloquearLadoB
-                    ? new List<Contenido>()
-                    : await _context.Contenidos
-                        .Include(c => c.Usuario)
-                        .Include(c => c.PistaMusical)
-                        .Include(c => c.Archivos.OrderBy(a => a.Orden))
-                        .Where(c => c.EstaActivo
-                                && !c.EsBorrador
-                                && !c.Censurado
-                                && !c.EsPrivado
-                                && c.TipoLado == TipoLado.LadoB
-                                && c.Usuario != null
-                                && c.UsuarioId != usuarioId
-                                && !creadoresLadoBIds.Contains(c.UsuarioId)
-                                && !contenidosCompradosIds.Contains(c.Id)
-                                && !usuariosBloqueadosIds.Contains(c.UsuarioId))
-                        .OrderBy(c => Guid.NewGuid())
-                        .Take(5)
-                        .ToListAsync();
-
-                // ⚡ Combinar contenido principal - SIN contenido LadoB bloqueado (se intercala después)
-                var todoContenido = contenidoPublico
-                    .Concat(contenidoPremiumSuscripciones)
-                    .Concat(contenidoPremiumPropio)
-                    .Concat(contenidoPremiumComprado)
-                    .DistinctBy(c => c.Id)
-                    .ToList();
-
-                // Aplicar algoritmo
-                var algoritmoUsuario = await _feedAlgorithmService.ObtenerAlgoritmoUsuarioAsync(usuarioId, _context);
-                var codigoAlgoritmo = algoritmoUsuario?.Codigo ?? "cronologico";
-
-                var contenidoOrdenado = await _feedAlgorithmService.AplicarAlgoritmoAsync(
-                    todoContenido,
-                    codigoAlgoritmo,
+                // ⚡ Usar FeedContentService para consistencia
+                var semilla = _feedContentService.ObtenerOCrearSemilla(HttpContext.Session);
+                var feedResultado = await _feedContentService.ObtenerContenidoFeedAsync(
                     usuarioId,
-                    _context);
+                    cantidad,
+                    idsYaVistos,
+                    semilla);
 
-                // ⚡ NUEVO: Intercalar contenido LadoB bloqueado con distribución configurable
-                // Guardar IDs de contenido bloqueado ANTES de intercalar
-                var contenidoBloqueadoIds = contenidoLadoBBloqueado.Select(c => c.Id).ToHashSet();
-
-                if (contenidoLadoBBloqueado.Any())
-                {
-                    var (cantidadPreview, intervaloPreview) = await ObtenerConfigDistribucionLadoBAsync();
-                    contenidoOrdenado = IntercalarPreviewLadoB(
-                        contenidoOrdenado.ToList(),
-                        contenidoLadoBBloqueado,
-                        cantidadPreview,
-                        intervaloPreview);
-                }
-
-                // Paginar
-                var contenidoPaginado = contenidoOrdenado
-                    .Skip(pagina * cantidad)
-                    .Take(cantidad)
-                    .ToList();
-
-                var hayMas = contenidoOrdenado.Count > (pagina + 1) * cantidad;
-
-                // Obtener likes del usuario
-                var contenidoIds = contenidoPaginado.Select(c => c.Id).ToList();
+                // Obtener likes del usuario para los posts retornados
+                var contenidoIds = feedResultado.Contenidos.Select(c => c.Id).ToList();
                 var likesUsuario = await _context.Likes
                     .Where(l => l.UsuarioId == usuarioId && contenidoIds.Contains(l.ContenidoId))
                     .Select(l => l.ContenidoId)
                     .ToListAsync();
 
                 // Serializar posts
-                var posts = contenidoPaginado.Select(post =>
+                var posts = feedResultado.Contenidos.Select(post =>
                 {
                     var esVideo = post.TipoContenido == TipoContenido.Video;
                     var esAudio = post.TipoContenido == TipoContenido.Audio;
                     var archivos = post.TodosLosArchivos;
-                    // Determinar si está bloqueado (LadoB de creador no suscrito y no comprado)
-                    var estaBloqueado = contenidoBloqueadoIds.Contains(post.Id);
+                    var estaBloqueado = feedResultado.ContenidoBloqueadoIds.Contains(post.Id);
 
                     return new
                     {
@@ -1491,9 +964,9 @@ namespace Lado.Controllers
                 {
                     success = true,
                     posts = posts,
-                    pagina = pagina,
-                    hayMas = hayMas,
-                    total = contenidoOrdenado.Count
+                    hayMas = feedResultado.HayMas,
+                    total = feedResultado.Contenidos.Count,
+                    semilla = feedResultado.Semilla // Para debug
                 });
             }
             catch (Exception ex)
@@ -1819,6 +1292,18 @@ namespace Lado.Controllers
                         usuarioId!,
                         contenido.Id,
                         comentario.Id);
+
+                    // 🔔 Push Notification
+                    var nombreComentador = usuario?.NombreCompleto ?? usuario?.UserName ?? "Alguien";
+                    var preview = texto.Length > 50 ? texto[..50] + "..." : texto;
+                    _ = _pushService.EnviarNotificacionAsync(
+                        contenido.UsuarioId,
+                        "💬 Nuevo comentario",
+                        $"{nombreComentador}: {preview}",
+                        $"/Feed/Detalle/{contenido.Id}",
+                        TipoNotificacionPush.NuevoComentario,
+                        usuario?.FotoPerfil
+                    );
                 }
 
                 // Si es una respuesta, notificar también al autor del comentario original
@@ -1829,6 +1314,17 @@ namespace Lado.Controllers
                         usuarioId!,
                         contenido.Id,
                         comentario.Id);
+
+                    // 🔔 Push Notification para respuesta
+                    var nombreComentador = usuario?.NombreCompleto ?? usuario?.UserName ?? "Alguien";
+                    _ = _pushService.EnviarNotificacionAsync(
+                        usuarioPadreId,
+                        "💬 Respuesta a tu comentario",
+                        $"{nombreComentador} te respondió",
+                        $"/Feed/Detalle/{contenido.Id}",
+                        TipoNotificacionPush.NuevoComentario,
+                        usuario?.FotoPerfil
+                    );
                 }
 
                 _logger.LogInformation("Comentario agregado: Usuario {UserId} en Contenido {ContenidoId} (Respuesta a: {PadreId})",
@@ -2355,6 +1851,17 @@ namespace Lado.Controllers
                     if (siguiendo)
                     {
                         _ = _notificationService.NotificarNuevoSeguidorAsync(id, usuarioActual.Id);
+
+                        // 🔔 Push Notification
+                        var nombreSeguidor = usuarioActual.NombreCompleto ?? usuarioActual.UserName ?? "Alguien";
+                        _ = _pushService.EnviarNotificacionAsync(
+                            id,
+                            "👤 Nuevo seguidor",
+                            $"{nombreSeguidor} comenzó a seguirte",
+                            $"/@{usuarioActual.UserName}",
+                            TipoNotificacionPush.NuevoSeguidor,
+                            usuarioActual.FotoPerfil
+                        );
                     }
 
                     return Json(new
@@ -3734,7 +3241,20 @@ namespace Lado.Controllers
                     {
                         try
                         {
+                            // Notificación interna
                             await _notificationService.NotificarNuevoLikeAsync(propietarioId, likeUsuarioId, contId);
+
+                            // 🔔 Push Notification
+                            var likeUser = await _userManager.FindByIdAsync(likeUsuarioId);
+                            var nombreLiker = likeUser?.NombreCompleto ?? likeUser?.UserName ?? "Alguien";
+                            await _pushService.EnviarNotificacionAsync(
+                                propietarioId,
+                                "❤️ Nuevo like",
+                                $"{nombreLiker} le dio like a tu publicación",
+                                $"/Feed/Detalle/{contId}",
+                                TipoNotificacionPush.NuevoLike,
+                                likeUser?.FotoPerfil
+                            );
                         }
                         catch (Exception ex)
                         {
@@ -4049,6 +3569,473 @@ namespace Lado.Controllers
                 _logger.LogError(ex, "Error al obtener post {PostId}", id);
                 return Json(new { success = false, message = "Error al obtener el post" });
             }
+        }
+
+        // ========================================
+        // ⭐ PHOTOWALL (MURO) - ENDPOINTS
+        // ========================================
+
+        /// <summary>
+        /// Vista principal del PhotoWall - Mosaico fullscreen de fotos
+        /// </summary>
+        [AllowAnonymous]
+        public async Task<IActionResult> Muro()
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            ViewBag.UsuarioId = usuario?.Id;
+
+            // Cargar saldo de LadoCoins directamente
+            if (usuario != null)
+            {
+                var ladoCoin = await _context.LadoCoins.FirstOrDefaultAsync(l => l.UsuarioId == usuario.Id);
+                ViewBag.SaldoLadoCoins = ladoCoin?.SaldoDisponible ?? 0;
+            }
+            else
+            {
+                ViewBag.SaldoLadoCoins = 0;
+            }
+
+            return View();
+        }
+
+        /// <summary>
+        /// API para obtener fotos del muro con sus niveles de destacado
+        /// </summary>
+        [AllowAnonymous]
+        [HttpGet]
+        public async Task<IActionResult> ObtenerFotosMuro(int cantidad = 500)
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var bloqueados = string.IsNullOrEmpty(usuarioId)
+                    ? new List<string>()
+                    : await ObtenerUsuariosBloqueadosCacheadosAsync(usuarioId);
+
+                // Obtener fotos elegibles: LadoA, públicas, activas, solo fotos
+                var fotosElegibles = await _context.Contenidos
+                    .Include(c => c.Usuario)
+                    .Where(c => c.EstaActivo
+                        && !c.EsBorrador
+                        && !c.Censurado
+                        && !c.EsPrivado
+                        && c.TipoLado == TipoLado.LadoA
+                        && c.TipoContenido == TipoContenido.Foto
+                        && !string.IsNullOrEmpty(c.RutaArchivo)
+                        && !bloqueados.Contains(c.UsuarioId))
+                    .OrderBy(c => Guid.NewGuid()) // Orden aleatorio
+                    .Take(cantidad)
+                    .Select(c => new
+                    {
+                        c.Id,
+                        c.RutaArchivo,
+                        c.Thumbnail,
+                        CreadorId = c.UsuarioId,
+                        CreadorNombre = c.Usuario!.NombreCompleto ?? c.Usuario.UserName,
+                        CreadorFoto = c.Usuario.FotoPerfil,
+                        CreadorUsername = c.Usuario.UserName
+                    })
+                    .ToListAsync();
+
+                // Obtener destacados activos
+                var ahora = DateTime.UtcNow;
+                var destacados = await _context.FotosDestacadas
+                    .Where(f => f.FechaInicio <= ahora && f.FechaExpiracion >= ahora)
+                    .ToDictionaryAsync(f => f.ContenidoId, f => (int)f.Nivel);
+
+                // Combinar fotos con sus niveles
+                var resultado = fotosElegibles.Select(f => new
+                {
+                    f.Id,
+                    Thumbnail = !string.IsNullOrEmpty(f.Thumbnail) ? f.Thumbnail : f.RutaArchivo,
+                    f.CreadorId,
+                    f.CreadorNombre,
+                    f.CreadorFoto,
+                    f.CreadorUsername,
+                    Nivel = destacados.GetValueOrDefault(f.Id, 0),
+                    Tamano = ObtenerTamanoNivel(destacados.GetValueOrDefault(f.Id, 0))
+                }).ToList();
+
+                // Si no hay suficientes fotos, duplicar para llenar
+                if (resultado.Count < cantidad && resultado.Count > 0)
+                {
+                    var original = resultado.ToList();
+                    while (resultado.Count < cantidad)
+                    {
+                        var toAdd = original.OrderBy(x => Guid.NewGuid()).Take(cantidad - resultado.Count);
+                        resultado.AddRange(toAdd);
+                    }
+                }
+
+                return Json(new { success = true, fotos = resultado });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener fotos del muro");
+                return Json(new { success = false, message = "Error al cargar las fotos" });
+            }
+        }
+
+        /// <summary>
+        /// API para destacar una foto pagando con LadoCoins
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> DestacarFoto(int contenidoId, int nivel)
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
+                    return Json(new { success = false, message = "Debes iniciar sesión" });
+
+                // Validar nivel
+                if (!Enum.IsDefined(typeof(NivelDestacado), nivel) || nivel == 0)
+                    return Json(new { success = false, message = "Nivel de destacado inválido" });
+
+                var nivelDestacado = (NivelDestacado)nivel;
+                var costo = FotoDestacada.ObtenerCosto(nivelDestacado);
+
+                // Verificar que el contenido existe y es del usuario
+                var contenido = await _context.Contenidos
+                    .FirstOrDefaultAsync(c => c.Id == contenidoId
+                        && c.UsuarioId == usuario.Id
+                        && c.TipoContenido == TipoContenido.Foto
+                        && c.TipoLado == TipoLado.LadoA
+                        && c.EstaActivo
+                        && !c.EsBorrador);
+
+                if (contenido == null)
+                    return Json(new { success = false, message = "Contenido no encontrado o no elegible" });
+
+                // Verificar saldo de LadoCoins
+                var ladoCoin = await _context.LadoCoins.FirstOrDefaultAsync(l => l.UsuarioId == usuario.Id);
+                if (ladoCoin == null || ladoCoin.SaldoDisponible < costo)
+                    return Json(new { success = false, message = $"Saldo insuficiente. Necesitas {costo} LadoCoins" });
+
+                // Verificar si ya tiene un destacado activo
+                var ahora = DateTime.UtcNow;
+                var destacadoExistente = await _context.FotosDestacadas
+                    .FirstOrDefaultAsync(f => f.ContenidoId == contenidoId && f.FechaExpiracion > ahora);
+
+                if (destacadoExistente != null)
+                {
+                    // Si el nuevo nivel es mayor, actualizar
+                    if (nivel > (int)destacadoExistente.Nivel)
+                    {
+                        var costoDiferencia = costo - FotoDestacada.ObtenerCosto(destacadoExistente.Nivel);
+                        if (ladoCoin.SaldoDisponible < costoDiferencia)
+                            return Json(new { success = false, message = $"Necesitas {costoDiferencia} LadoCoins más para mejorar" });
+
+                        // Actualizar destacado
+                        destacadoExistente.Nivel = nivelDestacado;
+                        destacadoExistente.FechaExpiracion = ahora.AddHours(FotoDestacada.ObtenerDuracionHoras(nivelDestacado));
+                        destacadoExistente.CostoPagado += costoDiferencia;
+
+                        // Descontar LadoCoins
+                        ladoCoin.SaldoDisponible -= costoDiferencia;
+                        ladoCoin.TotalGastado += costoDiferencia;
+
+                        // Registrar transacción
+                        _context.TransaccionesLadoCoins.Add(new TransaccionLadoCoin
+                        {
+                            UsuarioId = usuario.Id,
+                            Tipo = TipoTransaccionLadoCoin.GastoMuro,
+                            Monto = -costoDiferencia,
+                            SaldoAnterior = ladoCoin.SaldoDisponible + costoDiferencia,
+                            SaldoPosterior = ladoCoin.SaldoDisponible,
+                            Descripcion = $"Mejora destacado Muro: {destacadoExistente.Nivel} → {nivelDestacado}",
+                            ReferenciaId = contenidoId.ToString(),
+                            TipoReferencia = "FotoDestacada"
+                        });
+                    }
+                    else
+                    {
+                        return Json(new { success = false, message = "Ya tienes un destacado igual o superior activo" });
+                    }
+                }
+                else
+                {
+                    // Crear nuevo destacado
+                    var duracionHoras = FotoDestacada.ObtenerDuracionHoras(nivelDestacado);
+                    var nuevoDestacado = new FotoDestacada
+                    {
+                        ContenidoId = contenidoId,
+                        UsuarioId = usuario.Id,
+                        Nivel = nivelDestacado,
+                        FechaInicio = ahora,
+                        FechaExpiracion = ahora.AddHours(duracionHoras),
+                        CostoPagado = costo
+                    };
+                    _context.FotosDestacadas.Add(nuevoDestacado);
+
+                    // Descontar LadoCoins
+                    ladoCoin.SaldoDisponible -= costo;
+                    ladoCoin.TotalGastado += costo;
+
+                    // Registrar transacción
+                    _context.TransaccionesLadoCoins.Add(new TransaccionLadoCoin
+                    {
+                        UsuarioId = usuario.Id,
+                        Tipo = TipoTransaccionLadoCoin.GastoMuro,
+                        Monto = -costo,
+                        SaldoAnterior = ladoCoin.SaldoDisponible + costo,
+                        SaldoPosterior = ladoCoin.SaldoDisponible,
+                        Descripcion = $"Destacar foto en Muro: Nivel {nivelDestacado}",
+                        ReferenciaId = contenidoId.ToString(),
+                        TipoReferencia = "FotoDestacada"
+                    });
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Json(new
+                {
+                    success = true,
+                    message = $"¡Foto destacada con nivel {nivelDestacado}!",
+                    nuevoSaldo = ladoCoin.SaldoDisponible
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al destacar foto {ContenidoId}", contenidoId);
+                return Json(new { success = false, message = "Error al procesar la solicitud" });
+            }
+        }
+
+        /// <summary>
+        /// API para obtener las fotos propias del usuario que puede destacar
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ObtenerMisFotosParaDestacar()
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
+                    return Json(new { success = false, message = "No autenticado" });
+
+                var ahora = DateTime.UtcNow;
+
+                // Primero obtenemos los contenidos
+                var contenidos = await _context.Contenidos
+                    .Where(c => c.UsuarioId == usuario.Id
+                        && c.TipoContenido == TipoContenido.Foto
+                        && c.TipoLado == TipoLado.LadoA
+                        && c.EstaActivo
+                        && !c.EsBorrador
+                        && !string.IsNullOrEmpty(c.RutaArchivo))
+                    .OrderByDescending(c => c.Id)
+                    .Take(100)
+                    .Select(c => new { c.Id, c.Thumbnail, c.RutaArchivo, c.Descripcion })
+                    .ToListAsync();
+
+                // Luego obtenemos los destacados activos de estas fotos
+                var contenidoIds = contenidos.Select(c => c.Id).ToList();
+                var destacadosActivos = await _context.FotosDestacadas
+                    .Where(f => contenidoIds.Contains(f.ContenidoId) && f.FechaExpiracion > ahora)
+                    .Select(f => new { f.ContenidoId, f.Nivel, f.FechaExpiracion })
+                    .ToListAsync();
+
+                // Combinamos la información
+                var fotos = contenidos.Select(c =>
+                {
+                    var destacado = destacadosActivos.FirstOrDefault(d => d.ContenidoId == c.Id);
+                    string? tiempoRestante = null;
+
+                    if (destacado != null)
+                    {
+                        var tiempo = destacado.FechaExpiracion - ahora;
+                        if (tiempo.TotalDays >= 1)
+                            tiempoRestante = $"{(int)tiempo.TotalDays}d {tiempo.Hours}h";
+                        else if (tiempo.TotalHours >= 1)
+                            tiempoRestante = $"{(int)tiempo.TotalHours}h {tiempo.Minutes}m";
+                        else
+                            tiempoRestante = $"{tiempo.Minutes}m";
+                    }
+
+                    return new
+                    {
+                        c.Id,
+                        Thumbnail = !string.IsNullOrEmpty(c.Thumbnail) ? c.Thumbnail : c.RutaArchivo,
+                        c.Descripcion,
+                        DestacadoActual = destacado != null ? (int?)destacado.Nivel : null,
+                        TiempoRestante = tiempoRestante
+                    };
+                }).ToList();
+
+                return Json(new { success = true, fotos });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener fotos para destacar");
+                return Json(new { success = false, message = "Error al cargar las fotos" });
+            }
+        }
+
+        /// <summary>
+        /// Obtiene información de precios de destacado
+        /// </summary>
+        [AllowAnonymous]
+        [HttpGet]
+        public IActionResult ObtenerPreciosDestacado()
+        {
+            var precios = new[]
+            {
+                new { Nivel = 1, Nombre = "Bronce", Costo = FotoDestacada.ObtenerCosto(NivelDestacado.Bronce), Duracion = FotoDestacada.ObtenerDuracionHoras(NivelDestacado.Bronce), Tamano = 36 },
+                new { Nivel = 2, Nombre = "Plata", Costo = FotoDestacada.ObtenerCosto(NivelDestacado.Plata), Duracion = FotoDestacada.ObtenerDuracionHoras(NivelDestacado.Plata), Tamano = 54 },
+                new { Nivel = 3, Nombre = "Oro", Costo = FotoDestacada.ObtenerCosto(NivelDestacado.Oro), Duracion = FotoDestacada.ObtenerDuracionHoras(NivelDestacado.Oro), Tamano = 72 },
+                new { Nivel = 4, Nombre = "Diamante", Costo = FotoDestacada.ObtenerCosto(NivelDestacado.Diamante), Duracion = FotoDestacada.ObtenerDuracionHoras(NivelDestacado.Diamante), Tamano = 90 }
+            };
+
+            return Json(new { success = true, precios });
+        }
+
+        // ========================================
+        // BÚSQUEDA GLOBAL (Navbar)
+        // ========================================
+
+        /// <summary>
+        /// Búsqueda global para el navbar - busca usuarios, contenido y hashtags
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> BuscarGlobal(string q)
+        {
+            if (string.IsNullOrWhiteSpace(q) || q.Length < 2)
+            {
+                return Json(new { success = true, usuarios = new object[0], contenidos = new object[0], hashtags = new object[0] });
+            }
+
+            var usuarioActual = await _userManager.GetUserAsync(User);
+            var usuarioId = usuarioActual?.Id;
+            var query = q.Trim().ToLower();
+
+            // Obtener usuarios bloqueados
+            var usuariosBloqueados = usuarioId != null
+                ? await ObtenerUsuariosBloqueadosCacheadosAsync(usuarioId)
+                : new List<string>();
+
+            // Obtener IDs de admins para excluirlos
+            var adminIds = await ObtenerAdminIdsCacheadosAsync();
+
+            // 1. BUSCAR USUARIOS (máx 5)
+            var usuariosQuery = _userManager.Users
+                .AsNoTracking()
+                .Where(u => u.EstaActivo
+                    && !adminIds.Contains(u.Id)
+                    && !usuariosBloqueados.Contains(u.Id)
+                    && (u.UserName!.ToLower().Contains(query)
+                        || (u.NombreCompleto != null && u.NombreCompleto.ToLower().Contains(query))
+                        || (u.Seudonimo != null && u.Seudonimo.ToLower().Contains(query))));
+
+            // Si el usuario tiene LadoB bloqueado, excluir creadores adultos
+            if (usuarioActual?.BloquearLadoB == true)
+            {
+                usuariosQuery = usuariosQuery.Where(u => !u.CreadorVerificado || string.IsNullOrEmpty(u.Seudonimo));
+            }
+
+            var usuarios = await usuariosQuery
+                .OrderByDescending(u => u.NumeroSeguidores)
+                .Take(5)
+                .Select(u => new
+                {
+                    id = u.Id,
+                    username = u.UserName,
+                    nombre = u.Seudonimo ?? u.NombreCompleto ?? u.UserName,
+                    foto = u.FotoPerfil ?? "/images/default-avatar.svg",
+                    verificado = u.CreadorVerificado,
+                    seguidores = u.NumeroSeguidores
+                })
+                .ToListAsync();
+
+            // 2. BUSCAR CONTENIDO (máx 5) - solo LadoA público
+            var contenidosQuery = _context.Contenidos
+                .AsNoTracking()
+                .Include(c => c.Usuario)
+                .Where(c => c.EstaActivo
+                    && !c.EsBorrador
+                    && !c.Censurado
+                    && !c.EsPrivado
+                    && c.TipoLado == TipoLado.LadoA
+                    && c.Usuario != null
+                    && !usuariosBloqueados.Contains(c.UsuarioId)
+                    && (c.Descripcion != null && c.Descripcion.ToLower().Contains(query)));
+
+            var contenidos = await contenidosQuery
+                .OrderByDescending(c => c.NumeroLikes + c.NumeroComentarios)
+                .Take(5)
+                .Select(c => new
+                {
+                    id = c.Id,
+                    descripcion = c.Descripcion != null && c.Descripcion.Length > 60
+                        ? c.Descripcion.Substring(0, 60) + "..."
+                        : c.Descripcion,
+                    thumbnail = c.Thumbnail ?? c.RutaArchivo,
+                    tipo = c.TipoContenido.ToString(),
+                    usuario = c.Usuario!.Seudonimo ?? c.Usuario.NombreCompleto ?? c.Usuario.UserName,
+                    likes = c.NumeroLikes
+                })
+                .ToListAsync();
+
+            // 3. BUSCAR HASHTAGS/TAGS (máx 5)
+            // Buscar en los tags de contenidos populares
+            var hashtags = await _context.Contenidos
+                .AsNoTracking()
+                .Where(c => c.EstaActivo
+                    && !c.EsBorrador
+                    && !c.Censurado
+                    && c.Tags != null
+                    && c.Tags.ToLower().Contains(query))
+                .GroupBy(c => c.Tags)
+                .Select(g => new { tag = g.Key, count = g.Count() })
+                .OrderByDescending(x => x.count)
+                .Take(5)
+                .ToListAsync();
+
+            // Extraer tags individuales que coincidan
+            var tagsEncontrados = new List<object>();
+            foreach (var item in hashtags)
+            {
+                if (item.tag != null)
+                {
+                    // Los tags pueden estar separados por comas o ser JSON
+                    var tagsList = item.tag.Split(new[] { ',', '[', ']', '"' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(t => t.Trim().ToLower())
+                        .Where(t => t.Contains(query) && t.Length > 1)
+                        .Distinct();
+
+                    foreach (var tag in tagsList)
+                    {
+                        if (tagsEncontrados.Count < 5 && !tagsEncontrados.Any(t => ((dynamic)t).nombre == tag))
+                        {
+                            // Contar cuántos contenidos tienen este tag
+                            var conteo = await _context.Contenidos
+                                .CountAsync(c => c.EstaActivo && c.Tags != null && c.Tags.ToLower().Contains(tag));
+
+                            tagsEncontrados.Add(new { nombre = tag, cantidad = conteo });
+                        }
+                    }
+                }
+            }
+
+            return Json(new
+            {
+                success = true,
+                usuarios,
+                contenidos,
+                hashtags = tagsEncontrados.Take(5)
+            });
+        }
+
+        private static int ObtenerTamanoNivel(int nivel)
+        {
+            return nivel switch
+            {
+                1 => 36,  // Bronce (2x)
+                2 => 54,  // Plata (3x)
+                3 => 72,  // Oro (4x)
+                4 => 90,  // Diamante (5x)
+                _ => 18   // Normal
+            };
         }
     }
 }

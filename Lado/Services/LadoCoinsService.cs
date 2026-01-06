@@ -145,7 +145,10 @@ namespace Lado.Services
         {
             if (monto <= 0) return false;
 
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            // Detectar si ya hay una transacción activa (para evitar transacciones anidadas)
+            var transaccionExterna = _context.Database.CurrentTransaction != null;
+            var transaction = transaccionExterna ? null : await _context.Database.BeginTransactionAsync();
+
             try
             {
                 var saldo = await ObtenerOCrearSaldoAsync(usuarioId);
@@ -180,7 +183,12 @@ namespace Lado.Services
 
                 _context.TransaccionesLadoCoins.Add(transaccion);
                 await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
+
+                // Solo hacer commit si creamos la transacción
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync();
+                }
 
                 _logger.LogInformation("Acreditado ${Monto} LadoCoins a usuario {UsuarioId} por {Tipo}", monto, usuarioId, tipo);
 
@@ -199,9 +207,18 @@ namespace Lado.Services
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
+                // Solo hacer rollback si creamos la transacción
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync();
+                }
                 await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Pago, usuarioId, null);
+                _logger.LogError(ex, "Error en AcreditarMontoAsync para usuario {UsuarioId}", usuarioId);
                 return false;
+            }
+            finally
+            {
+                transaction?.Dispose();
             }
         }
 
@@ -213,12 +230,36 @@ namespace Lado.Services
         {
             if (monto <= 0) return (false, 0);
 
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            // Detectar si ya hay una transacción activa (para evitar transacciones anidadas)
+            var transaccionExterna = _context.Database.CurrentTransaction != null;
+            var transaction = transaccionExterna ? null : await _context.Database.BeginTransactionAsync();
+
             try
             {
+                // Obtener o crear saldo si no existe
                 var saldo = await ObtenerSaldoAsync(usuarioId);
-                if (saldo == null || saldo.SaldoDisponible < monto)
+                if (saldo == null)
                 {
+                    // Crear registro de saldo vacío
+                    saldo = new LadoCoin
+                    {
+                        UsuarioId = usuarioId,
+                        SaldoDisponible = 0,
+                        SaldoPorVencer = 0,
+                        TotalGanado = 0,
+                        TotalGastado = 0,
+                        TotalQuemado = 0,
+                        TotalRecibido = 0,
+                        FechaCreacion = DateTime.Now,
+                        UltimaActualizacion = DateTime.Now
+                    };
+                    _context.LadoCoins.Add(saldo);
+                }
+
+                if (saldo.SaldoDisponible < monto)
+                {
+                    _logger.LogWarning("DebitarAsync fallido: Usuario {UsuarioId} sin saldo suficiente. Tiene: {Saldo}, Necesita: {Monto}",
+                        usuarioId, saldo.SaldoDisponible, monto);
                     return (false, 0);
                 }
 
@@ -258,6 +299,10 @@ namespace Lado.Services
                 // Registrar transacción de quema separada
                 if (montoQuemado > 0)
                 {
+                    var descripcionQuema = !string.IsNullOrEmpty(descripcion)
+                        ? $"Quema 5% - {descripcion}"
+                        : $"Quema 5% por uso de ${monto:F2} LadoCoins";
+
                     var transaccionQuema = new TransaccionLadoCoin
                     {
                         UsuarioId = usuarioId,
@@ -265,7 +310,7 @@ namespace Lado.Services
                         Monto = -montoQuemado,
                         SaldoAnterior = saldo.SaldoDisponible,
                         SaldoPosterior = saldo.SaldoDisponible,
-                        Descripcion = $"Quema 5% de transacción #{referenciaId}",
+                        Descripcion = descripcionQuema,
                         ReferenciaId = referenciaId,
                         TipoReferencia = "Quema",
                         FechaTransaccion = DateTime.Now
@@ -274,7 +319,12 @@ namespace Lado.Services
                 }
 
                 await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
+
+                // Solo hacer commit si creamos la transacción
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync();
+                }
 
                 _logger.LogInformation("Debitado ${Monto} LadoCoins de usuario {UsuarioId} por {Tipo}, quema: ${Quema}", monto, usuarioId, tipo, montoQuemado);
 
@@ -282,9 +332,18 @@ namespace Lado.Services
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
+                // Solo hacer rollback si creamos la transacción
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync();
+                }
                 await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Pago, usuarioId, null);
+                _logger.LogError(ex, "Error en DebitarAsync para usuario {UsuarioId}", usuarioId);
                 return (false, 0);
+            }
+            finally
+            {
+                transaction?.Dispose();
             }
         }
 
@@ -462,7 +521,12 @@ namespace Lado.Services
                 };
 
                 _context.LadoCoins.Add(saldo);
-                await _context.SaveChangesAsync();
+
+                // Solo hacer SaveChanges si no hay transacción externa
+                if (_context.Database.CurrentTransaction == null)
+                {
+                    await _context.SaveChangesAsync();
+                }
             }
 
             return saldo;

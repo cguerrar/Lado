@@ -80,33 +80,32 @@ namespace Lado.Controllers
                     return RedirectToAction("Login", "Account");
                 }
 
-                // Validar archivos obligatorios
-                if (model.DocumentoIdentidad == null || model.SelfieConDocumento == null)
+                // Validar selfie con documento (único archivo obligatorio)
+                if (model.SelfieConDocumento == null)
                 {
-                    _logger.LogWarning("Archivos obligatorios faltantes - Usuario: {UserId}", user.Id);
-                    ModelState.AddModelError("", "Debes subir ambos documentos obligatorios.");
+                    _logger.LogWarning("Selfie con documento faltante - Usuario: {UserId}", user.Id);
+                    ModelState.AddModelError("", "Debes subir una selfie sosteniendo tu documento.");
                     return View(model);
                 }
 
-                // Validar formatos
-                var formatosPermitidos = new[] { ".jpg", ".jpeg", ".png", ".pdf" };
-                var extDocumento = Path.GetExtension(model.DocumentoIdentidad.FileName).ToLower();
+                // Validar formato de selfie
+                var formatosPermitidos = new[] { ".jpg", ".jpeg", ".png" };
                 var extSelfie = Path.GetExtension(model.SelfieConDocumento.FileName).ToLower();
 
-                if (!formatosPermitidos.Contains(extDocumento) || !formatosPermitidos.Contains(extSelfie))
+                if (!formatosPermitidos.Contains(extSelfie))
                 {
-                    _logger.LogWarning("Formato de archivo inválido - Usuario: {UserId}, Documento: {Ext1}, Selfie: {Ext2}",
-                        user.Id, extDocumento, extSelfie);
-                    ModelState.AddModelError("", "Solo se permiten archivos JPG, PNG o PDF.");
+                    _logger.LogWarning("Formato de archivo inválido - Usuario: {UserId}, Selfie: {Ext}",
+                        user.Id, extSelfie);
+                    ModelState.AddModelError("", "Solo se permiten archivos JPG o PNG para la selfie.");
                     return View(model);
                 }
 
-                // Validar tamaño de archivos (10MB máximo)
+                // Validar tamaño de archivo (10MB máximo)
                 const long maxFileSize = 10 * 1024 * 1024;
-                if (model.DocumentoIdentidad.Length > maxFileSize || model.SelfieConDocumento.Length > maxFileSize)
+                if (model.SelfieConDocumento.Length > maxFileSize)
                 {
                     _logger.LogWarning("Archivo demasiado grande - Usuario: {UserId}", user.Id);
-                    ModelState.AddModelError("", "El tamaño máximo por archivo es 10MB.");
+                    ModelState.AddModelError("", "El tamaño máximo es 10MB.");
                     return View(model);
                 }
 
@@ -122,26 +121,12 @@ namespace Lado.Controllers
                     return View(model);
                 }
 
-                // Guardar archivos
-                string documentoPath = null;
+                // Guardar selfie con documento (único archivo requerido)
                 string selfiePath = null;
-                string pruebaDireccionPath = null;
 
                 try
                 {
-                    _logger.LogInformation("Guardando documento de identidad - Usuario: {UserId}", user.Id);
-                    documentoPath = await GuardarArchivo(model.DocumentoIdentidad, uploadsFolder, "documento", user.Id);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error al guardar documento de identidad - Usuario: {UserId}", user.Id);
-                    ModelState.AddModelError("", $"Error al guardar el documento de identidad: {ex.Message}");
-                    return View(model);
-                }
-
-                try
-                {
-                    _logger.LogInformation("Guardando selfie - Usuario: {UserId}", user.Id);
+                    _logger.LogInformation("Guardando selfie con documento - Usuario: {UserId}", user.Id);
                     selfiePath = await GuardarArchivo(model.SelfieConDocumento, uploadsFolder, "selfie", user.Id);
                 }
                 catch (Exception ex)
@@ -149,24 +134,6 @@ namespace Lado.Controllers
                     _logger.LogError(ex, "Error al guardar selfie - Usuario: {UserId}", user.Id);
                     ModelState.AddModelError("", $"Error al guardar la selfie con documento: {ex.Message}");
                     return View(model);
-                }
-
-                // Prueba de dirección (opcional)
-                if (model.PruebaDireccion != null)
-                {
-                    var extDireccion = Path.GetExtension(model.PruebaDireccion.FileName).ToLower();
-                    if (formatosPermitidos.Contains(extDireccion))
-                    {
-                        try
-                        {
-                            _logger.LogInformation("Guardando prueba de dirección - Usuario: {UserId}", user.Id);
-                            pruebaDireccionPath = await GuardarArchivo(model.PruebaDireccion, uploadsFolder, "direccion", user.Id);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Error al guardar prueba de dirección (opcional) - Usuario: {UserId}", user.Id);
-                        }
-                    }
                 }
 
                 // Crear solicitud en base de datos
@@ -179,12 +146,8 @@ namespace Lado.Controllers
                         TipoDocumento = model.TipoDocumento,
                         NumeroDocumento = model.NumeroDocumento,
                         Pais = model.Pais,
-                        Ciudad = model.Ciudad,
-                        Direccion = model.Direccion,
                         Telefono = model.Telefono,
-                        DocumentoIdentidadPath = documentoPath,
                         SelfieConDocumentoPath = selfiePath,
-                        PruebaDireccionPath = pruebaDireccionPath,
                         Estado = "Pendiente",
                         FechaSolicitud = DateTime.Now
                     };
@@ -433,6 +396,96 @@ namespace Lado.Controllers
             {
                 _logger.LogError(ex, "Error al procesar verificación: {Id}", id);
                 TempData["Error"] = "Error al procesar la solicitud.";
+                return RedirectToAction("AdminPanel");
+            }
+        }
+
+        /// <summary>
+        /// POST: Revocar la verificación de un usuario ya aprobado
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RevocarVerificacion(string usuarioId, string motivo)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(usuarioId))
+                {
+                    TempData["Error"] = "Usuario no especificado.";
+                    return RedirectToAction("AdminPanel");
+                }
+
+                var usuario = await _userManager.FindByIdAsync(usuarioId);
+                if (usuario == null)
+                {
+                    TempData["Error"] = "Usuario no encontrado.";
+                    return RedirectToAction("AdminPanel");
+                }
+
+                if (!usuario.CreadorVerificado)
+                {
+                    TempData["Warning"] = "Este usuario no está verificado actualmente.";
+                    return RedirectToAction("AdminPanel");
+                }
+
+                var admin = await _userManager.GetUserAsync(User);
+
+                // Revocar verificación del usuario
+                usuario.CreadorVerificado = false;
+                usuario.FechaVerificacion = null;
+
+                await _userManager.UpdateAsync(usuario);
+
+                // Actualizar la solicitud si existe
+                var solicitud = await _context.CreatorVerificationRequests
+                    .Where(s => s.UserId == usuarioId && s.Estado == "Aprobada")
+                    .OrderByDescending(s => s.FechaRevision)
+                    .FirstOrDefaultAsync();
+
+                if (solicitud != null)
+                {
+                    solicitud.Estado = "Revocada";
+                    solicitud.MotivoRechazo = motivo ?? "Verificación revocada por administrador";
+                    solicitud.FechaRevision = DateTime.Now;
+                    solicitud.RevisadoPor = admin?.Id;
+                    await _context.SaveChangesAsync();
+                }
+
+                _logger.LogWarning("Verificación REVOCADA - Usuario: {UserId} ({UserName}), Admin: {AdminId}, Motivo: {Motivo}",
+                    usuarioId, usuario.UserName, admin?.Id, motivo);
+
+                TempData["Success"] = $"Verificación de {usuario.UserName} revocada exitosamente.";
+                return RedirectToAction("AdminPanel");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al revocar verificación del usuario: {UserId}", usuarioId);
+                TempData["Error"] = "Error al revocar la verificación.";
+                return RedirectToAction("AdminPanel");
+            }
+        }
+
+        /// <summary>
+        /// GET: Lista de usuarios verificados (para poder revocar)
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpGet]
+        public async Task<IActionResult> UsuariosVerificados()
+        {
+            try
+            {
+                var usuariosVerificados = await _userManager.Users
+                    .Where(u => u.CreadorVerificado && u.EstaActivo)
+                    .OrderByDescending(u => u.FechaVerificacion)
+                    .ToListAsync();
+
+                return View(usuariosVerificados);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al cargar usuarios verificados");
+                TempData["Error"] = "Error al cargar los usuarios verificados.";
                 return RedirectToAction("AdminPanel");
             }
         }

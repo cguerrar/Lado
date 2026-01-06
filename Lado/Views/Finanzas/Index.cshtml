@@ -1,0 +1,712 @@
+@model Lado.Controllers.FinanzasViewModel
+@{
+    ViewData["Title"] = "Finanzas";
+}
+
+<style>
+    .finanzas-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px 16px;
+    }
+
+    .finanzas-header {
+        margin-bottom: 24px;
+    }
+
+    .finanzas-header h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--fg);
+        margin: 0 0 8px 0;
+    }
+
+    .finanzas-header p {
+        color: var(--muted);
+        font-size: 0.9375rem;
+        margin: 0;
+    }
+
+    .finanzas-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+        margin-bottom: 32px;
+    }
+
+    .balance-card {
+        background: var(--surface);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        border: 1px solid var(--line);
+    }
+
+    .balance-card.primary {
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        border: none;
+        color: white;
+    }
+
+    .balance-card.gold {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        border: none;
+        color: white;
+    }
+
+    .balance-label {
+        font-size: 0.8125rem;
+        opacity: 0.9;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .balance-label svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .balance-amount {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 16px;
+    }
+
+    .balance-meta {
+        font-size: 0.8125rem;
+        opacity: 0.85;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .balance-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+
+    .stat-card {
+        background: var(--surface);
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        border: 1px solid var(--line);
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--fg);
+        margin-bottom: 4px;
+    }
+
+    .stat-value.positive { color: #22c55e; }
+    .stat-value.negative { color: #ef4444; }
+    .stat-value.gold { color: #f59e0b; }
+
+    .stat-label {
+        font-size: 0.8125rem;
+        color: var(--muted);
+    }
+
+    .section-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--fg);
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .section-title svg {
+        width: 20px;
+        height: 20px;
+        stroke: var(--primary);
+    }
+
+    .activities-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+        margin-bottom: 32px;
+    }
+
+    .activity-section {
+        background: var(--surface);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--line);
+        overflow: hidden;
+    }
+
+    .activity-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .activity-header h3 {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--fg);
+        margin: 0;
+    }
+
+    .activity-list {
+        max-height: 320px;
+        overflow-y: auto;
+    }
+
+    .activity-item {
+        padding: 14px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--line-light);
+    }
+
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+
+    .activity-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .activity-desc {
+        font-size: 0.875rem;
+        color: var(--fg);
+    }
+
+    .activity-date {
+        font-size: 0.75rem;
+        color: var(--muted);
+    }
+
+    .activity-amount {
+        font-size: 0.9375rem;
+        font-weight: 600;
+    }
+
+    .activity-amount.positive { color: #22c55e; }
+    .activity-amount.negative { color: #ef4444; }
+
+    .racha-section {
+        background: var(--surface);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        border: 1px solid var(--line);
+        margin-bottom: 32px;
+    }
+
+    .racha-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .racha-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--fg);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .racha-badge {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8125rem;
+        font-weight: 600;
+    }
+
+    .daily-goals {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+    }
+
+    .goal-card {
+        background: var(--bg-secondary);
+        border-radius: var(--radius-md);
+        padding: 14px;
+        text-align: center;
+    }
+
+    .goal-card.completed {
+        background: rgba(34, 197, 94, 0.1);
+        border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .goal-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--bg-tertiary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 8px;
+    }
+
+    .goal-card.completed .goal-icon {
+        background: #22c55e;
+        color: white;
+    }
+
+    .goal-progress {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-bottom: 2px;
+    }
+
+    .goal-reward {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: #f59e0b;
+    }
+
+    .referral-section {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        color: white;
+    }
+
+    .referral-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 16px;
+    }
+
+    .referral-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
+    .referral-subtitle {
+        font-size: 0.875rem;
+        opacity: 0.9;
+    }
+
+    .referral-stats {
+        text-align: right;
+    }
+
+    .referral-count {
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+
+    .referral-label {
+        font-size: 0.75rem;
+        opacity: 0.8;
+    }
+
+    .referral-link {
+        display: flex;
+        gap: 8px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: var(--radius-md);
+        padding: 12px 16px;
+    }
+
+    .referral-link input {
+        flex: 1;
+        background: transparent;
+        border: none;
+        color: white;
+        font-size: 0.875rem;
+    }
+
+    .referral-link input::placeholder {
+        color: rgba(255, 255, 255, 0.6);
+    }
+
+    .referral-link button {
+        background: white;
+        color: #4f46e5;
+        border: none;
+        padding: 8px 16px;
+        border-radius: var(--radius-sm);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+    }
+
+    .btn-action {
+        flex: 1;
+        padding: 12px 20px;
+        border-radius: var(--radius-md);
+        font-size: 0.9375rem;
+        font-weight: 600;
+        text-decoration: none;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+
+    .btn-action.primary {
+        background: var(--primary);
+        color: white;
+    }
+
+    .btn-action.outline {
+        background: var(--surface);
+        color: var(--fg);
+        border: 1px solid var(--line);
+    }
+
+    .btn-action:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+
+    @@media (max-width: 992px) {
+        .finanzas-grid,
+        .activities-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .stat-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .daily-goals {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @@media (max-width: 576px) {
+        .stat-grid,
+        .daily-goals {
+            grid-template-columns: 1fr;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+        }
+    }
+</style>
+
+<div class="finanzas-container">
+    <div class="finanzas-header">
+        <h1>Finanzas</h1>
+        <p>Gestiona tu dinero y LadoCoins en un solo lugar</p>
+    </div>
+
+    <!-- Saldos principales -->
+    <div class="finanzas-grid">
+        <div class="balance-card primary">
+            <div class="balance-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+                Saldo Disponible
+            </div>
+            <div class="balance-amount">$@Model.SaldoReal.ToString("N2")</div>
+            <div class="balance-meta">
+                <span class="balance-meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M23 6l-9.5 9.5-5-5L1 18"/>
+                    </svg>
+                    +$@Model.IngresosEsteMes.ToString("N0") este mes
+                </span>
+                @if (Model.CrecimientoMes != 0)
+                {
+                    <span class="balance-meta-item">
+                        @(Model.CrecimientoMes > 0 ? "+" : "")@Model.CrecimientoMes%
+                    </span>
+                }
+            </div>
+        </div>
+
+        <div class="balance-card gold">
+            <div class="balance-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 6v12M8 10h8M8 14h8"/>
+                </svg>
+                LadoCoins
+            </div>
+            <div class="balance-amount">$@Model.SaldoLadoCoins.ToString("N2")</div>
+            <div class="balance-meta">
+                @if (Model.MontoPorVencer7Dias > 0)
+                {
+                    <span class="balance-meta-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                        $@Model.MontoPorVencer7Dias.ToString("N2") por vencer
+                    </span>
+                }
+                <span class="balance-meta-item">
+                    $@Model.TotalLCGanado.ToString("N0") ganados
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadisticas rapidas -->
+    <div class="stat-grid">
+        <div class="stat-card">
+            <div class="stat-value positive">$@Model.IngresosEsteMes.ToString("N0")</div>
+            <div class="stat-label">Ingresos del mes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">$@Model.TotalRetirado.ToString("N0")</div>
+            <div class="stat-label">Total retirado</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value gold">$@Model.TotalLCGanado.ToString("N0")</div>
+            <div class="stat-label">LC ganados total</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@Model.RachaActual</div>
+            <div class="stat-label">Dias de racha</div>
+        </div>
+    </div>
+
+    <!-- Racha y metas diarias -->
+    <div class="racha-section">
+        <div class="racha-header">
+            <div class="racha-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                </svg>
+                Metas Diarias
+            </div>
+            @if (Model.RachaActual > 0)
+            {
+                <span class="racha-badge">@Model.RachaActual dias</span>
+            }
+        </div>
+        <div class="daily-goals">
+            <div class="goal-card @(Model.PremioLoginHoy ? "completed" : "")">
+                <div class="goal-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        @if (Model.PremioLoginHoy)
+                        {
+                            <path d="M20 6L9 17l-5-5"/>
+                        }
+                        else
+                        {
+                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/>
+                        }
+                    </svg>
+                </div>
+                <div class="goal-progress">@(Model.PremioLoginHoy ? "Completado" : "Hoy")</div>
+                <div class="goal-reward">+$0.50</div>
+            </div>
+            <div class="goal-card @(Model.Premio5LikesHoy ? "completed" : "")">
+                <div class="goal-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        @if (Model.Premio5LikesHoy)
+                        {
+                            <path d="M20 6L9 17l-5-5"/>
+                        }
+                        else
+                        {
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                        }
+                    </svg>
+                </div>
+                <div class="goal-progress">@Model.LikesHoy / 5 likes</div>
+                <div class="goal-reward">+$0.25</div>
+            </div>
+            <div class="goal-card @(Model.Premio3ComentariosHoy ? "completed" : "")">
+                <div class="goal-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        @if (Model.Premio3ComentariosHoy)
+                        {
+                            <path d="M20 6L9 17l-5-5"/>
+                        }
+                        else
+                        {
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        }
+                    </svg>
+                </div>
+                <div class="goal-progress">@Model.ComentariosHoy / 3 comentarios</div>
+                <div class="goal-reward">+$0.50</div>
+            </div>
+            <div class="goal-card @(Model.PremioContenidoHoy ? "completed" : "")">
+                <div class="goal-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        @if (Model.PremioContenidoHoy)
+                        {
+                            <path d="M20 6L9 17l-5-5"/>
+                        }
+                        else
+                        {
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                        }
+                    </svg>
+                </div>
+                <div class="goal-progress">@Model.ContenidosHoy contenido</div>
+                <div class="goal-reward">+$1.00</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actividad reciente -->
+    <h3 class="section-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        Actividad Reciente
+    </h3>
+    <div class="activities-grid">
+        <div class="activity-section">
+            <div class="activity-header">
+                <h3>Transacciones</h3>
+                <a href="/Usuario/Billetera" style="color: var(--primary); font-size: 0.8125rem;">Ver todo</a>
+            </div>
+            <div class="activity-list">
+                @if (Model.TransaccionesRecientes.Any())
+                {
+                    foreach (var t in Model.TransaccionesRecientes)
+                    {
+                        <div class="activity-item">
+                            <div class="activity-info">
+                                <span class="activity-desc">@t.Descripcion</span>
+                                <span class="activity-date">@t.FechaTransaccion.ToString("dd MMM, HH:mm")</span>
+                            </div>
+                            <span class="activity-amount @(t.Tipo == "Ingreso" ? "positive" : "negative")">
+                                @(t.Tipo == "Ingreso" ? "+" : "-")$@t.Monto.ToString("N2")
+                            </span>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="activity-item">
+                        <span class="activity-desc" style="color: var(--muted);">Sin transacciones</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="activity-section">
+            <div class="activity-header">
+                <h3>Movimientos LadoCoins</h3>
+                <a href="/LadoCoins/Historial" style="color: var(--primary); font-size: 0.8125rem;">Ver todo</a>
+            </div>
+            <div class="activity-list">
+                @if (Model.TransaccionesLC.Any())
+                {
+                    foreach (var t in Model.TransaccionesLC)
+                    {
+                        var esIngreso = t.Monto > 0;
+                        <div class="activity-item">
+                            <div class="activity-info">
+                                <span class="activity-desc">@t.Tipo.ToString().Replace("Bono", "Bono ")</span>
+                                <span class="activity-date">@t.FechaTransaccion.ToString("dd MMM, HH:mm")</span>
+                            </div>
+                            <span class="activity-amount @(esIngreso ? "positive" : "negative")">
+                                @(esIngreso ? "+" : "")$@t.Monto.ToString("N2")
+                            </span>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="activity-item">
+                        <span class="activity-desc" style="color: var(--muted);">Sin movimientos</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Referidos -->
+    <div class="referral-section">
+        <div class="referral-header">
+            <div>
+                <div class="referral-title">Invita amigos y gana</div>
+                <div class="referral-subtitle">Gana $10 por cada referido + 10% de sus premios por 3 meses</div>
+            </div>
+            <div class="referral-stats">
+                <div class="referral-count">@Model.TotalReferidos</div>
+                <div class="referral-label">referidos</div>
+            </div>
+        </div>
+        <div class="referral-link">
+            <input type="text" id="referralLink" value="@Url.Action("Register", "Account", new { r = Model.CodigoReferido }, Context.Request.Scheme)" readonly>
+            <button onclick="copiarEnlace()">Copiar</button>
+        </div>
+    </div>
+
+    <!-- Acciones -->
+    <div class="action-buttons">
+        <a href="/Usuario/Billetera" class="btn-action primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+                <line x1="1" y1="10" x2="23" y2="10"/>
+            </svg>
+            Solicitar Retiro
+        </a>
+        <a href="/LadoCoins" class="btn-action outline">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 6v12M8 10h8M8 14h8"/>
+            </svg>
+            Ver LadoCoins
+        </a>
+        <a href="/LadoCoins/Referidos" class="btn-action outline">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            Mis Referidos
+        </a>
+    </div>
+</div>
+
+<script>
+    function copiarEnlace() {
+        const input = document.getElementById('referralLink');
+        input.select();
+        navigator.clipboard.writeText(input.value);
+
+        const btn = input.nextElementSibling;
+        btn.textContent = 'Copiado!';
+        setTimeout(() => btn.textContent = 'Copiar', 2000);
+    }
+</script>

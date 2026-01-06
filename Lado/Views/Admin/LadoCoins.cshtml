@@ -1,0 +1,909 @@
+@using Lado.Controllers
+@using Lado.Models
+@model LadoCoinsDashboardAdminViewModel
+@{
+    ViewData["Title"] = "LadoCoins - Admin";
+}
+
+<style>
+    .ladocoins-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+
+    .ladocoins-header h2 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: var(--text-dark);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .ladocoins-header h2 i {
+        color: #f59e0b;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 12px;
+    }
+
+    /* Stats Grid */
+    .lc-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 20px;
+        margin-bottom: 32px;
+    }
+
+    .lc-stat-card {
+        background: var(--bg-white);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
+    }
+
+    .lc-stat-card .stat-label {
+        font-size: 0.8125rem;
+        color: var(--text-gray);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .lc-stat-card .stat-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--text-dark);
+    }
+
+    .lc-stat-card .stat-value.positive {
+        color: #22c55e;
+    }
+
+    .lc-stat-card .stat-value.negative {
+        color: #ef4444;
+    }
+
+    .lc-stat-card .stat-value.orange {
+        color: #f59e0b;
+    }
+
+    .lc-stat-card .stat-detail {
+        font-size: 0.75rem;
+        color: var(--text-gray);
+        margin-top: 6px;
+    }
+
+    /* Content Grid */
+    .lc-content-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-bottom: 32px;
+    }
+
+    .lc-card {
+        background: var(--bg-white);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
+    }
+
+    .lc-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .lc-card-header h4 {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .lc-card-header h4 i {
+        color: var(--primary);
+    }
+
+    /* Table Styles */
+    .lc-table {
+        width: 100%;
+    }
+
+    .lc-table th {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-gray);
+        text-transform: uppercase;
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .lc-table td {
+        padding: 14px 12px;
+        font-size: 0.875rem;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .lc-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .lc-table .user-cell {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .lc-table .user-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: var(--bg-light);
+    }
+
+    .lc-table .user-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .lc-table .user-name {
+        font-weight: 600;
+        color: var(--text-dark);
+    }
+
+    .lc-table .user-email {
+        font-size: 0.75rem;
+        color: var(--text-gray);
+    }
+
+    .lc-table .amount {
+        font-weight: 600;
+        font-family: monospace;
+    }
+
+    .lc-table .amount.positive {
+        color: #22c55e;
+    }
+
+    .lc-table .amount.negative {
+        color: #ef4444;
+    }
+
+    /* User Search */
+    .user-search-section {
+        background: var(--bg-white);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
+        margin-bottom: 32px;
+    }
+
+    .user-search-section h4 {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0 0 16px 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .user-search-section h4 i {
+        color: var(--primary);
+    }
+
+    .search-form {
+        display: flex;
+        gap: 12px;
+    }
+
+    .search-form input {
+        flex: 1;
+        padding: 12px 16px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        font-size: 0.9375rem;
+    }
+
+    .search-form button {
+        padding: 12px 24px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: var(--radius-md);
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .search-form button:hover {
+        background: var(--primary-dark);
+    }
+
+    #searchResults {
+        margin-top: 20px;
+    }
+
+    .search-result-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px;
+        background: var(--bg-light);
+        border-radius: var(--radius-md);
+        margin-bottom: 10px;
+        border: 1px solid var(--border-light);
+    }
+
+    .search-result-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .result-user-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .result-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: var(--bg-light);
+    }
+
+    .result-details h5 {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        margin: 0 0 4px 0;
+    }
+
+    .result-details span {
+        font-size: 0.8125rem;
+        color: var(--text-gray);
+    }
+
+    .result-actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .result-saldo {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: #f59e0b;
+        margin-right: 16px;
+    }
+
+    /* Transaction Type Badges */
+    .tx-type {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .tx-type.ingreso {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .tx-type.gasto {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .tx-type.quema {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    /* User Modal */
+    .user-modal-content {
+        padding: 24px;
+    }
+
+    .user-modal-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .user-modal-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .user-modal-info h4 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin: 0 0 4px 0;
+    }
+
+    .user-modal-info span {
+        color: var(--text-gray);
+    }
+
+    .user-modal-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .user-modal-stat {
+        text-align: center;
+        padding: 16px;
+        background: var(--bg-light);
+        border-radius: var(--radius-md);
+    }
+
+    .user-modal-stat .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+
+    .user-modal-stat .stat-value.saldo {
+        color: #f59e0b;
+    }
+
+    .user-modal-stat .stat-label {
+        font-size: 0.8125rem;
+        color: var(--text-gray);
+    }
+
+    .action-forms {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    .action-form {
+        padding: 16px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-color);
+    }
+
+    .action-form.acreditar {
+        background: #f0fdf4;
+        border-color: #86efac;
+    }
+
+    .action-form.debitar {
+        background: #fef2f2;
+        border-color: #fca5a5;
+    }
+
+    .action-form h5 {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        margin: 0 0 12px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .action-form.acreditar h5 {
+        color: #166534;
+    }
+
+    .action-form.debitar h5 {
+        color: #991b1b;
+    }
+
+    .action-form label {
+        display: block;
+        font-size: 0.8125rem;
+        color: var(--text-gray);
+        margin-bottom: 6px;
+    }
+
+    .action-form input,
+    .action-form textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+        margin-bottom: 12px;
+    }
+
+    .action-form button {
+        width: 100%;
+        padding: 10px;
+        border: none;
+        border-radius: var(--radius-md);
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .action-form.acreditar button {
+        background: #22c55e;
+        color: white;
+    }
+
+    .action-form.debitar button {
+        background: #ef4444;
+        color: white;
+    }
+
+    /* Responsive */
+    @@media (max-width: 1200px) {
+        .lc-stats-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
+    @@media (max-width: 992px) {
+        .lc-content-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .lc-stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .ladocoins-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .action-forms {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="ladocoins-header">
+    <h2>
+        <i class="fas fa-coins"></i>
+        LadoCoins - Panel de Administracion
+    </h2>
+    <div class="header-actions">
+        <a href="@Url.Action("LadoCoinsConfiguracion")" class="btn btn-outline-primary">
+            <i class="fas fa-cog"></i> Configuracion
+        </a>
+        <a href="@Url.Action("HistorialLadoCoins")" class="btn btn-outline-secondary">
+            <i class="fas fa-history"></i> Historial Global
+        </a>
+    </div>
+</div>
+
+<!-- Stats Grid -->
+<div class="lc-stats-grid">
+    <div class="lc-stat-card">
+        <div class="stat-label">
+            <i class="fas fa-coins"></i> En Circulacion
+        </div>
+        <div class="stat-value orange">$@Model.TotalEnCirculacion.ToString("N2")</div>
+        <div class="stat-detail">@Model.UsuariosConSaldo de @Model.TotalUsuarios usuarios</div>
+    </div>
+    <div class="lc-stat-card">
+        <div class="stat-label">
+            <i class="fas fa-arrow-down"></i> Total Ganado
+        </div>
+        <div class="stat-value positive">$@Model.TotalGanado.ToString("N2")</div>
+        <div class="stat-detail">Bonos y premios otorgados</div>
+    </div>
+    <div class="lc-stat-card">
+        <div class="stat-label">
+            <i class="fas fa-arrow-up"></i> Total Gastado
+        </div>
+        <div class="stat-value negative">$@Model.TotalGastado.ToString("N2")</div>
+        <div class="stat-detail">Usado en pagos</div>
+    </div>
+    <div class="lc-stat-card">
+        <div class="stat-label">
+            <i class="fas fa-fire"></i> Total Quemado
+        </div>
+        <div class="stat-value" style="color: #f97316;">$@Model.TotalQuemado.ToString("N2")</div>
+        <div class="stat-detail">5% por transaccion</div>
+    </div>
+    <div class="lc-stat-card">
+        <div class="stat-label">
+            <i class="fas fa-clock"></i> Total Vencido
+        </div>
+        <div class="stat-value" style="color: #6b7280;">$@Model.TotalVencido.ToString("N2")</div>
+        <div class="stat-detail">Expiraron despues de 30 dias</div>
+    </div>
+</div>
+
+<!-- User Search -->
+<div class="user-search-section">
+    <h4>
+        <i class="fas fa-search"></i> Buscar Usuario
+    </h4>
+    <div class="search-form">
+        <input type="text" id="searchQuery" placeholder="Buscar por username, email o nombre..." autocomplete="off">
+        <button type="button" id="btnSearch">
+            <i class="fas fa-search"></i> Buscar
+        </button>
+    </div>
+    <div id="searchResults"></div>
+</div>
+
+<!-- Content Grid -->
+<div class="lc-content-grid">
+    <!-- Top Users -->
+    <div class="lc-card">
+        <div class="lc-card-header">
+            <h4><i class="fas fa-trophy"></i> Top Usuarios por Saldo</h4>
+        </div>
+        <table class="lc-table">
+            <thead>
+                <tr>
+                    <th>Usuario</th>
+                    <th>Saldo</th>
+                    <th>Ganado</th>
+                    <th>Gastado</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in Model.TopUsuarios)
+                {
+                    <tr>
+                        <td>
+                            <div class="user-cell">
+                                <div class="user-info">
+                                    <span class="user-name">@@@user.Username</span>
+                                    <span class="user-email">@user.Email</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td><span class="amount" style="color: #f59e0b;">$@user.SaldoDisponible.ToString("N2")</span></td>
+                        <td><span class="amount positive">$@user.TotalGanado.ToString("N2")</span></td>
+                        <td><span class="amount negative">$@user.TotalGastado.ToString("N2")</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="lc-card">
+        <div class="lc-card-header">
+            <h4><i class="fas fa-history"></i> Transacciones Recientes</h4>
+            <a href="@Url.Action("HistorialLadoCoins")" class="btn btn-sm btn-outline-primary">Ver todas</a>
+        </div>
+        <table class="lc-table">
+            <thead>
+                <tr>
+                    <th>Usuario</th>
+                    <th>Tipo</th>
+                    <th>Monto</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var tx in Model.TransaccionesRecientes)
+                {
+                    var esIngreso = tx.Monto > 0;
+                    var esQuema = tx.Tipo == TipoTransaccionLadoCoin.Quema5Porciento || tx.Tipo == TipoTransaccionLadoCoin.Vencimiento;
+                    var tipoClass = esQuema ? "quema" : (esIngreso ? "ingreso" : "gasto");
+
+                    <tr>
+                        <td>@@@tx.Usuario?.UserName</td>
+                        <td>
+                            <span class="tx-type @tipoClass">
+                                @GetTipoNombre(tx.Tipo)
+                            </span>
+                        </td>
+                        <td>
+                            <span class="amount @(esIngreso ? "positive" : "negative")">
+                                @(esIngreso ? "+" : "")$@Math.Abs(tx.Monto).ToString("N2")
+                            </span>
+                        </td>
+                        <td>@tx.FechaTransaccion.ToString("dd/MM HH:mm")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Statistics by Type -->
+<div class="lc-card">
+    <div class="lc-card-header">
+        <h4><i class="fas fa-chart-pie"></i> Estadisticas por Tipo de Transaccion</h4>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
+        @foreach (var stat in Model.EstadisticasPorTipo.OrderByDescending(s => Math.Abs(s.Value.Total)))
+        {
+            var esIngreso = stat.Value.Total > 0;
+            <div style="padding: 16px; background: var(--bg-light); border-radius: 8px;">
+                <div style="font-size: 0.875rem; color: var(--text-gray); margin-bottom: 4px;">@stat.Key</div>
+                <div style="font-size: 1.25rem; font-weight: 700; color: @(esIngreso ? "#22c55e" : "#ef4444");">
+                    @(esIngreso ? "+" : "")$@stat.Value.Total.ToString("N2")
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-gray);">@stat.Value.Count transacciones</div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- User Detail Modal -->
+<div class="modal fade" id="userDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalle de Usuario</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="userDetailContent">
+                <!-- Content loaded via AJAX -->
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    document.getElementById('btnSearch').addEventListener('click', buscarUsuario);
+    document.getElementById('searchQuery').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') buscarUsuario();
+    });
+
+    async function buscarUsuario() {
+        const query = document.getElementById('searchQuery').value.trim();
+        if (!query || query.length < 2) {
+            alert('Ingresa al menos 2 caracteres');
+            return;
+        }
+
+        const resultsDiv = document.getElementById('searchResults');
+        resultsDiv.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
+
+        try {
+            const response = await fetch(`/Admin/BuscarUsuarioLadoCoins?query=${encodeURIComponent(query)}`);
+            const data = await response.json();
+
+            if (!data.success) {
+                resultsDiv.innerHTML = `<div class="alert alert-warning">${data.message}</div>`;
+                return;
+            }
+
+            if (data.usuarios.length === 0) {
+                resultsDiv.innerHTML = '<div class="alert alert-info">No se encontraron usuarios</div>';
+                return;
+            }
+
+            let html = '';
+            for (const user of data.usuarios) {
+                html += `
+                    <div class="search-result-item">
+                        <div class="result-user-info">
+                            <img src="${user.fotoPerfil || '/images/default-avatar.svg'}" class="result-avatar" onerror="this.src='/images/default-avatar.svg'">
+                            <div class="result-details">
+                                <h5>@@${user.username}</h5>
+                                <span>${user.email}</span>
+                            </div>
+                        </div>
+                        <div class="result-actions">
+                            <span class="result-saldo">$${user.saldoDisponible.toFixed(2)}</span>
+                            <button class="btn btn-sm btn-primary" onclick="verDetalleUsuario('${user.usuarioId}')">
+                                <i class="fas fa-eye"></i> Detalle
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+            resultsDiv.innerHTML = html;
+        } catch (error) {
+            resultsDiv.innerHTML = '<div class="alert alert-danger">Error al buscar usuarios</div>';
+        }
+    }
+
+    async function verDetalleUsuario(usuarioId) {
+        const modal = new bootstrap.Modal(document.getElementById('userDetailModal'));
+        const contentDiv = document.getElementById('userDetailContent');
+        contentDiv.innerHTML = '<div class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
+        modal.show();
+
+        try {
+            const response = await fetch(`/Admin/DetalleUsuarioLadoCoins?usuarioId=${encodeURIComponent(usuarioId)}`);
+            const data = await response.json();
+
+            if (!data.success) {
+                contentDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                return;
+            }
+
+            const user = data.usuario;
+            contentDiv.innerHTML = `
+                <div class="user-modal-content">
+                    <div class="user-modal-header">
+                        <img src="${user.fotoPerfil || '/images/default-avatar.svg'}" class="user-modal-avatar" onerror="this.src='/images/default-avatar.svg'">
+                        <div class="user-modal-info">
+                            <h4>@@${user.username}</h4>
+                            <span>${user.email}</span>
+                        </div>
+                    </div>
+                    <div class="user-modal-stats">
+                        <div class="user-modal-stat">
+                            <div class="stat-value saldo">$${user.saldoDisponible.toFixed(2)}</div>
+                            <div class="stat-label">Saldo Disponible</div>
+                        </div>
+                        <div class="user-modal-stat">
+                            <div class="stat-value" style="color: #22c55e;">$${user.totalGanado.toFixed(2)}</div>
+                            <div class="stat-label">Total Ganado</div>
+                        </div>
+                        <div class="user-modal-stat">
+                            <div class="stat-value" style="color: #ef4444;">$${user.totalGastado.toFixed(2)}</div>
+                            <div class="stat-label">Total Gastado</div>
+                        </div>
+                    </div>
+                    <div class="action-forms">
+                        <div class="action-form acreditar">
+                            <h5><i class="fas fa-plus-circle"></i> Acreditar LadoCoins</h5>
+                            <label>Monto ($)</label>
+                            <input type="number" id="montoAcreditar" step="0.01" min="0.01" placeholder="0.00">
+                            <label>Razon</label>
+                            <textarea id="razonAcreditar" rows="2" placeholder="Ej: Bono por promocion..."></textarea>
+                            <button onclick="acreditarLadoCoins('${user.usuarioId}')">
+                                <i class="fas fa-plus"></i> Acreditar
+                            </button>
+                        </div>
+                        <div class="action-form debitar">
+                            <h5><i class="fas fa-minus-circle"></i> Debitar LadoCoins</h5>
+                            <label>Monto ($)</label>
+                            <input type="number" id="montoDebitar" step="0.01" min="0.01" max="${user.saldoDisponible}" placeholder="0.00">
+                            <label>Razon</label>
+                            <textarea id="razonDebitar" rows="2" placeholder="Ej: Correccion de error..."></textarea>
+                            <button onclick="debitarLadoCoins('${user.usuarioId}')">
+                                <i class="fas fa-minus"></i> Debitar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } catch (error) {
+            contentDiv.innerHTML = '<div class="alert alert-danger">Error al cargar detalle del usuario</div>';
+        }
+    }
+
+    async function acreditarLadoCoins(usuarioId) {
+        const monto = parseFloat(document.getElementById('montoAcreditar').value);
+        const razon = document.getElementById('razonAcreditar').value.trim();
+
+        if (!monto || monto <= 0) {
+            alert('Ingresa un monto valido');
+            return;
+        }
+        if (!razon) {
+            alert('Ingresa una razon');
+            return;
+        }
+
+        if (!confirm(`¿Acreditar $${monto.toFixed(2)} a este usuario?`)) return;
+
+        try {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            const response = await fetch('/Admin/AcreditarLadoCoins', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: `usuarioId=${encodeURIComponent(usuarioId)}&monto=${monto}&razon=${encodeURIComponent(razon)}&__RequestVerificationToken=${encodeURIComponent(token)}`
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                alert(data.message);
+                verDetalleUsuario(usuarioId); // Refresh
+            } else {
+                alert('Error: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error al acreditar');
+        }
+    }
+
+    async function debitarLadoCoins(usuarioId) {
+        const monto = parseFloat(document.getElementById('montoDebitar').value);
+        const razon = document.getElementById('razonDebitar').value.trim();
+
+        if (!monto || monto <= 0) {
+            alert('Ingresa un monto valido');
+            return;
+        }
+        if (!razon) {
+            alert('Ingresa una razon');
+            return;
+        }
+
+        if (!confirm(`¿Debitar $${monto.toFixed(2)} de este usuario?`)) return;
+
+        try {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            const response = await fetch('/Admin/DebitarLadoCoins', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: `usuarioId=${encodeURIComponent(usuarioId)}&monto=${monto}&razon=${encodeURIComponent(razon)}&__RequestVerificationToken=${encodeURIComponent(token)}`
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                alert(data.message);
+                verDetalleUsuario(usuarioId); // Refresh
+            } else {
+                alert('Error: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error al debitar');
+        }
+    }
+</script>
+}
+
+@Html.AntiForgeryToken()
+
+@functions {
+    string GetTipoNombre(TipoTransaccionLadoCoin tipo)
+    {
+        return tipo switch
+        {
+            TipoTransaccionLadoCoin.BonoBienvenida => "Bienvenida",
+            TipoTransaccionLadoCoin.BonoPrimerContenido => "1er Contenido",
+            TipoTransaccionLadoCoin.BonoVerificarEmail => "Email",
+            TipoTransaccionLadoCoin.BonoCompletarPerfil => "Perfil",
+            TipoTransaccionLadoCoin.BonoLoginDiario => "Login",
+            TipoTransaccionLadoCoin.BonoSubirContenido => "Subida",
+            TipoTransaccionLadoCoin.BonoDarLikes => "Likes",
+            TipoTransaccionLadoCoin.BonoComentar => "Comentarios",
+            TipoTransaccionLadoCoin.BonoRacha7Dias => "Racha 7d",
+            TipoTransaccionLadoCoin.BonoReferidor => "Referidor",
+            TipoTransaccionLadoCoin.BonoReferido => "Referido",
+            TipoTransaccionLadoCoin.BonoReferidoCreadorLadoB => "Ref LadoB",
+            TipoTransaccionLadoCoin.ComisionReferido => "Comision",
+            TipoTransaccionLadoCoin.RecibirPago => "Pago Recibido",
+            TipoTransaccionLadoCoin.AjusteAdmin => "Ajuste",
+            TipoTransaccionLadoCoin.BonoAdmin => "Bono Admin",
+            TipoTransaccionLadoCoin.DebitoAdmin => "Debito Admin",
+            TipoTransaccionLadoCoin.PagoSuscripcion => "Suscripcion",
+            TipoTransaccionLadoCoin.PagoPropina => "Propina",
+            TipoTransaccionLadoCoin.CompraPublicidad => "Publicidad",
+            TipoTransaccionLadoCoin.BoostAlgoritmo => "Boost",
+            TipoTransaccionLadoCoin.CompraContenido => "Compra",
+            TipoTransaccionLadoCoin.Quema5Porciento => "Quema 5%",
+            TipoTransaccionLadoCoin.Vencimiento => "Vencido",
+            _ => tipo.ToString()
+        };
+    }
+}

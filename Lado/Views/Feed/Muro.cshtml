@@ -1,0 +1,1420 @@
+@{
+    ViewData["Title"] = "PhotoWall - Muro";
+    Layout = null; // Sin layout para fullscreen
+    var usuarioId = ViewBag.UsuarioId as string;
+    var saldoLadoCoins = ViewBag.SaldoLadoCoins ?? 0;
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>@ViewData["Title"] - Lado</title>
+    <link rel="icon" type="image/png" href="/images/favicon.png" />
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --surface: #111;
+            --fg: #fff;
+            --muted: #888;
+            --primary: #667eea;
+            --primary-dark: #5a67d8;
+            --gold: #ffd700;
+            --silver: #c0c0c0;
+            --bronze: #cd7f32;
+            --diamond: linear-gradient(135deg, #b9f2ff 0%, #89cff0 50%, #00bfff 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* ========================================
+           HEADER FLOTANTE
+           ======================================== */
+        .muro-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .muro-header > * {
+            pointer-events: auto;
+        }
+
+        .muro-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--fg);
+            text-decoration: none;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .muro-logo svg {
+            width: 28px;
+            height: 28px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .saldo-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(255,215,0,0.15);
+            border: 1px solid rgba(255,215,0,0.3);
+            border-radius: 20px;
+            color: var(--gold);
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .btn-destacar {
+            padding: 8px 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-destacar:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .btn-close {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-close:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* ========================================
+           CONTENEDOR DEL MOSAICO
+           ======================================== */
+        .muro-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+        }
+
+        .muro-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, 18px);
+            grid-auto-rows: 18px;
+            grid-auto-flow: dense; /* Llena los huecos automáticamente */
+            gap: 1px;
+            padding: 0;
+            width: 100vw;
+            min-height: 100vh;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @@keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* ========================================
+           FOTOS DEL MURO
+           ======================================== */
+        .muro-foto {
+            position: relative;
+            cursor: pointer;
+            overflow: hidden;
+            transition: transform 0.3s ease, z-index 0s;
+        }
+
+        .muro-foto:hover {
+            transform: scale(2.5);
+            z-index: 100;
+        }
+
+        .muro-foto img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* Tamaños según nivel usando grid-span */
+        .muro-foto.nivel-0 { grid-column: span 1; grid-row: span 1; } /* 18px */
+        .muro-foto.nivel-1 { grid-column: span 2; grid-row: span 2; } /* 36px */
+        .muro-foto.nivel-2 { grid-column: span 3; grid-row: span 3; } /* 54px */
+        .muro-foto.nivel-3 { grid-column: span 4; grid-row: span 4; } /* 72px */
+        .muro-foto.nivel-4 { grid-column: span 5; grid-row: span 5; } /* 90px */
+
+        /* Efectos de borde según nivel */
+        .muro-foto.nivel-1 {
+            box-shadow: 0 0 0 1px var(--bronze);
+        }
+
+        .muro-foto.nivel-2 {
+            box-shadow: 0 0 4px 1px var(--silver);
+        }
+
+        .muro-foto.nivel-3 {
+            box-shadow: 0 0 8px 2px var(--gold);
+        }
+
+        .muro-foto.nivel-4 {
+            animation: diamondGlow 2s ease-in-out infinite;
+        }
+
+        @@keyframes diamondGlow {
+            0%, 100% { box-shadow: 0 0 10px 2px #00bfff, 0 0 20px 4px rgba(0,191,255,0.5); }
+            50% { box-shadow: 0 0 15px 4px #89cff0, 0 0 30px 6px rgba(137,207,240,0.5); }
+        }
+
+        /* Tooltip al hover */
+        .muro-foto .foto-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            padding: 6px 10px;
+            background: rgba(0,0,0,0.9);
+            color: white;
+            font-size: 11px;
+            border-radius: 6px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.2s;
+            z-index: 10;
+        }
+
+        .muro-foto:hover .foto-tooltip {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ========================================
+           MODAL DE DESTACAR
+           ======================================== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--surface);
+            border-radius: 16px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: modalSlide 0.3s ease;
+        }
+
+        @@keyframes modalSlide {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-header h2 {
+            color: var(--fg);
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        /* Selector de fotos propias */
+        .mis-fotos-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 20px;
+            max-height: 280px;
+            overflow-y: auto;
+            padding: 4px;
+        }
+
+        .mi-foto-item {
+            position: relative;
+            width: 100%;
+            padding-bottom: 100%; /* Fuerza aspect-ratio 1:1 */
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.2s;
+            background: #222;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .mi-foto-item:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .mi-foto-item.selected {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.5);
+        }
+
+        .mi-foto-item.selected::before {
+            content: '';
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            width: 24px;
+            height: 24px;
+            background: var(--primary);
+            border-radius: 50%;
+            z-index: 2;
+        }
+
+        .mi-foto-item.selected::after {
+            content: '✓';
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            width: 24px;
+            height: 24px;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mi-foto-item img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .mi-foto-item .foto-destacado-badge {
+            position: absolute;
+            bottom: 6px;
+            right: 6px;
+            padding: 3px 8px;
+            background: linear-gradient(135deg, var(--gold) 0%, #b8860b 100%);
+            color: #000;
+            font-size: 9px;
+            font-weight: 700;
+            border-radius: 4px;
+            text-transform: uppercase;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .mi-foto-item .foto-destacado-badge .tiempo-restante {
+            font-size: 8px;
+            font-weight: 500;
+            opacity: 0.9;
+        }
+
+        /* Niveles de destacado */
+        .niveles-destacado {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .nivel-card {
+            padding: 16px;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .nivel-card:hover {
+            background: rgba(255,255,255,0.08);
+        }
+
+        .nivel-card.selected {
+            border-color: var(--primary);
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .nivel-card.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .nivel-icon {
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 10px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .nivel-card.bronce .nivel-icon { background: var(--bronze); }
+        .nivel-card.plata .nivel-icon { background: var(--silver); color: #333; }
+        .nivel-card.oro .nivel-icon { background: var(--gold); color: #333; }
+        .nivel-card.diamante .nivel-icon { background: var(--diamond); color: #333; }
+
+        .nivel-nombre {
+            color: var(--fg);
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .nivel-precio {
+            color: var(--gold);
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .nivel-duracion {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .nivel-tamano {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        /* Botón confirmar */
+        .btn-confirmar-destacar {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.2s;
+        }
+
+        .btn-confirmar-destacar:hover:not(:disabled) {
+            background: var(--primary-dark);
+        }
+
+        .btn-confirmar-destacar:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* ========================================
+           MODAL DE PERFIL (al hacer clic en foto)
+           ======================================== */
+        .foto-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1500;
+            overflow: hidden;
+        }
+
+        .foto-modal.active {
+            display: flex;
+        }
+
+        .foto-modal-content {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .foto-zoom-container {
+            position: relative;
+            touch-action: none; /* Importante para gestos táctiles */
+            transform-origin: center center;
+            transition: transform 0.1s ease-out;
+            cursor: grab;
+        }
+
+        .foto-zoom-container.dragging {
+            cursor: grabbing;
+            transition: none;
+        }
+
+        .foto-zoom-container img {
+            max-width: 90vw;
+            max-height: 80vh;
+            border-radius: 8px;
+            user-select: none;
+            -webkit-user-drag: none;
+            pointer-events: none;
+        }
+
+        /* Controles de zoom */
+        .zoom-controls {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 16px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 30px;
+            z-index: 1600;
+        }
+
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .zoom-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .zoom-btn:active {
+            transform: scale(0.95);
+        }
+
+        .zoom-level {
+            color: white;
+            font-size: 13px;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .zoom-reset {
+            padding: 8px 16px;
+            background: var(--primary);
+            border: none;
+            border-radius: 20px;
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .zoom-hint {
+            position: fixed;
+            bottom: 160px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.6);
+            font-size: 12px;
+            text-align: center;
+            pointer-events: none;
+            opacity: 1;
+            transition: opacity 0.5s;
+        }
+
+        .zoom-hint.hidden {
+            opacity: 0;
+        }
+
+        .foto-modal-info {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            z-index: 1600;
+        }
+
+        .foto-modal-info a {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .foto-modal-info a:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Botón cerrar modal foto */
+        .foto-modal-close {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.5);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            z-index: 1600;
+        }
+
+        .foto-modal-close:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* ========================================
+           LOADING
+           ======================================== */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+        }
+
+        .loading-overlay.hidden {
+            display: none;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @@keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: var(--muted);
+            margin-top: 16px;
+            font-size: 14px;
+        }
+
+        /* ========================================
+           RESPONSIVE
+           ======================================== */
+        @@media (max-width: 768px) {
+            .muro-header {
+                padding: 0 12px;
+                height: 50px;
+            }
+
+            .muro-logo span {
+                display: none;
+            }
+
+            /* Saldo siempre visible en móvil */
+
+            .btn-destacar span {
+                display: none;
+            }
+
+            .btn-destacar {
+                padding: 8px 12px;
+            }
+
+            .modal-content {
+                margin: 10px;
+                max-height: calc(100vh - 20px);
+            }
+
+            .mis-fotos-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 6px;
+                max-height: 35vh;
+            }
+
+            .niveles-destacado {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+
+            .nivel-card {
+                padding: 12px 8px;
+            }
+
+            .nivel-icon {
+                width: 32px;
+                height: 32px;
+                font-size: 14px;
+            }
+
+            .nivel-nombre {
+                font-size: 12px;
+            }
+
+            .nivel-precio {
+                font-size: 11px;
+            }
+
+            .nivel-duracion,
+            .nivel-tamano {
+                font-size: 10px;
+            }
+        }
+
+        /* No mostrar nada de autenticación si no está logueado */
+        .auth-required {
+            display: @(string.IsNullOrEmpty(usuarioId) ? "none" : "flex");
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Cargando muro...</div>
+    </div>
+
+    <!-- Header flotante -->
+    <div class="muro-header">
+        <a href="/Feed/Explorar" class="muro-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+            <span>PhotoWall</span>
+        </a>
+
+        <div class="header-actions">
+            @if (!string.IsNullOrEmpty(usuarioId))
+            {
+                <div class="saldo-badge">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="12" cy="12" r="10"/>
+                    </svg>
+                    <span id="saldoDisplay">@saldoLadoCoins</span>
+                </div>
+                <button class="btn-destacar" onclick="abrirModalDestacar()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    </svg>
+                    <span>Destacar</span>
+                </button>
+            }
+            <a href="/Feed/Explorar" class="btn-close">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </a>
+        </div>
+    </div>
+
+    <!-- Contenedor del mosaico -->
+    <div class="muro-container">
+        <div class="muro-grid" id="muroGrid"></div>
+    </div>
+
+    <!-- Modal de foto ampliada con zoom -->
+    <div class="foto-modal" id="fotoModal">
+        <!-- Botón cerrar -->
+        <button class="foto-modal-close" onclick="cerrarFotoModal()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        </button>
+
+        <!-- Contenedor de la foto con zoom -->
+        <div class="foto-modal-content" id="fotoModalContent">
+            <div class="foto-zoom-container" id="fotoZoomContainer">
+                <img id="fotoModalImg" src="" alt="">
+            </div>
+        </div>
+
+        <!-- Hint de zoom (se oculta después de usarse) -->
+        <div class="zoom-hint" id="zoomHint">
+            Pellizca para hacer zoom o doble-tap
+        </div>
+
+        <!-- Controles de zoom -->
+        <div class="zoom-controls">
+            <button class="zoom-btn" onclick="zoomOut()">−</button>
+            <span class="zoom-level" id="zoomLevel">100%</span>
+            <button class="zoom-btn" onclick="zoomIn()">+</button>
+            <button class="zoom-reset" onclick="resetZoom()">Reset</button>
+        </div>
+
+        <!-- Info del creador -->
+        <div class="foto-modal-info">
+            <a href="#" id="fotoModalLink">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+                <span id="fotoModalCreador">Ver perfil</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Modal de destacar -->
+    <div class="modal-overlay" id="modalDestacar" onclick="cerrarModalDestacar(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2>Destacar mi foto</h2>
+                <button class="btn-close" onclick="cerrarModalDestacar()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--muted); margin-bottom: 16px; font-size: 14px;">
+                    Selecciona una de tus fotos para destacar en el muro:
+                </p>
+
+                <div class="mis-fotos-grid" id="misFotosGrid">
+                    <!-- Se llena con JS -->
+                </div>
+
+                <p style="color: var(--muted); margin-bottom: 12px; font-size: 14px;">
+                    Elige el nivel de destacado:
+                </p>
+
+                <div class="niveles-destacado" id="nivelesDestacado">
+                    <!-- Se llena con JS -->
+                </div>
+
+                <button class="btn-confirmar-destacar" id="btnConfirmarDestacar" disabled onclick="confirmarDestacar()">
+                    Selecciona foto y nivel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let fotosData = [];
+        let fotoSeleccionada = null;
+        let nivelSeleccionado = null;
+        let preciosNiveles = [];
+
+        // Calcular cuántas fotos necesitamos para llenar la pantalla
+        function calcularFotosNecesarias() {
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+            const cellSize = 19; // 18px + 1px gap
+            const columnas = Math.ceil(screenWidth / cellSize);
+            const filas = Math.ceil(screenHeight / cellSize);
+            // Con CSS Grid dense, necesitamos suficientes para llenar + extra
+            return Math.ceil(columnas * filas * 1.5);
+        }
+
+        // Cargar fotos del muro
+        async function cargarMuro() {
+            try {
+                const response = await fetch('/Feed/ObtenerFotosMuro?cantidad=500');
+                const data = await response.json();
+
+                if (data.success && data.fotos.length > 0) {
+                    fotosData = data.fotos;
+                    renderizarMuro();
+                } else {
+                    console.error('Error:', data.message || 'No hay fotos');
+                    document.getElementById('muroGrid').innerHTML = '<p style="color: white; text-align: center; width: 100%; padding: 50px;">No hay fotos disponibles</p>';
+                }
+            } catch (error) {
+                console.error('Error cargando muro:', error);
+            } finally {
+                document.getElementById('loadingOverlay').classList.add('hidden');
+            }
+        }
+
+        // Renderizar el mosaico
+        function renderizarMuro() {
+            const grid = document.getElementById('muroGrid');
+            grid.innerHTML = '';
+
+            const fotasNecesarias = calcularFotosNecesarias();
+            let fotosParaRenderizar = [];
+
+            // Duplicar fotos hasta tener suficientes
+            while (fotosParaRenderizar.length < fotasNecesarias) {
+                // Mezclar y agregar
+                const mezcladas = [...fotosData].sort(() => Math.random() - 0.5);
+                fotosParaRenderizar = fotosParaRenderizar.concat(mezcladas);
+            }
+
+            // Cortar al número necesario
+            fotosParaRenderizar = fotosParaRenderizar.slice(0, fotasNecesarias);
+
+            // Crear fragmento para mejor rendimiento
+            const fragment = document.createDocumentFragment();
+
+            fotosParaRenderizar.forEach((foto, index) => {
+                const div = document.createElement('div');
+                div.className = `muro-foto nivel-${foto.nivel}`;
+                div.onclick = () => abrirFotoModal(foto);
+
+                const img = document.createElement('img');
+                img.src = foto.thumbnail;
+                img.alt = foto.creadorNombre || '';
+                img.loading = index < 200 ? 'eager' : 'lazy'; // Cargar las primeras 200 inmediatamente
+                img.onerror = () => { div.style.display = 'none'; };
+
+                const tooltip = document.createElement('div');
+                tooltip.className = 'foto-tooltip';
+                tooltip.textContent = foto.creadorNombre || 'Usuario';
+
+                div.appendChild(img);
+                div.appendChild(tooltip);
+                fragment.appendChild(div);
+            });
+
+            grid.appendChild(fragment);
+        }
+
+        // Recargar al cambiar tamaño de ventana
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (fotosData.length > 0) {
+                    renderizarMuro();
+                }
+            }, 300);
+        });
+
+        // ========================================
+        // ZOOM DEL MODAL DE FOTO
+        // ========================================
+        let currentZoom = 1;
+        let currentX = 0;
+        let currentY = 0;
+        let isDragging = false;
+        let startX, startY;
+        let lastTouchEnd = 0;
+        let initialDistance = 0;
+        let initialZoom = 1;
+        const MIN_ZOOM = 1;
+        const MAX_ZOOM = 5;
+        const ZOOM_STEP = 0.5;
+
+        // Abrir modal de foto
+        function abrirFotoModal(foto) {
+            const modal = document.getElementById('fotoModal');
+            const img = document.getElementById('fotoModalImg');
+            const link = document.getElementById('fotoModalLink');
+            const creador = document.getElementById('fotoModalCreador');
+
+            // Reset zoom al abrir
+            resetZoom();
+
+            img.src = foto.thumbnail.replace('_thumb', '').replace('/thumbnails/', '/');
+            link.href = `/Feed/Perfil/${foto.creadorUsername}`;
+            creador.textContent = `Ver perfil de ${foto.creadorNombre}`;
+
+            modal.classList.add('active');
+
+            // Mostrar hint de zoom
+            const hint = document.getElementById('zoomHint');
+            hint.classList.remove('hidden');
+            setTimeout(() => hint.classList.add('hidden'), 3000);
+        }
+
+        // Cerrar modal
+        function cerrarFotoModal() {
+            document.getElementById('fotoModal').classList.remove('active');
+            resetZoom();
+        }
+
+        // Funciones de zoom
+        function zoomIn() {
+            setZoom(Math.min(currentZoom + ZOOM_STEP, MAX_ZOOM));
+        }
+
+        function zoomOut() {
+            setZoom(Math.max(currentZoom - ZOOM_STEP, MIN_ZOOM));
+        }
+
+        function resetZoom() {
+            currentZoom = 1;
+            currentX = 0;
+            currentY = 0;
+            updateTransform();
+            updateZoomLevel();
+        }
+
+        function setZoom(newZoom, centerX = null, centerY = null) {
+            const container = document.getElementById('fotoZoomContainer');
+            const rect = container.getBoundingClientRect();
+
+            // Si se proporciona un punto central, ajustar la posición para zoom hacia ese punto
+            if (centerX !== null && centerY !== null) {
+                const scaleChange = newZoom / currentZoom;
+                const containerCenterX = rect.left + rect.width / 2;
+                const containerCenterY = rect.top + rect.height / 2;
+
+                currentX = centerX - (centerX - containerCenterX + currentX) * scaleChange - containerCenterX + currentX;
+                currentY = centerY - (centerY - containerCenterY + currentY) * scaleChange - containerCenterY + currentY;
+            }
+
+            currentZoom = newZoom;
+
+            // Si el zoom es 1, resetear posición
+            if (currentZoom === 1) {
+                currentX = 0;
+                currentY = 0;
+            }
+
+            // Limitar pan cuando hay zoom
+            limitPan();
+            updateTransform();
+            updateZoomLevel();
+
+            // Ocultar hint después del primer zoom
+            document.getElementById('zoomHint').classList.add('hidden');
+        }
+
+        function updateTransform() {
+            const container = document.getElementById('fotoZoomContainer');
+            container.style.transform = `translate(${currentX}px, ${currentY}px) scale(${currentZoom})`;
+        }
+
+        function updateZoomLevel() {
+            document.getElementById('zoomLevel').textContent = `${Math.round(currentZoom * 100)}%`;
+        }
+
+        function limitPan() {
+            if (currentZoom <= 1) {
+                currentX = 0;
+                currentY = 0;
+                return;
+            }
+
+            const container = document.getElementById('fotoZoomContainer');
+            const img = document.getElementById('fotoModalImg');
+            const imgRect = img.getBoundingClientRect();
+
+            const maxX = (imgRect.width * (currentZoom - 1)) / 2;
+            const maxY = (imgRect.height * (currentZoom - 1)) / 2;
+
+            currentX = Math.max(-maxX, Math.min(maxX, currentX));
+            currentY = Math.max(-maxY, Math.min(maxY, currentY));
+        }
+
+        // ========================================
+        // EVENTOS TÁCTILES (Pinch-to-zoom)
+        // ========================================
+        function initTouchEvents() {
+            const container = document.getElementById('fotoZoomContainer');
+            const modalContent = document.getElementById('fotoModalContent');
+
+            // Doble tap para zoom
+            container.addEventListener('touchend', (e) => {
+                const now = Date.now();
+                if (now - lastTouchEnd < 300 && e.changedTouches.length === 1) {
+                    e.preventDefault();
+                    const touch = e.changedTouches[0];
+                    if (currentZoom > 1) {
+                        resetZoom();
+                    } else {
+                        setZoom(2.5, touch.clientX, touch.clientY);
+                    }
+                }
+                lastTouchEnd = now;
+            });
+
+            // Pinch to zoom
+            container.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    initialDistance = getDistance(e.touches[0], e.touches[1]);
+                    initialZoom = currentZoom;
+                } else if (e.touches.length === 1 && currentZoom > 1) {
+                    isDragging = true;
+                    startX = e.touches[0].clientX - currentX;
+                    startY = e.touches[0].clientY - currentY;
+                    container.classList.add('dragging');
+                }
+            }, { passive: false });
+
+            container.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    const distance = getDistance(e.touches[0], e.touches[1]);
+                    const scale = distance / initialDistance;
+                    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, initialZoom * scale));
+
+                    // Centro entre los dos dedos
+                    const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                    const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+                    setZoom(newZoom, centerX, centerY);
+                } else if (e.touches.length === 1 && isDragging && currentZoom > 1) {
+                    e.preventDefault();
+                    currentX = e.touches[0].clientX - startX;
+                    currentY = e.touches[0].clientY - startY;
+                    limitPan();
+                    updateTransform();
+                }
+            }, { passive: false });
+
+            container.addEventListener('touchend', () => {
+                isDragging = false;
+                container.classList.remove('dragging');
+            });
+
+            // Cerrar modal al tocar fuera de la imagen
+            modalContent.addEventListener('click', (e) => {
+                if (e.target === modalContent && currentZoom === 1) {
+                    cerrarFotoModal();
+                }
+            });
+        }
+
+        // ========================================
+        // EVENTOS DE MOUSE (Desktop)
+        // ========================================
+        function initMouseEvents() {
+            const container = document.getElementById('fotoZoomContainer');
+            const modalContent = document.getElementById('fotoModalContent');
+
+            // Doble click para zoom
+            container.addEventListener('dblclick', (e) => {
+                e.preventDefault();
+                if (currentZoom > 1) {
+                    resetZoom();
+                } else {
+                    setZoom(2.5, e.clientX, e.clientY);
+                }
+            });
+
+            // Rueda del mouse para zoom
+            container.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+                const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, currentZoom + delta));
+                setZoom(newZoom, e.clientX, e.clientY);
+            }, { passive: false });
+
+            // Arrastrar para pan
+            container.addEventListener('mousedown', (e) => {
+                if (currentZoom > 1) {
+                    isDragging = true;
+                    startX = e.clientX - currentX;
+                    startY = e.clientY - currentY;
+                    container.classList.add('dragging');
+                }
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging && currentZoom > 1) {
+                    currentX = e.clientX - startX;
+                    currentY = e.clientY - startY;
+                    limitPan();
+                    updateTransform();
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+                document.getElementById('fotoZoomContainer')?.classList.remove('dragging');
+            });
+
+            // Cerrar modal al click fuera de la imagen
+            modalContent.addEventListener('click', (e) => {
+                if (e.target === modalContent && currentZoom === 1) {
+                    cerrarFotoModal();
+                }
+            });
+        }
+
+        // Calcular distancia entre dos puntos táctiles
+        function getDistance(touch1, touch2) {
+            const dx = touch1.clientX - touch2.clientX;
+            const dy = touch1.clientY - touch2.clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        // Inicializar eventos de zoom cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', () => {
+            initTouchEvents();
+            initMouseEvents();
+        });
+
+        // Modal de destacar
+        async function abrirModalDestacar() {
+            const modal = document.getElementById('modalDestacar');
+            modal.classList.add('active');
+
+            // Cargar precios
+            if (preciosNiveles.length === 0) {
+                const preciosResponse = await fetch('/Feed/ObtenerPreciosDestacado');
+                const preciosData = await preciosResponse.json();
+                if (preciosData.success) {
+                    preciosNiveles = preciosData.precios;
+                    renderizarNiveles();
+                }
+            }
+
+            // Cargar mis fotos
+            const fotosResponse = await fetch('/Feed/ObtenerMisFotosParaDestacar');
+            const fotosData = await fotosResponse.json();
+            if (fotosData.success) {
+                renderizarMisFotos(fotosData.fotos);
+            }
+        }
+
+        function cerrarModalDestacar(event) {
+            if (!event || event.target.id === 'modalDestacar') {
+                document.getElementById('modalDestacar').classList.remove('active');
+                fotoSeleccionada = null;
+                nivelSeleccionado = null;
+                actualizarBotonConfirmar();
+            }
+        }
+
+        function renderizarMisFotos(fotos) {
+            const grid = document.getElementById('misFotosGrid');
+            grid.innerHTML = '';
+
+            if (fotos.length === 0) {
+                grid.innerHTML = '<p style="color: var(--muted); grid-column: 1/-1; text-align: center; padding: 20px;">No tienes fotos en LadoA para destacar</p>';
+                return;
+            }
+
+            fotos.forEach(foto => {
+                const div = document.createElement('div');
+                div.className = 'mi-foto-item';
+                div.onclick = () => seleccionarFoto(foto.id, div);
+
+                const img = document.createElement('img');
+                img.src = foto.thumbnail;
+                img.alt = foto.descripcion || '';
+                img.loading = 'lazy';
+
+                div.appendChild(img);
+
+                // Badge si ya está destacado
+                if (foto.destacadoActual) {
+                    const badge = document.createElement('div');
+                    badge.className = 'foto-destacado-badge';
+                    const niveles = ['', 'Bronce', 'Plata', 'Oro', 'Diamante'];
+
+                    const nivelSpan = document.createElement('span');
+                    nivelSpan.textContent = niveles[foto.destacadoActual] || 'Activo';
+                    badge.appendChild(nivelSpan);
+
+                    // Mostrar tiempo restante si está disponible
+                    if (foto.tiempoRestante) {
+                        const tiempoSpan = document.createElement('span');
+                        tiempoSpan.className = 'tiempo-restante';
+                        tiempoSpan.textContent = foto.tiempoRestante;
+                        badge.appendChild(tiempoSpan);
+                    }
+
+                    div.appendChild(badge);
+                }
+
+                grid.appendChild(div);
+            });
+        }
+
+        function renderizarNiveles() {
+            const container = document.getElementById('nivelesDestacado');
+            container.innerHTML = '';
+
+            const clases = ['bronce', 'plata', 'oro', 'diamante'];
+            const iconos = ['&#129353;', '&#129352;', '&#129351;', '&#128142;']; // Medallas emoji
+
+            preciosNiveles.forEach((nivel, i) => {
+                const div = document.createElement('div');
+                div.className = `nivel-card ${clases[i]}`;
+                div.onclick = () => seleccionarNivel(nivel.nivel, div);
+
+                div.innerHTML = `
+                    <div class="nivel-icon">${iconos[i]}</div>
+                    <div class="nivel-nombre">${nivel.nombre}</div>
+                    <div class="nivel-precio">${nivel.costo} LadoCoins</div>
+                    <div class="nivel-duracion">${nivel.duracion}h de duración</div>
+                    <div class="nivel-tamano">${nivel.tamano}px de tamaño</div>
+                `;
+
+                container.appendChild(div);
+            });
+        }
+
+        function seleccionarFoto(id, element) {
+            document.querySelectorAll('.mi-foto-item').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+            fotoSeleccionada = id;
+            actualizarBotonConfirmar();
+        }
+
+        function seleccionarNivel(nivel, element) {
+            document.querySelectorAll('.nivel-card').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+            nivelSeleccionado = nivel;
+            actualizarBotonConfirmar();
+        }
+
+        function actualizarBotonConfirmar() {
+            const btn = document.getElementById('btnConfirmarDestacar');
+            if (fotoSeleccionada && nivelSeleccionado) {
+                const precio = preciosNiveles.find(p => p.nivel === nivelSeleccionado);
+                btn.textContent = `Destacar por ${precio.costo} LadoCoins`;
+                btn.disabled = false;
+            } else {
+                btn.textContent = 'Selecciona foto y nivel';
+                btn.disabled = true;
+            }
+        }
+
+        async function confirmarDestacar() {
+            if (!fotoSeleccionada || !nivelSeleccionado) return;
+
+            const btn = document.getElementById('btnConfirmarDestacar');
+            btn.disabled = true;
+            btn.textContent = 'Procesando...';
+
+            try {
+                const formData = new FormData();
+                formData.append('contenidoId', fotoSeleccionada);
+                formData.append('nivel', nivelSeleccionado);
+
+                const response = await fetch('/Feed/DestacarFoto', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(data.message);
+                    document.getElementById('saldoDisplay').textContent = data.nuevoSaldo;
+                    cerrarModalDestacar();
+                    // Recargar el muro para ver el cambio
+                    document.getElementById('loadingOverlay').classList.remove('hidden');
+                    await cargarMuro();
+                } else {
+                    alert(data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al procesar la solicitud');
+            } finally {
+                actualizarBotonConfirmar();
+            }
+        }
+
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', cargarMuro);
+
+        // Tecla ESC para cerrar modales
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                cerrarFotoModal();
+                document.getElementById('modalDestacar').classList.remove('active');
+            }
+        });
+    </script>
+</body>
+</html>

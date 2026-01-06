@@ -53,31 +53,58 @@ namespace Lado.Controllers
 
             ViewBag.ImagenesMosaico = contenidoMosaico;
 
+            // SEO Meta Tags - Pagina principal
+            ViewData["Title"] = "Muestra tus dos lados";
+            ViewData["MetaDescription"] = "Lado es la plataforma donde los creadores de contenido muestran su lado autentico y exclusivo. Unete gratis y conecta con tus creadores favoritos.";
+            ViewData["MetaKeywords"] = "lado, red social, creadores de contenido, contenido exclusivo, fotos, videos, suscripciones";
+            ViewData["CanonicalUrl"] = $"{Request.Scheme}://{Request.Host}/";
+            ViewData["OgTitle"] = "Lado - Muestra tus dos lados";
+            ViewData["OgDescription"] = "La plataforma donde los creadores muestran su lado autentico y exclusivo.";
+            ViewData["OgType"] = "website";
+
             return View();
         }
 
         public IActionResult Privacy()
         {
+            ViewData["Title"] = "Politica de Privacidad";
+            ViewData["MetaDescription"] = "Politica de privacidad de Lado. Conoce como protegemos tu informacion personal y tus datos.";
+            ViewData["CanonicalUrl"] = $"{Request.Scheme}://{Request.Host}/Home/Privacy";
+            ViewData["Robots"] = "index, follow";
             return View();
         }
 
         public IActionResult Terms()
         {
+            ViewData["Title"] = "Terminos y Condiciones";
+            ViewData["MetaDescription"] = "Terminos y condiciones de uso de Lado. Lee las reglas y politicas de nuestra plataforma.";
+            ViewData["CanonicalUrl"] = $"{Request.Scheme}://{Request.Host}/Home/Terms";
+            ViewData["Robots"] = "index, follow";
             return View();
         }
 
         public IActionResult Contact()
         {
+            ViewData["Title"] = "Contacto";
+            ViewData["MetaDescription"] = "Contacta con el equipo de Lado. Estamos aqui para ayudarte con cualquier consulta o problema.";
+            ViewData["CanonicalUrl"] = $"{Request.Scheme}://{Request.Host}/Home/Contact";
             return View();
         }
 
         public IActionResult Cookies()
         {
+            ViewData["Title"] = "Politica de Cookies";
+            ViewData["MetaDescription"] = "Politica de cookies de Lado. Conoce como usamos las cookies para mejorar tu experiencia.";
+            ViewData["CanonicalUrl"] = $"{Request.Scheme}://{Request.Host}/Home/Cookies";
+            ViewData["Robots"] = "index, follow";
             return View();
         }
 
         public IActionResult About()
         {
+            ViewData["Title"] = "Acerca de Lado";
+            ViewData["MetaDescription"] = "Conoce mas sobre Lado, la plataforma de contenido exclusivo para creadores. Nuestra mision es conectar creadores con su audiencia.";
+            ViewData["CanonicalUrl"] = $"{Request.Scheme}://{Request.Host}/Home/About";
             return View();
         }
     }

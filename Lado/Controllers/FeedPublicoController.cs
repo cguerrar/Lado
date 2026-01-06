@@ -19,6 +19,14 @@ namespace Lado.Controllers
         private readonly IAdService _adService;
         private readonly IMediaIntegrityService _mediaIntegrity;
 
+        // Constantes de configuración
+        private const int MaxContenidoPublico = 300;
+        private const int MaxContenidoPremium = 10;
+        private const int MaxCreadoresSugeridos = 8;
+        private const int MaxCreadoresPremium = 6;
+        private const int MaxAnuncios = 2;
+        private const long MaxTamanoVideoBytes = 20 * 1024 * 1024; // 20MB
+
         public FeedPublicoController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
@@ -33,15 +41,21 @@ namespace Lado.Controllers
             _mediaIntegrity = mediaIntegrity;
         }
 
-        // GET: /FeedPublico o /FeedPublico/Index
+        #region Acciones Públicas
+
+        /// <summary>
+        /// GET: /FeedPublico - Página principal del feed público con mosaico
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> Index()
         {
             try
             {
-                // Verificar si el usuario está autenticado
                 var estaAutenticado = User.Identity?.IsAuthenticated ?? false;
                 ViewBag.EstaAutenticado = estaAutenticado;
+
+                // Configurar SEO
+                ConfigurarSeoIndex();
 
                 // Obtener IDs de usuarios que quieren ocultar su contenido del feed público
                 var usuariosOcultos = await _userManager.Users
@@ -49,24 +63,23 @@ namespace Lado.Controllers
                     .Select(u => u.Id)
                     .ToListAsync();
 
-                // 1. CONTENIDO PÚBLICO para el mosaico - obtener mas contenido
+                // 1. CONTENIDO PÚBLICO para el mosaico
                 // IMPORTANTE: Solo LadoA (público) - NO mostrar LadoB en feed público
-                // Priorizar contenido con thumbnail (videos) o imágenes sobre videos sin thumbnail
                 var contenidoPublicoRaw = await _context.Contenidos
                     .Include(c => c.Usuario)
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
                             && !c.EsPrivado
-                            && !c.EsContenidoSensible  // Excluir contenido sensible del mosaico publico
-                            && c.TipoLado == TipoLado.LadoA  // Solo contenido público LadoA
-                            && !string.IsNullOrEmpty(c.RutaArchivo)  // Solo contenido con media
+                            && !c.EsContenidoSensible
+                            && c.TipoLado == TipoLado.LadoA
+                            && !string.IsNullOrEmpty(c.RutaArchivo)
                             && c.Usuario != null
                             && c.Usuario.EstaActivo
-                            && !usuariosOcultos.Contains(c.UsuarioId))  // Respetar privacidad del usuario
+                            && !usuariosOcultos.Contains(c.UsuarioId))
                     .OrderByDescending(c => c.NumeroLikes + c.NumeroVistas)
                     .ThenByDescending(c => c.FechaPublicacion)
-                    .Take(400)  // Obtener más para compensar los que se filtren
+                    .Take(400)
                     .ToListAsync();
 
                 _logger.LogInformation("FeedPublico: Query BD retornó {Count} contenidos raw", contenidoPublicoRaw.Count);
@@ -75,25 +88,23 @@ namespace Lado.Controllers
                 List<Contenido> contenidoPublico;
                 try
                 {
-                    // Usar filtro especial para feed público que excluye videos grandes
-                    contenidoPublico = _mediaIntegrity.FiltrarContenidoParaFeedPublico(contenidoPublicoRaw, 20 * 1024 * 1024)
-                        .Take(300)
+                    contenidoPublico = _mediaIntegrity
+                        .FiltrarContenidoParaFeedPublico(contenidoPublicoRaw, MaxTamanoVideoBytes)
+                        .Take(MaxContenidoPublico)
                         .ToList();
-                    _logger.LogInformation("FeedPublico: Después de filtrar (integridad + tamaño): {Count} contenidos válidos", contenidoPublico.Count);
+                    _logger.LogInformation("FeedPublico: Después de filtrar: {Count} contenidos válidos", contenidoPublico.Count);
                 }
                 catch (Exception exFiltro)
                 {
                     _logger.LogError(exFiltro, "FeedPublico: Error en FiltrarContenidoParaFeedPublico, usando contenido sin filtrar");
-                    // Si falla el filtro, usar el contenido raw (mejor mostrar algo que nada)
-                    contenidoPublico = contenidoPublicoRaw.Take(300).ToList();
+                    contenidoPublico = contenidoPublicoRaw.Take(MaxContenidoPublico).ToList();
                 }
 
-                // FALLBACK: Si no hay contenido, intentar query más simple (sin filtros estrictos)
+                // FALLBACK: Si no hay contenido, intentar query más simple
                 if (!contenidoPublico.Any())
                 {
                     _logger.LogWarning("FeedPublico: No hay contenido con filtros normales, intentando fallback");
-
-                    var contenidoFallback = await _context.Contenidos
+                    contenidoPublico = await _context.Contenidos
                         .Include(c => c.Usuario)
                         .Where(c => c.EstaActivo
                                 && !c.EsBorrador
@@ -103,9 +114,7 @@ namespace Lado.Controllers
                         .OrderByDescending(c => c.FechaPublicacion)
                         .Take(100)
                         .ToListAsync();
-
-                    _logger.LogInformation("FeedPublico: Fallback retornó {Count} contenidos", contenidoFallback.Count);
-                    contenidoPublico = contenidoFallback;
+                    _logger.LogInformation("FeedPublico: Fallback retornó {Count} contenidos", contenidoPublico.Count);
                 }
 
                 // 2. CONTENIDO PREMIUM (LadoB) para mostrar difuminado
@@ -118,33 +127,32 @@ namespace Lado.Controllers
                             && c.TipoLado == TipoLado.LadoB
                             && c.Usuario != null
                             && c.Usuario.EstaActivo
-                            && !usuariosOcultos.Contains(c.UsuarioId))  // Respetar privacidad del usuario
+                            && !usuariosOcultos.Contains(c.UsuarioId))
                     .OrderByDescending(c => c.NumeroLikes)
                     .ThenByDescending(c => c.FechaPublicacion)
-                    .Take(20)  // Obtener más para compensar filtrados
+                    .Take(20)
                     .ToListAsync();
 
-                // Filtrar contenido premium cuyos archivos no existen
                 var contenidoPremium = _mediaIntegrity.FiltrarContenidoValido(contenidoPremiumRaw)
-                    .Take(10)
+                    .Take(MaxContenidoPremium)
                     .ToList();
 
                 ViewBag.ContenidoPremium = contenidoPremium;
                 ViewBag.ContenidoPremiumIds = contenidoPremium.Select(c => c.Id).ToList();
 
-                // 3. SUGERENCIAS DE USUARIOS (creadores populares, excluyendo admin)
+                // 3. SUGERENCIAS DE USUARIOS (creadores populares)
                 var creadoresSugeridos = await _userManager.Users
                     .Where(u => u.EstaActivo
                             && u.CreadorVerificado
                             && u.EsCreador
                             && u.UserName != "admin"
                             && !u.Email.ToLower().Contains("admin")
-                            && !usuariosOcultos.Contains(u.Id))  // Respetar privacidad del usuario
+                            && !usuariosOcultos.Contains(u.Id))
                     .OrderByDescending(u => u.NumeroSeguidores)
-                    .Take(8)
+                    .Take(MaxCreadoresSugeridos)
                     .ToListAsync();
 
-                // Si no hay suficientes verificados, agregar creadores activos (no admin)
+                // Si no hay suficientes verificados, agregar creadores activos
                 if (creadoresSugeridos.Count < 5)
                 {
                     var usuariosAdicionales = await _userManager.Users
@@ -152,10 +160,10 @@ namespace Lado.Controllers
                                 && u.EsCreador
                                 && u.UserName != "admin"
                                 && !u.Email.ToLower().Contains("admin")
-                                && !usuariosOcultos.Contains(u.Id)  // Respetar privacidad del usuario
+                                && !usuariosOcultos.Contains(u.Id)
                                 && !creadoresSugeridos.Select(cs => cs.Id).Contains(u.Id))
                         .OrderByDescending(u => u.NumeroSeguidores)
-                        .Take(8 - creadoresSugeridos.Count)
+                        .Take(MaxCreadoresSugeridos - creadoresSugeridos.Count)
                         .ToListAsync();
 
                     creadoresSugeridos.AddRange(usuariosAdicionales);
@@ -163,10 +171,10 @@ namespace Lado.Controllers
 
                 ViewBag.CreadoresSugeridos = creadoresSugeridos;
 
-                // 4. CREADORES PREMIUM (usuarios con contenido LadoB público)
+                // 4. CREADORES PREMIUM (usuarios con contenido LadoB)
                 var creadoresPremiumIds = await _context.Contenidos
                     .Where(c => c.TipoLado == TipoLado.LadoB && c.EstaActivo && !c.EsBorrador && !c.EsPrivado
-                            && !usuariosOcultos.Contains(c.UsuarioId))  // Respetar privacidad
+                            && !usuariosOcultos.Contains(c.UsuarioId))
                     .Select(c => c.UsuarioId)
                     .Distinct()
                     .ToListAsync();
@@ -176,42 +184,16 @@ namespace Lado.Controllers
                             && u.EstaActivo
                             && u.UserName != "admin"
                             && !u.Email.ToLower().Contains("admin")
-                            && !usuariosOcultos.Contains(u.Id))  // Respetar privacidad del usuario
+                            && !usuariosOcultos.Contains(u.Id))
                     .OrderByDescending(u => u.NumeroSeguidores)
-                    .Take(6)
+                    .Take(MaxCreadoresPremium)
                     .ToListAsync();
 
                 ViewBag.CreadoresPremium = creadoresPremium;
 
-                // 5. Mezclar contenido público y premium para el feed
-                var feedMezclado = new List<Contenido>();
-                var indexPublico = 0;
-                var indexPremium = 0;
-
-                // Intercalar contenido: cada 3 posts públicos, mostrar 1 premium
-                while (indexPublico < contenidoPublico.Count || indexPremium < contenidoPremium.Count)
-                {
-                    // Agregar hasta 3 posts públicos
-                    for (int i = 0; i < 3 && indexPublico < contenidoPublico.Count; i++)
-                    {
-                        feedMezclado.Add(contenidoPublico[indexPublico]);
-                        indexPublico++;
-                    }
-
-                    // Agregar 1 post premium (difuminado)
-                    if (indexPremium < contenidoPremium.Count)
-                    {
-                        feedMezclado.Add(contenidoPremium[indexPremium]);
-                        indexPremium++;
-                    }
-                }
-
-                _logger.LogInformation("Feed público: {TotalPublico} públicos, {TotalPremium} premium, {TotalSugeridos} creadores sugeridos, {UsuariosOcultos} usuarios ocultos",
-                    contenidoPublico.Count, contenidoPremium.Count, creadoresSugeridos.Count, usuariosOcultos.Count);
-
-                // 6. CARGAR ANUNCIOS PUBLICITARIOS
+                // 5. CARGAR ANUNCIOS PUBLICITARIOS
                 var usuarioId = estaAutenticado ? _userManager.GetUserId(User) : null;
-                var anuncios = await _adService.ObtenerAnunciosActivos(2, usuarioId);
+                var anuncios = await _adService.ObtenerAnunciosActivos(MaxAnuncios, usuarioId);
                 ViewBag.Anuncios = anuncios;
 
                 // Registrar impresiones de los anuncios mostrados
@@ -221,8 +203,7 @@ namespace Lado.Controllers
                     await _adService.RegistrarImpresion(anuncio.Id, usuarioId, ipAddress);
                 }
 
-                // 7. ESTADISTICAS PARA EL MOSAICO
-                // Contar creadores: LadoA (EsCreador o TipoUsuario=1) + LadoB (tiene seudónimo)
+                // 6. ESTADÍSTICAS PARA EL MOSAICO
                 var totalCreadores = await _userManager.Users
                     .CountAsync(u => u.EstaActivo &&
                         (u.EsCreador || u.TipoUsuario == 1 || !string.IsNullOrEmpty(u.Seudonimo)));
@@ -235,7 +216,9 @@ namespace Lado.Controllers
                 ViewBag.TotalUsuarios = totalUsuarios;
                 ViewBag.TotalContenido = totalContenido;
 
-                // Para el mosaico, devolver todo el contenido sin mezclar
+                _logger.LogInformation("FeedPublico: {TotalPublico} públicos, {TotalPremium} premium, {TotalSugeridos} sugeridos",
+                    contenidoPublico.Count, contenidoPremium.Count, creadoresSugeridos.Count);
+
                 return View(contenidoPublico);
             }
             catch (Exception ex)
@@ -246,7 +229,9 @@ namespace Lado.Controllers
             }
         }
 
-        // GET: /FeedPublico/VerPerfil/{id}
+        /// <summary>
+        /// GET: /FeedPublico/VerPerfil/{id} - Ver perfil público de un creador
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> VerPerfil(string id)
         {
@@ -259,7 +244,6 @@ namespace Lado.Controllers
                 }
 
                 var usuario = await _userManager.FindByIdAsync(id);
-
                 if (usuario == null || !usuario.EstaActivo)
                 {
                     TempData["Error"] = "Usuario no encontrado";
@@ -267,9 +251,8 @@ namespace Lado.Controllers
                 }
 
                 var estaAutenticado = User.Identity?.IsAuthenticated ?? false;
-
-                // Verificar si el creador es LadoB (tiene seudónimo = contenido premium)
                 var esCreadorLadoB = usuario.TieneLadoB();
+
                 ViewBag.EsCreadorLadoB = esCreadorLadoB;
 
                 var contenidoPublico = new List<Contenido>();
@@ -278,12 +261,11 @@ namespace Lado.Controllers
                 // Si es creador LadoB y usuario NO está autenticado, NO mostrar contenido
                 if (esCreadorLadoB && !estaAutenticado)
                 {
-                    // Creador LadoB + usuario anónimo = NO mostrar nada
                     // contenidoPublico y contenidoPremium quedan vacíos
                 }
                 else if (!estaAutenticado)
                 {
-                    // Usuario anónimo viendo creador LadoA: solo contenido marcado como público general
+                    // Usuario anónimo viendo creador LadoA: solo contenido público general
                     contenidoPublico = await _context.Contenidos
                         .Where(c => c.UsuarioId == id
                                 && c.EstaActivo
@@ -291,7 +273,7 @@ namespace Lado.Controllers
                                 && !c.Censurado
                                 && !c.EsPrivado
                                 && c.TipoLado == TipoLado.LadoA
-                                && c.EsPublicoGeneral)  // Solo contenido público general
+                                && c.EsPublicoGeneral)
                         .OrderByDescending(c => c.FechaPublicacion)
                         .Take(12)
                         .ToListAsync();
@@ -326,7 +308,6 @@ namespace Lado.Controllers
                 ViewBag.ContenidoPublico = contenidoPublico;
                 ViewBag.ContenidoPremium = contenidoPremium;
                 ViewBag.ContenidoPremiumIds = contenidoPremium.Select(c => c.Id).ToList();
-
                 ViewBag.TotalPublicaciones = contenidoPublico.Count + contenidoPremium.Count;
                 ViewBag.TotalLikes = contenidoPublico.Sum(c => c.NumeroLikes);
 
@@ -335,32 +316,10 @@ namespace Lado.Controllers
 
                 ViewBag.EstaAutenticado = estaAutenticado;
 
-                // ========================================
-                // DETERMINAR DATOS DE PERFIL A MOSTRAR
-                // ========================================
-                // Regla:
-                // - Creador LadoB (tiene seudónimo): mostrar perfil LadoB (seudónimo, foto premium)
-                // - Creador LadoA (sin seudónimo): mostrar perfil LadoA (nombre real, foto normal)
+                // Determinar datos de perfil a mostrar
+                ConfigurarDatosPerfilViewBag(usuario, esCreadorLadoB);
 
-                if (esCreadorLadoB)
-                {
-                    // Creador LadoB: mostrar seudónimo y datos premium
-                    ViewBag.NombreMostrar = usuario.Seudonimo ?? usuario.NombreCompleto ?? usuario.UserName ?? "Usuario";
-                    ViewBag.FotoMostrar = usuario.FotoPerfilLadoB ?? usuario.FotoPerfil ?? "";
-                    ViewBag.BioMostrar = usuario.BiografiaLadoB ?? usuario.Biografia ?? "";
-                    ViewBag.UsernameMostrar = usuario.Seudonimo ?? usuario.UserName ?? "";
-                }
-                else
-                {
-                    // Creador LadoA: mostrar nombre real y datos normales
-                    ViewBag.NombreMostrar = usuario.NombreCompleto ?? usuario.UserName ?? "Usuario";
-                    ViewBag.FotoMostrar = usuario.FotoPerfil ?? "";
-                    ViewBag.BioMostrar = usuario.Biografia ?? "";
-                    ViewBag.UsernameMostrar = usuario.UserName ?? "";
-                }
-
-                _logger.LogInformation("VerPerfil: Usuario={Id}, EsLadoB={EsLadoB}, Nombre={Nombre}",
-                    id, esCreadorLadoB, (string)ViewBag.NombreMostrar);
+                _logger.LogInformation("VerPerfil: Usuario={Id}, EsLadoB={EsLadoB}", id, esCreadorLadoB);
 
                 return View(usuario);
             }
@@ -372,7 +331,9 @@ namespace Lado.Controllers
             }
         }
 
-        // POST: /FeedPublico/RequiereLogin
+        /// <summary>
+        /// POST: /FeedPublico/RequiereLogin - Indica que se requiere autenticación
+        /// </summary>
         [HttpPost]
         public IActionResult RequiereLogin(string accion)
         {
@@ -386,9 +347,8 @@ namespace Lado.Controllers
             });
         }
 
-        // POST: /FeedPublico/RegistrarClicAnuncio
         /// <summary>
-        /// Registra un clic en un anuncio y retorna la URL de destino
+        /// POST: /FeedPublico/RegistrarClicAnuncio - Registra clic en anuncio
         /// </summary>
         [HttpPost]
         public async Task<IActionResult> RegistrarClicAnuncio(int anuncioId)
@@ -397,20 +357,17 @@ namespace Lado.Controllers
             {
                 var anuncio = await _context.Anuncios.FindAsync(anuncioId);
                 if (anuncio == null)
-                {
                     return Json(new { success = false, message = "Anuncio no encontrado" });
-                }
 
                 var usuarioId = User.Identity?.IsAuthenticated == true ? _userManager.GetUserId(User) : null;
                 var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-
                 var registrado = await _adService.RegistrarClic(anuncioId, usuarioId, ipAddress);
 
                 return Json(new
                 {
                     success = true,
                     urlDestino = anuncio.UrlDestino,
-                    registrado = registrado
+                    registrado
                 });
             }
             catch (Exception ex)
@@ -420,9 +377,8 @@ namespace Lado.Controllers
             }
         }
 
-        // GET: /FeedPublico/RedirectAnuncio/{id}
         /// <summary>
-        /// Redirige al usuario al destino del anuncio despues de registrar el clic
+        /// GET: /FeedPublico/RedirectAnuncio/{id} - Redirige al destino del anuncio
         /// </summary>
         [HttpGet]
         public async Task<IActionResult> RedirectAnuncio(int id)
@@ -431,9 +387,7 @@ namespace Lado.Controllers
             {
                 var anuncio = await _context.Anuncios.FindAsync(id);
                 if (anuncio == null || string.IsNullOrEmpty(anuncio.UrlDestino))
-                {
                     return RedirectToAction("Index");
-                }
 
                 var usuarioId = User.Identity?.IsAuthenticated == true ? _userManager.GetUserId(User) : null;
                 var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
@@ -455,7 +409,6 @@ namespace Lado.Controllers
                     return RedirectToAction("Index");
                 }
 
-                // Redirigir al destino validado
                 return Redirect(uri.ToString());
             }
             catch (Exception ex)
@@ -464,5 +417,49 @@ namespace Lado.Controllers
                 return RedirectToAction("Index");
             }
         }
+
+        #endregion
+
+        #region Métodos Privados
+
+        /// <summary>
+        /// Configura las meta tags SEO para la página Index
+        /// </summary>
+        private void ConfigurarSeoIndex()
+        {
+            ViewData["Title"] = "Explorar Contenido Exclusivo";
+            ViewData["MetaDescription"] = "Descubre creadores verificados y contenido exclusivo en Lado. Explora fotos, videos y conecta con tus creadores favoritos.";
+            ViewData["MetaKeywords"] = "explorar contenido, creadores, fotos exclusivas, videos, lado, red social";
+            ViewData["CanonicalUrl"] = $"{Request.Scheme}://{Request.Host}/FeedPublico";
+            ViewData["OgTitle"] = "Explorar Contenido - Lado";
+            ViewData["OgDescription"] = "Descubre creadores verificados y contenido exclusivo en Lado.";
+            ViewData["OgType"] = "website";
+            ViewData["SchemaType"] = "CollectionPage";
+        }
+
+        /// <summary>
+        /// Configura los datos de perfil en ViewBag según el tipo de creador
+        /// </summary>
+        private void ConfigurarDatosPerfilViewBag(ApplicationUser usuario, bool esCreadorLadoB)
+        {
+            if (esCreadorLadoB)
+            {
+                // Creador LadoB: mostrar seudónimo y datos premium
+                ViewBag.NombreMostrar = usuario.Seudonimo ?? usuario.NombreCompleto ?? usuario.UserName ?? "Usuario";
+                ViewBag.FotoMostrar = usuario.FotoPerfilLadoB ?? usuario.FotoPerfil ?? "";
+                ViewBag.BioMostrar = usuario.BiografiaLadoB ?? usuario.Biografia ?? "";
+                ViewBag.UsernameMostrar = usuario.Seudonimo ?? usuario.UserName ?? "";
+            }
+            else
+            {
+                // Creador LadoA: mostrar nombre real y datos normales
+                ViewBag.NombreMostrar = usuario.NombreCompleto ?? usuario.UserName ?? "Usuario";
+                ViewBag.FotoMostrar = usuario.FotoPerfil ?? "";
+                ViewBag.BioMostrar = usuario.Biografia ?? "";
+                ViewBag.UsernameMostrar = usuario.UserName ?? "";
+            }
+        }
+
+        #endregion
     }
 }

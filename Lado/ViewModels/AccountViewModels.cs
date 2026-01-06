@@ -42,11 +42,10 @@ namespace Lado.ViewModels
         [Display(Name = "Acepto los términos")]
         public bool AceptaTerminos { get; set; }
 
-        [Required(ErrorMessage = "El seudónimo es obligatorio")]
-        [StringLength(30, MinimumLength = 3, ErrorMessage = "Entre 3 y 30 caracteres")]
-        [RegularExpression(@"^[a-zA-Z0-9_\s]+$", ErrorMessage = "Solo letras, números, espacios y guión bajo")]
-        [Display(Name = "Seudónimo")]
-        public string Seudonimo { get; set; }
+        [StringLength(30, ErrorMessage = "Máximo 30 caracteres")]
+        [RegularExpression(@"^[a-zA-Z0-9_\s]*$", ErrorMessage = "Solo letras, números, espacios y guión bajo")]
+        [Display(Name = "Seudónimo (opcional)")]
+        public string? Seudonimo { get; set; }
 
         [Display(Name = "Lado Preferido")]
         public TipoLado LadoPreferido { get; set; } = TipoLado.LadoA;

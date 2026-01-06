@@ -17,7 +17,16 @@ namespace Lado.Middleware
         // Rutas a ignorar
         private static readonly HashSet<string> _rutasIgnorar = new(StringComparer.OrdinalIgnoreCase)
         {
-            "/api/", "/lib/", "/css/", "/js/", "/images/", "/uploads/", "/fonts/", "/_framework/", "/swagger"
+            "/api/", "/lib/", "/css/", "/js/", "/images/", "/uploads/", "/fonts/", "/_framework/", "/swagger",
+            "/signalr", "/hubs/", "/_blazor", "/health", "/favicon"
+        };
+
+        // Rutas que son AJAX o paginación (no contar como visita nueva)
+        private static readonly HashSet<string> _rutasAjax = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "/Feed/CargarMas", "/Feed/ObtenerPost", "/Feed/BuscarUsuarios",
+            "/Contenido/ObtenerArchivos", "/Mensajes/CargarMas", "/Notificaciones/",
+            "/Stories/", "/LadoCoins/ObtenerSaldo", "/Usuario/BuscarUsuarios"
         };
 
         public VisitasMiddleware(RequestDelegate next, ILogger<VisitasMiddleware> logger)
@@ -35,7 +44,7 @@ namespace Lado.Middleware
             var path = context.Request.Path.Value ?? "";
 
             // Verificar si debemos contar esta visita (solo respuestas exitosas)
-            if (DebeContarVisita(path, context.Request.Method) && context.Response.StatusCode < 400)
+            if (DebeContarVisita(path, context.Request) && context.Response.StatusCode < 400)
             {
                 try
                 {
@@ -64,14 +73,34 @@ namespace Lado.Middleware
             }
         }
 
-        private bool DebeContarVisita(string path, string method)
+        private bool DebeContarVisita(string path, HttpRequest request)
         {
+            var method = request.Method;
+
             // Solo contar solicitudes GET
             if (!method.Equals("GET", StringComparison.OrdinalIgnoreCase))
                 return false;
 
             // Ignorar rutas vacias
             if (string.IsNullOrEmpty(path))
+                return false;
+
+            // Ignorar solicitudes AJAX (X-Requested-With header)
+            if (request.Headers.ContainsKey("X-Requested-With") &&
+                request.Headers["X-Requested-With"].ToString().Equals("XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            // Ignorar si tiene header Accept que indica JSON (APIs)
+            var acceptHeader = request.Headers["Accept"].ToString();
+            if (acceptHeader.Contains("application/json") && !acceptHeader.Contains("text/html"))
+                return false;
+
+            // Ignorar paginacion (query string con page, skip, take, offset)
+            var query = request.QueryString.Value ?? "";
+            if (query.Contains("page=", StringComparison.OrdinalIgnoreCase) ||
+                query.Contains("skip=", StringComparison.OrdinalIgnoreCase) ||
+                query.Contains("offset=", StringComparison.OrdinalIgnoreCase) ||
+                query.Contains("cursor=", StringComparison.OrdinalIgnoreCase))
                 return false;
 
             // Ignorar archivos estaticos por extension
@@ -83,6 +112,13 @@ namespace Lado.Middleware
             foreach (var rutaIgnorar in _rutasIgnorar)
             {
                 if (path.StartsWith(rutaIgnorar, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+
+            // Ignorar rutas AJAX conocidas
+            foreach (var rutaAjax in _rutasAjax)
+            {
+                if (path.StartsWith(rutaAjax, StringComparison.OrdinalIgnoreCase))
                     return false;
             }
 

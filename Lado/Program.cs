@@ -236,13 +236,16 @@ builder.Services.AddScoped<Lado.Services.IBulkEmailService, Lado.Services.BulkEm
 builder.Services.AddScoped<Lado.Services.IVisitasService, Lado.Services.VisitasService>();
 builder.Services.AddScoped<Lado.Services.INotificationService, Lado.Services.NotificationService>();
 builder.Services.AddScoped<Lado.Services.IFeedAlgorithmService, Lado.Services.FeedAlgorithmService>();
+builder.Services.AddScoped<Lado.Services.IFeedContentService, Lado.Services.FeedContentService>();
 builder.Services.AddScoped<Lado.Services.IImageService, Lado.Services.ImageService>();
 builder.Services.AddScoped<Lado.Services.IMediaConversionService, Lado.Services.MediaConversionService>();
+builder.Services.AddScoped<Lado.Services.IVideoCompositorService, Lado.Services.VideoCompositorService>();
 builder.Services.AddScoped<Lado.Services.IDateTimeService, Lado.Services.DateTimeService>();
 builder.Services.AddScoped<Lado.Services.IInteresesService, Lado.Services.InteresesService>();
 builder.Services.AddScoped<Lado.Services.ILogEventoService, Lado.Services.LogEventoService>();
 builder.Services.AddScoped<Lado.Services.ITrustService, Lado.Services.TrustService>();
 builder.Services.AddScoped<Lado.Services.ILiquidacionService, Lado.Services.LiquidacionService>();
+builder.Services.AddScoped<Lado.Services.IPushNotificationService, Lado.Services.PushNotificationService>();
 builder.Services.AddHostedService<Lado.Services.LogCleanupService>();
 builder.Services.AddHostedService<Lado.Services.TokenCleanupService>();
 builder.Services.AddHostedService<Lado.Services.SuscripcionExpirationService>();
@@ -291,6 +294,11 @@ builder.Services.AddScoped<Lado.Services.ILadoCoinsService, Lado.Services.LadoCo
 builder.Services.AddScoped<Lado.Services.IReferidosService, Lado.Services.ReferidosService>();
 builder.Services.AddScoped<Lado.Services.IRachasService, Lado.Services.RachasService>();
 builder.Services.AddHostedService<Lado.Services.LadoCoinsExpirationBackgroundService>();
+
+// ========================================
+// GIPHY SERVICE (GIFs animados en Stories)
+// ========================================
+builder.Services.AddSingleton<Lado.Services.IGiphyService, Lado.Services.GiphyService>();
 builder.Services.AddHostedService<Lado.Services.RachasResetBackgroundService>();
 builder.Services.AddHostedService<Lado.Services.ReferidosBackgroundService>();
 
@@ -380,6 +388,7 @@ app.Use(async (context, next) =>
 
     // Content Security Policy - Flexible para permitir recursos necesarios
     // Solo aplicar CSP a páginas HTML, no a assets estáticos
+    // NOTA: img-src y media-src usan https: (sin http:) para forzar HTTPS y permitir contenido de usuario
     if (!path.StartsWith("/css") && !path.StartsWith("/js") &&
         !path.StartsWith("/lib") && !path.StartsWith("/images") &&
         !path.StartsWith("/uploads") && !path.StartsWith("/audio"))
@@ -388,9 +397,9 @@ app.Use(async (context, next) =>
                   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://ajax.aspnetcdn.com https://unpkg.com https://d3js.org https://www.google.com https://www.gstatic.com https://accounts.google.com; " +
                   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://accounts.google.com; " +
                   "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; " +
-                  "img-src 'self' data: blob: https: http:; " +
-                  "media-src 'self' data: blob: https: http:; " +
-                  "connect-src 'self' wss: ws: https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://api.openstreetmap.org https://nominatim.openstreetmap.org https://accounts.google.com https://oauth2.googleapis.com; " +
+                  "img-src 'self' data: blob: https://i.giphy.com https://media.giphy.com https://*.googleusercontent.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org https:; " +
+                  "media-src 'self' data: blob: https://i.giphy.com https://media.giphy.com https:; " +
+                  "connect-src 'self' wss: ws: https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://api.openstreetmap.org https://nominatim.openstreetmap.org https://api.giphy.com https://accounts.google.com https://oauth2.googleapis.com; " +
                   "frame-src 'self' https://www.google.com https://www.youtube.com https://accounts.google.com; " +
                   "worker-src 'self' blob:; " +
                   "manifest-src 'self'; " +
@@ -466,6 +475,29 @@ app.Use(async (context, next) =>
 
     await next();
 });
+
+// ========================================
+// SEO ROUTES - Sitemap y rutas SEO
+// ========================================
+app.MapControllerRoute(
+    name: "sitemap",
+    pattern: "sitemap.xml",
+    defaults: new { controller = "Seo", action = "Sitemap" });
+
+app.MapControllerRoute(
+    name: "sitemap-paginas",
+    pattern: "sitemap-paginas.xml",
+    defaults: new { controller = "Seo", action = "SitemapPaginas" });
+
+app.MapControllerRoute(
+    name: "sitemap-perfiles",
+    pattern: "sitemap-perfiles.xml",
+    defaults: new { controller = "Seo", action = "SitemapPerfiles" });
+
+app.MapControllerRoute(
+    name: "sitemap-contenido",
+    pattern: "sitemap-contenido.xml",
+    defaults: new { controller = "Seo", action = "SitemapContenido" });
 
 // ⭐⭐⭐ CORRECCIÓN CRÍTICA: Línea estaba incompleta
 app.MapControllerRoute(

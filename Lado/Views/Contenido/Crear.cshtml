@@ -28,46 +28,26 @@
         <form asp-action="Crear" method="post" enctype="multipart/form-data" id="formContenido">
             @Html.AntiForgeryToken()
 
-            <!-- Selección de Lado -->
+            <!-- Indicador visual del lado actual (no editable) -->
             <div class="form-section">
-                <label class="section-label">¿Dónde quieres publicar?</label>
-                <div class="lado-selector">
-                    <!-- LADO A - GRATIS CON NOMBRE REAL -->
-                    <div class="lado-option @(ladoPreferidoEsB ? "" : "active")" data-lado="ladoa" data-esgratis="true">
-                        <img src="/images/angelito.png" alt="" class="lado-mascota" />
-                        <div class="lado-badge ladoa">A</div>
-                        <div class="lado-info">
-                            <h3>LadoA · Público</h3>
-                            <p>Contenido gratuito con tu nombre real</p>
-                        </div>
-                        <div class="lado-check">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                            </svg>
-                        </div>
-                    </div>
-
-                    <!-- LADO B - CON SEUDÓNIMO (solo visible si verificado) -->
-                    @if (usuarioVerificado)
+                <div class="lado-actual-banner @(ladoPreferidoEsB ? "lado-b" : "lado-a")">
+                    @if (ladoPreferidoEsB)
                     {
-                        <div class="lado-option @(ladoPreferidoEsB ? "active" : "")" data-lado="ladob" data-esgratis="false">
-                            <img src="/images/diablito.png" alt="" class="lado-mascota" />
-                            <div class="lado-badge ladob">B</div>
-                            <div class="lado-info">
-                                <h3>LadoB · Con seudónimo</h3>
-                                <p>Contenido con tu identidad alternativa</p>
-                            </div>
-                            <div class="lado-check">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                                </svg>
-                            </div>
-                        </div>
+                        <img src="/images/diablito.png" alt="" class="lado-mascota-mini" />
+                        <div class="lado-badge-mini ladob">B</div>
+                        <span>Publicando como <strong>Lado B</strong> (seudónimo)</span>
                     }
+                    else
+                    {
+                        <img src="/images/angelito.png" alt="" class="lado-mascota-mini" />
+                        <div class="lado-badge-mini ladoa">A</div>
+                        <span>Publicando como <strong>Lado A</strong> (nombre real)</span>
+                    }
+                    <a href="/Contenido" class="cambiar-lado-link" title="Cambia tu identidad en el menú lateral y vuelve a crear">Cambiar</a>
                 </div>
             </div>
 
-            <!-- Input hidden para EsGratis -->
+            <!-- Input hidden para EsGratis (basado en LadoPreferido) -->
             <input type="hidden" name="EsGratis" id="esGratisInput" value="@(ladoPreferidoEsB ? "false" : "true")" />
 
             <!-- Opcion Feed Publico (solo para LadoA) -->
@@ -140,6 +120,13 @@
                     <div class="preview-items" id="previewItems">
                         <!-- Items de preview se agregan dinámicamente -->
                     </div>
+                    <div class="reorder-hint" id="reorderHint" style="display: none;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z"/>
+                        </svg>
+                        <span class="hint-desktop">Arrastra para reordenar</span>
+                        <span class="hint-mobile">Mantén presionado y arrastra</span>
+                    </div>
                     <button type="button" class="btn-add-more" id="addMoreBtn">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
@@ -200,19 +187,111 @@
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
                                 </svg>
-                                Monetizar contenido premium
+                                Configurar acceso al contenido
                             </h3>
                             <p>Este contenido se publicará en tu LadoB con tu seudónimo</p>
                         </div>
 
-                        <div class="precio-selector">
+                        <!-- Tipo de acceso -->
+                        <div class="acceso-selector">
+                            <label class="acceso-label">¿Quién puede ver este contenido?</label>
+                            <div class="acceso-options">
+                                <!-- Opción 1: Solo Suscriptores -->
+                                <label class="acceso-option" data-tipo="suscriptores">
+                                    <input type="radio" name="TipoAcceso" value="suscriptores" checked>
+                                    <div class="acceso-option-content">
+                                        <div class="acceso-icon suscriptores">
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                                            </svg>
+                                        </div>
+                                        <div class="acceso-text">
+                                            <strong>Solo suscriptores</strong>
+                                            <span>Incluido en tu plan de suscripción</span>
+                                        </div>
+                                        <div class="acceso-check">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </label>
+
+                                <!-- Opción 2: Compra Individual -->
+                                <label class="acceso-option" data-tipo="compra">
+                                    <input type="radio" name="TipoAcceso" value="compra">
+                                    <div class="acceso-option-content">
+                                        <div class="acceso-icon compra">
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+                                            </svg>
+                                        </div>
+                                        <div class="acceso-text">
+                                            <strong>Compra individual</strong>
+                                            <span>Cualquiera puede comprar este contenido</span>
+                                        </div>
+                                        <div class="acceso-check">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </label>
+
+                                <!-- Opción 3: Ambos -->
+                                <label class="acceso-option" data-tipo="ambos">
+                                    <input type="radio" name="TipoAcceso" value="ambos">
+                                    <div class="acceso-option-content">
+                                        <div class="acceso-icon ambos">
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M12 2l-5.5 9h11L12 2zm0 3.84L13.93 9h-3.87L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5s2.01 4.5 4.5 4.5 4.5-2.01 4.5-4.5-2.01-4.5-4.5-4.5zm0 7c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z"/>
+                                            </svg>
+                                        </div>
+                                        <div class="acceso-text">
+                                            <strong>Suscriptores + Compra</strong>
+                                            <span>Suscriptores gratis, otros pueden comprar</span>
+                                        </div>
+                                        <div class="acceso-check">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </label>
+
+                                <!-- Opción 4: Gratis para todos -->
+                                <label class="acceso-option" data-tipo="gratis">
+                                    <input type="radio" name="TipoAcceso" value="gratis">
+                                    <div class="acceso-option-content">
+                                        <div class="acceso-icon gratis">
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                            </svg>
+                                        </div>
+                                        <div class="acceso-text">
+                                            <strong>Gratis para todos</strong>
+                                            <span>Visible públicamente en tu LadoB</span>
+                                        </div>
+                                        <div class="acceso-check">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Selector de precio (solo visible si hay compra) -->
+                        <div class="precio-selector" id="precioSelectorDiv" style="display: none;">
                             <label class="precio-label">
-                                Precio de desbloqueo
+                                Precio de compra individual
                                 <span class="required">*</span>
                             </label>
                             <div class="precio-input-group">
                                 <span class="precio-currency">$</span>
                                 <select name="PrecioDesbloqueo" class="precio-select" id="precioSelect">
+                                    <option value="0">0 (Gratis)</option>
                                     <option value="5">5</option>
                                     <option value="10" selected>10</option>
                                     <option value="15">15</option>
@@ -234,9 +313,12 @@
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 4px;">
                                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
                                 </svg>
-                                Los usuarios pagarán este monto para desbloquear tu contenido
+                                Los no-suscriptores pagarán este monto para desbloquear
                             </small>
                         </div>
+
+                        <!-- Input hidden para SoloSuscriptores -->
+                        <input type="hidden" name="SoloSuscriptores" id="soloSuscriptoresInput" value="true" />
                     }
                 </div>
             </div>
@@ -432,117 +514,52 @@
         margin-left: 8px;
     }
 
-    .lado-selector {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 16px;
-    }
-
-    .lado-option {
+    /* Banner de lado actual (no editable) */
+    .lado-actual-banner {
         display: flex;
         align-items: center;
-        gap: 16px;
-        padding: 20px;
-        background: white;
-        border: 2px solid #E5E7EB;
+        gap: 12px;
+        padding: 16px 20px;
         border-radius: 12px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        position: relative;
-        overflow: visible;
+        font-size: 0.9375rem;
+        color: var(--fg);
     }
-
-        .lado-option:hover {
-            border-color: #4682B4;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(70, 130, 180, 0.15);
-        }
-
-        .lado-option.active {
-            border-color: #4682B4;
-            background: rgba(70, 130, 180, 0.05);
-        }
-
-    /* Mascotas angelito/diablito */
-    .lado-mascota {
-        position: absolute;
-        right: 15px;
-        bottom: calc(100% + 2px);
-        width: auto;
-        height: 60px;
-        transform: scale(0.7);
-        transform-origin: bottom right;
-        pointer-events: none;
-        z-index: 10;
-        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+    .lado-actual-banner.lado-a {
+        background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(29,78,216,0.05));
+        border: 1px solid rgba(59,130,246,0.2);
     }
-
-    .lado-badge {
-        width: 48px;
-        height: 48px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 24px;
-        font-weight: 700;
-        color: white;
-        flex-shrink: 0;
+    .lado-actual-banner.lado-b {
+        background: linear-gradient(135deg, rgba(236,72,153,0.1), rgba(190,24,93,0.05));
+        border: 1px solid rgba(236,72,153,0.2);
     }
-
-        .lado-badge.ladoa {
-            background: #4682B4;
-        }
-
-        .lado-badge.ladob {
-            background: #F59E0B;
-        }
-
-    .lado-info {
-        flex: 1;
+    .lado-mascota-mini {
+        width: 32px;
+        height: 32px;
+        object-fit: contain;
     }
-
-        .lado-info h3 {
-            font-size: 16px;
-            font-weight: 600;
-            color: #111827;
-            margin: 0 0 4px 0;
-        }
-
-        .lado-info p {
-            font-size: 13px;
-            color: #6B7280;
-            margin: 0;
-        }
-
-    .lado-check {
+    .lado-badge-mini {
         width: 24px;
         height: 24px;
         border-radius: 50%;
-        border: 2px solid #E5E7EB;
         display: flex;
         align-items: center;
         justify-content: center;
-        flex-shrink: 0;
-        transition: all 0.3s ease;
+        font-weight: 800;
+        font-size: 0.75rem;
+        color: white;
     }
-
-        .lado-check svg {
-            opacity: 0;
-            transform: scale(0);
-            transition: all 0.3s ease;
-        }
-
-    .lado-option.active .lado-check {
-        background: #4682B4;
-        border-color: #4682B4;
+    .lado-badge-mini.ladoa { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+    .lado-badge-mini.ladob { background: linear-gradient(135deg, #ec4899, #be185d); }
+    .cambiar-lado-link {
+        margin-left: auto;
+        font-size: 0.8125rem;
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 500;
     }
-
-        .lado-option.active .lado-check svg {
-            opacity: 1;
-            transform: scale(1);
-            fill: white;
-        }
+    .cambiar-lado-link:hover {
+        text-decoration: underline;
+    }
 
     .tipo-grid {
         display: grid;
@@ -1037,6 +1054,187 @@
         color: #6B7280;
     }
 
+    /* Selector de tipo de acceso */
+    .acceso-selector {
+        margin-bottom: 20px;
+    }
+
+    .acceso-label {
+        display: block;
+        font-size: 15px;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 12px;
+    }
+
+    .acceso-options {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .acceso-option {
+        cursor: pointer;
+    }
+
+    .acceso-option input[type="radio"] {
+        display: none;
+    }
+
+    .acceso-option-content {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        background: #F9FAFB;
+        border: 2px solid #E5E7EB;
+        border-radius: 12px;
+        transition: all 0.2s ease;
+    }
+
+    .acceso-option:hover .acceso-option-content {
+        border-color: #9CA3AF;
+        background: #F3F4F6;
+    }
+
+    .acceso-option input:checked + .acceso-option-content {
+        border-color: var(--primary-color, #6366F1);
+        background: rgba(99, 102, 241, 0.08);
+    }
+
+    .acceso-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .acceso-icon.suscriptores {
+        background: linear-gradient(135deg, #8B5CF6, #6366F1);
+        color: white;
+    }
+
+    .acceso-icon.compra {
+        background: linear-gradient(135deg, #F59E0B, #D97706);
+        color: white;
+    }
+
+    .acceso-icon.ambos {
+        background: linear-gradient(135deg, #10B981, #059669);
+        color: white;
+    }
+
+    .acceso-icon.gratis {
+        background: linear-gradient(135deg, #3B82F6, #2563EB);
+        color: white;
+    }
+
+    .acceso-text {
+        flex: 1;
+    }
+
+    .acceso-text strong {
+        display: block;
+        font-size: 15px;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 2px;
+    }
+
+    .acceso-text span {
+        font-size: 13px;
+        color: #6B7280;
+    }
+
+    .acceso-check {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #E5E7EB;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: all 0.2s ease;
+    }
+
+    .acceso-check svg {
+        width: 16px;
+        height: 16px;
+        color: white;
+    }
+
+    .acceso-option input:checked + .acceso-option-content .acceso-check {
+        opacity: 1;
+        background: var(--primary-color, #6366F1);
+    }
+
+    .acceso-option.selected .acceso-option-content {
+        border-color: var(--primary-color, #6366F1);
+        background: rgba(99, 102, 241, 0.08);
+    }
+
+    .acceso-option.selected .acceso-check {
+        opacity: 1;
+        background: var(--primary-color, #6366F1);
+    }
+
+    /* Precio selector en LadoB */
+    .precio-selector {
+        margin-top: 16px;
+        padding: 16px;
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(217, 119, 6, 0.05) 100%);
+        border: 1px solid rgba(245, 158, 11, 0.25);
+        border-radius: 12px;
+    }
+
+    .precio-label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: #92400E;
+        margin-bottom: 10px;
+    }
+
+    .precio-input-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .precio-currency {
+        font-size: 18px;
+        font-weight: 700;
+        color: #D97706;
+    }
+
+    .precio-select {
+        padding: 10px 16px;
+        font-size: 16px;
+        font-weight: 600;
+        border: 2px solid #E5E7EB;
+        border-radius: 8px;
+        background: white;
+        color: #111827;
+        cursor: pointer;
+        min-width: 120px;
+    }
+
+    .precio-select:focus {
+        outline: none;
+        border-color: #F59E0B;
+    }
+
+    .precio-hint {
+        display: block;
+        margin-top: 8px;
+        font-size: 12px;
+        color: #92400E;
+    }
+
     /* Preview Blur Card */
     .preview-blur-card {
         background: linear-gradient(135deg, rgba(147, 51, 234, 0.05) 0%, rgba(192, 132, 252, 0.08) 100%);
@@ -1460,37 +1658,6 @@
             margin-top: 6px;
         }
 
-        /* Lado selector mobile */
-        .lado-selector {
-            grid-template-columns: 1fr;
-            gap: 12px;
-        }
-
-        .lado-option {
-            padding: 16px;
-            gap: 12px;
-        }
-
-        .lado-mascota {
-            height: 45px;
-            right: 10px;
-        }
-
-        .lado-badge {
-            width: 40px;
-            height: 40px;
-            font-size: 20px;
-            border-radius: 10px;
-        }
-
-        .lado-info h3 {
-            font-size: 15px;
-        }
-
-        .lado-info p {
-            font-size: 12px;
-        }
-
         /* Upload zone mobile */
         .upload-zone {
             padding: 32px 16px;
@@ -1736,16 +1903,6 @@
             font-size: 20px;
         }
 
-        .lado-option {
-            padding: 14px 12px;
-        }
-
-        .lado-badge {
-            width: 36px;
-            height: 36px;
-            font-size: 18px;
-        }
-
         .preview-items {
             grid-template-columns: repeat(2, 1fr);
         }
@@ -1769,14 +1926,6 @@
             gap: 4px;
         }
 
-        .lado-info h3 {
-            font-size: 14px;
-        }
-
-        .lado-info p {
-            font-size: 11px;
-        }
-
         .upload-content h3 {
             font-size: 14px;
         }
@@ -1784,16 +1933,6 @@
 
     /* Touch device optimizations */
     @@media (hover: none) and (pointer: coarse) {
-        .lado-option:hover {
-            transform: none;
-            box-shadow: none;
-        }
-
-        .lado-option:active {
-            transform: scale(0.98);
-            background: rgba(70, 130, 180, 0.08);
-        }
-
         .upload-zone:hover {
             transform: none;
         }
@@ -1907,6 +2046,55 @@
 
     .preview-item:hover {
         border-color: #4682B4;
+    }
+
+    .preview-item.dragging {
+        opacity: 0.5;
+        border: 2px dashed #4682B4;
+    }
+
+    .preview-item.drag-over {
+        border: 2px solid #10B981;
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .preview-items.has-multiple .preview-item {
+        cursor: grab;
+    }
+
+    .preview-items.has-multiple .preview-item:active {
+        cursor: grabbing;
+    }
+
+    .reorder-hint {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: rgba(70, 130, 180, 0.1);
+        border-radius: 8px;
+        color: #4682B4;
+        font-size: 13px;
+        margin-bottom: 12px;
+    }
+
+    .reorder-hint svg {
+        opacity: 0.8;
+    }
+
+    .reorder-hint .hint-mobile {
+        display: none;
+    }
+
+    @@media (hover: none) and (pointer: coarse) {
+        .reorder-hint .hint-desktop {
+            display: none;
+        }
+        .reorder-hint .hint-mobile {
+            display: inline;
+        }
     }
 
     .preview-item img,
@@ -2023,6 +2211,51 @@
 
 @section Scripts {
     <script>
+        // Capturar errores globales y enviarlos al servidor
+        window.onerror = function(mensaje, archivo, linea, columna, error) {
+            try {
+                const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                fetch('/Stories/LogErrorFrontend', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify({
+                        mensaje: mensaje,
+                        componente: 'ContenidoCrear',
+                        archivo: archivo,
+                        linea: linea,
+                        columna: columna,
+                        stack: error?.stack || null
+                    })
+                }).catch(() => {});
+            } catch (e) {}
+            return false;
+        };
+
+        // Capturar promesas no manejadas
+        window.onunhandledrejection = function(event) {
+            try {
+                const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                fetch('/Stories/LogErrorFrontend', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify({
+                        mensaje: 'Unhandled Promise Rejection: ' + (event.reason?.message || event.reason || 'Unknown'),
+                        componente: 'ContenidoCrear',
+                        archivo: null,
+                        linea: null,
+                        columna: null,
+                        stack: event.reason?.stack || null
+                    })
+                }).catch(() => {});
+            } catch (e) {}
+        };
+
         document.addEventListener('DOMContentLoaded', function() {
             const usuarioVerificado = @(usuarioVerificado ? "true" : "false");
             const ladoPreferidoEsB = @(ladoPreferidoEsB ? "true" : "false");
@@ -2033,7 +2266,6 @@
             const MAX_SIZE_VIDEO_MB = @limiteVideoMB;
 
             // Elementos
-            const ladoOptions = document.querySelectorAll('.lado-option');
             const esGratisInput = document.getElementById('esGratisInput');
             const precioSectionWrapper = document.getElementById('precioSectionWrapper');
             const tipoInput = document.getElementById('tipoContenidoInput');
@@ -2104,51 +2336,6 @@
                 }
             });
 
-            // Selector de Lado
-            ladoOptions.forEach(option => {
-                option.addEventListener('click', function() {
-                    ladoOptions.forEach(opt => opt.classList.remove('active'));
-                    this.classList.add('active');
-
-                    const esGratis = this.dataset.esgratis === 'true';
-                    esGratisInput.value = esGratis ? 'true' : 'false';
-
-                    if (esGratis) {
-                        precioSectionWrapper.style.display = 'none';
-                        if (precioSelect) precioSelect.removeAttribute('required');
-                    } else {
-                        precioSectionWrapper.style.display = 'block';
-                        if (usuarioVerificado && precioSelect) {
-                            precioSelect.setAttribute('required', 'required');
-                        }
-                    }
-
-                    const ladoSeleccionado = this.dataset.lado;
-                    if (feedPublicoSection) {
-                        if (ladoSeleccionado === 'ladoa') {
-                            feedPublicoSection.style.display = 'block';
-                        } else {
-                            feedPublicoSection.style.display = 'none';
-                            if (esPublicoGeneralInput) {
-                                esPublicoGeneralInput.checked = false;
-                            }
-                        }
-                    }
-
-                    // Controlar visibilidad de preview blur section
-                    const previewBlurSection = document.getElementById('previewBlurSection');
-                    if (previewBlurSection) {
-                        if (ladoSeleccionado === 'ladob') {
-                            previewBlurSection.style.display = 'block';
-                        } else {
-                            previewBlurSection.style.display = 'none';
-                            const crearPreviewBlurInput = document.getElementById('crearPreviewBlurInput');
-                            if (crearPreviewBlurInput) crearPreviewBlurInput.checked = false;
-                        }
-                    }
-                });
-            });
-
             // Checkbox de preview blur - mostrar/ocultar selector de tipo de censura
             const crearPreviewBlurInput = document.getElementById('crearPreviewBlurInput');
             const tipoCensuraSelector = document.getElementById('tipoCensuraSelector');
@@ -2164,6 +2351,55 @@
                 option.addEventListener('click', function() {
                     tipoCensuraOptions.forEach(opt => opt.classList.remove('selected'));
                     this.classList.add('selected');
+                });
+            });
+
+            // Selector de tipo de acceso (LadoB) - Solo suscriptores, Compra, Ambos, Gratis
+            const accesoOptions = document.querySelectorAll('.acceso-option');
+            const precioSelectorDiv = document.getElementById('precioSelectorDiv');
+            const soloSuscriptoresInput = document.getElementById('soloSuscriptoresInput');
+
+            // Inicializar la primera opción como seleccionada
+            if (accesoOptions.length > 0) {
+                const primeraOpcion = accesoOptions[0];
+                primeraOpcion.classList.add('selected');
+            }
+
+            accesoOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    // Actualizar selección visual
+                    accesoOptions.forEach(opt => opt.classList.remove('selected'));
+                    this.classList.add('selected');
+
+                    const tipoAcceso = this.querySelector('input[name="TipoAcceso"]').value;
+
+                    // Actualizar hidden inputs según la opción
+                    switch(tipoAcceso) {
+                        case 'suscriptores':
+                            // Solo suscriptores: incluido en plan, sin precio individual
+                            if (soloSuscriptoresInput) soloSuscriptoresInput.value = 'true';
+                            if (precioSelectorDiv) precioSelectorDiv.style.display = 'none';
+                            if (precioSelect) precioSelect.value = '0';
+                            break;
+                        case 'compra':
+                            // Compra individual: cualquiera puede comprar, NO incluido en suscripción
+                            if (soloSuscriptoresInput) soloSuscriptoresInput.value = 'false';
+                            if (precioSelectorDiv) precioSelectorDiv.style.display = 'block';
+                            if (precioSelect && precioSelect.value === '0') precioSelect.value = '10';
+                            break;
+                        case 'ambos':
+                            // Suscriptores gratis + otros pueden comprar
+                            if (soloSuscriptoresInput) soloSuscriptoresInput.value = 'true';
+                            if (precioSelectorDiv) precioSelectorDiv.style.display = 'block';
+                            if (precioSelect && precioSelect.value === '0') precioSelect.value = '10';
+                            break;
+                        case 'gratis':
+                            // Gratis para todos en LadoB
+                            if (soloSuscriptoresInput) soloSuscriptoresInput.value = 'false';
+                            if (precioSelectorDiv) precioSelectorDiv.style.display = 'none';
+                            if (precioSelect) precioSelect.value = '0';
+                            break;
+                    }
                 });
             });
 
@@ -2530,11 +2766,159 @@
                     });
                     item.appendChild(removeBtn);
 
+                    // Drag & Drop para reordenar (solo si hay más de 1 archivo)
+                    if (selectedFiles.length > 1) {
+                        item.draggable = true;
+
+                        item.addEventListener('dragstart', (e) => {
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.dataTransfer.setData('text/plain', index.toString());
+                            item.classList.add('dragging');
+                            draggedIndex = index;
+                        });
+
+                        item.addEventListener('dragend', () => {
+                            item.classList.remove('dragging');
+                            document.querySelectorAll('.preview-item').forEach(el => el.classList.remove('drag-over'));
+                            draggedIndex = null;
+                        });
+
+                        item.addEventListener('dragover', (e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                            if (draggedIndex !== null && draggedIndex !== index) {
+                                item.classList.add('drag-over');
+                            }
+                        });
+
+                        item.addEventListener('dragleave', () => {
+                            item.classList.remove('drag-over');
+                        });
+
+                        item.addEventListener('drop', (e) => {
+                            e.preventDefault();
+                            item.classList.remove('drag-over');
+                            const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                            const toIndex = index;
+
+                            if (fromIndex !== toIndex && !isNaN(fromIndex)) {
+                                // Reordenar array
+                                const [movedFile] = selectedFiles.splice(fromIndex, 1);
+                                selectedFiles.splice(toIndex, 0, movedFile);
+                                console.log('[Reorder] Movido de posición', fromIndex + 1, 'a', toIndex + 1);
+                                updatePreviewGrid();
+                            }
+                        });
+
+                        // Touch support para móviles
+                        setupTouchReorder(item, index);
+                    }
+
                     previewItems.appendChild(item);
                 });
 
+                // Agregar clase y hint si hay múltiples archivos (para cursor grab y reordenar)
+                const reorderHint = document.getElementById('reorderHint');
+                if (selectedFiles.length > 1) {
+                    previewItems.classList.add('has-multiple');
+                    if (reorderHint) reorderHint.style.display = 'flex';
+                } else {
+                    previewItems.classList.remove('has-multiple');
+                    if (reorderHint) reorderHint.style.display = 'none';
+                }
+
                 // Actualizar el input file con los archivos seleccionados
                 updateFileInput();
+            }
+
+            // Variable para tracking del drag
+            let draggedIndex = null;
+
+            // Touch support para móviles
+            let touchStartIndex = null;
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let touchMoved = false;
+
+            function setupTouchReorder(item, index) {
+                if (selectedFiles.length <= 1) return;
+
+                let longPressTimer = null;
+                let isDragging = false;
+
+                item.addEventListener('touchstart', (e) => {
+                    touchStartIndex = index;
+                    touchStartX = e.touches[0].clientX;
+                    touchStartY = e.touches[0].clientY;
+                    touchMoved = false;
+
+                    // Long press para iniciar drag
+                    longPressTimer = setTimeout(() => {
+                        isDragging = true;
+                        item.classList.add('dragging');
+                        navigator.vibrate && navigator.vibrate(50); // Feedback háptico
+                    }, 300);
+                }, { passive: true });
+
+                item.addEventListener('touchmove', (e) => {
+                    const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
+                    const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
+
+                    if (deltaX > 10 || deltaY > 10) {
+                        touchMoved = true;
+                        if (!isDragging) {
+                            clearTimeout(longPressTimer);
+                        }
+                    }
+
+                    if (isDragging) {
+                        e.preventDefault();
+                        // Encontrar elemento bajo el dedo
+                        const touch = e.touches[0];
+                        const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+                        const targetItem = elementBelow?.closest('.preview-item');
+
+                        document.querySelectorAll('.preview-item').forEach(el => el.classList.remove('drag-over'));
+                        if (targetItem && targetItem !== item) {
+                            targetItem.classList.add('drag-over');
+                        }
+                    }
+                }, { passive: false });
+
+                item.addEventListener('touchend', (e) => {
+                    clearTimeout(longPressTimer);
+
+                    if (isDragging) {
+                        item.classList.remove('dragging');
+
+                        // Encontrar destino
+                        const touch = e.changedTouches[0];
+                        const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+                        const targetItem = elementBelow?.closest('.preview-item');
+
+                        document.querySelectorAll('.preview-item').forEach(el => el.classList.remove('drag-over'));
+
+                        if (targetItem && targetItem !== item) {
+                            const toIndex = parseInt(targetItem.dataset.index);
+                            if (!isNaN(toIndex) && toIndex !== index) {
+                                const [movedFile] = selectedFiles.splice(index, 1);
+                                selectedFiles.splice(toIndex, 0, movedFile);
+                                console.log('[Touch Reorder] Movido de posición', index + 1, 'a', toIndex + 1);
+                                updatePreviewGrid();
+                            }
+                        }
+                    }
+
+                    isDragging = false;
+                    touchStartIndex = null;
+                }, { passive: true });
+
+                item.addEventListener('touchcancel', () => {
+                    clearTimeout(longPressTimer);
+                    item.classList.remove('dragging');
+                    document.querySelectorAll('.preview-item').forEach(el => el.classList.remove('drag-over'));
+                    isDragging = false;
+                }, { passive: true });
             }
 
             function updateFileInput() {

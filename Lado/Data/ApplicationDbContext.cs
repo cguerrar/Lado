@@ -37,6 +37,7 @@ namespace Lado.Data
         public DbSet<Story> Stories { get; set; }
         public DbSet<StoryVista> StoryVistas { get; set; }
         public DbSet<StoryLike> StoryLikes { get; set; }
+        public DbSet<StoryDraft> StoryDrafts { get; set; }
         public DbSet<Reaccion> Reacciones { get; set; }
         public DbSet<Coleccion> Colecciones { get; set; }
         public DbSet<ContenidoColeccion> ContenidoColecciones { get; set; }
@@ -81,6 +82,12 @@ namespace Lado.Data
         // ⭐ DbSets NUEVOS - NOTIFICACIONES
         // ========================================
         public DbSet<Notificacion> Notificaciones { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - PUSH NOTIFICATIONS
+        // ========================================
+        public DbSet<PushSubscription> PushSubscriptions { get; set; }
+        public DbSet<PreferenciasNotificacion> PreferenciasNotificaciones { get; set; }
 
         // ========================================
         // ⭐ DbSets NUEVOS - LOGS Y EVENTOS
@@ -154,6 +161,11 @@ namespace Lado.Data
         public DbSet<Referido> Referidos { get; set; }
         public DbSet<RachaUsuario> RachasUsuarios { get; set; }
         public DbSet<ConfiguracionLadoCoin> ConfiguracionesLadoCoins { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - PHOTOWALL (MURO)
+        // ========================================
+        public DbSet<FotoDestacada> FotosDestacadas { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -2002,6 +2014,44 @@ namespace Lado.Data
                     .IsUnique()
                     .HasFilter("[CodigoReferido] IS NOT NULL")
                     .HasDatabaseName("IX_AspNetUsers_CodigoReferido");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE FOTOS DESTACADAS (PHOTOWALL)
+            // ========================================
+            modelBuilder.Entity<FotoDestacada>(entity =>
+            {
+                entity.HasKey(f => f.Id);
+
+                entity.HasOne(f => f.Contenido)
+                    .WithMany()
+                    .HasForeignKey(f => f.ContenidoId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(f => f.Usuario)
+                    .WithMany()
+                    .HasForeignKey(f => f.UsuarioId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.Property(f => f.CostoPagado)
+                    .HasDefaultValue(0);
+
+                // Índices
+                entity.HasIndex(f => f.ContenidoId)
+                    .HasDatabaseName("IX_FotosDestacadas_ContenidoId");
+
+                entity.HasIndex(f => f.UsuarioId)
+                    .HasDatabaseName("IX_FotosDestacadas_UsuarioId");
+
+                entity.HasIndex(f => f.FechaExpiracion)
+                    .HasDatabaseName("IX_FotosDestacadas_FechaExpiracion");
+
+                entity.HasIndex(f => f.Nivel)
+                    .HasDatabaseName("IX_FotosDestacadas_Nivel");
+
+                // Índice compuesto para obtener destacados activos
+                entity.HasIndex(f => new { f.FechaInicio, f.FechaExpiracion, f.Nivel })
+                    .HasDatabaseName("IX_FotosDestacadas_Activos");
             });
         }
     }

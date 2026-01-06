@@ -272,6 +272,105 @@ namespace Lado.Controllers
             return Ok(new { success = true, contadorUsos = pista.ContadorUsos });
         }
 
+        /// <summary>
+        /// Proxy para servir archivos de audio con headers correctos para CORS y iOS
+        /// Esto evita problemas de fetch() con AudioContext en navegadores móviles
+        /// </summary>
+        [HttpGet("audio/{id}")]
+        [AllowAnonymous] // Permitir acceso sin autenticación para reproductores
+        public async Task<IActionResult> GetAudio(int id)
+        {
+            var pista = await _context.PistasMusica.FindAsync(id);
+            if (pista == null || string.IsNullOrEmpty(pista.RutaArchivo))
+            {
+                return NotFound();
+            }
+
+            try
+            {
+                // Construir la ruta del archivo
+                var webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+                var relativePath = pista.RutaArchivo.TrimStart('/');
+                var fullPath = Path.Combine(webRootPath, relativePath);
+
+                if (!System.IO.File.Exists(fullPath))
+                {
+                    _logger.LogWarning("Archivo de audio no encontrado: {Path}", fullPath);
+                    return NotFound();
+                }
+
+                // Detectar el tipo MIME
+                var extension = Path.GetExtension(fullPath).ToLowerInvariant();
+                var contentType = extension switch
+                {
+                    ".mp3" => "audio/mpeg",
+                    ".m4a" => "audio/mp4",
+                    ".aac" => "audio/aac",
+                    ".ogg" => "audio/ogg",
+                    ".wav" => "audio/wav",
+                    ".webm" => "audio/webm",
+                    _ => "audio/mpeg"
+                };
+
+                // Leer el archivo
+                var fileBytes = await System.IO.File.ReadAllBytesAsync(fullPath);
+
+                // Agregar headers para CORS y caché
+                Response.Headers["Access-Control-Allow-Origin"] = "*";
+                Response.Headers["Access-Control-Allow-Methods"] = "GET, OPTIONS";
+                Response.Headers["Access-Control-Allow-Headers"] = "Range, Content-Type";
+                Response.Headers["Accept-Ranges"] = "bytes";
+                Response.Headers["Cache-Control"] = "public, max-age=86400"; // Cachear por 24h
+
+                return File(fileBytes, contentType);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al servir audio para pista {Id}", id);
+                return StatusCode(500, "Error al cargar el audio");
+            }
+        }
+
+        /// <summary>
+        /// Proxy para servir audio desde URL externa (si se necesita)
+        /// </summary>
+        [HttpGet("proxy")]
+        public async Task<IActionResult> ProxyAudio([FromQuery] string url)
+        {
+            if (string.IsNullOrEmpty(url))
+            {
+                return BadRequest("URL requerida");
+            }
+
+            try
+            {
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0");
+
+                var response = await httpClient.GetAsync(url);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return StatusCode((int)response.StatusCode);
+                }
+
+                var contentType = response.Content.Headers.ContentType?.MediaType ?? "audio/mpeg";
+                var audioBytes = await response.Content.ReadAsByteArrayAsync();
+
+                // Headers CORS
+                Response.Headers["Access-Control-Allow-Origin"] = "*";
+                Response.Headers["Access-Control-Allow-Methods"] = "GET, OPTIONS";
+                Response.Headers["Accept-Ranges"] = "bytes";
+                Response.Headers["Cache-Control"] = "public, max-age=3600";
+
+                return File(audioBytes, contentType);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al hacer proxy de audio desde {Url}", url);
+                return StatusCode(500, "Error al cargar el audio");
+            }
+        }
+
         private static string FormatDuration(int seconds)
         {
             var minutes = seconds / 60;

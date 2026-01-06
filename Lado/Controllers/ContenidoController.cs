@@ -132,7 +132,7 @@ namespace Lado.Controllers
         // INDEX - LISTADO DE CONTENIDO DEL USUARIO
         // ========================================
 
-        public async Task<IActionResult> Index(string filtro = "todos")
+        public async Task<IActionResult> Index(string? filtro = null)
         {
             var usuario = await _userManager.GetUserAsync(User);
 
@@ -142,10 +142,20 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
+            // Determinar modo actual basado en LadoPreferido
+            var enModoLadoA = usuario.LadoPreferido == TipoLado.LadoA;
+            ViewBag.ModoActual = enModoLadoA ? "LadoA" : "LadoB";
+
+            // Si no se especifica filtro, usar el modo actual como default
+            if (string.IsNullOrEmpty(filtro))
+            {
+                filtro = enModoLadoA ? "ladoa" : "ladob";
+            }
+
             var query = _context.Contenidos.AsQueryable();
             query = query.Where(c => c.UsuarioId == usuario.Id && c.EstaActivo);
 
-            switch (filtro?.ToLower() ?? "todos")
+            switch (filtro.ToLower())
             {
                 case "publicados":
                     query = query.Where(c => !c.EsBorrador);
@@ -163,7 +173,11 @@ namespace Lado.Controllers
                     query = query.Where(c => c.TipoLado == TipoLado.LadoB);
                     break;
                 case "todos":
+                    // Mostrar todo
+                    break;
                 default:
+                    // Filtro no reconocido, usar modo actual
+                    query = query.Where(c => c.TipoLado == usuario.LadoPreferido);
                     break;
             }
 
@@ -171,7 +185,7 @@ namespace Lado.Controllers
                 .OrderByDescending(c => c.FechaPublicacion)
                 .ToListAsync();
 
-            ViewBag.FiltroActual = filtro ?? "todos";
+            ViewBag.FiltroActual = filtro;
 
             // Estadísticas por tipo
             ViewBag.TotalLadoA = await _context.Contenidos
@@ -231,7 +245,8 @@ namespace Lado.Controllers
             bool EsBorrador = false,
             bool EsPublicoGeneral = false,
             bool CrearPreviewBlur = false,
-            int TipoCensuraPreview = 0)
+            int TipoCensuraPreview = 0,
+            bool SoloSuscriptores = false)
         {
             try
             {
@@ -313,17 +328,18 @@ namespace Lado.Controllers
                 // ✅ GUARDAR LA INTENCIÓN ORIGINAL DEL USUARIO
                 var intentaPublicarEnLadoB = !EsGratis;
 
-                // ✅ REGLA PRINCIPAL: Solo verificados pueden monetizar
-                if (!EsGratis && !usuario.CreadorVerificado)
+                // ✅ REGLA PRINCIPAL: Solo verificados pueden crear contenido en LadoB
+                if (intentaPublicarEnLadoB && !usuario.CreadorVerificado)
                 {
-                    _logger.LogWarning("⚠️ Usuario {Username} intentó monetizar sin verificación - Forzando contenido gratis",
+                    _logger.LogWarning("⚠️ Usuario {Username} intentó crear contenido LadoB sin verificación - Forzando LadoA",
                         usuario.UserName);
 
-                    // Forzar gratis pero mantener que intentó publicar en LadoB
+                    // Forzar a LadoA (gratis) para usuarios no verificados
+                    intentaPublicarEnLadoB = false;
                     EsGratis = true;
                     PrecioDesbloqueo = 0;
 
-                    TempData["Warning"] = "Para monetizar contenido debes verificar tu identidad. Tu contenido se ha publicado gratis en LadoB.";
+                    TempData["Warning"] = "Para crear contenido en LadoB debes verificar tu identidad. Tu contenido se ha publicado en LadoA.";
                 }
 
                 // Validaciones básicas - archivo requerido para fotos/videos
@@ -335,18 +351,26 @@ namespace Lado.Controllers
                 }
 
                 // Validación de precio múltiplo de 5 (solo si NO es gratis Y está verificado)
+                // Si SoloSuscriptores=true y PrecioDesbloqueo=0, significa que solo suscriptores pueden ver (sin compra individual)
                 if (!EsGratis && usuario.CreadorVerificado)
                 {
-                    if (!PrecioDesbloqueo.HasValue || PrecioDesbloqueo <= 0)
+                    // Solo validar precio si hay compra individual disponible
+                    var tieneCompraIndividual = !SoloSuscriptores || (PrecioDesbloqueo.HasValue && PrecioDesbloqueo > 0);
+
+                    if (tieneCompraIndividual && PrecioDesbloqueo.HasValue && PrecioDesbloqueo > 0)
                     {
-                        PrecioDesbloqueo = 10m;
+                        if (PrecioDesbloqueo % 5 != 0)
+                        {
+                            TempData["Error"] = "El precio debe ser un múltiplo de 5 (5, 10, 15, 20...)";
+                            ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
+                            return View();
+                        }
                     }
 
-                    if (PrecioDesbloqueo % 5 != 0)
+                    // Si no tiene precio y no es solo suscriptores, establecer precio default
+                    if (!SoloSuscriptores && (!PrecioDesbloqueo.HasValue || PrecioDesbloqueo <= 0))
                     {
-                        TempData["Error"] = "El precio debe ser un múltiplo de 5 (5, 10, 15, 20...)";
-                        ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
-                        return View();
+                        PrecioDesbloqueo = 10m;
                     }
                 }
 
@@ -368,6 +392,7 @@ namespace Lado.Controllers
                     NombreMostrado = nombreMostrado,
                     EsPremium = !EsGratis,
                     PrecioDesbloqueo = EsGratis ? 0m : (PrecioDesbloqueo ?? 0m),
+                    SoloSuscriptores = tipoLado == TipoLado.LadoB && SoloSuscriptores,
                     EsBorrador = EsBorrador,
                     FechaPublicacion = DateTime.Now,
                     EstaActivo = true,
@@ -733,13 +758,25 @@ namespace Lado.Controllers
                     {
                         TempData["Success"] = $"✅ Contenido público (LadoA) publicado como {usuario.NombreCompleto}";
                     }
-                    else if (EsGratis)
+                    else if (SoloSuscriptores && (PrecioDesbloqueo == null || PrecioDesbloqueo == 0))
                     {
-                        TempData["Success"] = $"✅ Contenido gratis en LadoB publicado como {usuario.Seudonimo}";
+                        // Solo suscriptores (incluido en plan)
+                        TempData["Success"] = $"✅ Contenido para suscriptores publicado como {usuario.Seudonimo}";
+                    }
+                    else if (SoloSuscriptores && PrecioDesbloqueo > 0)
+                    {
+                        // Suscriptores gratis + compra individual
+                        TempData["Success"] = $"✅ Contenido para suscriptores y compra individual (${PrecioDesbloqueo}) publicado como {usuario.Seudonimo}";
+                    }
+                    else if (!SoloSuscriptores && PrecioDesbloqueo > 0)
+                    {
+                        // Solo compra individual
+                        TempData["Success"] = $"✅ Contenido premium (${PrecioDesbloqueo}) publicado como {usuario.Seudonimo}";
                     }
                     else
                     {
-                        TempData["Success"] = $"✅ Contenido premium (LadoB) publicado como {usuario.Seudonimo} (${PrecioDesbloqueo})";
+                        // Gratis para todos en LadoB
+                        TempData["Success"] = $"✅ Contenido gratis en LadoB publicado como {usuario.Seudonimo}";
                     }
                 }
 
@@ -747,7 +784,9 @@ namespace Lado.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al crear contenido");
+                _logger.LogError(ex, "Error al crear contenido. Tipo: {Tipo}", TipoContenido);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 TempData["Error"] = $"Error al crear contenido: {ex.Message}";
                 ViewBag.UsuarioVerificado = false;
                 return View();
@@ -961,7 +1000,9 @@ namespace Lado.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error en CrearRapido");
+                _logger.LogError(ex, "Error en CrearRapido. Archivo: {FileName}, Tamaño: {Length}", archivo?.FileName, archivo?.Length);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 return Json(new { success = false, error = "Error al publicar: " + ex.Message });
             }
         }
@@ -1083,10 +1124,13 @@ namespace Lado.Controllers
                 _logger.LogInformation("=== CREAR CARRUSEL ===");
                 _logger.LogInformation("Usuario: {Username}, Archivos: {Count}", usuario.UserName, archivos.Count);
 
-                // Validar verificación para monetización
+                // Validar verificación - solo verificados pueden crear contenido en LadoB
                 var intentaPublicarEnLadoB = !EsGratis;
-                if (!EsGratis && !usuario.CreadorVerificado)
+                if (intentaPublicarEnLadoB && !usuario.CreadorVerificado)
                 {
+                    _logger.LogWarning("⚠️ Usuario {Username} intentó crear carrusel LadoB sin verificación - Forzando LadoA",
+                        usuario.UserName);
+                    intentaPublicarEnLadoB = false;
                     EsGratis = true;
                     PrecioDesbloqueo = 0;
                 }
@@ -1876,7 +1920,9 @@ namespace Lado.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al crear contenido desde Reels");
+                _logger.LogError(ex, "Error al crear contenido desde Reels. Archivo: {FileName}, Tamaño: {Length}", archivo?.FileName, archivo?.Length);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }
@@ -1996,6 +2042,17 @@ namespace Lado.Controllers
             _logger.LogInformation("Editando contenido ID: {Id}, TipoContenido: {TipoContenido}, TipoLado: {TipoLado}, EsGratis: {EsGratis}",
                 id, contenido.TipoContenido, contenido.TipoLado, contenido.EsGratis);
 
+            // Debug: Log de la pista musical
+            if (contenido.PistaMusical != null)
+            {
+                _logger.LogInformation("PistaMusical ID: {Id}, Titulo: {Titulo}, RutaArchivo: '{RutaArchivo}'",
+                    contenido.PistaMusical.Id, contenido.PistaMusical.Titulo, contenido.PistaMusical.RutaArchivo);
+            }
+            else
+            {
+                _logger.LogInformation("Contenido sin PistaMusical");
+            }
+
             return View(contenido);
         }
 
@@ -2043,16 +2100,17 @@ namespace Lado.Controllers
                 // ✅ GUARDAR INTENCIÓN ORIGINAL
                 var intentaPublicarEnLadoB = !EsGratis;
 
-                // ✅ REGLA: Solo verificados pueden monetizar
-                if (!EsGratis && !usuario.CreadorVerificado)
+                // ✅ REGLA PRINCIPAL: Solo verificados pueden crear/editar contenido en LadoB
+                if (intentaPublicarEnLadoB && !usuario.CreadorVerificado)
                 {
-                    _logger.LogWarning("⚠️ Usuario {Username} intentó monetizar sin verificación en edición",
+                    _logger.LogWarning("⚠️ Usuario {Username} intentó editar a LadoB sin verificación - Forzando LadoA",
                         usuario.UserName);
 
+                    intentaPublicarEnLadoB = false;
                     EsGratis = true;
                     PrecioDesbloqueo = 0;
 
-                    TempData["Warning"] = "Para monetizar contenido debes verificar tu identidad. El contenido se mantendrá gratis.";
+                    TempData["Warning"] = "Para crear contenido en LadoB debes verificar tu identidad. El contenido permanece en LadoA.";
                 }
 
                 // ✅ Validar precio SOLO si es contenido de pago Y está verificado
@@ -2129,7 +2187,19 @@ namespace Lado.Controllers
                 _logger.LogInformation("Precio asignado: ${Precio}, Nombre: {Nombre}",
                     contenido.PrecioDesbloqueo, contenido.NombreMostrado);
 
-                // ✅ Subir nuevo archivo si se proporciona
+                // ✅ Subir nuevo archivo si se proporciona (SOLO para borradores)
+                if (archivo != null && archivo.Length > 0)
+                {
+                    // ⚠️ SEGURIDAD: No permitir cambiar archivo en contenido ya publicado
+                    if (!contenido.EsBorrador)
+                    {
+                        _logger.LogWarning("⚠️ Intento de cambiar archivo en contenido publicado ID {Id} por usuario {Username}",
+                            id, usuario.UserName);
+                        // Ignorar el archivo silenciosamente - la UI no debería permitir esto
+                        archivo = null;
+                    }
+                }
+
                 if (archivo != null && archivo.Length > 0)
                 {
                     // ✅ SEGURIDAD: Validar archivo con magic bytes (no solo Content-Type)
@@ -2216,7 +2286,9 @@ namespace Lado.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al editar contenido");
+                _logger.LogError(ex, "Error al editar contenido {Id}", id);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 TempData["Error"] = $"Error al editar contenido: {ex.Message}";
                 return RedirectToAction("Editar", new { id });
             }
@@ -2291,7 +2363,9 @@ namespace Lado.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al usar contenido como foto de perfil");
+                _logger.LogError(ex, "Error al usar contenido {Id} como foto de perfil", id);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }
@@ -2307,13 +2381,29 @@ namespace Lado.Controllers
             try
             {
                 var usuario = await _userManager.GetUserAsync(User);
+
+                if (usuario == null)
+                {
+                    _logger.LogWarning("Usuario no autenticado intentando eliminar contenido {Id}", id);
+                    TempData["Error"] = "Debes iniciar sesión para eliminar contenido";
+                    return RedirectToAction("Login", "Account");
+                }
+
                 var contenido = await _context.Contenidos
                     .FirstOrDefaultAsync(c => c.Id == id && c.UsuarioId == usuario.Id);
 
                 if (contenido == null)
                 {
-                    _logger.LogWarning("Contenido no encontrado para eliminar: {Id}", id);
-                    return NotFound();
+                    _logger.LogWarning("Contenido {Id} no encontrado o no pertenece al usuario {Username}", id, usuario.UserName);
+                    TempData["Error"] = "El contenido no existe o no tienes permiso para eliminarlo";
+                    return RedirectToAction("Index");
+                }
+
+                if (!contenido.EstaActivo)
+                {
+                    _logger.LogWarning("Intento de eliminar contenido ya eliminado {Id}", id);
+                    TempData["Warning"] = "Este contenido ya fue eliminado";
+                    return RedirectToAction("Index");
                 }
 
                 contenido.EstaActivo = false;
@@ -2322,13 +2412,15 @@ namespace Lado.Controllers
                 _logger.LogInformation("Contenido eliminado (lógico) - ID: {Id}, Usuario: {Username}",
                     id, usuario.UserName);
 
-                TempData["Success"] = "✅ Contenido eliminado exitosamente";
+                TempData["Success"] = "Contenido eliminado exitosamente";
                 return RedirectToAction("Index");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al eliminar contenido {Id}", id);
-                TempData["Error"] = "Error al eliminar el contenido";
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
+                TempData["Error"] = "Error al eliminar el contenido. Por favor intenta de nuevo.";
                 return RedirectToAction("Index");
             }
         }
@@ -2404,6 +2496,8 @@ namespace Lado.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al procesar like para contenido {Id}", id);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 return Json(new { success = false, message = "Error al procesar el like" });
             }
         }
@@ -2475,7 +2569,9 @@ namespace Lado.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al publicar comentario");
+                _logger.LogError(ex, "Error al publicar comentario en contenido {Id}", id);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 return Json(new { success = false, message = "Error al publicar el comentario" });
             }
         }

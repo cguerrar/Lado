@@ -9,6 +9,7 @@ using Lado.Hubs;
 using Lado.Models;
 using Lado.Services;
 using ImageMagick;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Lado.Controllers
 {
@@ -23,6 +24,9 @@ namespace Lado.Controllers
         private readonly IFileValidationService _fileValidationService;
         private readonly IMediaConversionService _mediaConversionService;
         private readonly IHubContext<ChatHub> _hubContext;
+        private readonly IGiphyService _giphyService;
+        private readonly IWebHostEnvironment _environment;
+        private readonly ILogEventoService _logEventoService;
 
         public StoriesController(
             ApplicationDbContext context,
@@ -31,7 +35,10 @@ namespace Lado.Controllers
             IRateLimitService rateLimitService,
             IFileValidationService fileValidationService,
             IMediaConversionService mediaConversionService,
-            IHubContext<ChatHub> hubContext)
+            IHubContext<ChatHub> hubContext,
+            IGiphyService giphyService,
+            IWebHostEnvironment environment,
+            ILogEventoService logEventoService)
         {
             _context = context;
             _userManager = userManager;
@@ -40,6 +47,9 @@ namespace Lado.Controllers
             _fileValidationService = fileValidationService;
             _mediaConversionService = mediaConversionService;
             _hubContext = hubContext;
+            _giphyService = giphyService;
+            _environment = environment;
+            _logEventoService = logEventoService;
         }
 
         /// <summary>
@@ -181,6 +191,8 @@ namespace Lado.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al obtener stories");
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 return Json(new { success = false, message = "Error al cargar stories" });
             }
         }
@@ -308,11 +320,24 @@ namespace Lado.Controllers
                 // Guardar archivo (implementar tu lógica de guardado)
                 var rutaArchivo = await GuardarArchivoStory(archivo, usuarioId);
 
-                // Determinar TipoLado
+                // Determinar TipoLado (solo usuarios verificados pueden crear contenido LadoB)
                 var tipoLadoFinal = TipoLado.LadoA;
                 if (!string.IsNullOrEmpty(tipoLado) && Enum.TryParse<TipoLado>(tipoLado, out var parsedTipoLado))
                 {
-                    tipoLadoFinal = parsedTipoLado;
+                    // Verificar si el usuario puede usar LadoB
+                    if (parsedTipoLado == TipoLado.LadoB)
+                    {
+                        var usuarioStory = await _userManager.FindByIdAsync(usuarioId);
+                        if (usuarioStory?.EsCreador == true && usuarioStory?.CreadorVerificado == true)
+                        {
+                            tipoLadoFinal = parsedTipoLado;
+                        }
+                        // Si no está verificado, se queda en LadoA (silenciosamente)
+                    }
+                    else
+                    {
+                        tipoLadoFinal = parsedTipoLado;
+                    }
                 }
 
                 // Crear story
@@ -431,7 +456,9 @@ namespace Lado.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al crear story");
+                _logger.LogError(ex, "Error al crear story. Archivo: {FileName}, Tamaño: {Length}", archivo?.FileName, archivo?.Length);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 return Json(new { success = false, message = "Error al crear la story" });
             }
         }
@@ -469,6 +496,8 @@ namespace Lado.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al eliminar story: {StoryId}", storyId);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 return Json(new { success = false, message = "Error al eliminar la story" });
             }
         }
@@ -517,6 +546,8 @@ namespace Lado.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al obtener vistas de story: {StoryId}", storyId);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 return Json(new { success = false, message = "Error al cargar vistas" });
             }
         }
@@ -604,6 +635,8 @@ namespace Lado.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al crear story desde post {PostId}", postId);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 return Json(new { success = false, message = "Error al crear la historia" });
             }
         }
@@ -617,11 +650,15 @@ namespace Lado.Controllers
         /// </summary>
         /// <param name="modo">story (default) o reel</param>
         [HttpGet("Editor")]
-        public IActionResult Editor(string modo = "story")
+        public async Task<IActionResult> Editor(string modo = "story")
         {
+            var usuario = await _userManager.GetUserAsync(User);
+            var usuarioVerificado = usuario?.EsCreador == true && usuario?.CreadorVerificado == true;
+
             ViewBag.Modo = modo;
             ViewBag.Titulo = modo == "reel" ? "Crear Reel" : "Crear Historia";
             ViewBag.TextoPublicar = modo == "reel" ? "Publicar Reel" : "Publicar";
+            ViewBag.UsuarioVerificado = usuarioVerificado;
             return View();
         }
 
@@ -743,6 +780,16 @@ namespace Lado.Controllers
                     }
                     else
                     {
+                        // ⚠️ CRÍTICO: La conversión falló - registrar en Admin/Logs
+                        _logger.LogError("[Reel] ERROR convirtiendo video {Extension} a MP4 - El video puede no reproducirse en iOS/Safari", extension);
+                        await _logEventoService.RegistrarEventoAsync(
+                            $"ERROR: Conversión de video {extension} falló en Reel - Video puede no reproducirse en iOS",
+                            CategoriaEvento.Contenido,
+                            TipoLogEvento.Error,
+                            usuarioId,
+                            null,
+                            $"Archivo: {archivo.FileName}, Tamaño: {archivo.Length / 1024 / 1024}MB, Extension: {extension}. El video se guardó sin convertir y puede causar problemas de reproducción.");
+
                         nombreArchivo = $"{nombreBase}{extension}";
                         var rutaCompleta = Path.Combine(carpeta, nombreArchivo);
                         using (var stream2 = new FileStream(rutaCompleta, FileMode.Create))
@@ -764,11 +811,23 @@ namespace Lado.Controllers
                     rutaArchivo = $"/uploads/{nombreCarpeta}/{nombreArchivo}";
                 }
 
-                // Determinar TipoLado
+                // Determinar TipoLado (solo usuarios verificados pueden crear contenido LadoB)
                 var tipoLadoFinal = TipoLado.LadoA;
                 if (!string.IsNullOrEmpty(tipoLado) && Enum.TryParse<TipoLado>(tipoLado, out var parsedTipoLado))
                 {
-                    tipoLadoFinal = parsedTipoLado;
+                    // Verificar si el usuario puede usar LadoB
+                    if (parsedTipoLado == TipoLado.LadoB)
+                    {
+                        if (usuario?.EsCreador == true && usuario?.CreadorVerificado == true)
+                        {
+                            tipoLadoFinal = parsedTipoLado;
+                        }
+                        // Si no está verificado, se queda en LadoA (silenciosamente)
+                    }
+                    else
+                    {
+                        tipoLadoFinal = parsedTipoLado;
+                    }
                 }
 
                 // Crear contenido como Reel
@@ -802,7 +861,9 @@ namespace Lado.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al crear reel");
+                _logger.LogError(ex, "Error al crear reel. Archivo: {FileName}, Tamaño: {Length}", archivo?.FileName, archivo?.Length);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 return Json(new { success = false, message = "Error al crear el reel" });
             }
         }
@@ -937,6 +998,13 @@ namespace Lado.Controllers
                 }
 
                 _logger.LogWarning("[Story] Error convirtiendo imagen, usando original");
+                await _logEventoService.RegistrarEventoAsync(
+                    $"Error convirtiendo imagen {extension} en Story, usando original",
+                    CategoriaEvento.Contenido,
+                    TipoLogEvento.Warning,
+                    usuarioId,
+                    null,
+                    $"Archivo: {archivo.FileName}, Tamaño: {archivo.Length / 1024}KB");
             }
             else if (requiereConversionVideo)
             {
@@ -952,7 +1020,15 @@ namespace Lado.Controllers
                     return $"/stories/{usuarioId}/{nombreArchivo}";
                 }
 
-                _logger.LogWarning("[Story] Error convirtiendo video, usando original");
+                // ⚠️ CRÍTICO: La conversión falló - registrar en Admin/Logs
+                _logger.LogError("[Story] ERROR convirtiendo video {Extension} a MP4 - El video puede no reproducirse en iOS/Safari", extension);
+                await _logEventoService.RegistrarEventoAsync(
+                    $"ERROR: Conversión de video {extension} falló en Story - Video puede no reproducirse en iOS",
+                    CategoriaEvento.Contenido,
+                    TipoLogEvento.Error,
+                    usuarioId,
+                    null,
+                    $"Archivo: {archivo.FileName}, Tamaño: {archivo.Length / 1024 / 1024}MB, Extension: {extension}. El video se guardó sin convertir y puede causar problemas de reproducción.");
             }
 
             // Archivo ya está en formato estándar o conversión falló - guardar sin cambios
@@ -1037,6 +1113,7 @@ namespace Lado.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al convertir WebM a MP4: {Archivo}", rutaWebm);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, null, null);
                 return null; // Devolver null para usar el WebM original como fallback
             }
         }
@@ -1402,6 +1479,8 @@ namespace Lado.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al responder story {StoryId}", request?.StoryId);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 return Json(new { success = false, message = "Error al enviar respuesta" });
             }
         }
@@ -1760,6 +1839,317 @@ namespace Lado.Controllers
             }
         }
 
+        // ========================================
+        // GIPHY - GIFs ANIMADOS
+        // ========================================
+
+        /// <summary>
+        /// Buscar GIFs en Giphy
+        /// </summary>
+        [HttpGet("BuscarGifs")]
+        public async Task<IActionResult> BuscarGifs(string? q, int limit = 20, int offset = 0)
+        {
+            try
+            {
+                GiphySearchResult result;
+
+                if (string.IsNullOrWhiteSpace(q))
+                {
+                    // Sin query, devolver trending
+                    result = await _giphyService.ObtenerTrendingAsync(limit, offset);
+                }
+                else
+                {
+                    result = await _giphyService.BuscarGifsAsync(q, limit, offset);
+                }
+
+                return Json(new
+                {
+                    success = result.Success,
+                    gifs = result.Gifs,
+                    totalCount = result.TotalCount,
+                    offset = result.Offset,
+                    isDemo = result.IsDemo,
+                    error = result.Error
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al buscar GIFs: {Query}", q);
+                return Json(new { success = false, error = "Error al buscar GIFs" });
+            }
+        }
+
+        /// <summary>
+        /// Obtener GIFs trending
+        /// </summary>
+        [HttpGet("GifsTrending")]
+        public async Task<IActionResult> GifsTrending(int limit = 20, int offset = 0)
+        {
+            try
+            {
+                var result = await _giphyService.ObtenerTrendingAsync(limit, offset);
+
+                return Json(new
+                {
+                    success = result.Success,
+                    gifs = result.Gifs,
+                    totalCount = result.TotalCount,
+                    offset = result.Offset,
+                    isDemo = result.IsDemo,
+                    error = result.Error
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener GIFs trending");
+                return Json(new { success = false, error = "Error al cargar GIFs" });
+            }
+        }
+
+        /// <summary>
+        /// Obtener GIFs por categoría
+        /// </summary>
+        [HttpGet("GifsCategoria/{categoria}")]
+        public async Task<IActionResult> GifsCategoria(string categoria, int limit = 20)
+        {
+            try
+            {
+                var result = await _giphyService.ObtenerPorCategoriaAsync(categoria, limit);
+
+                return Json(new
+                {
+                    success = result.Success,
+                    gifs = result.Gifs,
+                    categoria = categoria,
+                    isDemo = result.IsDemo,
+                    error = result.Error
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener GIFs por categoría: {Categoria}", categoria);
+                return Json(new { success = false, error = "Error al cargar GIFs" });
+            }
+        }
+
+        /// <summary>
+        /// Obtener lista de categorías disponibles para GIFs
+        /// </summary>
+        [HttpGet("GifsCategorias")]
+        public IActionResult GifsCategorias()
+        {
+            var categorias = new[]
+            {
+                new { id = "trending", nombre = "Tendencias", icono = "trending_up" },
+                new { id = "reacciones", nombre = "Reacciones", icono = "sentiment_satisfied" },
+                new { id = "amor", nombre = "Amor", icono = "favorite" },
+                new { id = "fiesta", nombre = "Fiesta", icono = "celebration" },
+                new { id = "risa", nombre = "Risa", icono = "mood" },
+                new { id = "sorpresa", nombre = "Sorpresa", icono = "sentiment_very_satisfied" },
+                new { id = "triste", nombre = "Triste", icono = "sentiment_dissatisfied" },
+                new { id = "aplausos", nombre = "Aplausos", icono = "thumb_up" },
+                new { id = "bailar", nombre = "Bailar", icono = "music_note" },
+                new { id = "comida", nombre = "Comida", icono = "restaurant" },
+                new { id = "animales", nombre = "Animales", icono = "pets" },
+                new { id = "deportes", nombre = "Deportes", icono = "sports_soccer" }
+            };
+
+            return Json(new { success = true, categorias });
+        }
+
+        // ========================================
+        // BORRADORES DE STORIES/REELS
+        // ========================================
+        // Nota: La biblioteca de música usa /api/Musica/biblioteca (MusicaController)
+
+        /// <summary>
+        /// Guardar borrador
+        /// </summary>
+        [HttpPost("GuardarBorrador")]
+        public async Task<IActionResult> GuardarBorrador([FromBody] GuardarBorradorRequest request)
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(usuarioId))
+                    return Json(new { success = false, error = "No autenticado" });
+
+                StoryDraft draft;
+
+                if (request.DraftId.HasValue && request.DraftId > 0)
+                {
+                    // Actualizar borrador existente
+                    draft = await _context.StoryDrafts
+                        .FirstOrDefaultAsync(d => d.Id == request.DraftId && d.UsuarioId == usuarioId);
+
+                    if (draft == null)
+                        return Json(new { success = false, error = "Borrador no encontrado" });
+
+                    draft.FechaModificacion = DateTime.Now;
+                }
+                else
+                {
+                    // Crear nuevo borrador
+                    draft = new StoryDraft
+                    {
+                        UsuarioId = usuarioId,
+                        FechaCreacion = DateTime.Now
+                    };
+                    _context.StoryDrafts.Add(draft);
+                }
+
+                // Actualizar campos
+                draft.Tipo = request.Tipo ?? "reel";
+                draft.Nombre = request.Nombre ?? $"Borrador {DateTime.Now:dd/MM HH:mm}";
+                draft.CanvasState = request.CanvasState;
+                draft.MediaUrl = request.MediaUrl;
+                draft.MediaType = request.MediaType;
+                draft.MusicConfig = request.MusicConfig;
+                draft.VideoEffects = request.VideoEffects;
+                draft.BeatSyncConfig = request.BeatSyncConfig;
+                draft.Thumbnail = request.Thumbnail;
+                draft.TipoLado = request.TipoLado;
+                draft.Duracion = request.Duracion;
+                draft.FechaModificacion = DateTime.Now;
+
+                await _context.SaveChangesAsync();
+
+                return Json(new
+                {
+                    success = true,
+                    draftId = draft.Id,
+                    message = "Borrador guardado"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al guardar borrador");
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
+                return Json(new { success = false, error = "Error al guardar borrador" });
+            }
+        }
+
+        /// <summary>
+        /// Obtener lista de borradores del usuario
+        /// </summary>
+        [HttpGet("MisBorradores")]
+        public async Task<IActionResult> MisBorradores(string? tipo = null)
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(usuarioId))
+                    return Json(new { success = false, error = "No autenticado" });
+
+                var query = _context.StoryDrafts
+                    .Where(d => d.UsuarioId == usuarioId)
+                    .OrderByDescending(d => d.FechaModificacion);
+
+                if (!string.IsNullOrEmpty(tipo))
+                {
+                    query = (IOrderedQueryable<StoryDraft>)query.Where(d => d.Tipo == tipo);
+                }
+
+                var borradores = await query
+                    .Select(d => new
+                    {
+                        d.Id,
+                        d.Tipo,
+                        d.Nombre,
+                        d.Thumbnail,
+                        d.TipoLado,
+                        d.Duracion,
+                        d.FechaCreacion,
+                        d.FechaModificacion
+                    })
+                    .Take(20)
+                    .ToListAsync();
+
+                return Json(new { success = true, borradores });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener borradores");
+                return Json(new { success = false, error = "Error al cargar borradores" });
+            }
+        }
+
+        /// <summary>
+        /// Cargar un borrador específico
+        /// </summary>
+        [HttpGet("CargarBorrador/{id}")]
+        public async Task<IActionResult> CargarBorrador(int id)
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(usuarioId))
+                    return Json(new { success = false, error = "No autenticado" });
+
+                var draft = await _context.StoryDrafts
+                    .FirstOrDefaultAsync(d => d.Id == id && d.UsuarioId == usuarioId);
+
+                if (draft == null)
+                    return Json(new { success = false, error = "Borrador no encontrado" });
+
+                return Json(new
+                {
+                    success = true,
+                    draft = new
+                    {
+                        draft.Id,
+                        draft.Tipo,
+                        draft.Nombre,
+                        draft.CanvasState,
+                        draft.MediaUrl,
+                        draft.MediaType,
+                        draft.MusicConfig,
+                        draft.VideoEffects,
+                        draft.BeatSyncConfig,
+                        draft.TipoLado,
+                        draft.Duracion
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al cargar borrador {Id}", id);
+                return Json(new { success = false, error = "Error al cargar borrador" });
+            }
+        }
+
+        /// <summary>
+        /// Eliminar un borrador
+        /// </summary>
+        [HttpDelete("EliminarBorrador/{id}")]
+        public async Task<IActionResult> EliminarBorrador(int id)
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(usuarioId))
+                    return Json(new { success = false, error = "No autenticado" });
+
+                var draft = await _context.StoryDrafts
+                    .FirstOrDefaultAsync(d => d.Id == id && d.UsuarioId == usuarioId);
+
+                if (draft == null)
+                    return Json(new { success = false, error = "Borrador no encontrado" });
+
+                _context.StoryDrafts.Remove(draft);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Borrador eliminado" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al eliminar borrador {Id}", id);
+                return Json(new { success = false, error = "Error al eliminar borrador" });
+            }
+        }
+
         /// <summary>
         /// Convertir imagen HEIC a JPEG (para navegadores que no soportan HEIC)
         /// </summary>
@@ -1800,8 +2190,234 @@ namespace Lado.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error convirtiendo HEIC: {FileName}", archivo?.FileName);
+                _logger.LogError(ex, "Error convirtiendo HEIC: {FileName}, Tamaño: {Length}", archivo?.FileName, archivo?.Length);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 return BadRequest(new { success = false, error = "Error al convertir: " + ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Procesar fotos para BeatSync - Redimensiona y optimiza en el servidor
+        /// </summary>
+        [HttpPost("ProcesarFotosBeatSync")]
+        [RequestSizeLimit(500_000_000)] // 500MB total
+        public async Task<IActionResult> ProcesarFotosBeatSync(List<IFormFile> fotos)
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(usuarioId))
+                    return Unauthorized(new { success = false, error = "No autenticado" });
+
+                if (fotos == null || fotos.Count == 0)
+                    return BadRequest(new { success = false, error = "No se recibieron fotos" });
+
+                // Límite de 100 fotos por solicitud
+                if (fotos.Count > 100)
+                    return BadRequest(new { success = false, error = "Máximo 100 fotos por solicitud" });
+
+                var resultados = new List<object>();
+                var carpetaDestino = Path.Combine(_environment.WebRootPath, "uploads", "beatsync", usuarioId);
+                Directory.CreateDirectory(carpetaDestino);
+
+                // Procesar en paralelo con límite de concurrencia
+                var semaphore = new SemaphoreSlim(4); // Máximo 4 simultáneas
+                var tareas = fotos.Select(async (foto, index) =>
+                {
+                    await semaphore.WaitAsync();
+                    try
+                    {
+                        // Validar que sea imagen
+                        var extension = Path.GetExtension(foto.FileName).ToLowerInvariant();
+                        var extensionesValidas = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".bmp" };
+
+                        if (!extensionesValidas.Contains(extension))
+                        {
+                            return new { index, success = false, error = "Formato no válido", url = (string?)null };
+                        }
+
+                        // Generar nombre único
+                        var nombreBase = $"{Guid.NewGuid()}";
+
+                        // Convertir y redimensionar (máximo 1920px para BeatSync)
+                        using var stream = foto.OpenReadStream();
+                        var rutaConvertida = await _mediaConversionService.ConvertirImagenAsync(
+                            stream,
+                            carpetaDestino,
+                            extension,
+                            nombreBase,
+                            maxDimension: 1920, // Óptimo para video 1080p
+                            quality: 85
+                        );
+
+                        if (string.IsNullOrEmpty(rutaConvertida))
+                        {
+                            return new { index, success = false, error = "Error al procesar", url = (string?)null };
+                        }
+
+                        // Generar URL relativa
+                        var nombreArchivo = Path.GetFileName(rutaConvertida);
+                        var urlRelativa = $"/uploads/beatsync/{usuarioId}/{nombreArchivo}";
+
+                        return new { index, success = true, error = (string?)null, url = urlRelativa };
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error procesando foto {Index}", index);
+                        return new { index, success = false, error = ex.Message, url = (string?)null };
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                });
+
+                var resultadosArray = await Task.WhenAll(tareas);
+
+                // Ordenar por índice original
+                var fotosExitosas = resultadosArray
+                    .Where(r => r.success)
+                    .OrderBy(r => r.index)
+                    .Select(r => r.url)
+                    .ToList();
+
+                var errores = resultadosArray.Count(r => !r.success);
+
+                return Json(new {
+                    success = true,
+                    fotos = fotosExitosas,
+                    total = fotos.Count,
+                    procesadas = fotosExitosas.Count,
+                    errores = errores
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error procesando fotos BeatSync. Cantidad: {Count}", fotos?.Count);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
+                return StatusCode(500, new { success = false, error = "Error interno del servidor" });
+            }
+        }
+
+        // ========================================
+        // CONVERSIÓN DE VIDEO PARA DESCARGA
+        // Convierte WebM a MP4 para compatibilidad con iOS
+        // ========================================
+        [HttpPost("ConvertirVideoMP4")]
+        [RequestSizeLimit(200 * 1024 * 1024)] // 200MB max
+        public async Task<IActionResult> ConvertirVideoMP4(IFormFile video)
+        {
+            try
+            {
+                if (video == null || video.Length == 0)
+                {
+                    return BadRequest(new { success = false, error = "No se recibió ningún video" });
+                }
+
+                // Verificar que sea un video
+                var extension = Path.GetExtension(video.FileName).ToLowerInvariant();
+                var allowedExtensions = new[] { ".webm", ".mp4", ".mov", ".avi", ".mkv" };
+                if (!allowedExtensions.Contains(extension))
+                {
+                    return BadRequest(new { success = false, error = "Formato de video no soportado" });
+                }
+
+                // Nota: Siempre procesamos para asegurar compatibilidad H.264
+                // Incluso archivos MP4 pueden tener codecs incompatibles con iOS
+
+                _logger.LogInformation("[Stories] Convirtiendo video {Extension} a MP4 para descarga, tamaño: {Size}KB",
+                    extension, video.Length / 1024);
+
+                // Guardar archivo temporal
+                var tempFolder = Path.GetTempPath();
+                var inputPath = Path.Combine(tempFolder, $"input_{Guid.NewGuid()}{extension}");
+                string? outputPath = null;
+
+                try
+                {
+                    // Guardar archivo de entrada
+                    using (var stream = new FileStream(inputPath, FileMode.Create))
+                    {
+                        await video.CopyToAsync(stream);
+                    }
+
+                    // Convertir a MP4 H.264 (retorna la ruta del archivo convertido)
+                    outputPath = await _mediaConversionService.ConvertirVideoAsync(inputPath, tempFolder, $"converted_{Guid.NewGuid()}");
+
+                    if (string.IsNullOrEmpty(outputPath) || !System.IO.File.Exists(outputPath))
+                    {
+                        _logger.LogError("[Stories] Error convirtiendo video a MP4");
+                        return StatusCode(500, new { success = false, error = "Error al convertir el video" });
+                    }
+
+                    // Leer archivo convertido
+                    var videoBytes = await System.IO.File.ReadAllBytesAsync(outputPath);
+
+                    _logger.LogInformation("[Stories] Video convertido exitosamente. Tamaño original: {Original}KB, Convertido: {Convertido}KB",
+                        video.Length / 1024, videoBytes.Length / 1024);
+
+                    return File(videoBytes, "video/mp4", "beatsync_converted.mp4");
+                }
+                finally
+                {
+                    // Limpiar archivos temporales
+                    if (System.IO.File.Exists(inputPath))
+                        System.IO.File.Delete(inputPath);
+                    if (!string.IsNullOrEmpty(outputPath) && System.IO.File.Exists(outputPath))
+                        System.IO.File.Delete(outputPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[Stories] Error en ConvertirVideoMP4. Archivo: {FileName}, Tamaño: {Length}", video?.FileName, video?.Length);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
+                return StatusCode(500, new { success = false, error = "Error interno al convertir el video" });
+            }
+        }
+
+        // ========================================
+        // REGISTRO DE ERRORES FRONTEND
+        // ========================================
+
+        /// <summary>
+        /// Endpoint para registrar errores del frontend (JavaScript) en el sistema de logs
+        /// </summary>
+        [HttpPost("LogErrorFrontend")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> LogErrorFrontend([FromBody] FrontendErrorRequest request)
+        {
+            try
+            {
+                if (request == null || string.IsNullOrEmpty(request.Mensaje))
+                {
+                    return BadRequest(new { success = false });
+                }
+
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var detalle = $"Componente: {request.Componente ?? "N/A"}\n" +
+                              $"Archivo: {request.Archivo ?? "N/A"}\n" +
+                              $"Línea: {request.Linea}\n" +
+                              $"Columna: {request.Columna}\n" +
+                              $"Stack: {request.Stack ?? "N/A"}\n" +
+                              $"UserAgent: {Request.Headers["User-Agent"]}";
+
+                await _logEventoService.RegistrarEventoAsync(
+                    request.Mensaje.Length > 500 ? request.Mensaje.Substring(0, 500) : request.Mensaje,
+                    CategoriaEvento.Frontend,
+                    TipoLogEvento.Error,
+                    userId,
+                    null,
+                    detalle);
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al registrar error de frontend");
+                return Json(new { success = false });
             }
         }
     }
@@ -1810,10 +2426,36 @@ namespace Lado.Controllers
     // REQUEST MODEL
     // ========================================
 
+    public class FrontendErrorRequest
+    {
+        public string? Mensaje { get; set; }
+        public string? Componente { get; set; }
+        public string? Archivo { get; set; }
+        public int? Linea { get; set; }
+        public int? Columna { get; set; }
+        public string? Stack { get; set; }
+    }
+
     public class ResponderStoryRequest
     {
         public int StoryId { get; set; }
         public string? Mensaje { get; set; }
         public TipoRespuestaStory? TipoRespuesta { get; set; }
+    }
+
+    public class GuardarBorradorRequest
+    {
+        public int? DraftId { get; set; }
+        public string? Tipo { get; set; }
+        public string? Nombre { get; set; }
+        public string? CanvasState { get; set; }
+        public string? MediaUrl { get; set; }
+        public string? MediaType { get; set; }
+        public string? MusicConfig { get; set; }
+        public string? VideoEffects { get; set; }
+        public string? BeatSyncConfig { get; set; }
+        public string? Thumbnail { get; set; }
+        public TipoLado TipoLado { get; set; }
+        public double? Duracion { get; set; }
     }
 }

@@ -934,14 +934,14 @@
                             <span asp-validation-for="NombreCompleto" class="text-danger"></span>
                         </div>
 
-                        <!-- Campo de Seudónimo -->
+                        <!-- Campo de Seudónimo (Opcional) -->
                         <div class="form-group">
                             <label asp-for="Seudonimo" class="form-label">
                                 @Localizer.Get("Register_Pseudonym")
-                                <span class="form-label-help">(@Localizer.Get("Register_ForPremiumContent"))</span>
+                                <span class="form-label-help">(opcional - si no lo completas, usaremos tu nombre de usuario)</span>
                             </label>
                             <div class="field-with-indicator">
-                                <input asp-for="Seudonimo" class="form-control" placeholder="@Localizer.Get("Register_PseudonymPlaceholder")" id="seudonimoInput" />
+                                <input asp-for="Seudonimo" class="form-control" placeholder="Tu nombre artístico o alias" id="seudonimoInput" />
                                 <span class="availability-indicator" id="seudonimoIndicator">
                                     <i class="fas fa-spinner fa-spin"></i>
                                 </span>
@@ -1088,7 +1088,7 @@
         // ========================================
         let emailAvailable = null;
         let usernameAvailable = null;
-        let seudonimoAvailable = null;
+        let seudonimoAvailable = true; // Opcional - válido si está vacío
 
         // ========================================
         // VALIDACIÓN DEL FORMULARIO ANTES DE SUBMIT
@@ -1110,8 +1110,8 @@
             if (!username) errors.push('El nombre de usuario es requerido');
             if (username.length < 3) errors.push('El nombre de usuario debe tener al menos 3 caracteres');
             if (!/^[a-zA-Z0-9_]+$/.test(username)) errors.push('El nombre de usuario solo puede contener letras, números y guión bajo');
-            if (!seudonimo) errors.push('El seudónimo es requerido');
-            if (seudonimo.length < 3) errors.push('El seudónimo debe tener al menos 3 caracteres');
+            // Seudónimo es opcional, pero si se proporciona debe tener máximo 30 caracteres
+            if (seudonimo && seudonimo.length > 30) errors.push('El seudónimo no puede tener más de 30 caracteres');
             if (!nombre) errors.push('El nombre completo es requerido');
             if (!password) errors.push('La contraseña es requerida');
             if (password.length < 8) errors.push('La contraseña debe tener al menos 8 caracteres');
@@ -1304,15 +1304,24 @@
             }, 600);
         });
 
-        // Seudónimo availability
+        // Seudónimo availability (opcional - solo verificar si se proporciona)
         document.getElementById('seudonimoInput').addEventListener('input', function() {
             const seudonimo = this.value.trim();
             const indicator = document.getElementById('seudonimoIndicator');
 
             clearTimeout(seudonimoTimeout);
-            seudonimoAvailable = null; // Reset estado
 
-            if (seudonimo.length < 3) {
+            // Si está vacío, es válido (usará el username como fallback)
+            if (!seudonimo) {
+                seudonimoAvailable = true;
+                indicator.className = 'availability-indicator';
+                indicator.innerHTML = '';
+                return;
+            }
+
+            seudonimoAvailable = null; // Reset estado mientras verificamos
+
+            if (seudonimo.length < 1) {
                 indicator.className = 'availability-indicator';
                 return;
             }

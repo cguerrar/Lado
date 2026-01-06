@@ -23,6 +23,7 @@ namespace Lado.Controllers
         private readonly IFileValidationService _fileValidationService;
         private readonly ILadoCoinsService _ladoCoinsService;
         private readonly IReferidosService _referidosService;
+        private readonly IPushNotificationService _pushService;
 
         // Límite de archivo: 10 MB
         private const long MaxFileSize = 10 * 1024 * 1024;
@@ -37,7 +38,8 @@ namespace Lado.Controllers
             IRateLimitService rateLimitService,
             IFileValidationService fileValidationService,
             ILadoCoinsService ladoCoinsService,
-            IReferidosService referidosService)
+            IReferidosService referidosService,
+            IPushNotificationService pushService)
         {
             _context = context;
             _userManager = userManager;
@@ -49,6 +51,7 @@ namespace Lado.Controllers
             _fileValidationService = fileValidationService;
             _ladoCoinsService = ladoCoinsService;
             _referidosService = referidosService;
+            _pushService = pushService;
         }
 
         // ========================================
@@ -66,19 +69,46 @@ namespace Lado.Controllers
 
             _logger.LogInformation("Cargando conversaciones para usuario: {Username}", usuario.UserName);
 
-            // ⭐ CAMBIO: Ya no diferenciamos por TipoUsuario
-            // Todos los usuarios pueden tener conversaciones con cualquiera
+            // ⭐ Detectar modo actual (LadoA o LadoB)
+            var enModoLadoA = usuario.LadoPreferido == TipoLado.LadoA;
+            var ocultarLadoB = (usuario.BloquearLadoB) || enModoLadoA;
+            ViewBag.ModoActual = enModoLadoA ? "LadoA" : "LadoB";
 
             // Obtener IDs de usuarios con los que hay suscripciones (en ambas direcciones)
-            var creadoresSuscritos = await _context.Suscripciones
-                .Where(s => s.FanId == usuario.Id && s.EstaActiva)
+            // Si está en modo LadoA, solo obtener suscripciones LadoA
+            var querySuscripcionesFan = _context.Suscripciones
+                .Where(s => s.FanId == usuario.Id && s.EstaActiva);
+
+            var querySuscripcionesCreador = _context.Suscripciones
+                .Where(s => s.CreadorId == usuario.Id && s.EstaActiva);
+
+            if (ocultarLadoB)
+            {
+                querySuscripcionesFan = querySuscripcionesFan.Where(s => s.TipoLado == TipoLado.LadoA);
+                querySuscripcionesCreador = querySuscripcionesCreador.Where(s => s.TipoLado == TipoLado.LadoA);
+            }
+
+            var creadoresSuscritos = await querySuscripcionesFan
                 .Select(s => s.CreadorId)
                 .ToListAsync();
 
-            var suscriptoresPropios = await _context.Suscripciones
-                .Where(s => s.CreadorId == usuario.Id && s.EstaActiva)
+            var suscriptoresPropios = await querySuscripcionesCreador
                 .Select(s => s.FanId)
                 .ToListAsync();
+
+            // ⭐ Si está en modo LadoA, obtener IDs de usuarios con suscripciones LadoB (para filtrarlos)
+            var contactosLadoBIds = new HashSet<string>();
+            if (ocultarLadoB)
+            {
+                var suscripcionesLadoB = await _context.Suscripciones
+                    .Where(s => (s.FanId == usuario.Id || s.CreadorId == usuario.Id) &&
+                               s.EstaActiva &&
+                               s.TipoLado == TipoLado.LadoB)
+                    .Select(s => s.FanId == usuario.Id ? s.CreadorId : s.FanId)
+                    .ToListAsync();
+
+                contactosLadoBIds = new HashSet<string>(suscripcionesLadoB);
+            }
 
             // Obtener IDs de conversaciones existentes (excluyendo mensajes eliminados por el usuario)
             var conversacionesExistentes = await _context.MensajesPrivados
@@ -98,14 +128,15 @@ namespace Lado.Controllers
                 .ToListAsync();
 
             // CAMBIO: Solo mostrar conversaciones que ya tienen mensajes
-            // Eliminar contactos sin conversación iniciada Y filtrar bloqueados
+            // Eliminar contactos sin conversación iniciada, filtrar bloqueados y filtrar por modo
             var contactosIds = conversacionesExistentes
                 .Where(id => !usuariosBloqueadosIds.Contains(id))
+                .Where(id => !contactosLadoBIds.Contains(id)) // ⭐ Filtrar contactos LadoB si está en modo LadoA
                 .Distinct()
                 .ToList();
 
-            _logger.LogInformation("Total de contactos encontrados: {Count} (excluidos {Bloqueados} bloqueados)",
-                contactosIds.Count, usuariosBloqueadosIds.Count);
+            _logger.LogInformation("Total de contactos encontrados: {Count} (excluidos {Bloqueados} bloqueados, {LadoB} LadoB)",
+                contactosIds.Count, usuariosBloqueadosIds.Count, contactosLadoBIds.Count);
 
             var conversaciones = new List<ConversacionViewModel>();
 
@@ -515,6 +546,33 @@ namespace Lado.Controllers
 
                 // Notificar via SignalR al destinatario
                 await _hubContext.Clients.Group($"user_{destinatarioId}").SendAsync("RecibirMensaje", mensajeDto);
+
+                // 🔔 Enviar Push Notification al destinatario
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var nombreRemitente = usuario.NombreCompleto ?? usuario.UserName ?? "Alguien";
+                        var preview = mensaje.TipoMensaje == TipoMensaje.Texto
+                            ? (mensaje.Contenido?.Length > 50 ? mensaje.Contenido[..50] + "..." : mensaje.Contenido)
+                            : mensaje.TipoMensaje == TipoMensaje.Imagen ? "📷 Imagen"
+                            : mensaje.TipoMensaje == TipoMensaje.Video ? "🎬 Video"
+                            : "📎 Archivo";
+
+                        await _pushService.EnviarNotificacionAsync(
+                            destinatarioId,
+                            $"💬 {nombreRemitente}",
+                            preview ?? "Nuevo mensaje",
+                            $"/Mensajes/Chat/{usuario.Id}",
+                            TipoNotificacionPush.NuevoMensaje,
+                            usuario.FotoPerfil
+                        );
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error al enviar push notification de mensaje");
+                    }
+                });
 
                 return Json(new { success = true, mensaje = mensajeDto });
             }
@@ -1215,11 +1273,29 @@ namespace Lado.Controllers
                     return Json(new List<object>());
                 }
 
+                // ⭐ Detectar modo actual (LadoA o LadoB)
+                var enModoLadoA = usuario.LadoPreferido == TipoLado.LadoA;
+                var ocultarLadoB = (usuario.BloquearLadoB) || enModoLadoA;
+
                 // Obtener usuarios bloqueados
                 var bloqueadosIds = await _context.BloqueosUsuarios
                     .Where(b => b.BloqueadorId == usuario.Id || b.BloqueadoId == usuario.Id)
                     .Select(b => b.BloqueadorId == usuario.Id ? b.BloqueadoId : b.BloqueadorId)
                     .ToListAsync();
+
+                // ⭐ Si está en modo LadoA, obtener IDs de usuarios con suscripciones LadoB (para filtrarlos)
+                var contactosLadoBIds = new HashSet<string>();
+                if (ocultarLadoB)
+                {
+                    var suscripcionesLadoB = await _context.Suscripciones
+                        .Where(s => (s.FanId == usuario.Id || s.CreadorId == usuario.Id) &&
+                                   s.EstaActiva &&
+                                   s.TipoLado == TipoLado.LadoB)
+                        .Select(s => s.FanId == usuario.Id ? s.CreadorId : s.FanId)
+                        .ToListAsync();
+
+                    contactosLadoBIds = new HashSet<string>(suscripcionesLadoB);
+                }
 
                 // Obtener mensajes (tanto MensajesPrivados como ChatMensajes)
                 var mensajesPrivados = await _context.MensajesPrivados
@@ -1258,8 +1334,9 @@ namespace Lado.Controllers
                 }
 
                 // Agrupar por usuario y tomar el mensaje más reciente
+                // ⭐ Filtrar contactos LadoB si está en modo LadoA
                 var conversaciones = todosMensajes
-                    .Where(m => m.OtroUsuario != null)
+                    .Where(m => m.OtroUsuario != null && !contactosLadoBIds.Contains(m.OtroUsuarioId))
                     .GroupBy(m => m.OtroUsuarioId)
                     .Select(g =>
                     {

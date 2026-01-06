@@ -43,6 +43,9 @@ namespace Lado.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Suscribirse(string creadorId, int? tipoLado = null, int? duracion = null, decimal? montoLadoCoins = null)
         {
+            // Determinar tipo de suscripción - fuera del try para usar en catch
+            var tipo = tipoLado.HasValue ? (TipoLado)tipoLado.Value : TipoLado.LadoA;
+
             try
             {
                 var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -71,9 +74,6 @@ namespace Lado.Controllers
                     return RedirectToAction("Index", "Feed");
                 }
 
-                // Determinar tipo de suscripción
-                var tipo = tipoLado.HasValue ? (TipoLado)tipoLado.Value : TipoLado.LadoA;
-
                 // Determinar duración (default: mensual)
                 var tipoDuracion = duracion.HasValue
                     ? (DuracionSuscripcion)duracion.Value
@@ -96,7 +96,7 @@ namespace Lado.Controllers
                 if (suscripcionExistente != null)
                 {
                     TempData["Info"] = "Ya estás suscrito a este creador";
-                    return RedirectToAction("Perfil", "Feed", new { id = creadorId });
+                    return RedirectToAction("Perfil", "Feed", new { id = creadorId, verSeudonimo = tipo == TipoLado.LadoB ? true : (bool?)null });
                 }
 
                 // ⭐ LADOCOINS: Calcular pago mixto
@@ -258,7 +258,7 @@ namespace Lado.Controllers
                         usuarioId, creadorId, tipo, tipoDuracion, precio, usarLadoCoins, montoReal);
 
                     TempData["Success"] = mensaje;
-                    return RedirectToAction("Perfil", "Feed", new { id = creadorId });
+                    return RedirectToAction("Perfil", "Feed", new { id = creadorId, verSeudonimo = tipo == TipoLado.LadoB ? true : (bool?)null });
                 }
                 catch (Exception ex)
                 {
@@ -271,7 +271,7 @@ namespace Lado.Controllers
             {
                 _logger.LogError(ex, "Error al procesar suscripción");
                 TempData["Error"] = "Error al procesar la suscripción";
-                return RedirectToAction("Perfil", "Feed", new { id = creadorId });
+                return RedirectToAction("Perfil", "Feed", new { id = creadorId, verSeudonimo = tipo == TipoLado.LadoB ? true : (bool?)null });
             }
         }
 
@@ -279,12 +279,12 @@ namespace Lado.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CancelarDesdeCreador(string creadorId, int? tipoLado = null)
         {
+            // Determinar TipoLado (default LadoA) - fuera del try para usar en catch
+            var tipo = tipoLado.HasValue ? (TipoLado)tipoLado.Value : TipoLado.LadoA;
+
             try
             {
                 var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-                // Determinar TipoLado (default LadoA)
-                var tipo = tipoLado.HasValue ? (TipoLado)tipoLado.Value : TipoLado.LadoA;
 
                 var suscripcion = await _context.Suscripciones
                     .Include(s => s.Creador)
@@ -293,7 +293,7 @@ namespace Lado.Controllers
                 if (suscripcion == null)
                 {
                     TempData["Error"] = "No se encontró la suscripción";
-                    return RedirectToAction("Perfil", "Feed", new { id = creadorId });
+                    return RedirectToAction("Perfil", "Feed", new { id = creadorId, verSeudonimo = tipo == TipoLado.LadoB ? true : (bool?)null });
                 }
 
                 suscripcion.EstaActiva = false;
@@ -311,13 +311,13 @@ namespace Lado.Controllers
                 _logger.LogInformation($"Suscripción cancelada: Fan {usuarioId} -> Creador {creadorId}");
 
                 TempData["Success"] = "Suscripción cancelada exitosamente";
-                return RedirectToAction("Perfil", "Feed", new { id = creadorId });
+                return RedirectToAction("Perfil", "Feed", new { id = creadorId, verSeudonimo = tipo == TipoLado.LadoB ? true : (bool?)null });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al cancelar suscripción");
                 TempData["Error"] = "Error al cancelar la suscripción";
-                return RedirectToAction("Perfil", "Feed", new { id = creadorId });
+                return RedirectToAction("Perfil", "Feed", new { id = creadorId, verSeudonimo = tipo == TipoLado.LadoB ? true : (bool?)null });
             }
         }
 

@@ -640,8 +640,8 @@
             var cargarDirecto = 6; // Solo 6 imágenes cargan directo (feedback inmediato)
             var videosConAutoplay = 15; // Videos con autoplay para dar vida al mosaico
 
-            // Función para limpiar comillas de rutas (datos legacy)
-            string LimpiarRuta(string ruta) {
+            // Función para limpiar y normalizar rutas (datos legacy)
+            string LimpiarRuta(string ruta, string? carpetaUsuario = null) {
                 if (string.IsNullOrEmpty(ruta)) return "";
                 // Remover todo tipo de comillas y escapes
                 var limpia = ruta.Trim();
@@ -652,15 +652,32 @@
                 while (limpia.EndsWith("\"") || limpia.EndsWith("'") || limpia.EndsWith("\\\""))
                     limpia = limpia.TrimEnd('"', '\'', '\\');
                 // Limpiar cualquier comilla restante y entidades HTML
-                return limpia.Replace("\"", "").Replace("'", "").Replace("&quot;", "").Replace("%22", "");
+                limpia = limpia.Replace("\"", "").Replace("'", "").Replace("&quot;", "").Replace("%22", "");
+
+                // Normalizar ruta
+                if (string.IsNullOrEmpty(limpia)) return "";
+
+                // Si solo es nombre de archivo (sin path), construir ruta completa
+                if (!limpia.Contains("/") && !limpia.Contains("\\") && !string.IsNullOrEmpty(carpetaUsuario))
+                {
+                    limpia = $"/uploads/{carpetaUsuario}/{limpia}";
+                }
+                // Si la ruta no comienza con /, agregarla
+                else if (!limpia.StartsWith("/") && !limpia.StartsWith("http"))
+                {
+                    limpia = "/" + limpia;
+                }
+
+                return limpia;
             }
 
             foreach (var item in itemsParaMostrar)
             {
                 var esVideo = item.TipoContenido == TipoContenido.Video;
+                var carpetaUsuario = item.Usuario?.UserName ?? item.Usuario?.NombreCompleto?.Replace(" ", "_") ?? "default";
                 // Limpiar comillas de rutas (puede haber datos legacy con comillas)
-                var rutaArchivo = LimpiarRuta(item.RutaArchivo);
-                var thumbnailUrl = LimpiarRuta(item.Thumbnail);
+                var rutaArchivo = LimpiarRuta(item.RutaArchivo, carpetaUsuario);
+                var thumbnailUrl = LimpiarRuta(item.Thumbnail, carpetaUsuario);
                 // Usar thumbnail si existe para carga más rápida
                 var imagenSrc = !string.IsNullOrEmpty(thumbnailUrl) ? thumbnailUrl : rutaArchivo;
                 var usarLazy = contador >= cargarDirecto;

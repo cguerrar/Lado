@@ -113,9 +113,14 @@ namespace Lado.Controllers
                     return View(model);
                 }
 
+                // ✅ Determinar seudónimo (usar NombreUsuario si no se proporciona)
+                var seudonimo = !string.IsNullOrWhiteSpace(model.Seudonimo)
+                    ? model.Seudonimo.Trim()
+                    : model.NombreUsuario;
+
                 // ✅ Verificar que el seudónimo sea único
                 var existingSeudonimo = await _userManager.Users
-                    .AnyAsync(u => u.Seudonimo == model.Seudonimo);
+                    .AnyAsync(u => u.Seudonimo == seudonimo);
                 if (existingSeudonimo)
                 {
                     ModelState.AddModelError("Seudonimo", "Este seudónimo ya está en uso");
@@ -128,7 +133,7 @@ namespace Lado.Controllers
                     UserName = model.NombreUsuario,
                     Email = model.Email,
                     NombreCompleto = model.NombreCompleto,
-                    Seudonimo = model.Seudonimo, // ⭐ NUEVO campo obligatorio
+                    Seudonimo = seudonimo, // Usa NombreUsuario si no se proporciona
                     LadoPreferido = model.LadoPreferido, // ⭐ Lado preferido seleccionado por el usuario
                     ZonaHoraria = model.ZonaHoraria, // ⭐ Zona horaria detectada automáticamente
                     FechaRegistro = DateTime.Now,

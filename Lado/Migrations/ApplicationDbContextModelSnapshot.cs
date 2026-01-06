@@ -491,6 +491,10 @@ namespace Lado.Migrations
                     b.Property<bool>("EstaActivo")
                         .HasColumnType("bit");
 
+                    b.Property<string>("Facebook")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<DateTime?>("FechaNacimiento")
                         .HasColumnType("datetime2");
 
@@ -516,6 +520,10 @@ namespace Lado.Migrations
                         .IsRequired()
                         .HasMaxLength(5)
                         .HasColumnType("nvarchar(5)");
+
+                    b.Property<string>("Instagram")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<int>("LadoPreferido")
                         .HasColumnType("int");
@@ -567,6 +575,10 @@ namespace Lado.Migrations
 
                     b.Property<bool>("OcultarIdentidadLadoA")
                         .HasColumnType("bit");
+
+                    b.Property<string>("OnlyFans")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("Pais")
                         .HasMaxLength(5)
@@ -633,6 +645,10 @@ namespace Lado.Migrations
                     b.Property<int?>("TiempoPromedioRespuesta")
                         .HasColumnType("int");
 
+                    b.Property<string>("TikTok")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("TipoCuentaRetiro")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -644,6 +660,10 @@ namespace Lado.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("decimal(18,2)")
                         .HasDefaultValue(0m);
+
+                    b.Property<string>("Twitter")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("bit");
@@ -660,6 +680,10 @@ namespace Lado.Migrations
 
                     b.Property<int>("VisitasPerfil")
                         .HasColumnType("int");
+
+                    b.Property<string>("YouTube")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("ZonaHoraria")
                         .HasMaxLength(50)
@@ -1615,7 +1639,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "ComisionBilleteraElectronica",
                             Descripcion = "Comision por usar billetera electronica (%)",
-                            UltimaModificacion = new DateTime(2026, 1, 1, 22, 44, 51, 328, DateTimeKind.Local).AddTicks(3303),
+                            UltimaModificacion = new DateTime(2026, 1, 5, 23, 28, 51, 89, DateTimeKind.Local).AddTicks(2697),
                             Valor = "2.5"
                         },
                         new
@@ -1624,7 +1648,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "TiempoProcesoRetiro",
                             Descripcion = "Tiempo estimado para procesar retiros",
-                            UltimaModificacion = new DateTime(2026, 1, 1, 22, 44, 51, 328, DateTimeKind.Local).AddTicks(3366),
+                            UltimaModificacion = new DateTime(2026, 1, 5, 23, 28, 51, 89, DateTimeKind.Local).AddTicks(2756),
                             Valor = "3-5 dias habiles"
                         },
                         new
@@ -1633,7 +1657,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMinimoRecarga",
                             Descripcion = "Monto minimo para recargar saldo",
-                            UltimaModificacion = new DateTime(2026, 1, 1, 22, 44, 51, 328, DateTimeKind.Local).AddTicks(3368),
+                            UltimaModificacion = new DateTime(2026, 1, 5, 23, 28, 51, 89, DateTimeKind.Local).AddTicks(2758),
                             Valor = "5"
                         },
                         new
@@ -1642,7 +1666,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMaximoRecarga",
                             Descripcion = "Monto maximo para recargar saldo",
-                            UltimaModificacion = new DateTime(2026, 1, 1, 22, 44, 51, 328, DateTimeKind.Local).AddTicks(3369),
+                            UltimaModificacion = new DateTime(2026, 1, 5, 23, 28, 51, 89, DateTimeKind.Local).AddTicks(2759),
                             Valor = "1000"
                         },
                         new
@@ -1651,7 +1675,7 @@ namespace Lado.Migrations
                             Categoria = "General",
                             Clave = "ComisionPlataforma",
                             Descripcion = "Comision general de la plataforma (%)",
-                            UltimaModificacion = new DateTime(2026, 1, 1, 22, 44, 51, 328, DateTimeKind.Local).AddTicks(3371),
+                            UltimaModificacion = new DateTime(2026, 1, 5, 23, 28, 51, 89, DateTimeKind.Local).AddTicks(2761),
                             Valor = "20"
                         });
                 });
@@ -1768,6 +1792,9 @@ namespace Lado.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<bool>("SoloSuscriptores")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Tags")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -1855,17 +1882,14 @@ namespace Lado.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Ciudad")
-                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("Direccion")
-                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("DocumentoIdentidadPath")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Estado")
@@ -2124,6 +2148,55 @@ namespace Lado.Migrations
                     b.HasIndex("UsuarioId");
 
                     b.ToTable("Feedbacks");
+                });
+
+            modelBuilder.Entity("Lado.Models.FotoDestacada", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ContenidoId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CostoPagado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTime>("FechaExpiracion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaInicio")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Nivel")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContenidoId")
+                        .HasDatabaseName("IX_FotosDestacadas_ContenidoId");
+
+                    b.HasIndex("FechaExpiracion")
+                        .HasDatabaseName("IX_FotosDestacadas_FechaExpiracion");
+
+                    b.HasIndex("Nivel")
+                        .HasDatabaseName("IX_FotosDestacadas_Nivel");
+
+                    b.HasIndex("UsuarioId")
+                        .HasDatabaseName("IX_FotosDestacadas_UsuarioId");
+
+                    b.HasIndex("FechaInicio", "FechaExpiracion", "Nivel")
+                        .HasDatabaseName("IX_FotosDestacadas_Activos");
+
+                    b.ToTable("FotosDestacadas");
                 });
 
             modelBuilder.Entity("Lado.Models.HistoriaSilenciada", b =>
@@ -3132,6 +3205,56 @@ namespace Lado.Migrations
                     b.ToTable("PreferenciasAlgoritmoUsuario");
                 });
 
+            modelBuilder.Entity("Lado.Models.PreferenciasNotificacion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<TimeOnly?>("HoraSilencioFin")
+                        .HasColumnType("time");
+
+                    b.Property<TimeOnly?>("HoraSilencioInicio")
+                        .HasColumnType("time");
+
+                    b.Property<bool>("NotificarComentarios")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("NotificarLikes")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("NotificarMenciones")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("NotificarMensajes")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("NotificarPropinas")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("NotificarSeguidores")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("NotificarSuscripciones")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ZonaHoraria")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("PreferenciasNotificaciones");
+                });
+
             modelBuilder.Entity("Lado.Models.PropuestaDesafio", b =>
                 {
                     b.Property<int>("Id")
@@ -3184,6 +3307,60 @@ namespace Lado.Migrations
                         .HasDatabaseName("IX_PropuestasDesafios_FechaPropuesta");
 
                     b.ToTable("PropuestasDesafios");
+                });
+
+            modelBuilder.Entity("Lado.Models.PushSubscription", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Activa")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Auth")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Endpoint")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("FallosConsecutivos")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("P256dh")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UltimaNotificacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("PushSubscriptions");
                 });
 
             modelBuilder.Entity("Lado.Models.RachaUsuario", b =>
@@ -3669,6 +3846,69 @@ namespace Lado.Migrations
                         .HasDatabaseName("IX_Stories_Creador_Expiracion_Activo");
 
                     b.ToTable("Stories");
+                });
+
+            modelBuilder.Entity("Lado.Models.StoryDraft", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BeatSyncConfig")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CanvasState")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<double?>("Duracion")
+                        .HasColumnType("float");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaModificacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("MediaType")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("MediaUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("MusicConfig")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Nombre")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Thumbnail")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("TipoLado")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("VideoEffects")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("StoryDrafts");
                 });
 
             modelBuilder.Entity("Lado.Models.StoryLike", b =>
@@ -4585,6 +4825,25 @@ namespace Lado.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("Lado.Models.FotoDestacada", b =>
+                {
+                    b.HasOne("Lado.Models.Contenido", "Contenido")
+                        .WithMany()
+                        .HasForeignKey("ContenidoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Lado.Models.ApplicationUser", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Contenido");
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("Lado.Models.HistoriaSilenciada", b =>
                 {
                     b.HasOne("Lado.Models.ApplicationUser", "Silenciado")
@@ -4795,6 +5054,17 @@ namespace Lado.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("Lado.Models.PreferenciasNotificacion", b =>
+                {
+                    b.HasOne("Lado.Models.ApplicationUser", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("Lado.Models.PropuestaDesafio", b =>
                 {
                     b.HasOne("Lado.Models.ApplicationUser", "Creador")
@@ -4812,6 +5082,17 @@ namespace Lado.Migrations
                     b.Navigation("Creador");
 
                     b.Navigation("Desafio");
+                });
+
+            modelBuilder.Entity("Lado.Models.PushSubscription", b =>
+                {
+                    b.HasOne("Lado.Models.ApplicationUser", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("Lado.Models.RachaUsuario", b =>
@@ -4931,6 +5212,17 @@ namespace Lado.Migrations
                     b.Navigation("Creador");
 
                     b.Navigation("PistaMusical");
+                });
+
+            modelBuilder.Entity("Lado.Models.StoryDraft", b =>
+                {
+                    b.HasOne("Lado.Models.ApplicationUser", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("Lado.Models.StoryLike", b =>

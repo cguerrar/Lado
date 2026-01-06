@@ -636,6 +636,34 @@
         overflow: hidden;
     }
 
+    /* Indicador de carga de story */
+    .story-loading-indicator {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        color: white;
+        font-size: 14px;
+        z-index: 10;
+    }
+
+    .story-loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: storySpinner 0.8s linear infinite;
+    }
+
+    @@keyframes storySpinner {
+        to { transform: rotate(360deg); }
+    }
+
     .story-viewer-media {
         width: 100%;
         height: 100%;
@@ -1057,6 +1085,132 @@
 
     .story-send-feedback .feedback-icon {
         font-size: 18px;
+    }
+
+    /* ========================================
+       MODAL COMPARTIR STORY
+       ======================================== */
+    .share-story-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        z-index: 99999999;
+        display: none;
+        align-items: flex-end;
+        justify-content: center;
+    }
+
+    .share-story-overlay.active {
+        display: flex;
+    }
+
+    .share-story-modal {
+        background: var(--card-bg, white);
+        border-radius: 20px 20px 0 0;
+        width: 100%;
+        max-width: 500px;
+        max-height: 80vh;
+        overflow: hidden;
+        animation: slideUpShare 0.3s ease;
+    }
+
+    @@keyframes slideUpShare {
+        from {
+            transform: translateY(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .share-story-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border, #eee);
+    }
+
+    .share-story-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--fg, #111);
+    }
+
+    .share-story-close {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: var(--bg, #f5f5f5);
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted, #666);
+        transition: background 0.2s;
+    }
+
+    .share-story-close:hover {
+        background: var(--border, #e0e0e0);
+    }
+
+    .share-story-options {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        padding: 20px;
+    }
+
+    @@media (max-width: 400px) {
+        .share-story-options {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
+    .share-story-option {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 8px;
+        border: none;
+        background: none;
+        cursor: pointer;
+        border-radius: 12px;
+        transition: background 0.2s;
+    }
+
+    .share-story-option:hover {
+        background: var(--bg, #f5f5f5);
+    }
+
+    .share-story-option:active {
+        transform: scale(0.95);
+    }
+
+    .share-option-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .share-story-option span {
+        font-size: 12px;
+        color: var(--fg, #111);
+        font-weight: 500;
+        text-align: center;
     }
 
     /* Animación de reacciones flotantes */
@@ -1571,23 +1725,27 @@
         margin: 4px 0;
     }
 
-    /* POST MEDIA - Con aspect-ratio para evitar layout shift */
+    /* POST MEDIA - aspect-ratio 4:5 para acomodar fotos verticales */
     .post-media {
         width: 100%;
         max-width: 100%;
         background: var(--bg-tertiary);
         position: relative;
-        aspect-ratio: 4 / 5;
         overflow: hidden;
+        aspect-ratio: 4 / 5;
+    }
+
+    /* Para contenido bloqueado/censurado, forzar cuadrado */
+    .post-media.locked-media {
+        aspect-ratio: 1 / 1;
     }
 
     .post-media img {
         width: 100%;
         height: 100%;
         max-width: 100%;
-        max-height: 600px;
         display: block;
-        object-fit: cover;
+        object-fit: contain;
     }
 
     .post-media video {
@@ -1942,8 +2100,14 @@
         align-items: center;
         justify-content: center;
         opacity: 0;
-        transition: opacity 0.2s ease;
-        pointer-events: none;
+        transition: opacity 0.2s ease, transform 0.15s ease;
+        pointer-events: auto; /* Habilitado para click → fullview */
+        cursor: pointer;
+        z-index: 10;
+    }
+
+    .video-play-icon:active {
+        transform: scale(0.92);
     }
 
     .video-play-icon svg {
@@ -3854,11 +4018,15 @@
 
     .fullscreen-slide img,
     .fullscreen-slide video {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain; /* Mostrar completo sin recortar */
         user-select: none;
         -webkit-user-drag: none;
+        -webkit-touch-callout: none; /* iOS: evitar menú contextual */
+        margin: auto; /* Centrar la imagen */
     }
 
     .fullscreen-slide video {
@@ -4022,7 +4190,231 @@
         }
     }
 
-    /* Double tap heart animation */
+    /* ========================================
+       SWIPER.JS - Carrusel Fullscreen iOS-Compatible
+       ======================================== */
+    .fs-swiper-carousel {
+        width: 100%;
+        height: 100%;
+        position: relative;
+    }
+
+    .fs-swiper-carousel .swiper-wrapper {
+        align-items: center;
+    }
+
+    .fs-swiper-carousel .swiper-slide {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+    }
+
+    .fs-swiper-carousel .swiper-slide img,
+    .fs-swiper-carousel .swiper-slide video {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        user-select: none;
+        -webkit-user-drag: none;
+        -webkit-touch-callout: none;
+    }
+
+    /* Botones de navegación Swiper - Mejorados para visibilidad */
+    .fs-swiper-carousel .swiper-button-next,
+    .fs-swiper-carousel .swiper-button-prev {
+        color: white;
+        background: rgba(0, 0, 0, 0.6);
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        transition: all 0.2s ease;
+        z-index: 100;
+        opacity: 0;
+        pointer-events: auto;
+    }
+
+    /* Mostrar botones en hover del carrusel */
+    .fs-swiper-carousel:hover .swiper-button-next,
+    .fs-swiper-carousel:hover .swiper-button-prev {
+        opacity: 1;
+    }
+
+    /* En móvil siempre visibles si hay más de 1 slide */
+    @@media (max-width: 768px) {
+        .fs-swiper-carousel .swiper-button-next,
+        .fs-swiper-carousel .swiper-button-prev {
+            opacity: 0.8;
+            width: 40px;
+            height: 40px;
+        }
+    }
+
+    .fs-swiper-carousel .swiper-button-next:after,
+    .fs-swiper-carousel .swiper-button-prev:after {
+        font-size: 18px;
+        font-weight: bold;
+    }
+
+    .fs-swiper-carousel .swiper-button-next:hover,
+    .fs-swiper-carousel .swiper-button-prev:hover {
+        background: rgba(0, 0, 0, 0.85);
+        transform: scale(1.1);
+        opacity: 1;
+    }
+
+    .fs-swiper-carousel .swiper-button-next:active,
+    .fs-swiper-carousel .swiper-button-prev:active {
+        transform: scale(0.95);
+    }
+
+    .fs-swiper-carousel .swiper-button-disabled {
+        opacity: 0.2 !important;
+        pointer-events: none;
+    }
+
+    /* Posicionamiento más hacia adentro en móvil */
+    .fs-swiper-carousel .swiper-button-prev {
+        left: 12px;
+    }
+
+    .fs-swiper-carousel .swiper-button-next {
+        right: 12px;
+    }
+
+    /* Áreas clickables para navegación (desktop) */
+    @@media (min-width: 769px) {
+        .fs-swiper-carousel::before,
+        .fs-swiper-carousel::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 25%;
+            z-index: 5;
+            cursor: pointer;
+            pointer-events: none; /* Los clicks pasan al handler JS */
+        }
+
+        .fs-swiper-carousel::before {
+            left: 0;
+            background: linear-gradient(90deg, rgba(0,0,0,0.03) 0%, transparent 100%);
+        }
+
+        .fs-swiper-carousel::after {
+            right: 0;
+            background: linear-gradient(-90deg, rgba(0,0,0,0.03) 0%, transparent 100%);
+        }
+
+        .fs-swiper-carousel:hover::before,
+        .fs-swiper-carousel:hover::after {
+            background: linear-gradient(90deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+        }
+    }
+
+    /* Paginación (bullets) */
+    .fs-swiper-carousel .swiper-pagination {
+        bottom: 20px !important;
+    }
+
+    .fs-swiper-carousel .swiper-pagination-bullet {
+        width: 8px;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.5);
+        opacity: 1;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+
+    .fs-swiper-carousel .swiper-pagination-bullet:hover {
+        background: rgba(255, 255, 255, 0.8);
+        transform: scale(1.2);
+    }
+
+    .fs-swiper-carousel .swiper-pagination-bullet-active {
+        background: white;
+        transform: scale(1.4);
+        box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+    }
+
+    /* Contador personalizado - más visible */
+    .fs-swiper-counter {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 8px 14px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        z-index: 10;
+        pointer-events: none;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        letter-spacing: 0.5px;
+    }
+
+    /* Indicador visual de swipe en móvil */
+    @@media (max-width: 768px) {
+        .fs-swiper-carousel[data-has-multiple="true"]::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            right: 8px;
+            width: 4px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 2px;
+            transform: translateY(-50%);
+            animation: swipeHint 2s ease-in-out infinite;
+            opacity: 0;
+        }
+
+        .fs-swiper-carousel[data-swipe-hint="true"]::after {
+            opacity: 1;
+        }
+
+        @@keyframes swipeHint {
+            0%, 100% { transform: translateY(-50%) translateX(0); }
+            50% { transform: translateY(-50%) translateX(-5px); }
+        }
+    }
+
+    /* Responsive para Swiper */
+    @@media (max-width: 768px) {
+        .fs-swiper-carousel .swiper-button-next,
+        .fs-swiper-carousel .swiper-button-prev {
+            width: 36px;
+            height: 36px;
+        }
+
+        .fs-swiper-carousel .swiper-button-next:after,
+        .fs-swiper-carousel .swiper-button-prev:after {
+            font-size: 14px;
+        }
+
+        .fs-swiper-counter {
+            top: 15px;
+            right: 15px;
+            font-size: 12px;
+            padding: 4px 10px;
+        }
+    }
+
+    /* Desktop - imágenes/videos más grandes con sombra */
+    @@media (min-width: 992px) {
+        .fs-swiper-carousel .swiper-slide img,
+        .fs-swiper-carousel .swiper-slide video {
+            max-width: 90%;
+            max-height: 90vh;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+    }
+
+    /* Double tap heart animation - Fullscreen */
     .fullscreen-heart-animation {
         position: absolute;
         top: 50%;
@@ -4041,6 +4433,55 @@
 
     .fullscreen-heart-animation.animate {
         animation: heartPop 0.8s ease-out forwards;
+    }
+
+    /* Double tap heart animation - Feed (Instagram style) */
+    .doubletap-heart {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0);
+        pointer-events: none;
+        z-index: 100;
+        opacity: 0;
+    }
+
+    .doubletap-heart svg {
+        width: 100px;
+        height: 100px;
+        fill: #ed4956;
+        filter: drop-shadow(0 0 15px rgba(237, 73, 86, 0.5));
+    }
+
+    .doubletap-heart.animate {
+        animation: heartPopFeed 0.9s cubic-bezier(0.17, 0.89, 0.32, 1.28) forwards;
+    }
+
+    @@keyframes heartPopFeed {
+        0% {
+            transform: translate(-50%, -50%) scale(0);
+            opacity: 0;
+        }
+        10% {
+            opacity: 1;
+        }
+        25% {
+            transform: translate(-50%, -50%) scale(1.3);
+        }
+        40% {
+            transform: translate(-50%, -50%) scale(0.9);
+        }
+        55% {
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+        70% {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+        100% {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 0;
+        }
     }
 
     @@keyframes heartPop {
@@ -4392,29 +4833,31 @@
 
     .carousel-container {
         width: 100%;
+        height: 100%;
         overflow: hidden;
     }
 
     .carousel-track {
         display: flex;
+        height: 100%;
         transition: transform 0.3s ease-out;
     }
 
     .carousel-slide {
         flex-shrink: 0;
+        height: 100%;
         position: relative;
         display: flex;
         align-items: center;
         justify-content: center;
-        min-height: 300px;
-        max-height: 600px;
     }
 
-    .carousel-media {
+    .carousel-slide img.carousel-media,
+    .carousel-slide video.carousel-media {
         width: 100%;
         height: 100%;
         object-fit: contain;
-        max-height: 600px;
+        display: block;
     }
 
     .carousel-play-icon {
@@ -4731,7 +5174,7 @@
         align-items: center;
         gap: 20px;
         pointer-events: auto;
-        margin-bottom: 10px;
+        margin-bottom: 48px; /* Subido ~1cm */
     }
 
     .credits-action-btn {
@@ -6561,7 +7004,7 @@
                         @if (tieneArchivo)
                         {
                             var rutaArchivoLimpia = LimpiarRuta(post.RutaArchivo);
-                            <div class="post-media" style="aspect-ratio:4/5;max-width:100%;overflow:hidden;">
+                            <div class="post-media" style="aspect-ratio:1/1;max-width:100%;overflow:hidden;">
                                 @if (esImagen || (!esVideo && !esAudio))
                                 {
                                     <img src="@rutaArchivoLimpia" alt="" loading="lazy" style="max-width:100%;max-height:600px;width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'media-error-placeholder\'></div>';">
@@ -6642,15 +7085,16 @@
                          data-media-type="@tipoPrimerArchivo"
                          data-media-src="@primerArchivo.RutaArchivo"
                          onclick="openFullscreenViewer(event, @post.Id)"
-                         style="cursor:pointer;aspect-ratio:4/5;max-width:100%;overflow:hidden;">
+                         style="cursor:pointer;max-width:100%;overflow:hidden;">
                         <div class="carousel-container">
+                            @{var slideWidthPercent = 100.0 / archivosCarrusel.Count;}
                             <div class="carousel-track" style="width: @(archivosCarrusel.Count * 100)%;">
                                 @for (int i = 0; i < archivosCarrusel.Count; i++)
                                 {
                                     var archivo = archivosCarrusel[i];
                                     var esArchivoVideo = archivo.TipoArchivo == TipoArchivo.Video;
                                     var rutaArchivoCarrusel = LimpiarRuta(archivo.RutaArchivo);
-                                    <div class="carousel-slide" data-index="@i" style="width: @(100.0 / archivosCarrusel.Count)%;">
+                                    <div class="carousel-slide" data-index="@i" style="width: @(slideWidthPercent.ToString("F4", System.Globalization.CultureInfo.InvariantCulture))%;">
                                         @if (esArchivoVideo)
                                         {
                                             @* iOS Safari requiere tipo MIME explícito *@
@@ -6682,7 +7126,7 @@
                                         }
                                         else
                                         {
-                                            <img src="@rutaArchivoCarrusel" alt="" class="carousel-media" loading="lazy" style="max-width:100%;max-height:600px;width:100%;height:100%;object-fit:cover;display:block;" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E';">
+                                            <img src="@rutaArchivoCarrusel" alt="" class="carousel-media" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E';">
                                         }
                                     </div>
                                 }
@@ -6784,7 +7228,7 @@
                          {
                             <text>onclick="openFullscreenViewer(event, @post.Id)"</text>
                          }
-                         style="cursor:pointer;aspect-ratio:4/5;max-width:100%;overflow:hidden;">
+                         style="cursor:pointer;max-width:100%;overflow:hidden;">
                         @if (esPreviewBlur)
                         {
                             <!-- Badge LadoB -->
@@ -6815,7 +7259,7 @@
                         @{var rutaPostMedia = LimpiarRuta(post.RutaArchivo);}
                         @if (esImagen)
                         {
-                            <img src="@rutaPostMedia" alt="" loading="lazy" style="max-width:100%;max-height:600px;width:100%;height:100%;object-fit:cover;display:block;" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E';">
+                            <img src="@rutaPostMedia" alt="" loading="lazy" class="carousel-media" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E';">
                             @if (!string.IsNullOrEmpty(post.NombreUbicacion))
                             {
                                 <!-- Badge de ubicación -->
@@ -6933,7 +7377,7 @@
                         }
                         else
                         {
-                            <img src="@rutaPostMedia" alt="" loading="lazy" style="max-width:100%;max-height:600px;width:100%;height:100%;object-fit:cover;display:block;" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E';">
+                            <img src="@rutaPostMedia" alt="" loading="lazy" class="carousel-media" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E';">
                             @if (!string.IsNullOrEmpty(post.NombreUbicacion))
                             {
                                 <!-- Badge de ubicación -->
@@ -7795,14 +8239,31 @@
 
     // ========================================
     // PULL TO REFRESH & INFINITE SCROLL
+    // ⚡ MEJORADO: Usa IDs ya vistos en lugar de paginación
     // ========================================
-    let currentPage = 1; // Empezamos en página 1 porque la 0 ya está cargada
     let isLoadingMore = false;
     let hasMorePosts = @(Model.Count() > 10 ? "true" : "false");
     let isPulling = false;
     let pullStartY = 0;
     let pullDistance = 0;
     const PULL_THRESHOLD = 80;
+
+    // ⚡ NUEVO: Set de IDs de posts ya cargados (evita duplicados)
+    const loadedPostIds = new Set();
+
+    // Inicializar con los posts ya cargados en el servidor
+    function initLoadedPostIds() {
+        document.querySelectorAll('.post[data-post-id]').forEach(post => {
+            const postId = parseInt(post.dataset.postId);
+            if (!isNaN(postId)) {
+                loadedPostIds.add(postId);
+            }
+        });
+        console.log('[Feed] Posts iniciales cargados:', loadedPostIds.size);
+    }
+
+    // Llamar al cargar la página
+    initLoadedPostIds();
 
     // Pull to Refresh
     function initPullToRefresh() {
@@ -7858,23 +8319,20 @@
         pullIndicator.classList.add('refreshing');
 
         try {
-            // Obtener los posts más recientes sin recargar la página
-            const response = await fetch('/Feed/CargarMasPosts?pagina=0&cantidad=10&refresh=true');
+            // ⚡ MEJORADO: No enviar IDs para refresh (queremos los más recientes)
+            const response = await fetch('/Feed/CargarMasPosts?cantidad=10');
             const data = await response.json();
 
             if (data.success && data.posts.length > 0) {
                 const postsContainer = document.getElementById('postsContainer');
-                const existingIds = new Set(
-                    Array.from(postsContainer.querySelectorAll('.post[data-post-id]'))
-                        .map(p => p.dataset.postId)
-                );
 
-                // Solo agregar posts que no existen
+                // Solo agregar posts que no existen en loadedPostIds
                 let newPostsHtml = '';
                 let newCount = 0;
                 data.posts.forEach(post => {
-                    if (!existingIds.has(String(post.id))) {
+                    if (!loadedPostIds.has(post.id)) {
                         newPostsHtml += renderPost(post);
+                        loadedPostIds.add(post.id); // Registrar nuevo ID
                         newCount++;
                     }
                 });
@@ -7935,11 +8393,15 @@
         hideLoadError(); // Ocultar error previo si existe
 
         try {
+            // ⚡ MEJORADO: Enviar IDs ya vistos al servidor
+            const idsVistosParam = Array.from(loadedPostIds).join(',');
+
             // Fetch con timeout de 15 segundos
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-            const response = await fetch(`/Feed/CargarMasPosts?pagina=${currentPage}&cantidad=10`, {
+            // ⚡ Usar nuevo endpoint con IDs ya vistos
+            const response = await fetch(`/Feed/CargarMasPosts?cantidad=10&idsVistos=${encodeURIComponent(idsVistosParam)}`, {
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
@@ -7952,13 +8414,20 @@
 
             if (data.success && data.posts.length > 0) {
                 const postsContainer = document.getElementById('postsContainer');
+                let nuevosAgregados = 0;
 
                 data.posts.forEach(post => {
-                    const postHtml = renderPost(post);
-                    postsContainer.insertAdjacentHTML('beforeend', postHtml);
+                    // Solo agregar si no existe (doble verificación)
+                    if (!loadedPostIds.has(post.id)) {
+                        const postHtml = renderPost(post);
+                        postsContainer.insertAdjacentHTML('beforeend', postHtml);
+                        loadedPostIds.add(post.id); // Registrar nuevo ID
+                        nuevosAgregados++;
+                    }
                 });
 
-                currentPage++;
+                console.log('[Feed] Cargados', nuevosAgregados, 'posts nuevos. Total:', loadedPostIds.size);
+
                 hasMorePosts = data.hayMas;
                 loadRetryCount = 0; // Reset retry count on success
 
@@ -7988,6 +8457,7 @@
             }
 
         } catch (error) {
+            console.error('[Feed] Error cargando más posts:', error);
             loadRetryCount++;
 
             // Reintentar automáticamente hasta MAX_RETRIES
@@ -8065,7 +8535,7 @@
                         </svg>
                         EXCLUSIVO
                     </div>
-                    <div class="post-media" style="aspect-ratio:4/5;max-width:100%;overflow:hidden;">
+                    <div class="post-media" style="aspect-ratio:1/1;max-width:100%;overflow:hidden;">
                         ${post.esVideo
                             ? `<video class="feed-video" muted loop playsinline poster="${post.thumbnail || ''}" style="filter:blur(20px);transform:scale(1.1);">
                                    <source src="${rutaArchivoLimpia}" type="video/mp4">
@@ -8240,8 +8710,8 @@
                          data-media-type="image"
                          data-media-src="${rutaArchivoLimpia}"
                          onclick="openFullscreenViewer(event, ${post.id})"
-                         style="cursor:pointer;aspect-ratio:4/5;max-width:100%;overflow:hidden;">
-                        <img src="${rutaArchivoLimpia}" alt="" loading="lazy" style="max-width:100%;max-height:600px;width:100%;height:100%;object-fit:cover;display:block;" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E';">
+                         style="cursor:pointer;max-width:100%;overflow:hidden;">
+                        <img src="${rutaArchivoLimpia}" alt="" loading="lazy" style="max-width:100%;max-height:600px;width:auto;height:auto;object-fit:contain;display:block;margin:0 auto;" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E';">
                         ${post.nombreUbicacion ? `
                         <div class="location-badge">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -8494,63 +8964,36 @@
         return success;
     }
 
-    // Handler para click en overlay - toggle play/pause con tap
+    // Flag global para indicar que hubo double-tap reciente (evita play/pause en videos)
+    window._doubleTapJustFired = false;
+
+    // Handler para click en overlay de video
+    // Tap en cualquier parte = abrir FullView (igual que fotos, estilo Instagram)
+    // Double-tap = like (manejado por el handler global de double-tap)
     // ⚠️ GLOBAL para que onclick del HTML pueda accederla
     window.handleVideoClick = function(event, overlay) {
         event.stopPropagation();
+
+        // Si hubo double-tap reciente, ignorar este click
+        if (window._doubleTapJustFired) {
+            window._doubleTapJustFired = false;
+            return;
+        }
+
+        // Si clickeó en el botón de mute, ignorar (tiene su propio handler)
+        if (event.target.closest('.video-mute-btn')) {
+            return;
+        }
+
         event.preventDefault();
 
+        // Tap en cualquier parte del video = abrir FullView (igual que las fotos)
         const postMedia = overlay.closest('.post-media');
-        const video = postMedia?.querySelector('video.feed-video');
-        if (!video) return;
+        const postCard = postMedia?.closest('.post-card, .post, [data-post-id]');
+        const postId = postCard?.dataset?.postId || postMedia?.dataset?.postId;
 
-        const videoId = video.getAttribute('data-post-id') || video.src;
-
-        if (video.paused) {
-            // Usuario quiere reproducir - TAP DIRECTO (funciona en iOS 18+)
-            manuallyPausedVideos.delete(videoId);
-            postMedia.classList.remove('needs-tap');
-            pauseAllVideosExcept(video);
-
-            // iOS 18+: Asegurar estado correcto antes de play
-            video.muted = isGlobalMuted;
-            if (video.readyState < 2) {
-                video.load();
-            }
-
-            // Usar promesa encadenada para iOS 18+
-            const playWithFallback = async () => {
-                try {
-                    await video.play();
-                    updateVideoState(video, true);
-                } catch (err1) {
-                    // Fallback 1: Forzar muted
-                    video.muted = true;
-                    try {
-                        await video.play();
-                        updateVideoState(video, true);
-                    } catch (err2) {
-                        // Fallback 2: Reiniciar y reproducir
-                        video.currentTime = 0;
-                        video.load();
-                        try {
-                            await video.play();
-                            updateVideoState(video, true);
-                        } catch (err3) {
-                            // Falló todo - mostrar needs-tap de nuevo
-                            postMedia.classList.add('needs-tap');
-                            updateVideoState(video, false);
-                        }
-                    }
-                }
-            };
-
-            playWithFallback();
-        } else {
-            // Usuario quiere pausar - marcar como pausa manual
-            manuallyPausedVideos.add(videoId);
-            video.pause();
-            updateVideoState(video, false);
+        if (postId && typeof window.openFullscreenViewer === 'function') {
+            window.openFullscreenViewer(event, parseInt(postId));
         }
     };
 
@@ -9296,6 +9739,221 @@
             });
         }, { once: true, passive: true });
     }
+
+    // ========================================
+    // DOUBLE TAP PARA LIKE - Instagram Style
+    // Compatible con iOS Safari y todos los navegadores
+    // ========================================
+    (function initDoubleTapLike() {
+        // Estado global para tracking de taps
+        const tapState = new Map(); // postId -> { lastTap, timeout, startX, startY }
+        const DOUBLE_TAP_DELAY = 300; // ms entre taps para considerarlo doble
+        const TAP_MOVE_THRESHOLD = 15; // px máximo de movimiento para considerarlo tap
+        const likeInProgressFeed = new Set();
+
+        // Crear el corazón si no existe en el post-media
+        function ensureHeartElement(postMedia) {
+            let heart = postMedia.querySelector('.doubletap-heart');
+            if (!heart) {
+                heart = document.createElement('div');
+                heart.className = 'doubletap-heart';
+                heart.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+                postMedia.appendChild(heart);
+            }
+            return heart;
+        }
+
+        // Mostrar animación del corazón
+        function showHeartAnimation(postMedia) {
+            const heart = ensureHeartElement(postMedia);
+            heart.classList.remove('animate');
+            void heart.offsetWidth; // Force reflow
+            heart.classList.add('animate');
+            setTimeout(() => heart.classList.remove('animate'), 900);
+        }
+
+        // Dar like al post
+        async function likePostFromDoubleTap(postId, postMedia) {
+            if (likeInProgressFeed.has(postId)) return;
+            likeInProgressFeed.add(postId);
+
+            // Mostrar animación inmediatamente (optimistic UI)
+            showHeartAnimation(postMedia);
+
+            // Haptic feedback
+            if (window.LadoHaptic) {
+                window.LadoHaptic.medium();
+            } else if (navigator.vibrate) {
+                navigator.vibrate(30);
+            }
+
+            try {
+                const response = await fetch('/Feed/Like', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `id=${postId}`
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    // Actualizar botón de like
+                    const likeBtn = document.querySelector(`.like-btn[data-id="${postId}"]`);
+                    if (likeBtn) {
+                        likeBtn.classList.toggle('liked', data.liked);
+                    }
+
+                    // Actualizar contador
+                    const likesSpan = document.getElementById(`likes-${postId}`);
+                    if (likesSpan && data.likes !== undefined) {
+                        likesSpan.textContent = `${data.likes} Me gusta`;
+                    }
+                }
+            } catch (err) {
+                console.warn('Error al dar like:', err);
+            } finally {
+                setTimeout(() => likeInProgressFeed.delete(postId), 500);
+            }
+        }
+
+        // Obtener postId de un elemento
+        function getPostId(element) {
+            const postMedia = element.closest('.post-media');
+            if (!postMedia) return null;
+
+            // Buscar data-post-id en el media o en el contenedor padre
+            let postId = postMedia.dataset?.postId;
+            if (!postId) {
+                const postCard = postMedia.closest('.post, .post-card, [data-post-id]');
+                postId = postCard?.dataset?.postId;
+            }
+            return postId;
+        }
+
+        // Variables para tracking de touch
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let isTouchMoving = false;
+
+        // Trackear inicio del touch
+        document.addEventListener('touchstart', function(e) {
+            if (e.touches.length !== 1) return;
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            isTouchMoving = false;
+        }, { passive: true });
+
+        // Detectar si hubo movimiento (scroll)
+        document.addEventListener('touchmove', function(e) {
+            if (e.touches.length !== 1) return;
+            const dx = Math.abs(e.touches[0].clientX - touchStartX);
+            const dy = Math.abs(e.touches[0].clientY - touchStartY);
+            if (dx > TAP_MOVE_THRESHOLD || dy > TAP_MOVE_THRESHOLD) {
+                isTouchMoving = true;
+            }
+        }, { passive: true });
+
+        // Detectar double-tap en touchend
+        document.addEventListener('touchend', function(e) {
+            // Ignorar si hubo movimiento, múltiples toques, o fullscreen activo
+            if (isTouchMoving) return;
+            if (e.changedTouches.length !== 1) return;
+            if (typeof isFullscreenActive !== 'undefined' && isFullscreenActive) return;
+
+            const touch = e.changedTouches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY) || e.target;
+
+            // Ignorar si es en controles específicos
+            if (target.closest('.video-mute-btn, .photo-music-mute-btn, .carousel-btn, .music-badge, audio, .carousel-dots, .sensitive-reveal-btn, .locked-overlay, .preview-blur-overlay, .video-play-icon')) {
+                return;
+            }
+
+            const postMedia = target.closest('.post-media');
+            if (!postMedia) return;
+
+            // Ignorar contenido bloqueado
+            if (postMedia.closest('.locked-content-wrapper')) return;
+
+            const postId = getPostId(target);
+            if (!postId) return;
+
+            const now = Date.now();
+            const state = tapState.get(postId) || { lastTap: 0 };
+
+            if (now - state.lastTap < DOUBLE_TAP_DELAY) {
+                // ¡Double tap detectado!
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+
+                // Marcar flag global para que otros handlers ignoren el click subsecuente
+                window._doubleTapJustFired = true;
+                setTimeout(() => { window._doubleTapJustFired = false; }, 100);
+
+                // Limpiar timeout de single tap
+                if (state.timeout) clearTimeout(state.timeout);
+                tapState.delete(postId);
+
+                // Dar like
+                likePostFromDoubleTap(postId, postMedia);
+            } else {
+                // Primer tap - guardar estado
+                state.lastTap = now;
+                state.timeout = setTimeout(() => {
+                    tapState.delete(postId);
+                }, DOUBLE_TAP_DELAY + 50);
+                tapState.set(postId, state);
+            }
+        }, { passive: false, capture: true }); // capture: true para interceptar antes que otros handlers
+
+        // Desktop: dblclick
+        document.addEventListener('dblclick', function(e) {
+            // Ignorar en touch devices
+            if ('ontouchstart' in window) return;
+            if (typeof isFullscreenActive !== 'undefined' && isFullscreenActive) return;
+
+            const postMedia = e.target.closest('.post-media');
+            if (!postMedia) return;
+
+            if (postMedia.closest('.locked-content-wrapper')) return;
+            if (e.target.closest('.video-mute-btn, .carousel-btn, .music-badge, audio, .video-play-icon')) return;
+
+            const postId = getPostId(e.target);
+            if (!postId) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+            likePostFromDoubleTap(postId, postMedia);
+        }, { capture: true });
+
+        // Observer para posts cargados dinámicamente
+        const postObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === 1 && node.querySelectorAll) {
+                        node.querySelectorAll('.post-media').forEach(pm => {
+                            if (pm.closest('.post, .post-card') && !pm.closest('.locked-content-wrapper') && !pm.querySelector('.doubletap-heart')) {
+                                ensureHeartElement(pm);
+                            }
+                        });
+                    }
+                });
+            });
+        });
+
+        postObserver.observe(document.body, { childList: true, subtree: true });
+
+        // Inicializar corazones en posts existentes
+        document.querySelectorAll('.post-media').forEach(pm => {
+            if (pm.closest('.post, .post-card') && !pm.closest('.locked-content-wrapper')) {
+                ensureHeartElement(pm);
+            }
+        });
+
+        // Exponer función global para usar desde otros handlers
+        window.triggerDoubleTapLike = function(postId, postMedia) {
+            likePostFromDoubleTap(postId, postMedia);
+        };
+    })();
 
     // Click en badge de música para reproducir manualmente
     document.addEventListener('click', (e) => {
@@ -10123,8 +10781,9 @@
         // No hacer nada si ya estamos en el borde
         if (newIndex === currentIndex) return;
 
-        // Mover el track
-        const offset = -newIndex * (100 / totalSlides);
+        // Mover el track (cada slide ocupa 100/totalSlides % del track)
+        const offsetPercent = (100 / totalSlides);
+        const offset = -newIndex * offsetPercent;
         track.style.transform = `translateX(${offset}%)`;
 
         // Actualizar índice actual
@@ -10162,6 +10821,28 @@
         document.querySelectorAll('.post-carousel').forEach(carousel => {
             carousel.dataset.currentIndex = '0';
 
+            // PRECARGAR TODAS LAS IMÁGENES DEL CARRUSEL
+            carousel.querySelectorAll('.carousel-slide img.carousel-media').forEach(img => {
+                const originalSrc = img.src;
+                if (originalSrc && !img.complete) {
+                    // Forzar carga creando nueva imagen
+                    const preloadImg = new Image();
+                    preloadImg.onload = () => {
+                        // Forzar re-render de la imagen original
+                        if (!img.complete || img.naturalWidth === 0) {
+                            img.src = '';
+                            img.src = originalSrc;
+                        }
+                    };
+                    preloadImg.src = originalSrc;
+                } else if (img.complete && img.naturalWidth === 0) {
+                    // Imagen marcada como completa pero sin dimensiones - recargar
+                    const src = img.src;
+                    img.src = '';
+                    img.src = src;
+                }
+            });
+
             // Ocultar botón prev inicialmente
             const prevBtn = carousel.querySelector('.carousel-prev');
             if (prevBtn) prevBtn.classList.add('hidden');
@@ -10178,7 +10859,8 @@
                         if (!track) return;
                         const totalSlides = carousel.querySelectorAll('.carousel-slide').length;
                         if (totalSlides === 0) return;
-                        const offset = -index * (100 / totalSlides);
+                        const offsetPercent = (100 / totalSlides);
+                        const offset = -index * offsetPercent;
                         track.style.transform = `translateX(${offset}%)`;
                         carousel.dataset.currentIndex = index;
 
@@ -10811,7 +11493,7 @@
             const verifiedBadge = u.esVerificado ? '<i class="fas fa-check-circle verified"></i>' : '';
             html += `
                 <a href="/Feed/Perfil/${u.id}" class="${prefix}-user">
-                    <img src="${u.foto}" alt="" class="${prefix}-avatar" onerror="this.src='/images/default-avatar.png'">
+                    <img src="${u.foto}" alt="" class="${prefix}-avatar" onerror="this.src='/images/default-avatar.svg'">
                     <div class="${prefix}-info">
                         <div class="${prefix}-username">${escapeHtml(u.username)}${verifiedBadge}</div>
                         <div class="${prefix}-name">${escapeHtml(u.nombre)}</div>
@@ -11365,6 +12047,14 @@
             </button>
             <!-- Menú dropdown -->
             <div class="story-menu-dropdown" id="storyMenuDropdown">
+                <button class="story-menu-item" id="btnDescargarStory" onclick="descargarStoryActual()" style="display:none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <span>Descargar</span>
+                </button>
                 <button class="story-menu-item danger" id="btnEliminarStory" onclick="eliminarStoryActual()" style="display:none;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
                         <polyline points="3 6 5 6 21 6"/>
@@ -11402,6 +12092,12 @@
 
         <!-- Contenido (imagen/video) -->
         <div class="story-viewer-content" id="storyViewerContent">
+            <!-- Indicador de carga -->
+            <div class="story-loading-indicator" id="storyLoadingIndicator" style="display:none;">
+                <div class="story-loading-spinner"></div>
+                <span>Cargando...</span>
+            </div>
+
             <img src="" alt="" class="story-viewer-media" id="storyViewerImage" style="display:none;">
             <video class="story-viewer-video" id="storyViewerVideo" playsinline muted style="display:none;"></video>
 
@@ -11493,8 +12189,8 @@
                         <span id="storyLikeCount" class="story-like-count"></span>
                     </button>
 
-                    <!-- Compartir/Direct -->
-                    <button class="story-bottom-btn" onclick="abrirMensajesDesdeStory()" title="Enviar por mensaje">
+                    <!-- Compartir -->
+                    <button class="story-bottom-btn" onclick="abrirCompartirStory()" title="Compartir">
                         <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 3L9.218 10.083M22 3l-4.545 18-5.237-7.917M22 3L2 11l7.218 2.083"></path>
                         </svg>
@@ -11504,6 +12200,98 @@
         </div>
     </div><!-- Cierra story-viewer-container -->
 </div><!-- Cierra story-viewer-overlay -->
+
+<!-- ========================================
+     MODAL COMPARTIR STORY
+     ======================================== -->
+<div class="share-story-overlay" id="shareStoryOverlay" onclick="cerrarCompartirStory(event)">
+    <div class="share-story-modal" onclick="event.stopPropagation()">
+        <div class="share-story-header">
+            <h3>Compartir</h3>
+            <button class="share-story-close" onclick="cerrarCompartirStory()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        <div class="share-story-options">
+            <!-- WhatsApp -->
+            <button class="share-story-option" onclick="compartirStoryWhatsApp()">
+                <div class="share-option-icon" style="background: #25D366;">
+                    <svg viewBox="0 0 24 24" fill="white" width="24" height="24">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                    </svg>
+                </div>
+                <span>WhatsApp</span>
+            </button>
+
+            <!-- Copiar enlace -->
+            <button class="share-story-option" onclick="copiarEnlaceStory()">
+                <div class="share-option-icon" style="background: var(--primary);">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" width="24" height="24">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                    </svg>
+                </div>
+                <span>Copiar enlace</span>
+            </button>
+
+            <!-- Facebook -->
+            <button class="share-story-option" onclick="compartirStoryFacebook()">
+                <div class="share-option-icon" style="background: #1877F2;">
+                    <svg viewBox="0 0 24 24" fill="white" width="24" height="24">
+                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                </div>
+                <span>Facebook</span>
+            </button>
+
+            <!-- Twitter/X -->
+            <button class="share-story-option" onclick="compartirStoryTwitter()">
+                <div class="share-option-icon" style="background: #000;">
+                    <svg viewBox="0 0 24 24" fill="white" width="20" height="20">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                    </svg>
+                </div>
+                <span>X</span>
+            </button>
+
+            <!-- Telegram -->
+            <button class="share-story-option" onclick="compartirStoryTelegram()">
+                <div class="share-option-icon" style="background: #0088cc;">
+                    <svg viewBox="0 0 24 24" fill="white" width="22" height="22">
+                        <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                    </svg>
+                </div>
+                <span>Telegram</span>
+            </button>
+
+            <!-- Enviar mensaje directo -->
+            <button class="share-story-option" onclick="enviarStoryPorMensaje()">
+                <div class="share-option-icon" style="background: linear-gradient(135deg, #833AB4, #E1306C, #F77737);">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" width="22" height="22">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                        <polyline points="22,6 12,13 2,6"/>
+                    </svg>
+                </div>
+                <span>Mensaje</span>
+            </button>
+
+            <!-- Más opciones (Web Share API) -->
+            <button class="share-story-option" id="shareStoryMoreBtn" onclick="compartirStoryNativo()" style="display:none;">
+                <div class="share-option-icon" style="background: #666;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" width="22" height="22">
+                        <circle cx="12" cy="12" r="1"/>
+                        <circle cx="19" cy="12" r="1"/>
+                        <circle cx="5" cy="12" r="1"/>
+                    </svg>
+                </div>
+                <span>Más</span>
+            </button>
+        </div>
+    </div>
+</div>
 
 <!-- ========================================
      MODAL CREAR STORY
@@ -11547,23 +12335,30 @@
             <!-- Texto opcional -->
             <textarea class="create-story-text" id="storyTexto" placeholder="Añade un texto a tu historia (opcional)" rows="2"></textarea>
 
-            <!-- Tipo de lado -->
-            <div class="create-story-tipo">
-                <input type="radio" name="storyTipoLado" id="storyTipoLadoA" value="LadoA" checked>
-                <label for="storyTipoLadoA">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                        <circle cx="12" cy="12" r="10"></circle>
-                    </svg>
-                    Lado A
-                </label>
-                <input type="radio" name="storyTipoLado" id="storyTipoLadoB" value="LadoB">
-                <label for="storyTipoLadoB">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                        <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zM2 12h20"></path>
-                    </svg>
-                    Lado B
-                </label>
-            </div>
+            <!-- Tipo de lado (solo mostrar si el usuario es creador verificado) -->
+            @if (usuarioActual?.CreadorVerificado == true)
+            {
+                <div class="create-story-tipo">
+                    <input type="radio" name="storyTipoLado" id="storyTipoLadoA" value="LadoA" checked>
+                    <label for="storyTipoLadoA">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <circle cx="12" cy="12" r="10"></circle>
+                        </svg>
+                        Lado A
+                    </label>
+                    <input type="radio" name="storyTipoLado" id="storyTipoLadoB" value="LadoB">
+                    <label for="storyTipoLadoB">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zM2 12h20"></path>
+                        </svg>
+                        Lado B
+                    </label>
+                </div>
+            }
+            else
+            {
+                <input type="hidden" name="storyTipoLado" value="LadoA">
+            }
 
             <!-- Botón crear -->
             <button class="create-story-submit" id="storySubmitBtn" onclick="crearStory()" disabled>
@@ -11932,6 +12727,19 @@
     let lastTapTime = 0;
     let tapTimeout = null;
 
+    // Variables para infinite scroll dentro del FullView
+    let isLoadingMoreFullscreen = false;
+    let fullscreenCurrentPage = 0; // Página actual para cargar más posts
+    let fullscreenHasMore = true; // Si hay más posts por cargar
+
+    // Sincronizar fullscreenHasMore con el estado del feed normal
+    function syncFullscreenHasMore() {
+        // Usar la variable global hasMorePosts del feed si existe
+        if (typeof hasMorePosts !== 'undefined') {
+            fullscreenHasMore = hasMorePosts;
+        }
+    }
+
     // iOS Audio Unlock - Desbloquear audio en dispositivos iOS/Safari
     let audioUnlocked = false;
 
@@ -12128,6 +12936,7 @@
                 fullscreenPosts.push(postData);
             }
         });
+        console.log('[FullView] Posts recolectados:', fullscreenPosts.length);
     }
 
     // Precargar medios adyacentes
@@ -12206,8 +13015,17 @@
         lastScrollIndex = -1;
         currentPlayingAudioId = null;
 
+        // Sincronizar estado de carga con el feed normal
+        syncFullscreenHasMore();
+
         // Recolectar posts
         collectMediaPosts();
+
+        // Si hay muy pocos posts y hay más disponibles, precargar
+        if (fullscreenPosts.length < 5 && fullscreenHasMore) {
+            // Cargar más posts en background
+            loadMoreFullscreenPosts();
+        }
 
         // Encontrar el indice del post actual
         currentFullscreenIndex = fullscreenPosts.findIndex(p => p.id === postId);
@@ -12467,6 +13285,125 @@
     }
 
     // Generar los slides
+    // Generar el contenido HTML de un slide individual
+    function generateSlideContent(post, index) {
+        let content = '';
+
+        if (post.type === 'video') {
+            const isWebm = post.src.toLowerCase().endsWith('.webm');
+            const mimeType = isWebm ? 'video/webm' : 'video/mp4';
+            const posterAttr = post.thumbnail ? `poster="${post.thumbnail}"` : '';
+            content = `
+                <div class="fullscreen-loading-indicator">
+                    <div class="loading-spinner"></div>
+                </div>
+                <video playsinline webkit-playsinline="true" loop muted preload="metadata" ${posterAttr}>
+                    ${!isWebm ? `<source src="${post.src}" type="video/mp4">` : ''}
+                    <source src="${post.src}" type="${mimeType}">
+                </video>
+                <button class="fullscreen-mute-btn" onclick="event.stopPropagation(); toggleFullscreenMute(this)" title="Activar/Desactivar sonido">
+                    <svg class="icon-muted" viewBox="0 0 24 24" fill="white">
+                        <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                    </svg>
+                    <svg class="icon-unmuted" viewBox="0 0 24 24" fill="white" style="display:none;">
+                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                    </svg>
+                </button>
+                <div class="fullscreen-heart-animation">
+                    <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                </div>
+                ${generateCreditsHtml(post)}
+            `;
+        } else if (post.type === 'audio') {
+            content = `
+                <div class="fullscreen-audio-content">
+                    <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                    <audio src="${post.src}" controls></audio>
+                </div>
+                <div class="fullscreen-heart-animation">
+                    <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                </div>
+                ${generateCreditsHtml(post)}
+            `;
+        } else if (post.isCarousel && post.carouselFiles && post.carouselFiles.length > 1) {
+            // Generar slides para Swiper.js
+            const swiperSlidesHtml = post.carouselFiles.map((file, idx) => {
+                if (file.type === 'video') {
+                    const isWebmCarousel = file.src.toLowerCase().endsWith('.webm');
+                    const mimeTypeCarousel = isWebmCarousel ? 'video/webm' : 'video/mp4';
+                    return `<div class="swiper-slide" data-idx="${idx}">
+                        <video playsinline webkit-playsinline="true" loop muted preload="metadata">
+                            ${!isWebmCarousel ? `<source src="${file.src}" type="video/mp4">` : ''}
+                            <source src="${file.src}" type="${mimeTypeCarousel}">
+                        </video>
+                    </div>`;
+                } else {
+                    return `<div class="swiper-slide" data-idx="${idx}">
+                        <img src="${file.src}" alt="" draggable="false">
+                    </div>`;
+                }
+            }).join('');
+
+            const hasMultiple = post.carouselFiles.length > 1;
+            content = `
+                <div class="fullscreen-loading-indicator">
+                    <div class="loading-spinner"></div>
+                </div>
+                <div class="swiper fs-swiper-carousel" data-post-id="${post.id}" data-has-multiple="${hasMultiple}" data-swipe-hint="${hasMultiple}">
+                    <div class="swiper-wrapper">
+                        ${swiperSlidesHtml}
+                    </div>
+                    <div class="swiper-pagination fs-swiper-pagination"></div>
+                    <div class="swiper-button-next fs-swiper-next"></div>
+                    <div class="swiper-button-prev fs-swiper-prev"></div>
+                    <div class="fs-swiper-counter">1/${post.carouselFiles.length}</div>
+                </div>
+                <div class="fullscreen-heart-animation">
+                    <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                </div>
+                ${generateCreditsHtml(post)}
+            `;
+        } else {
+            // Imagen simple
+            let audioHtml = '';
+            if (post.audioSrc) {
+                audioHtml = `
+                    <div class="fullscreen-music-badge" data-post-id="${post.id}">
+                        <div class="fullscreen-music-icon">
+                            <svg viewBox="0 0 24 24" fill="white">
+                                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                            </svg>
+                        </div>
+                        <div class="fullscreen-music-info">
+                            <div class="fullscreen-music-title">${post.audioTitle}</div>
+                            <div class="fullscreen-music-artist">${post.audioArtist}</div>
+                        </div>
+                    </div>
+                    <audio class="fullscreen-audio-player"
+                           data-post-id="${post.id}"
+                           src="${post.audioSrc}"
+                           loop
+                           data-start="${post.audioStart}"
+                           data-volume="${post.audioVolume}">
+                    </audio>
+                `;
+            }
+            content = `
+                <div class="fullscreen-loading-indicator">
+                    <div class="loading-spinner"></div>
+                </div>
+                <img src="${post.src}" alt="" draggable="false">
+                ${audioHtml}
+                <div class="fullscreen-heart-animation">
+                    <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                </div>
+                ${generateCreditsHtml(post)}
+            `;
+        }
+
+        return content;
+    }
+
     function generateFullscreenSlides() {
         const container = document.getElementById('fullscreenSlidesContainer');
         container.innerHTML = '';
@@ -12533,45 +13470,38 @@
                 `;
                 slide.classList.add('media-loaded'); // Audio siempre listo
             } else if (post.isCarousel && post.carouselFiles && post.carouselFiles.length > 1) {
-                // CARRUSEL - Múltiples archivos con navegación horizontal
-                const carouselSlidesHtml = post.carouselFiles.map((file, idx) => {
+                // CARRUSEL - Múltiples archivos con Swiper.js
+                const swiperSlidesHtml = post.carouselFiles.map((file, idx) => {
                     if (file.type === 'video') {
                         // iOS Safari requiere MIME type explícito
                         const isWebmCarousel = file.src.toLowerCase().endsWith('.webm');
                         const mimeTypeCarousel = isWebmCarousel ? 'video/webm' : 'video/mp4';
-                        return `<div class="fs-carousel-item ${idx === 0 ? 'active' : ''}" data-idx="${idx}">
+                        return `<div class="swiper-slide" data-idx="${idx}">
                             <video playsinline webkit-playsinline="true" loop muted preload="metadata">
                                 ${!isWebmCarousel ? `<source src="${file.src}" type="video/mp4">` : ''}
                                 <source src="${file.src}" type="${mimeTypeCarousel}">
                             </video>
                         </div>`;
                     } else {
-                        return `<div class="fs-carousel-item ${idx === 0 ? 'active' : ''}" data-idx="${idx}">
+                        return `<div class="swiper-slide" data-idx="${idx}">
                             <img src="${file.src}" alt="" draggable="false">
                         </div>`;
                     }
                 }).join('');
 
-                const dotsHtml = post.carouselFiles.map((_, idx) =>
-                    `<span class="fs-carousel-dot ${idx === 0 ? 'active' : ''}" data-idx="${idx}"></span>`
-                ).join('');
-
+                const hasMultipleSlides = post.carouselFiles.length > 1;
                 slide.innerHTML = `
                     <div class="fullscreen-loading-indicator">
                         <div class="loading-spinner"></div>
                     </div>
-                    <div class="fs-carousel-wrapper" data-post-id="${post.id}" data-current="0">
-                        <div class="fs-carousel-slides">
-                            ${carouselSlidesHtml}
+                    <div class="swiper fs-swiper-carousel" data-post-id="${post.id}" data-has-multiple="${hasMultipleSlides}" data-swipe-hint="${hasMultipleSlides}">
+                        <div class="swiper-wrapper">
+                            ${swiperSlidesHtml}
                         </div>
-                        <button class="fs-carousel-nav fs-carousel-prev" onclick="event.stopPropagation(); fsCarouselNav(${post.id}, -1)">
-                            <svg viewBox="0 0 24 24" fill="white"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
-                        </button>
-                        <button class="fs-carousel-nav fs-carousel-next" onclick="event.stopPropagation(); fsCarouselNav(${post.id}, 1)">
-                            <svg viewBox="0 0 24 24" fill="white"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
-                        </button>
-                        <div class="fs-carousel-dots">${dotsHtml}</div>
-                        <div class="fs-carousel-counter">1/${post.carouselFiles.length}</div>
+                        <div class="swiper-pagination fs-swiper-pagination"></div>
+                        <div class="swiper-button-next fs-swiper-next"></div>
+                        <div class="swiper-button-prev fs-swiper-prev"></div>
+                        <div class="fs-swiper-counter">1/${post.carouselFiles.length}</div>
                     </div>
                     <div class="fullscreen-heart-animation">
                         <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
@@ -12580,31 +13510,6 @@
                 `;
                 slide.classList.add('media-loaded');
                 slide.classList.add('has-carousel');
-
-                // Agregar eventos de swipe horizontal para el carrusel
-                const wrapper = slide.querySelector('.fs-carousel-wrapper');
-                if (wrapper) {
-                    let startX = 0;
-                    wrapper.addEventListener('touchstart', (e) => {
-                        startX = e.touches[0].clientX;
-                    }, { passive: true });
-                    wrapper.addEventListener('touchend', (e) => {
-                        const endX = e.changedTouches[0].clientX;
-                        const diff = startX - endX;
-                        if (Math.abs(diff) > 50) {
-                            e.stopPropagation();
-                            fsCarouselNav(post.id, diff > 0 ? 1 : -1);
-                        }
-                    }, { passive: false });
-                }
-
-                // Click en dots
-                slide.querySelectorAll('.fs-carousel-dot').forEach(dot => {
-                    dot.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        fsCarouselGoTo(post.id, parseInt(dot.dataset.idx));
-                    });
-                });
             } else {
                 // Imagen simple - verificar si tiene audio
                 let audioHtml = '';
@@ -12661,9 +13566,125 @@
 
         // Listener para scroll/snap
         container.addEventListener('scroll', onFullscreenScroll);
+
+        // Inicializar todos los Swiper carousels
+        initFullscreenSwipers();
     }
 
-    // Navegación del carrusel dentro del fullscreen
+    // Almacenar instancias de Swiper
+    const fullscreenSwipers = new Map();
+
+    // Inicializar Swiper.js en los carruseles del fullscreen
+    function initFullscreenSwipers() {
+        // Destruir instancias previas
+        fullscreenSwipers.forEach(swiper => swiper.destroy(true, true));
+        fullscreenSwipers.clear();
+
+        // Inicializar nuevos Swipers
+        document.querySelectorAll('.fs-swiper-carousel').forEach(swiperEl => {
+            const postId = swiperEl.dataset.postId;
+            const counter = swiperEl.querySelector('.fs-swiper-counter');
+            const totalSlides = swiperEl.querySelectorAll('.swiper-slide').length;
+
+            const swiper = new Swiper(swiperEl, {
+                // Configuración base
+                slidesPerView: 1,
+                spaceBetween: 0,
+                loop: false,
+                speed: 300,
+                cssMode: false, // Mejor rendimiento en iOS
+
+                // Navegación
+                navigation: {
+                    nextEl: swiperEl.querySelector('.swiper-button-next'),
+                    prevEl: swiperEl.querySelector('.swiper-button-prev'),
+                },
+
+                // Paginación (bullets)
+                pagination: {
+                    el: swiperEl.querySelector('.swiper-pagination'),
+                    clickable: true,
+                    dynamicBullets: totalSlides > 5,
+                },
+
+                // Soporte táctil mejorado para iOS
+                touchEventsTarget: 'container',
+                simulateTouch: true,
+                allowTouchMove: true,
+                touchRatio: 1.2, // Más sensible al swipe
+                touchAngle: 35, // Más tolerante al ángulo
+                grabCursor: true,
+                passiveListeners: true,
+                touchStartPreventDefault: false,
+                touchMoveStopPropagation: true,
+
+                // Threshold para detectar swipe (en px)
+                threshold: 10,
+
+                // Resistencia en los bordes
+                resistance: true,
+                resistanceRatio: 0.65,
+
+                // Teclado - navegación con flechas izq/der en carrusel
+                keyboard: {
+                    enabled: true,
+                    onlyInViewport: true,
+                    pageUpDown: false,
+                },
+
+                // Eventos
+                on: {
+                    slideChange: function() {
+                        // Actualizar contador
+                        if (counter) {
+                            counter.textContent = `${this.activeIndex + 1}/${totalSlides}`;
+                        }
+
+                        // Ocultar hint de swipe después del primer cambio
+                        this.el.removeAttribute('data-swipe-hint');
+
+                        // Pausar videos de slides anteriores
+                        this.slides.forEach((slide, idx) => {
+                            const video = slide.querySelector('video');
+                            if (video) {
+                                if (idx === this.activeIndex) {
+                                    video.play().catch(() => {});
+                                } else {
+                                    video.pause();
+                                }
+                            }
+                        });
+
+                        // Haptic feedback en móvil
+                        if (navigator.vibrate) {
+                            navigator.vibrate(10);
+                        }
+                    },
+                    init: function() {
+                        // Reproducir video del primer slide si existe
+                        const firstSlide = this.slides[0];
+                        if (firstSlide) {
+                            const video = firstSlide.querySelector('video');
+                            if (video) {
+                                video.play().catch(() => {});
+                            }
+                        }
+                    },
+                    touchStart: function() {
+                        // Detener propagación para evitar conflictos con scroll vertical
+                        this.el.style.touchAction = 'pan-y';
+                    },
+                    touchEnd: function() {
+                        this.el.style.touchAction = '';
+                    }
+                }
+            });
+
+            fullscreenSwipers.set(postId, swiper);
+        });
+    }
+
+    // Navegación del carrusel dentro del fullscreen (legacy - mantener compatibilidad)
     function fsCarouselNav(postId, direction) {
         const wrapper = document.querySelector(`.fs-carousel-wrapper[data-post-id="${postId}"]`);
         if (!wrapper) return;
@@ -12728,27 +13749,61 @@
         if (nextBtn) nextBtn.style.display = index === total - 1 ? 'none' : 'flex';
     }
 
-    // Manejar tap/click (detectar doble tap)
+    // Manejar tap/click (detectar doble tap + navegación lateral en carruseles)
     function handleTap(event, postId, slideElement) {
-        // Ignorar si es audio controls
+        // Ignorar si es audio controls o botones de navegación
         if (event.target.tagName === 'AUDIO') return;
+        if (event.target.closest('.swiper-button-next, .swiper-button-prev, .swiper-pagination')) return;
+        if (event.target.closest('.fs-carousel-nav, .fs-carousel-dots')) return;
 
         const now = Date.now();
         const timeDiff = now - lastTapTime;
+
+        // Verificar si es un carrusel con Swiper
+        const swiperEl = slideElement.querySelector('.fs-swiper-carousel');
+        const swiper = swiperEl ? fullscreenSwipers.get(postId) : null;
+
+        // Desktop: navegación por click en áreas laterales del carrusel
+        if (swiper && window.innerWidth > 768) {
+            const rect = swiperEl.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const width = rect.width;
+
+            // Click en el 25% izquierdo - slide anterior
+            if (clickX < width * 0.25 && swiper.activeIndex > 0) {
+                event.stopPropagation();
+                swiper.slidePrev();
+                return;
+            }
+            // Click en el 25% derecho - slide siguiente
+            if (clickX > width * 0.75 && swiper.activeIndex < swiper.slides.length - 1) {
+                event.stopPropagation();
+                swiper.slideNext();
+                return;
+            }
+        }
 
         if (timeDiff < 300 && timeDiff > 0) {
             // Doble tap - dar like
             clearTimeout(tapTimeout);
             triggerLike(postId, slideElement);
         } else {
-            // Primer tap - toggle video si es video
+            // Primer tap - toggle video si es video (solo si no es carrusel)
             tapTimeout = setTimeout(() => {
-                const video = slideElement.querySelector('video');
-                if (video) {
-                    if (video.paused) {
-                        video.play();
-                    } else {
-                        video.pause();
+                // Si es carrusel, buscar video en el slide activo del swiper
+                if (swiper) {
+                    const activeSlide = swiper.slides[swiper.activeIndex];
+                    const video = activeSlide?.querySelector('video');
+                    if (video) {
+                        if (video.paused) video.play();
+                        else video.pause();
+                    }
+                } else {
+                    // Imagen/video simple
+                    const video = slideElement.querySelector('video');
+                    if (video) {
+                        if (video.paused) video.play();
+                        else video.pause();
                     }
                 }
             }, 300);
@@ -12963,7 +14018,173 @@
                 preloadAdjacentMedia(currentFullscreenIndex);
                 playCurrentVideo();
             }
+
+            // Infinite scroll: Cargar más posts cuando estamos cerca del final
+            const shouldLoadMore = fullscreenHasMore && !isLoadingMoreFullscreen &&
+                currentFullscreenIndex >= fullscreenPosts.length - 3;
+
+            if (shouldLoadMore) {
+                console.log('[FullView] Trigger carga:', {
+                    index: currentFullscreenIndex,
+                    total: fullscreenPosts.length,
+                    threshold: fullscreenPosts.length - 3
+                });
+                loadMoreFullscreenPosts();
+            }
         }, 150);
+    }
+
+    // Cargar más posts para el FullView
+    // ⚡ MEJORADO: Usa IDs ya vistos en lugar de paginación
+    async function loadMoreFullscreenPosts() {
+        if (isLoadingMoreFullscreen || !fullscreenHasMore) {
+            console.log('[FullView] No cargar más:', { isLoading: isLoadingMoreFullscreen, hasMore: fullscreenHasMore });
+            return;
+        }
+
+        isLoadingMoreFullscreen = true;
+        console.log('[FullView] Cargando más posts...');
+
+        try {
+            // ⚡ MEJORADO: Enviar IDs ya vistos
+            const idsVistosParam = Array.from(loadedPostIds).join(',');
+            console.log('[FullView] IDs ya vistos:', loadedPostIds.size);
+
+            const response = await fetch(`/Feed/CargarMasPosts?cantidad=10&idsVistos=${encodeURIComponent(idsVistosParam)}`);
+            const data = await response.json();
+
+            console.log('[FullView] Respuesta servidor:', {
+                success: data.success,
+                postsRecibidos: data.posts?.length || 0,
+                hayMas: data.hayMas
+            });
+
+            if (data.success && data.posts && data.posts.length > 0) {
+                // Agregar posts al DOM del feed normal (mantener sincronizado)
+                const postsContainer = document.getElementById('postsContainer');
+
+                data.posts.forEach(post => {
+                    // Verificar que no exista ya
+                    if (!loadedPostIds.has(post.id) && !document.querySelector(`.post[data-post-id="${post.id}"]`)) {
+                        const postHtml = renderPost(post);
+                        postsContainer.insertAdjacentHTML('beforeend', postHtml);
+                        loadedPostIds.add(post.id); // Registrar nuevo ID
+                    }
+                });
+
+                // Reinicializar carruseles y observers para los nuevos posts
+                if (typeof initCarousels === 'function') {
+                    initCarousels();
+                }
+                if (typeof initVideoObserversForNewPosts === 'function') {
+                    initVideoObserversForNewPosts();
+                }
+
+                // Ahora recolectar los nuevos posts para el fullscreen
+                const existingIds = new Set(fullscreenPosts.map(p => p.id));
+
+                document.querySelectorAll('.post-media[data-post-id]').forEach(media => {
+                    const postId = parseInt(media.dataset.postId);
+                    if (postId && !existingIds.has(postId)) {
+                        const mediaSrc = media.dataset.mediaSrc;
+                        const mediaType = media.dataset.mediaType;
+                        if (mediaSrc) {
+                            const postElement = media.closest('.post');
+                            const postData = {
+                                id: postId,
+                                type: mediaType,
+                                src: mediaSrc,
+                                loaded: false,
+                                creatorId: postElement?.dataset.creatorId || '',
+                                creatorName: postElement?.dataset.creatorName || 'Creador',
+                                creatorPhoto: postElement?.dataset.creatorPhoto || '',
+                                creatorUsername: postElement?.querySelector('.post-username')?.textContent?.trim() || '',
+                                creatorVerified: postElement?.querySelector('.post-username .fas.fa-check-circle') !== null,
+                                isLadoB: postElement?.querySelector('.badge-ladob') !== null,
+                                isFollowing: postElement?.dataset.isFollowing === 'true',
+                                description: postElement?.querySelector('.post-caption-text')?.textContent?.trim() || '',
+                                likes: parseInt(postElement?.dataset.likes) || 0,
+                                comments: parseInt(postElement?.dataset.comments) || 0,
+                                isLiked: postElement?.querySelector('.like-btn')?.classList.contains('liked') || false,
+                                postDate: postElement?.querySelector('.post-time')?.textContent?.trim() || ''
+                            };
+
+                            // Verificar carrusel
+                            if (media.dataset.isCarousel === 'true' && media.dataset.carouselFiles) {
+                                try {
+                                    postData.isCarousel = true;
+                                    postData.carouselFiles = JSON.parse(media.dataset.carouselFiles);
+                                    postData.carouselIndex = 0;
+                                } catch (e) {}
+                            }
+
+                            // Audio
+                            if (media.dataset.audioSrc) {
+                                postData.audioSrc = media.dataset.audioSrc;
+                                postData.audioTitle = media.dataset.audioTitle || '';
+                                postData.audioArtist = media.dataset.audioArtist || '';
+                                postData.audioStart = parseFloat(media.dataset.audioStart) || 0;
+                                postData.audioVolume = Math.min(1, Math.max(0, parseFloat(media.dataset.audioVolume) || 0.7));
+                            }
+
+                            fullscreenPosts.push(postData);
+                        }
+                    }
+                });
+
+                // Generar slides para los nuevos posts
+                const container = document.getElementById('fullscreenSlidesContainer');
+                const newPostsCount = fullscreenPosts.length - existingIds.size;
+                const startIndex = fullscreenPosts.length - newPostsCount;
+
+                for (let i = startIndex; i < fullscreenPosts.length; i++) {
+                    const post = fullscreenPosts[i];
+                    const slide = document.createElement('div');
+                    slide.className = 'fullscreen-slide';
+                    slide.dataset.postId = post.id;
+                    slide.dataset.index = i;
+                    slide.innerHTML = generateSlideContent(post, i);
+
+                    // Agregar event listeners de doble tap para like
+                    slide.addEventListener('click', (e) => handleTap(e, post.id, slide));
+                    slide.addEventListener('touchend', (e) => handleTap(e, post.id, slide));
+
+                    // Si es carrusel, agregar eventos de swipe
+                    if (post.isCarousel) {
+                        const wrapper = slide.querySelector('.fs-carousel-wrapper');
+                        if (wrapper) {
+                            let startX = 0;
+                            wrapper.addEventListener('touchstart', (e) => {
+                                startX = e.touches[0].clientX;
+                            }, { passive: true });
+                            wrapper.addEventListener('touchend', (e) => {
+                                const endX = e.changedTouches[0].clientX;
+                                const diff = startX - endX;
+                                if (Math.abs(diff) > 50) {
+                                    e.stopPropagation();
+                                    fsCarouselNav(post.id, diff > 0 ? 1 : -1);
+                                }
+                            }, { passive: false });
+                        }
+                    }
+
+                    container.appendChild(slide);
+                }
+
+                // Actualizar contador
+                updateCounter();
+
+                console.log('[FullView] Nuevos slides agregados. Total posts:', fullscreenPosts.length, 'hayMas:', data.hayMas);
+
+                fullscreenHasMore = data.hayMas;
+            } else {
+                fullscreenHasMore = false;
+            }
+        } catch (error) {
+            console.error('Error cargando más posts para fullscreen:', error);
+        } finally {
+            isLoadingMoreFullscreen = false;
+        }
     }
 
     // Scroll al slide
@@ -13144,6 +14365,119 @@
         // Cerrar también el carrusel fullscreen si está abierto
         closeFullscreenCarousel();
     };
+
+    // ========================================
+    // SWIPE DOWN PARA CERRAR FULLVIEW
+    // Compatible con iOS Safari y todos los navegadores
+    // ========================================
+    (function initSwipeDownToClose() {
+        let touchStartY = 0;
+        let touchStartX = 0;
+        let touchCurrentY = 0;
+        let isSwiping = false;
+        const SWIPE_THRESHOLD = 100; // pixels para activar cierre
+        const HORIZONTAL_THRESHOLD = 50; // si se mueve más horizontal, ignorar
+
+        const viewer = document.getElementById('fullscreenViewer');
+        const slidesContainer = document.getElementById('fullscreenSlidesContainer');
+
+        if (!viewer || !slidesContainer) return;
+
+        // Solo en el primer slide (índice 0) permitir swipe down
+        function canSwipeDown() {
+            // Verificar si estamos en el primer slide
+            if (currentFullscreenIndex !== 0) return false;
+            // Verificar si el contenedor está en el top
+            return slidesContainer.scrollTop < 10;
+        }
+
+        viewer.addEventListener('touchstart', function(e) {
+            if (!canSwipeDown()) return;
+
+            // Ignorar si el touch inicia dentro de un carrusel Swiper
+            if (e.target.closest('.fs-swiper-carousel')) {
+                isSwiping = false;
+                return;
+            }
+
+            touchStartY = e.touches[0].clientY;
+            touchStartX = e.touches[0].clientX;
+            touchCurrentY = touchStartY;
+            isSwiping = true;
+        }, { passive: true });
+
+        viewer.addEventListener('touchmove', function(e) {
+            if (!isSwiping) return;
+
+            touchCurrentY = e.touches[0].clientY;
+            const touchCurrentX = e.touches[0].clientX;
+            const deltaY = touchCurrentY - touchStartY;
+            const deltaX = Math.abs(touchCurrentX - touchStartX);
+
+            // Si se está moviendo más horizontal que vertical, cancelar
+            if (deltaX > HORIZONTAL_THRESHOLD) {
+                isSwiping = false;
+                return;
+            }
+
+            // Solo permitir arrastrar hacia abajo
+            if (deltaY > 0 && canSwipeDown()) {
+                // Feedback visual: mover el viewer hacia abajo
+                const translateY = Math.min(deltaY * 0.5, 150);
+                const scale = Math.max(1 - (deltaY * 0.0005), 0.9);
+                const opacity = Math.max(1 - (deltaY * 0.003), 0.5);
+
+                viewer.style.transform = `translateY(${translateY}px) scale(${scale})`;
+                viewer.style.opacity = opacity;
+                viewer.style.transition = 'none';
+            }
+        }, { passive: true });
+
+        viewer.addEventListener('touchend', function(e) {
+            if (!isSwiping) return;
+            isSwiping = false;
+
+            const deltaY = touchCurrentY - touchStartY;
+
+            // Restaurar estilos
+            viewer.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+
+            if (deltaY > SWIPE_THRESHOLD && canSwipeDown()) {
+                // Swipe down suficiente - cerrar
+                viewer.style.transform = 'translateY(100vh)';
+                viewer.style.opacity = '0';
+
+                // Haptic feedback
+                if (window.LadoHaptic) {
+                    window.LadoHaptic.light();
+                } else if (navigator.vibrate) {
+                    navigator.vibrate(15);
+                }
+
+                setTimeout(() => {
+                    viewer.style.transform = '';
+                    viewer.style.opacity = '';
+                    viewer.style.transition = '';
+                    closeFullscreenViewer();
+                }, 300);
+            } else {
+                // No suficiente - volver a posición original
+                viewer.style.transform = '';
+                viewer.style.opacity = '';
+                setTimeout(() => {
+                    viewer.style.transition = '';
+                }, 300);
+            }
+        }, { passive: true });
+
+        // También permitir swipe down en carrusel interno
+        viewer.addEventListener('touchcancel', function() {
+            isSwiping = false;
+            viewer.style.transform = '';
+            viewer.style.opacity = '';
+            viewer.style.transition = '';
+        }, { passive: true });
+    })();
 
     // Navegar entre slides con botones
     // ⚠️ GLOBAL para onclick en HTML
@@ -13469,6 +14803,11 @@
 
     document.getElementById('fullscreenSlidesContainer')?.addEventListener('touchstart', function(e) {
         if (e.touches.length === 1) {
+            // Si el touch inicia dentro de un carrusel Swiper, no rastrear para swipes de cierre
+            if (e.target.closest('.fs-swiper-carousel')) {
+                swipeDirection = null;
+                return;
+            }
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
             touchStartTime = Date.now();
@@ -13478,6 +14817,14 @@
 
     document.getElementById('fullscreenSlidesContainer')?.addEventListener('touchmove', function(e) {
         if (e.touches.length !== 1 || swipeDirection === 'vertical') return;
+
+        // Ignorar si estamos dentro de un carrusel Swiper
+        const targetSlide = e.target.closest('.fullscreen-slide');
+        const hasCarousel = targetSlide?.querySelector('.fs-swiper-carousel');
+        if (hasCarousel) {
+            swipeDirection = null;
+            return;
+        }
 
         const touchX = e.touches[0].clientX;
         const touchY = e.touches[0].clientY;
@@ -13496,6 +14843,16 @@
 
     document.getElementById('fullscreenSlidesContainer')?.addEventListener('touchend', function(e) {
         if (swipeDirection !== 'horizontal') {
+            swipeDirection = null;
+            return;
+        }
+
+        // IMPORTANTE: Ignorar swipes horizontales si estamos dentro de un carrusel Swiper
+        // para evitar conflictos con la navegación del carrusel
+        const targetSlide = e.target.closest('.fullscreen-slide');
+        const hasCarousel = targetSlide?.querySelector('.fs-swiper-carousel');
+        if (hasCarousel) {
+            // Dejar que Swiper maneje la navegación del carrusel
             swipeDirection = null;
             return;
         }
@@ -13661,6 +15018,99 @@
     // Variable para almacenar el anuncio actual
     let anuncioActual = null;
 
+    // Cache de recursos precargados para stories
+    const storyPreloadCache = new Map();
+    let isPreloadingStory = false;
+
+    // Precargar todos los recursos de una story
+    async function precargarStory(story) {
+        if (!story) return false;
+
+        const cacheKey = story.id + '_' + story.rutaArchivo;
+        if (storyPreloadCache.has(cacheKey)) {
+            return true; // Ya precargado
+        }
+
+        const promesas = [];
+
+        // 1. Precargar media principal (imagen o video)
+        if (story.tipo === 'Video') {
+            promesas.push(new Promise((resolve) => {
+                const video = document.createElement('video');
+                video.preload = 'auto';
+                video.muted = true;
+                video.oncanplaythrough = () => resolve(true);
+                video.onerror = () => resolve(false);
+                video.src = story.rutaArchivo;
+                // Timeout de 10 segundos
+                setTimeout(() => resolve(true), 10000);
+            }));
+        } else {
+            promesas.push(new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve(true);
+                img.onerror = () => resolve(false);
+                img.src = story.rutaArchivo;
+                // Timeout de 5 segundos
+                setTimeout(() => resolve(true), 5000);
+            }));
+        }
+
+        // 2. Precargar overlays (stickers, imágenes)
+        if (story.overlays && Array.isArray(story.overlays)) {
+            story.overlays.forEach(overlay => {
+                if (overlay.tipo === 'sticker' || overlay.tipo === 'gif') {
+                    promesas.push(new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => resolve(true);
+                        img.onerror = () => resolve(false);
+                        img.src = overlay.src;
+                        setTimeout(() => resolve(true), 3000);
+                    }));
+                }
+            });
+        }
+
+        // 3. Precargar música
+        if (story.musica && story.musica.audioUrl) {
+            promesas.push(new Promise((resolve) => {
+                const audio = new Audio();
+                audio.preload = 'auto';
+                audio.oncanplaythrough = () => resolve(true);
+                audio.onerror = () => resolve(false);
+                audio.src = story.musica.audioUrl;
+                setTimeout(() => resolve(true), 5000);
+            }));
+        }
+
+        try {
+            await Promise.all(promesas);
+            storyPreloadCache.set(cacheKey, true);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // Precargar stories adyacentes en background
+    function precargarStoriesAdyacentes() {
+        const userStories = storiesData[currentUserIndex];
+        if (!userStories) return;
+
+        // Precargar siguiente story del mismo usuario
+        if (currentStoryIndex + 1 < userStories.stories.length) {
+            precargarStory(userStories.stories[currentStoryIndex + 1]);
+        }
+
+        // Precargar primera story del siguiente usuario
+        if (currentUserIndex + 1 < storiesData.length) {
+            const nextUser = storiesData[currentUserIndex + 1];
+            if (nextUser && nextUser.stories && nextUser.stories[0]) {
+                precargarStory(nextUser.stories[0]);
+            }
+        }
+    }
+
     // Abrir visor de stories
     async function abrirVisorStories(creadorId) {
         try {
@@ -13684,12 +15134,18 @@
 
             currentStoryIndex = 0;
 
-            // Mostrar overlay
+            // Precargar primera story ANTES de mostrar el visor
+            const primeraStory = storiesData[currentUserIndex]?.stories?.[0];
+            if (primeraStory) {
+                await precargarStory(primeraStory);
+            }
+
+            // Mostrar overlay (después de precargar)
             document.getElementById('storyViewerOverlay').classList.add('active');
             document.body.style.overflow = 'hidden';
             document.body.classList.add('story-viewer-open');
 
-            // Mostrar primera story del usuario
+            // Mostrar primera story del usuario (ya precargada)
             mostrarStory();
 
         } catch (error) {
@@ -13738,8 +15194,8 @@
         }
     }
 
-    // Mostrar story actual
-    function mostrarStory() {
+    // Mostrar story actual (con precarga optimizada)
+    async function mostrarStory() {
         const userStories = storiesData[currentUserIndex];
         if (!userStories) {
             cerrarVisorStories();
@@ -13753,6 +15209,132 @@
             return;
         }
 
+        // Elementos del DOM
+        const imgEl = document.getElementById('storyViewerImage');
+        const videoEl = document.getElementById('storyViewerVideo');
+        const textoEl = document.getElementById('storyViewerText');
+        const audioBtn = document.getElementById('storyAudioBtn');
+        const loadingEl = document.getElementById('storyLoadingIndicator');
+        const overlaysContainer = document.getElementById('storyOverlaysContainer');
+
+        // Ocultar media anterior y mostrar loading
+        imgEl.style.display = 'none';
+        videoEl.style.display = 'none';
+        videoEl.pause();
+        overlaysContainer.innerHTML = '';
+        detenerMusicaStory();
+
+        // Mostrar loading solo si no está precargado
+        const cacheKey = story.id + '_' + story.rutaArchivo;
+        if (!storyPreloadCache.has(cacheKey)) {
+            loadingEl.style.display = 'flex';
+        }
+
+        // Actualizar UI mientras se precarga (header, progress bars, etc.)
+        actualizarUIStory(userStories, story);
+
+        // Precargar story actual
+        await precargarStory(story);
+
+        // Ocultar loading
+        loadingEl.style.display = 'none';
+
+        // Mostrar media
+        if (story.tipo === 'Video') {
+            // Flag para evitar múltiples llamadas al timer
+            let timerStarted = false;
+
+            // Configurar eventos ANTES de establecer src (importante para videos en caché)
+            videoEl.onerror = function() {
+                if (timerStarted) return;
+                timerStarted = true;
+                videoEl.style.display = 'none';
+                textoEl.textContent = '⚠️ Video no compatible con tu dispositivo';
+                textoEl.style.display = 'block';
+                storyDuration = 3000;
+                iniciarTimerStory();
+            };
+
+            videoEl.onloadedmetadata = function() {
+                if (timerStarted) return;
+                timerStarted = true;
+                // Usar duración completa del video (sin límite de 30s)
+                storyDuration = videoEl.duration * 1000;
+                iniciarTimerStory();
+            };
+
+            // Establecer src y mostrar
+            videoEl.src = story.rutaArchivo;
+            videoEl.style.display = 'block';
+            if (audioBtn) audioBtn.style.display = 'flex';
+            aplicarEstadoAudio();
+
+            // Si el video ya tiene metadata (precargado), iniciar timer inmediatamente
+            if (!timerStarted && videoEl.readyState >= 1 && videoEl.duration > 0) {
+                timerStarted = true;
+                storyDuration = videoEl.duration * 1000;
+                iniciarTimerStory();
+            }
+
+            videoEl.play().catch((err) => {
+                if (err.name !== 'AbortError') {
+                    videoEl.onerror?.();
+                }
+            });
+        } else {
+            // Para imágenes, esperar a que cargue antes de mostrar
+            imgEl.onload = function() {
+                imgEl.style.display = 'block';
+                storyDuration = 5000;
+                iniciarTimerStory();
+                // Reproducir música DESPUÉS de que la imagen esté visible
+                reproducirMusicaStory(story);
+            };
+            imgEl.onerror = function() {
+                imgEl.style.display = 'block'; // Mostrar igual
+                storyDuration = 5000;
+                iniciarTimerStory();
+            };
+            if (audioBtn) audioBtn.style.display = 'none';
+            imgEl.src = story.rutaArchivo;
+
+            // Si la imagen ya está en caché del navegador, onload puede no disparar
+            if (imgEl.complete) {
+                imgEl.style.display = 'block';
+                storyDuration = 5000;
+                iniciarTimerStory();
+                reproducirMusicaStory(story);
+            }
+        }
+
+        // Renderizar overlays
+        renderizarOverlays(story);
+
+        // Texto de la story
+        if (!story.tieneOverlays) {
+            textoEl.textContent = story.texto || '';
+        } else {
+            textoEl.textContent = '';
+        }
+
+        // Para videos, reproducir música al iniciar playback
+        if (story.tipo === 'Video') {
+            reproducirMusicaStory(story);
+        }
+
+        // Marcar como vista
+        marcarStoryVista(story.id);
+
+        // Actualizar navegación
+        actualizarNavegacionUsuarios();
+        actualizarLikeUI(story);
+
+        // Precargar stories adyacentes en background
+        setTimeout(() => precargarStoriesAdyacentes(), 500);
+    }
+
+    // Actualizar UI del header y controles (sin esperar media)
+    function actualizarUIStory(userStories, story) {
         // Manejar elementos de anuncio
         const adBadge = document.getElementById('storyAdBadge');
         const adCta = document.getElementById('storyAdCta');
@@ -13761,14 +15343,12 @@
         const btnSilenciar = document.getElementById('btnSilenciarHistorias');
 
         if (story.esAnuncio || userStories.esAnuncio) {
-            // Es un anuncio - mostrar badge y CTA
             adBadge.style.display = 'block';
             adCta.style.display = 'flex';
             adCtaText.textContent = story.textoBoton || 'Ver mas';
             if (bottomBar) bottomBar.style.display = 'none';
             if (btnSilenciar) btnSilenciar.style.display = 'none';
         } else {
-            // Es una story normal - ocultar elementos de anuncio
             adBadge.style.display = 'none';
             adCta.style.display = 'none';
             if (bottomBar) bottomBar.style.display = 'flex';
@@ -13794,88 +15374,23 @@
         // Actualizar barras de progreso
         actualizarBarrasProgreso(userStories.stories.length, currentStoryIndex);
 
-        // Actualizar visibilidad de controles (ocultar en propias stories)
+        // Actualizar visibilidad de controles
         actualizarControlesStory();
 
         // Limpiar input de mensaje
         const msgInput = document.getElementById('storyMessageInput');
         if (msgInput) msgInput.value = '';
+    }
 
-        // Mostrar media
-        const imgEl = document.getElementById('storyViewerImage');
-        const videoEl = document.getElementById('storyViewerVideo');
-        const textoEl = document.getElementById('storyViewerText');
-        const audioBtn = document.getElementById('storyAudioBtn');
-
-        imgEl.style.display = 'none';
-        videoEl.style.display = 'none';
-
-        // Pausar video anterior antes de cargar nuevo contenido
-        videoEl.pause();
-
-        if (story.tipo === 'Video') {
-            videoEl.src = story.rutaArchivo;
-            videoEl.style.display = 'block';
-            // Mostrar botón de audio para videos
-            if (audioBtn) {
-                audioBtn.style.display = 'flex';
-            }
-            // Aplicar estado de audio (muted por defecto en iOS hasta que el usuario toque)
-            aplicarEstadoAudio();
-
-            // Manejar error de video (ej: WebM en iOS/Safari)
-            videoEl.onerror = function() {
-                // Mostrar mensaje de error y avanzar después de 3 segundos
-                videoEl.style.display = 'none';
-                textoEl.textContent = '⚠️ Video no compatible con tu dispositivo';
-                textoEl.style.display = 'block';
-                storyDuration = 3000;
-                iniciarTimerStory();
-            };
-
-            // Manejar promesa de play para evitar AbortError
-            videoEl.play().catch((err) => {
-                // Si no puede reproducir, tratar como error
-                if (err.name !== 'AbortError') {
-                    videoEl.onerror?.();
-                }
-            });
-
-            // Para videos, usar su duración real
-            videoEl.onloadedmetadata = function() {
-                storyDuration = Math.min(videoEl.duration * 1000, 30000); // Máximo 30s
-                iniciarTimerStory();
-            };
-        } else {
-            imgEl.src = story.rutaArchivo;
-            imgEl.style.display = 'block';
-            // Ocultar botón de audio para imágenes
-            if (audioBtn) audioBtn.style.display = 'none';
-            storyDuration = 5000;
-            iniciarTimerStory();
+    // Detener música de story
+    function detenerMusicaStory() {
+        const audioEl = document.getElementById('storyMusicPlayer');
+        if (audioEl) {
+            audioEl.pause();
+            audioEl.src = '';
         }
-
-        // Texto de la story (solo si no hay overlays)
-        if (!story.tieneOverlays) {
-            textoEl.textContent = story.texto || '';
-        } else {
-            textoEl.textContent = '';
-        }
-
-        // Renderizar overlays del editor
-        renderizarOverlays(story);
-
-        // Reproducir música si tiene
-        reproducirMusicaStory(story);
-
-        // Marcar como vista
-        marcarStoryVista(story.id);
-
-        // Actualizar navegación entre usuarios
-        actualizarNavegacionUsuarios();
-
-        // Actualizar estado de likes
-        actualizarLikeUI(story);
+        const indicator = document.getElementById('storyMusicIndicator');
+        if (indicator) indicator.style.display = 'none';
     }
 
     // Actualizar UI de like en el visor de story
@@ -14009,6 +15524,181 @@
     // ========================================
     // ELIMINAR STORY INDIVIDUAL
     // ========================================
+    // Descargar la historia actual (solo para historias propias)
+    async function descargarStoryActual() {
+        const userStories = storiesData[currentUserIndex];
+        if (!userStories || !userStories.stories) return;
+
+        const currentStory = userStories.stories[currentStoryIndex];
+        if (!currentStory || !currentStory.rutaArchivo) return;
+
+        // Cerrar menú
+        const menu = document.getElementById('storyMenuDropdown');
+        if (menu) menu.classList.remove('active');
+
+        try {
+            // Pausar la historia mientras se descarga
+            pausarTimerStory();
+
+            // Obtener el archivo
+            const response = await fetch(currentStory.rutaArchivo);
+            if (!response.ok) throw new Error('No se pudo descargar');
+
+            const blob = await response.blob();
+
+            // Determinar extensión según tipo
+            let extension = 'jpg';
+            if (currentStory.tipo === 'Video') {
+                extension = 'mp4';
+            } else if (currentStory.rutaArchivo.includes('.png')) {
+                extension = 'png';
+            } else if (currentStory.rutaArchivo.includes('.gif')) {
+                extension = 'gif';
+            }
+
+            // Crear nombre del archivo
+            const fecha = new Date().toISOString().split('T')[0];
+            const nombreArchivo = `historia_${fecha}_${currentStory.id}.${extension}`;
+
+            // Crear link de descarga
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = nombreArchivo;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            // Reanudar la historia
+            reanudarTimerStory();
+        } catch (error) {
+            console.error('Error al descargar historia:', error);
+            alert('No se pudo descargar la historia');
+            reanudarTimerStory();
+        }
+    }
+
+    // ========================================
+    // COMPARTIR STORY
+    // ========================================
+    let currentShareStoryData = null;
+
+    function abrirCompartirStory() {
+        const userStories = storiesData[currentUserIndex];
+        if (!userStories || !userStories.stories) return;
+
+        const currentStory = userStories.stories[currentStoryIndex];
+        if (!currentStory) return;
+
+        // Guardar datos de la story actual
+        // URL al perfil del creador (las historias se ven desde ahí)
+        const creadorId = userStories.creador?.id || '';
+        currentShareStoryData = {
+            id: currentStory.id,
+            url: `${window.location.origin}/Feed/Perfil/${creadorId}`,
+            creador: userStories.creador,
+            rutaArchivo: currentStory.rutaArchivo
+        };
+
+        // Pausar story mientras está abierto el modal
+        pausarTimerStory();
+
+        // Mostrar botón "Más" si Web Share API está disponible
+        if (navigator.share) {
+            document.getElementById('shareStoryMoreBtn').style.display = 'flex';
+        }
+
+        // Mostrar modal
+        document.getElementById('shareStoryOverlay').classList.add('active');
+    }
+
+    function cerrarCompartirStory(event) {
+        if (event && event.target !== event.currentTarget) return;
+        document.getElementById('shareStoryOverlay').classList.remove('active');
+        reanudarTimerStory();
+    }
+
+    function getShareStoryUrl() {
+        return currentShareStoryData?.url || window.location.href;
+    }
+
+    function getShareStoryText() {
+        const creador = currentShareStoryData?.creador?.nombre || 'alguien';
+        return `Mira esta historia de ${creador} en LadoApp`;
+    }
+
+    function compartirStoryWhatsApp() {
+        const url = getShareStoryUrl();
+        const text = getShareStoryText();
+        window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
+        cerrarCompartirStory();
+    }
+
+    function compartirStoryFacebook() {
+        const url = getShareStoryUrl();
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank', 'width=600,height=400');
+        cerrarCompartirStory();
+    }
+
+    function compartirStoryTwitter() {
+        const url = getShareStoryUrl();
+        const text = getShareStoryText();
+        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'width=600,height=400');
+        cerrarCompartirStory();
+    }
+
+    function compartirStoryTelegram() {
+        const url = getShareStoryUrl();
+        const text = getShareStoryText();
+        window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank');
+        cerrarCompartirStory();
+    }
+
+    async function copiarEnlaceStory() {
+        const url = getShareStoryUrl();
+        try {
+            await navigator.clipboard.writeText(url);
+            showToast('Enlace copiado');
+        } catch (e) {
+            // Fallback para navegadores que no soportan clipboard API
+            const input = document.createElement('input');
+            input.value = url;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand('copy');
+            document.body.removeChild(input);
+            showToast('Enlace copiado');
+        }
+        cerrarCompartirStory();
+    }
+
+    function enviarStoryPorMensaje() {
+        cerrarCompartirStory();
+        // Usar la funcionalidad existente
+        abrirMensajesDesdeStory();
+    }
+
+    async function compartirStoryNativo() {
+        if (!navigator.share) {
+            showToast('Compartir no disponible en este navegador');
+            return;
+        }
+
+        try {
+            await navigator.share({
+                title: 'Historia en LadoApp',
+                text: getShareStoryText(),
+                url: getShareStoryUrl()
+            });
+        } catch (e) {
+            if (e.name !== 'AbortError') {
+                console.log('Error compartiendo:', e);
+            }
+        }
+        cerrarCompartirStory();
+    }
+
     async function eliminarStoryActual() {
         const userStories = storiesData[currentUserIndex];
         if (!userStories || !userStories.stories) return;
@@ -14262,6 +15952,7 @@
         const userStories = storiesData[currentUserIndex];
         const bottomBar = document.getElementById('storyBottomBar');
         const btnEliminar = document.getElementById('btnEliminarStory');
+        const btnDescargar = document.getElementById('btnDescargarStory');
         const btnSilenciar = document.getElementById('btnSilenciarHistorias');
         const currentUserId = '@(usuarioActual?.Id ?? "")';
         // Comparar como strings para evitar problemas de tipo
@@ -14279,6 +15970,11 @@
         // Mostrar/ocultar botón de eliminar según si es historia propia
         if (btnEliminar) {
             btnEliminar.style.display = isOwnStory ? 'flex' : 'none';
+        }
+
+        // Mostrar/ocultar botón de descargar según si es historia propia
+        if (btnDescargar) {
+            btnDescargar.style.display = isOwnStory ? 'flex' : 'none';
         }
 
         // Ocultar botón de silenciar en historias propias

@@ -1,0 +1,504 @@
+@model IEnumerable<Lado.Models.ConfiguracionLadoCoin>
+@{
+    ViewData["Title"] = "Configuracion LadoCoins";
+
+    var categorias = Model.GroupBy(c => c.Categoria ?? "General").OrderBy(g => g.Key);
+}
+
+<style>
+    .config-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+
+    .config-header h2 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: var(--text-dark);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .config-header h2 i {
+        color: #f59e0b;
+    }
+
+    .config-section {
+        background: var(--bg-white);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
+    }
+
+    .config-section-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .config-section-header h4 {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0;
+    }
+
+    .config-section-header .badge {
+        font-size: 0.75rem;
+    }
+
+    .config-table {
+        width: 100%;
+    }
+
+    .config-table th {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-gray);
+        text-transform: uppercase;
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .config-table td {
+        padding: 16px 12px;
+        font-size: 0.875rem;
+        border-bottom: 1px solid var(--border-light);
+        vertical-align: middle;
+    }
+
+    .config-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .config-key {
+        font-family: monospace;
+        font-size: 0.8125rem;
+        background: var(--bg-light);
+        padding: 4px 8px;
+        border-radius: 4px;
+        color: #7c3aed;
+    }
+
+    .config-description {
+        color: var(--text-gray);
+        font-size: 0.8125rem;
+    }
+
+    .config-value-input {
+        width: 120px;
+        padding: 8px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        font-size: 0.9375rem;
+        font-weight: 600;
+        text-align: right;
+        transition: all 0.2s ease;
+    }
+
+    .config-value-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .config-value-input.modified {
+        border-color: #f59e0b;
+        background: #fffbeb;
+    }
+
+    .config-value-input.saved {
+        border-color: #22c55e;
+        background: #f0fdf4;
+    }
+
+    .save-btn {
+        padding: 6px 14px;
+        border: none;
+        border-radius: var(--radius-md);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+    }
+
+    .save-btn.hidden {
+        display: none;
+    }
+
+    .save-btn.primary {
+        background: var(--primary);
+        color: white;
+    }
+
+    .save-btn.primary:hover {
+        background: var(--primary-dark);
+    }
+
+    .config-meta {
+        font-size: 0.75rem;
+        color: var(--text-gray);
+    }
+
+    .config-active-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .toggle-switch {
+        position: relative;
+        width: 40px;
+        height: 22px;
+    }
+
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #e5e7eb;
+        border-radius: 11px;
+        transition: 0.3s;
+    }
+
+    .toggle-slider:before {
+        content: "";
+        position: absolute;
+        height: 18px;
+        width: 18px;
+        left: 2px;
+        bottom: 2px;
+        background: white;
+        border-radius: 50%;
+        transition: 0.3s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+        background: #22c55e;
+    }
+
+    .toggle-switch input:checked + .toggle-slider:before {
+        transform: translateX(18px);
+    }
+
+    /* Category Icons */
+    .cat-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+    }
+
+    .cat-icon.registro {
+        background: #dbeafe;
+        color: #2563eb;
+    }
+
+    .cat-icon.diario {
+        background: #dcfce7;
+        color: #16a34a;
+    }
+
+    .cat-icon.referidos {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    .cat-icon.sistema {
+        background: #f3e8ff;
+        color: #9333ea;
+    }
+
+    .cat-icon.canje {
+        background: #fce7f3;
+        color: #db2777;
+    }
+
+    .cat-icon.limites {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+
+    /* Alert */
+    .config-alert {
+        padding: 16px;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: var(--radius-md);
+        margin-bottom: 24px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .config-alert i {
+        color: #2563eb;
+        font-size: 1.25rem;
+    }
+
+    .config-alert-text h5 {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        margin: 0 0 4px 0;
+        color: #1e40af;
+    }
+
+    .config-alert-text p {
+        font-size: 0.8125rem;
+        color: #3b82f6;
+        margin: 0;
+    }
+
+    @@media (max-width: 768px) {
+        .config-table th:nth-child(3),
+        .config-table td:nth-child(3) {
+            display: none;
+        }
+
+        .config-value-input {
+            width: 90px;
+        }
+    }
+</style>
+
+<div class="config-header">
+    <h2>
+        <i class="fas fa-cog"></i>
+        Configuracion de LadoCoins
+    </h2>
+    <a href="@Url.Action("LadoCoins")" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Volver al Dashboard
+    </a>
+</div>
+
+<div class="config-alert">
+    <i class="fas fa-info-circle"></i>
+    <div class="config-alert-text">
+        <h5>Los cambios se aplican inmediatamente</h5>
+        <p>Al modificar un valor, este se guarda automaticamente y afecta las nuevas transacciones. Los bonos ya otorgados no se modifican.</p>
+    </div>
+</div>
+
+@foreach (var categoria in categorias)
+{
+    var catKey = categoria.Key.ToLower();
+    var iconClass = catKey switch
+    {
+        "registro" => "registro",
+        "diario" => "diario",
+        "referidos" => "referidos",
+        "sistema" => "sistema",
+        "canje" => "canje",
+        "limites" => "limites",
+        _ => "sistema"
+    };
+    var icon = catKey switch
+    {
+        "registro" => "fa-user-plus",
+        "diario" => "fa-calendar-check",
+        "referidos" => "fa-users",
+        "sistema" => "fa-cogs",
+        "canje" => "fa-exchange-alt",
+        "limites" => "fa-shield-alt",
+        _ => "fa-sliders-h"
+    };
+
+    <div class="config-section">
+        <div class="config-section-header">
+            <div class="cat-icon @iconClass">
+                <i class="fas @icon"></i>
+            </div>
+            <h4>@categoria.Key</h4>
+            <span class="badge bg-secondary">@categoria.Count() configuraciones</span>
+        </div>
+
+        <table class="config-table">
+            <thead>
+                <tr>
+                    <th style="width: 25%;">Clave</th>
+                    <th style="width: 30%;">Descripcion</th>
+                    <th style="width: 15%;">Valor</th>
+                    <th style="width: 10%;">Activo</th>
+                    <th style="width: 20%;">Ultima Modificacion</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var config in categoria)
+                {
+                    <tr data-id="@config.Id">
+                        <td>
+                            <code class="config-key">@config.Clave</code>
+                        </td>
+                        <td>
+                            <span class="config-description">@config.Descripcion</span>
+                        </td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number"
+                                       class="config-value-input"
+                                       data-id="@config.Id"
+                                       data-original="@config.Valor.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                       value="@config.Valor.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                       step="0.01"
+                                       onchange="marcarModificado(this)"
+                                       onkeyup="marcarModificado(this)">
+                                <button class="save-btn primary hidden" data-id="@config.Id" onclick="guardarConfig(@config.Id)">
+                                    <i class="fas fa-save"></i>
+                                </button>
+                            </div>
+                        </td>
+                        <td>
+                            <label class="toggle-switch">
+                                <input type="checkbox"
+                                       @(config.Activo ? "checked" : "")
+                                       onchange="toggleActivo(@config.Id, this.checked)">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </td>
+                        <td>
+                            <div class="config-meta">
+                                @if (config.FechaModificacion != default)
+                                {
+                                    <div>@config.FechaModificacion.ToString("dd/MM/yyyy HH:mm")</div>
+                                    @if (!string.IsNullOrEmpty(config.ModificadoPor))
+                                    {
+                                        <div style="color: var(--primary);">@config.ModificadoPor</div>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="color: var(--text-light);">Sin modificar</span>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@section Scripts {
+<script>
+    function marcarModificado(input) {
+        const id = input.dataset.id;
+        const original = parseFloat(input.dataset.original);
+        const current = parseFloat(input.value);
+        const saveBtn = document.querySelector(`.save-btn[data-id="${id}"]`);
+
+        if (current !== original) {
+            input.classList.add('modified');
+            input.classList.remove('saved');
+            saveBtn.classList.remove('hidden');
+        } else {
+            input.classList.remove('modified');
+            saveBtn.classList.add('hidden');
+        }
+    }
+
+    async function guardarConfig(id) {
+        const input = document.querySelector(`.config-value-input[data-id="${id}"]`);
+        const saveBtn = document.querySelector(`.save-btn[data-id="${id}"]`);
+        const valor = parseFloat(input.value);
+
+        if (isNaN(valor)) {
+            alert('Valor invalido');
+            return;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        try {
+            const response = await fetch('/Admin/GuardarConfiguracionLadoCoins', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                },
+                body: `id=${id}&valor=${valor}`
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                input.classList.remove('modified');
+                input.classList.add('saved');
+                input.dataset.original = valor;
+                saveBtn.classList.add('hidden');
+
+                // Update meta info
+                const row = input.closest('tr');
+                const metaDiv = row.querySelector('.config-meta');
+                metaDiv.innerHTML = `
+                    <div>${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'})}</div>
+                    <div style="color: var(--primary);">${data.modificadoPor || 'Admin'}</div>
+                `;
+
+                // Remove green after 3 seconds
+                setTimeout(() => {
+                    input.classList.remove('saved');
+                }, 3000);
+            } else {
+                alert('Error: ' + data.message);
+            }
+        } catch (error) {
+            alert('Error al guardar');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-save"></i>';
+        }
+    }
+
+    async function toggleActivo(id, activo) {
+        try {
+            const response = await fetch('/Admin/ToggleConfiguracionLadoCoins', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                },
+                body: `id=${id}&activo=${activo}`
+            });
+
+            const data = await response.json();
+            if (!data.success) {
+                alert('Error: ' + data.message);
+                // Revert toggle
+                const toggle = document.querySelector(`tr[data-id="${id}"] .toggle-switch input`);
+                toggle.checked = !activo;
+            }
+        } catch (error) {
+            alert('Error al cambiar estado');
+        }
+    }
+</script>
+
+@Html.AntiForgeryToken()
+}

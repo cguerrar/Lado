@@ -96,6 +96,9 @@ namespace Lado.Controllers
                 MultiplicadorPublicidad = multiplicadorPublicidad > 0 ? multiplicadorPublicidad : 1.5m,
                 MultiplicadorBoost = multiplicadorBoost > 0 ? multiplicadorBoost : 2m,
 
+                // Solo creadores verificados pueden usar publicidad y boost
+                EsCreadorVerificado = usuario.EsCreador && usuario.CreadorVerificado,
+
                 BonoBienvenidaEntregado = usuario.BonoBienvenidaEntregado,
                 BonoPrimerContenidoEntregado = usuario.BonoPrimerContenidoEntregado,
                 BonoEmailVerificadoEntregado = usuario.BonoEmailVerificadoEntregado,
@@ -579,6 +582,9 @@ namespace Lado.Controllers
         // Multiplicadores
         public decimal MultiplicadorPublicidad { get; set; }
         public decimal MultiplicadorBoost { get; set; }
+
+        // Verificación de creador (para mostrar opciones de publicidad/boost)
+        public bool EsCreadorVerificado { get; set; }
 
         // Bonos de perfil
         public bool BonoBienvenidaEntregado { get; set; }

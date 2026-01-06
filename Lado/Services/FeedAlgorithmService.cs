@@ -11,7 +11,8 @@ namespace Lado.Services
             List<Contenido> contenidos,
             string algoritmo,
             string usuarioId,
-            ApplicationDbContext context);
+            ApplicationDbContext context,
+            int? semilla = null);
 
         Task<List<AlgoritmoFeed>> ObtenerAlgoritmosActivosAsync(ApplicationDbContext context);
         Task<AlgoritmoFeed?> ObtenerAlgoritmoUsuarioAsync(string usuarioId, ApplicationDbContext context);
@@ -88,38 +89,56 @@ namespace Lado.Services
         }
         #endregion
 
+        // ⚡ NUEVO: Función hash para desempate determinístico
+        private static int CalcularHashDeterministico(int id, int semilla)
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + id;
+                hash = hash * 31 + semilla;
+                return hash;
+            }
+        }
+
         public async Task<List<Contenido>> AplicarAlgoritmoAsync(
             List<Contenido> contenidos,
             string algoritmo,
             string usuarioId,
-            ApplicationDbContext context)
+            ApplicationDbContext context,
+            int? semilla = null)
         {
             if (!contenidos.Any()) return contenidos;
 
-            _logger.LogInformation("Aplicando algoritmo {Algoritmo} para usuario {UsuarioId}", algoritmo, usuarioId);
+            // Usar semilla proporcionada o generar una basada en el día (para consistencia diaria)
+            var semillaActual = semilla ?? DateTime.Today.GetHashCode();
+
+            _logger.LogInformation("Aplicando algoritmo {Algoritmo} para usuario {UsuarioId} con semilla {Semilla}",
+                algoritmo, usuarioId, semillaActual);
 
             return algoritmo.ToLower() switch
             {
-                "cronologico" => AplicarCronologico(contenidos),
-                "trending" => await AplicarTrendingAsync(contenidos, context),
-                "seguidos" => await AplicarSeguidosPrimeroAsync(contenidos, usuarioId, context),
-                "para_ti" => await AplicarParaTiAsync(contenidos, usuarioId, context),
-                "por_intereses" => await AplicarPorInteresesAsync(contenidos, usuarioId, context),
-                _ => AplicarCronologico(contenidos)
+                "cronologico" => AplicarCronologico(contenidos, semillaActual),
+                "trending" => await AplicarTrendingAsync(contenidos, context, semillaActual),
+                "seguidos" => await AplicarSeguidosPrimeroAsync(contenidos, usuarioId, context, semillaActual),
+                "para_ti" => await AplicarParaTiAsync(contenidos, usuarioId, context, semillaActual),
+                "por_intereses" => await AplicarPorInteresesAsync(contenidos, usuarioId, context, semillaActual),
+                _ => AplicarCronologico(contenidos, semillaActual)
             };
         }
 
         #region Algoritmo Cronológico
-        private List<Contenido> AplicarCronologico(List<Contenido> contenidos)
+        private List<Contenido> AplicarCronologico(List<Contenido> contenidos, int semilla)
         {
             return contenidos
                 .OrderByDescending(c => c.FechaPublicacion)
+                .ThenBy(c => CalcularHashDeterministico(c.Id, semilla)) // Desempate determinístico
                 .ToList();
         }
         #endregion
 
         #region Algoritmo Trending
-        private async Task<List<Contenido>> AplicarTrendingAsync(List<Contenido> contenidos, ApplicationDbContext context)
+        private async Task<List<Contenido>> AplicarTrendingAsync(List<Contenido> contenidos, ApplicationDbContext context, int semilla)
         {
             var contenidoIds = contenidos.Select(c => c.Id).ToList();
 
@@ -137,6 +156,7 @@ namespace Lado.Services
                     Score = CalcularScoreTrending(c, reaccionesPorContenido.GetValueOrDefault(c.Id, 0))
                 })
                 .OrderByDescending(x => x.Score)
+                .ThenBy(x => CalcularHashDeterministico(x.Contenido.Id, semilla)) // Desempate determinístico
                 .Select(x => x.Contenido)
                 .ToList();
         }
@@ -168,7 +188,8 @@ namespace Lado.Services
         private async Task<List<Contenido>> AplicarSeguidosPrimeroAsync(
             List<Contenido> contenidos,
             string usuarioId,
-            ApplicationDbContext context)
+            ApplicationDbContext context,
+            int semilla)
         {
             // Obtener IDs de creadores seguidos
             var creadoresSeguidos = await context.Suscripciones
@@ -181,11 +202,13 @@ namespace Lado.Services
             var contenidoSeguidos = contenidos
                 .Where(c => creadoresSeguidos.Contains(c.UsuarioId))
                 .OrderByDescending(c => c.FechaPublicacion)
+                .ThenBy(c => CalcularHashDeterministico(c.Id, semilla)) // Desempate determinístico
                 .ToList();
 
             var contenidoDescubrimiento = contenidos
                 .Where(c => !creadoresSeguidos.Contains(c.UsuarioId))
                 .OrderByDescending(c => c.NumeroLikes + c.NumeroComentarios * 2)
+                .ThenBy(c => CalcularHashDeterministico(c.Id, semilla)) // Desempate determinístico
                 .ToList();
 
             // 70% seguidos, 30% descubrimiento, intercalados
@@ -219,7 +242,8 @@ namespace Lado.Services
         private async Task<List<Contenido>> AplicarParaTiAsync(
             List<Contenido> contenidos,
             string usuarioId,
-            ApplicationDbContext context)
+            ApplicationDbContext context,
+            int semilla)
         {
             // Obtener pesos configurables
             var pesos = await ObtenerPesosAsync(context);
@@ -283,6 +307,7 @@ namespace Lado.Services
                         pesos)
                 })
                 .OrderByDescending(x => x.Score)
+                .ThenBy(x => CalcularHashDeterministico(x.Contenido.Id, semilla)) // Desempate determinístico
                 .Select(x => x.Contenido)
                 .ToList();
         }
@@ -360,7 +385,8 @@ namespace Lado.Services
         private async Task<List<Contenido>> AplicarPorInteresesAsync(
             List<Contenido> contenidos,
             string usuarioId,
-            ApplicationDbContext context)
+            ApplicationDbContext context,
+            int semilla)
         {
             // Obtener pesos configurables
             var pesos = await ObtenerPesosAsync(context);
@@ -376,7 +402,7 @@ namespace Lado.Services
             {
                 // Si no tiene intereses, usar trending como fallback
                 _logger.LogInformation("Usuario {UsuarioId} sin intereses, usando trending como fallback", usuarioId);
-                return await AplicarTrendingAsync(contenidos, context);
+                return await AplicarTrendingAsync(contenidos, context, semilla);
             }
 
             var contenidoIds = contenidos.Select(c => c.Id).ToList();
@@ -395,12 +421,14 @@ namespace Lado.Services
                     Score = CalcularScorePorIntereses(c, interesesUsuario, reaccionesPorContenido.GetValueOrDefault(c.Id, 0))
                 })
                 .OrderByDescending(x => x.Score)
+                .ThenBy(x => CalcularHashDeterministico(x.Contenido.Id, semilla)) // Desempate determinístico
                 .Select(x => x.Contenido)
                 .ToList();
 
             var contenidoSinCategoria = contenidos
                 .Where(c => !c.CategoriaInteresId.HasValue || !interesesUsuario.ContainsKey(c.CategoriaInteresId.Value))
                 .OrderByDescending(c => c.NumeroLikes + c.NumeroComentarios * 2)
+                .ThenBy(c => CalcularHashDeterministico(c.Id, semilla)) // Desempate determinístico
                 .ToList();
 
             // Usar peso configurable: pesoCategoria% contenido de intereses, resto descubrimiento

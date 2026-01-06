@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 namespace Lado.Models
 {
     // ViewModel para la solicitud de verificación de creador
+    // SIMPLIFICADO: Solo requiere selfie con documento para reducir fricción
     public class CreatorVerificationRequestViewModel
     {
         [Required(ErrorMessage = "El nombre completo es obligatorio")]
@@ -22,32 +23,18 @@ namespace Lado.Models
         [Display(Name = "País")]
         public string Pais { get; set; }
 
-        [Required(ErrorMessage = "La ciudad es obligatoria")]
-        [Display(Name = "Ciudad")]
-        public string Ciudad { get; set; }
-
-        [Required(ErrorMessage = "La dirección es obligatoria")]
-        [Display(Name = "Dirección")]
-        public string Direccion { get; set; }
-
         [Required(ErrorMessage = "El teléfono es obligatorio")]
         [Phone(ErrorMessage = "Formato de teléfono inválido")]
         [Display(Name = "Teléfono")]
         public string Telefono { get; set; }
 
-        [Required(ErrorMessage = "Debes subir tu documento de identidad")]
-        [Display(Name = "Documento de Identidad")]
-        public IFormFile DocumentoIdentidad { get; set; }
-
         [Required(ErrorMessage = "Debes subir una selfie con tu documento")]
         [Display(Name = "Selfie con Documento")]
         public IFormFile SelfieConDocumento { get; set; }
-
-        [Display(Name = "Prueba de Domicilio (Opcional)")]
-        public IFormFile? PruebaDireccion { get; set; }
     }
 
     // Modelo de base de datos para solicitudes de verificación de creadores
+    // SIMPLIFICADO: Solo selfie con documento es obligatoria
     public class CreatorVerificationRequest
     {
         public int Id { get; set; }
@@ -72,24 +59,24 @@ namespace Lado.Models
         [StringLength(5)]
         public string Pais { get; set; }
 
-        [Required]
+        // Ciudad y Dirección ya no son obligatorios
         [StringLength(100)]
-        public string Ciudad { get; set; }
+        public string? Ciudad { get; set; }
 
-        [Required]
         [StringLength(200)]
-        public string Direccion { get; set; }
+        public string? Direccion { get; set; }
 
         [Required]
         [StringLength(20)]
         public string Telefono { get; set; }
 
-        [Required]
-        public string DocumentoIdentidadPath { get; set; }
+        // Documento de identidad por separado ya no es obligatorio
+        public string? DocumentoIdentidadPath { get; set; }
 
         [Required]
         public string SelfieConDocumentoPath { get; set; }
 
+        // Prueba de dirección eliminada (ya no se usa)
         public string? PruebaDireccionPath { get; set; }
 
         [Required]

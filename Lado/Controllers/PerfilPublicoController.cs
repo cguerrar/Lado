@@ -129,6 +129,37 @@ namespace Lado.Controllers
                 await _context.SaveChangesAsync();
             }
 
+            // SEO Meta Tags dinamicos
+            var nombreDisplay = usuario.NombreCompleto ?? usuario.UserName ?? username;
+            var descripcionPerfil = !string.IsNullOrEmpty(usuario.Biografia)
+                ? usuario.Biografia
+                : $"Perfil de {nombreDisplay} en Lado. {totalContenido} publicaciones, {totalSeguidores} seguidores.";
+
+            ViewData["Title"] = $"{nombreDisplay} (@{usuario.UserName})";
+            ViewData["MetaDescription"] = descripcionPerfil.Length > 160
+                ? descripcionPerfil.Substring(0, 157) + "..."
+                : descripcionPerfil;
+            ViewData["MetaKeywords"] = $"{nombreDisplay}, {usuario.UserName}, perfil, creador, lado";
+            ViewData["CanonicalUrl"] = $"{Request.Scheme}://{Request.Host}/@{usuario.UserName}";
+            ViewData["OgTitle"] = nombreDisplay;
+            ViewData["OgDescription"] = descripcionPerfil;
+            ViewData["OgType"] = "profile";
+            ViewData["OgUrl"] = $"{Request.Scheme}://{Request.Host}/@{usuario.UserName}";
+
+            // Imagen de perfil para OG
+            if (!string.IsNullOrEmpty(usuario.FotoPerfil))
+            {
+                var fotoUrl = usuario.FotoPerfil.StartsWith("http")
+                    ? usuario.FotoPerfil
+                    : $"{Request.Scheme}://{Request.Host}{usuario.FotoPerfil}";
+                ViewData["OgImage"] = fotoUrl;
+            }
+
+            // Schema.org Person
+            ViewData["SchemaType"] = "Person";
+            ViewData["SchemaName"] = nombreDisplay;
+            ViewData["SchemaDescription"] = descripcionPerfil;
+
             // Preparar ViewModel
             var viewModel = new PerfilPublicoViewModel
             {

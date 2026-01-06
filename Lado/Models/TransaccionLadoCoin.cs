@@ -57,6 +57,12 @@ namespace Lado.Models
         /// <summary>Ajuste manual por administrador</summary>
         AjusteAdmin = 14,
 
+        /// <summary>Bono otorgado manualmente por administrador</summary>
+        BonoAdmin = 15,
+
+        /// <summary>Débito aplicado manualmente por administrador</summary>
+        DebitoAdmin = 16,
+
         // ========================================
         // GASTOS
         // ========================================
@@ -75,6 +81,9 @@ namespace Lado.Models
 
         /// <summary>Compra de contenido individual</summary>
         CompraContenido = 24,
+
+        /// <summary>Gasto en destacar foto en el PhotoWall (Muro)</summary>
+        GastoMuro = 25,
 
         // ========================================
         // DEDUCCIONES (No son gastos del usuario)

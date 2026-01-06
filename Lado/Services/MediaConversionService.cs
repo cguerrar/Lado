@@ -504,20 +504,24 @@ namespace Lado.Services
                     return rutaDestino;
                 }
 
-                // Construir comando FFmpeg (parámetros optimizados estilo TikTok)
+                // Construir comando FFmpeg (parámetros optimizados para WhatsApp/iOS)
                 // -y: sobrescribir sin preguntar
                 // -i: input
                 // -c:v libx264: codec video H.264
+                // -profile:v baseline -level 3.0: perfil más compatible con WhatsApp/iOS
                 // -preset medium: balance calidad/velocidad
-                // -crf: calidad (menor = mejor, 18-28 rango típico, TikTok ~23)
+                // -crf: calidad (menor = mejor, 18-28 rango típico)
                 // -pix_fmt yuv420p: formato de pixel compatible con todos los dispositivos
-                // -r 30: frame rate 30fps (estándar TikTok)
+                // -r 30: frame rate 30fps de salida
+                // -vsync cfr: forzar frame rate constante (interpolar si es necesario)
                 // -c:a aac: codec audio AAC
-                // -b:a 192k: bitrate audio 192kbps (estándar TikTok)
-                // -movflags +faststart: optimizar para streaming web
-                // -vf scale: escalar si excede maxWidth (altura divisible por 2)
-                var scaleFilter = $"scale='min({maxWidth},iw)':-2";
-                var arguments = $"-y -i \"{rutaOrigen}\" -c:v libx264 -preset medium -crf {crf} -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -movflags +faststart -vf \"{scaleFilter}\" \"{rutaDestino}\"";
+                // -b:a 128k: bitrate audio 128kbps (más compatible)
+                // -ar 44100: sample rate 44.1kHz (estándar para WhatsApp)
+                // -ac 2: audio estéreo
+                // -movflags +faststart: optimizar para streaming web (CRÍTICO para WhatsApp)
+                // -vf fps=30,scale: forzar fps y escalar
+                var videoFilter = $"fps=30,scale='min({maxWidth},iw)':-2";
+                var arguments = $"-y -i \"{rutaOrigen}\" -c:v libx264 -profile:v baseline -level 3.0 -preset medium -crf {crf} -pix_fmt yuv420p -vsync cfr -c:a aac -b:a 128k -ar 44100 -ac 2 -movflags +faststart -vf \"{videoFilter}\" \"{rutaDestino}\"";
 
                 var resultado = await EjecutarFFmpegAsync(arguments);
 
@@ -774,9 +778,37 @@ namespace Lado.Services
                 var formatMatch = System.Text.RegularExpressions.Regex.Match(output, "\"format_name\"\\s*:\\s*\"([^\"]+)\"");
                 if (formatMatch.Success) info.Format = formatMatch.Groups[1].Value;
 
-                // Verificar si es compatible (H.264 en MP4)
-                info.EsCompatible = info.Codec?.Equals("h264", StringComparison.OrdinalIgnoreCase) == true &&
-                                   (info.Format?.Contains("mp4") == true || info.Format?.Contains("mov") == true);
+                // Buscar frame rate (r_frame_rate o avg_frame_rate)
+                double frameRate = 0;
+                var fpsMatch = System.Text.RegularExpressions.Regex.Match(output, "\"r_frame_rate\"\\s*:\\s*\"(\\d+)/(\\d+)\"");
+                if (fpsMatch.Success)
+                {
+                    var num = double.Parse(fpsMatch.Groups[1].Value);
+                    var den = double.Parse(fpsMatch.Groups[2].Value);
+                    if (den > 0) frameRate = num / den;
+                }
+
+                // Buscar level
+                int level = 0;
+                var levelMatch = System.Text.RegularExpressions.Regex.Match(output, "\"level\"\\s*:\\s*(\\d+)");
+                if (levelMatch.Success) level = int.Parse(levelMatch.Groups[1].Value);
+
+                // Verificar si es compatible con WhatsApp/iOS:
+                // - H.264 en MP4/MOV
+                // - Frame rate >= 24fps (WhatsApp rechaza videos con frame rate bajo)
+                // - Level <= 31 (3.1) para mejor compatibilidad
+                var esH264 = info.Codec?.Equals("h264", StringComparison.OrdinalIgnoreCase) == true;
+                var esFormatoCompatible = info.Format?.Contains("mp4") == true || info.Format?.Contains("mov") == true;
+                var esFpsCompatible = frameRate >= 24;
+                var esLevelCompatible = level > 0 && level <= 31;
+
+                info.EsCompatible = esH264 && esFormatoCompatible && esFpsCompatible && esLevelCompatible;
+
+                if (!info.EsCompatible)
+                {
+                    _logger.LogInformation("[MediaConversion] Video no compatible: codec={Codec}, fps={Fps}, level={Level}",
+                        info.Codec, frameRate.ToString("F1"), level);
+                }
 
                 return info;
             }
