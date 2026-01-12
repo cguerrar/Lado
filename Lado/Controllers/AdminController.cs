@@ -31,6 +31,8 @@ namespace Lado.Controllers
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILadoCoinsService _ladoCoinsService;
         private readonly IMemoryCache _cache;
+        private readonly ISeoConfigService _seoConfigService;
+        private readonly IFileValidationService _fileValidationService;
 
         // Lista de IDs de contenidos que fallaron durante la clasificación por lotes
         // Se limpia cuando se inicia una nueva reclasificación masiva
@@ -62,7 +64,9 @@ namespace Lado.Controllers
             ILogger<AdminController> logger,
             IServiceScopeFactory serviceScopeFactory,
             ILadoCoinsService ladoCoinsService,
-            IMemoryCache cache)
+            IMemoryCache cache,
+            ISeoConfigService seoConfigService,
+            IFileValidationService fileValidationService)
         {
             _context = context;
             _userManager = userManager;
@@ -81,6 +85,8 @@ namespace Lado.Controllers
             _serviceScopeFactory = serviceScopeFactory;
             _ladoCoinsService = ladoCoinsService;
             _cache = cache;
+            _seoConfigService = seoConfigService;
+            _fileValidationService = fileValidationService;
         }
 
         public override void OnActionExecuting(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext context)
@@ -91,18 +97,71 @@ namespace Lado.Controllers
 
         public async Task<IActionResult> Index()
         {
+            // ═══════════════════════════════════════════════════════════
+            // ESTADÍSTICAS DE USUARIOS
+            // ═══════════════════════════════════════════════════════════
             ViewBag.TotalUsuarios = await _context.Users.CountAsync();
-            ViewBag.TotalSuscripciones = await _context.Suscripciones.CountAsync(s => s.EstaActiva);
+            ViewBag.TotalCreadores = await _context.Users.CountAsync(u => u.EsCreador);
+            ViewBag.TotalFans = await _context.Users.CountAsync(u => !u.EsCreador);
+            ViewBag.CreadoresVerificados = await _context.Users.CountAsync(u => u.EsCreador && u.CreadorVerificado);
+            ViewBag.UsuariosBloqueados = await _context.Users.CountAsync(u => !u.EstaActivo);
+            ViewBag.UsuariosHoy = await _context.Users.CountAsync(u => u.FechaRegistro.Date == DateTime.Today);
+
+            // ═══════════════════════════════════════════════════════════
+            // ESTADÍSTICAS DE CONTENIDO
+            // ═══════════════════════════════════════════════════════════
             ViewBag.TotalPublicaciones = await _context.Contenidos.CountAsync();
             ViewBag.PublicacionesHoy = await _context.Contenidos
                 .CountAsync(c => c.FechaPublicacion.Date == DateTime.Today);
-            ViewBag.UsuariosBloqueados = await _context.Users.CountAsync(u => !u.EstaActivo);
+            ViewBag.ContenidoCensurado = await _context.Contenidos.CountAsync(c => c.Censurado);
+            ViewBag.TotalArchivos = await _context.ArchivosContenido.CountAsync();
 
-            // Estadisticas de visitas
+            // ═══════════════════════════════════════════════════════════
+            // ESTADÍSTICAS DE SUSCRIPCIONES
+            // ═══════════════════════════════════════════════════════════
+            ViewBag.TotalSuscripciones = await _context.Suscripciones.CountAsync(s => s.EstaActiva);
+            ViewBag.SuscripcionesHoy = await _context.Suscripciones
+                .CountAsync(s => s.FechaInicio.Date == DateTime.Today);
+
+            // ═══════════════════════════════════════════════════════════
+            // ESTADÍSTICAS DE MODERACIÓN Y SUPERVISORES
+            // ═══════════════════════════════════════════════════════════
+            ViewBag.ColaPendiente = await _context.ColaModeracion
+                .CountAsync(c => c.Estado == Models.Moderacion.EstadoModeracion.Pendiente);
+            ViewBag.ColaEnRevision = await _context.ColaModeracion
+                .CountAsync(c => c.Estado == Models.Moderacion.EstadoModeracion.EnRevision);
+            ViewBag.ColaEscalada = await _context.ColaModeracion
+                .CountAsync(c => c.Estado == Models.Moderacion.EstadoModeracion.Escalado);
+            ViewBag.RevisadosHoy = await _context.ColaModeracion
+                .CountAsync(c => c.FechaResolucion.HasValue && c.FechaResolucion.Value.Date == DateTime.Today);
+            ViewBag.SupervisoresActivos = await _context.UsuariosSupervisor
+                .CountAsync(s => s.EstaActivo && s.EstaDisponible);
+            ViewBag.TotalSupervisores = await _context.UsuariosSupervisor
+                .CountAsync(s => s.EstaActivo);
+
+            // ═══════════════════════════════════════════════════════════
+            // ESTADÍSTICAS DE VISITAS
+            // ═══════════════════════════════════════════════════════════
             ViewBag.TotalVisitas = await _visitasService.ObtenerTotalVisitasAsync();
             ViewBag.VisitasHoy = await _visitasService.ObtenerVisitasHoyAsync();
             ViewBag.VisitantesUnicosHoy = await _visitasService.ObtenerVisitantesUnicosHoyAsync();
             ViewBag.VisitasUltimos7Dias = await _visitasService.ObtenerVisitasUltimos7DiasAsync();
+
+            // ═══════════════════════════════════════════════════════════
+            // ESTADÍSTICAS FINANCIERAS
+            // ═══════════════════════════════════════════════════════════
+            var inicioMes = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+            ViewBag.IngresosMes = await _context.Transacciones
+                .Where(t => t.FechaTransaccion >= inicioMes && t.EstadoTransaccion == Models.EstadoTransaccion.Completada)
+                .SumAsync(t => (decimal?)t.Monto) ?? 0;
+            ViewBag.RetirosPendientes = await _context.Transacciones
+                .CountAsync(t => t.TipoTransaccion == Models.TipoTransaccion.Retiro && t.EstadoTransaccion == Models.EstadoTransaccion.Pendiente);
+
+            // ═══════════════════════════════════════════════════════════
+            // VERIFICACIONES PENDIENTES
+            // ═══════════════════════════════════════════════════════════
+            ViewBag.VerificacionesPendientes = await _context.CreatorVerificationRequests
+                .CountAsync(v => v.Estado == "Pendiente");
 
             return View();
         }
@@ -339,18 +398,74 @@ namespace Lado.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EliminarUsuario(string id)
         {
+            // Log de inicio
+            var adminActual = await _userManager.GetUserAsync(User);
+            var adminId = adminActual?.Id;
+            var adminNombre = adminActual?.NombreCompleto ?? "Admin";
+
+            await _logEventoService.RegistrarEventoAsync(
+                $"[ELIMINAR-INICIO] Solicitud de eliminación recibida para userId: {id}",
+                CategoriaEvento.Admin,
+                TipoLogEvento.Info,
+                adminId,
+                adminNombre,
+                $"Método: EliminarUsuario, Id recibido: '{id}', Request Method: {Request.Method}"
+            );
+
+            if (string.IsNullOrEmpty(id))
+            {
+                await _logEventoService.RegistrarEventoAsync(
+                    "[ELIMINAR-ERROR] Id de usuario vacío o nulo",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Error,
+                    adminId,
+                    adminNombre,
+                    "El parámetro id llegó vacío"
+                );
+                TempData["Error"] = "ID de usuario no proporcionado.";
+                return RedirectToAction(nameof(Usuarios));
+            }
+
             var usuario = await _context.Users.FindAsync(id);
 
             if (usuario == null)
             {
+                await _logEventoService.RegistrarEventoAsync(
+                    $"[ELIMINAR-ERROR] Usuario no encontrado: {id}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Error,
+                    adminId,
+                    adminNombre,
+                    $"No se encontró usuario con Id: {id}"
+                );
                 TempData["Error"] = "Usuario no encontrado.";
                 return RedirectToAction(nameof(Usuarios));
             }
+
+            var usuarioNombre = usuario.NombreCompleto ?? usuario.UserName ?? "Sin nombre";
+            var usuarioEmail = usuario.Email ?? "Sin email";
+
+            await _logEventoService.RegistrarEventoAsync(
+                $"[ELIMINAR-PROCESO] Iniciando eliminación de: {usuarioNombre}",
+                CategoriaEvento.Admin,
+                TipoLogEvento.Info,
+                adminId,
+                adminNombre,
+                $"Usuario a eliminar: {usuarioNombre} ({usuarioEmail}), Id: {id}"
+            );
 
             // Verificar que no sea un Admin
             var roles = await _userManager.GetRolesAsync(usuario);
             if (roles.Contains("Admin"))
             {
+                await _logEventoService.RegistrarEventoAsync(
+                    $"[ELIMINAR-BLOQUEADO] Intento de eliminar administrador: {usuarioNombre}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Warning,
+                    adminId,
+                    adminNombre,
+                    $"Se intentó eliminar al admin {usuarioNombre}"
+                );
                 TempData["Error"] = "No se puede eliminar un usuario administrador.";
                 return RedirectToAction(nameof(Usuarios));
             }
@@ -520,11 +635,18 @@ namespace Lado.Controllers
                 if (agencia != null)
                     _context.Agencias.Remove(agencia);
 
+                // 17. Eliminar impresiones de anuncios del usuario
+                var impresionesAnuncios = await _context.ImpresionesAnuncios
+                    .Where(i => i.UsuarioId == id)
+                    .ToListAsync();
+                if (impresionesAnuncios.Any())
+                    _context.ImpresionesAnuncios.RemoveRange(impresionesAnuncios);
+
                 // ========================================
                 // FASE 2: Eliminar entidades con FK Cascade (explícito por seguridad)
                 // ========================================
 
-                // 17. Eliminar stories del usuario (vistas y likes se eliminan en cascada)
+                // 18. Eliminar stories del usuario (vistas y likes se eliminan en cascada)
                 var stories = await _context.Stories
                     .Where(s => s.CreadorId == id)
                     .ToListAsync();
@@ -682,26 +804,258 @@ namespace Lado.Controllers
                 // ========================================
                 // FASE 4: Guardar cambios y eliminar usuario
                 // ========================================
+                await _logEventoService.RegistrarEventoAsync(
+                    $"[ELIMINAR-GUARDANDO] Guardando cambios en BD para: {usuarioNombre}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Info,
+                    adminId,
+                    adminNombre,
+                    "Ejecutando SaveChangesAsync para eliminar entidades relacionadas"
+                );
+
                 await _context.SaveChangesAsync();
+
+                await _logEventoService.RegistrarEventoAsync(
+                    $"[ELIMINAR-DELETEUSER] Eliminando usuario con UserManager: {usuarioNombre}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Info,
+                    adminId,
+                    adminNombre,
+                    $"Entidades relacionadas eliminadas, procediendo a DeleteAsync"
+                );
 
                 // Finalmente, eliminar el usuario con UserManager
                 var result = await _userManager.DeleteAsync(usuario);
 
                 if (result.Succeeded)
                 {
-                    TempData["Success"] = $"Usuario {usuario.NombreCompleto} eliminado permanentemente junto con todos sus datos.";
+                    await _logEventoService.RegistrarEventoAsync(
+                        $"[ELIMINAR-EXITO] Usuario eliminado correctamente: {usuarioNombre}",
+                        CategoriaEvento.Admin,
+                        TipoLogEvento.Evento,
+                        adminId,
+                        adminNombre,
+                        $"Usuario {usuarioNombre} ({usuarioEmail}) eliminado permanentemente por {adminNombre}"
+                    );
+                    TempData["Success"] = $"Usuario {usuarioNombre} eliminado permanentemente junto con todos sus datos.";
                 }
                 else
                 {
-                    TempData["Error"] = "Error al eliminar el usuario: " + string.Join(", ", result.Errors.Select(e => e.Description));
+                    var errores = string.Join(", ", result.Errors.Select(e => e.Description));
+                    await _logEventoService.RegistrarEventoAsync(
+                        $"[ELIMINAR-ERROR-IDENTITY] Error de Identity al eliminar: {usuarioNombre}",
+                        CategoriaEvento.Admin,
+                        TipoLogEvento.Error,
+                        adminId,
+                        adminNombre,
+                        $"Errores de Identity: {errores}"
+                    );
+                    TempData["Error"] = "Error al eliminar el usuario: " + errores;
                 }
             }
             catch (Exception ex)
             {
+                await _logEventoService.RegistrarErrorAsync(
+                    ex,
+                    CategoriaEvento.Admin,
+                    adminId,
+                    adminNombre
+                );
                 TempData["Error"] = $"Error al eliminar el usuario: {ex.Message}";
             }
 
             return RedirectToAction(nameof(Usuarios));
+        }
+
+        /// <summary>
+        /// Endpoint AJAX para eliminar usuario con respuesta JSON detallada
+        /// </summary>
+        [HttpPost]
+        [IgnoreAntiforgeryToken] // AJAX endpoint - ya protegido por [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> EliminarUsuarioAjax([FromBody] EliminarUsuarioRequest request)
+        {
+            var adminActual = await _userManager.GetUserAsync(User);
+            var adminId = adminActual?.Id;
+            var adminNombre = adminActual?.NombreCompleto ?? "Admin";
+
+            await _logEventoService.RegistrarEventoAsync(
+                $"[AJAX-ELIMINAR-INICIO] Request recibido",
+                CategoriaEvento.Admin,
+                TipoLogEvento.Info,
+                adminId,
+                adminNombre,
+                $"UserId: '{request?.UserId}', Request Body: {System.Text.Json.JsonSerializer.Serialize(request)}"
+            );
+
+            if (request == null || string.IsNullOrEmpty(request.UserId))
+            {
+                await _logEventoService.RegistrarEventoAsync(
+                    "[AJAX-ELIMINAR-ERROR] Request inválido",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Error,
+                    adminId,
+                    adminNombre,
+                    $"Request es null: {request == null}, UserId vacío: {string.IsNullOrEmpty(request?.UserId)}"
+                );
+                return Json(new { success = false, message = "ID de usuario no proporcionado", step = "validation" });
+            }
+
+            var usuario = await _context.Users.FindAsync(request.UserId);
+            if (usuario == null)
+            {
+                await _logEventoService.RegistrarEventoAsync(
+                    $"[AJAX-ELIMINAR-ERROR] Usuario no encontrado: {request.UserId}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Error,
+                    adminId,
+                    adminNombre,
+                    $"No existe usuario con Id: {request.UserId}"
+                );
+                return Json(new { success = false, message = "Usuario no encontrado", step = "find_user" });
+            }
+
+            var usuarioNombre = usuario.NombreCompleto ?? usuario.UserName ?? "Sin nombre";
+            var usuarioEmail = usuario.Email ?? "Sin email";
+
+            // Verificar que no sea Admin
+            var roles = await _userManager.GetRolesAsync(usuario);
+            if (roles.Contains("Admin"))
+            {
+                await _logEventoService.RegistrarEventoAsync(
+                    $"[AJAX-ELIMINAR-BLOQUEADO] Intento de eliminar admin: {usuarioNombre}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Warning,
+                    adminId,
+                    adminNombre,
+                    "No se puede eliminar un administrador"
+                );
+                return Json(new { success = false, message = "No se puede eliminar un administrador", step = "admin_check" });
+            }
+
+            try
+            {
+                await _logEventoService.RegistrarEventoAsync(
+                    $"[AJAX-ELIMINAR-PROCESO] Eliminando datos de: {usuarioNombre}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Info,
+                    adminId,
+                    adminNombre,
+                    "Iniciando eliminación de entidades relacionadas"
+                );
+
+                // Eliminar todas las entidades relacionadas (mismo código que EliminarUsuario)
+                var id = request.UserId;
+
+                // FASE 1: Entidades con FK Restrict
+                _context.LikesComentarios.RemoveRange(await _context.LikesComentarios.Where(lc => lc.UsuarioId == id).ToListAsync());
+                _context.Reacciones.RemoveRange(await _context.Reacciones.Where(r => r.UsuarioId == id).ToListAsync());
+                _context.StoryVistas.RemoveRange(await _context.StoryVistas.Where(sv => sv.UsuarioId == id).ToListAsync());
+                _context.StoryLikes.RemoveRange(await _context.StoryLikes.Where(sl => sl.UsuarioId == id).ToListAsync());
+                _context.ComprasContenido.RemoveRange(await _context.ComprasContenido.Where(cc => cc.UsuarioId == id).ToListAsync());
+                _context.ComprasColeccion.RemoveRange(await _context.ComprasColeccion.Where(cc => cc.CompradorId == id).ToListAsync());
+                _context.Tips.RemoveRange(await _context.Tips.Where(t => t.FanId == id || t.CreadorId == id).ToListAsync());
+                _context.FotosDestacadas.RemoveRange(await _context.FotosDestacadas.Where(f => f.UsuarioId == id).ToListAsync());
+                _context.MensajesPrivados.RemoveRange(await _context.MensajesPrivados.Where(m => m.RemitenteId == id || m.DestinatarioId == id).ToListAsync());
+                _context.ChatMensajes.RemoveRange(await _context.ChatMensajes.Where(m => m.RemitenteId == id || m.DestinatarioId == id).ToListAsync());
+                _context.PropuestasDesafios.RemoveRange(await _context.PropuestasDesafios.Where(p => p.CreadorId == id).ToListAsync());
+                _context.Desafios.RemoveRange(await _context.Desafios.Where(d => d.FanId == id || d.CreadorObjetivoId == id || d.CreadorAsignadoId == id).ToListAsync());
+                _context.BloqueosUsuarios.RemoveRange(await _context.BloqueosUsuarios.Where(b => b.BloqueadorId == id || b.BloqueadoId == id).ToListAsync());
+                _context.HistoriasSilenciadas.RemoveRange(await _context.HistoriasSilenciadas.Where(h => h.UsuarioId == id || h.SilenciadoId == id).ToListAsync());
+                _context.Referidos.RemoveRange(await _context.Referidos.Where(r => r.ReferidorId == id || r.ReferidoUsuarioId == id).ToListAsync());
+
+                var agencia = await _context.Agencias.FirstOrDefaultAsync(a => a.UsuarioId == id);
+                if (agencia != null) _context.Agencias.Remove(agencia);
+
+                // Eliminar impresiones de anuncios del usuario
+                _context.ImpresionesAnuncios.RemoveRange(await _context.ImpresionesAnuncios.Where(i => i.UsuarioId == id).ToListAsync());
+
+                // FASE 2: Entidades con FK Cascade
+                _context.Stories.RemoveRange(await _context.Stories.Where(s => s.CreadorId == id).ToListAsync());
+                _context.StoryDrafts.RemoveRange(await _context.StoryDrafts.Where(sd => sd.UsuarioId == id).ToListAsync());
+                _context.Colecciones.RemoveRange(await _context.Colecciones.Where(c => c.CreadorId == id).ToListAsync());
+                _context.Favoritos.RemoveRange(await _context.Favoritos.Where(f => f.UsuarioId == id).ToListAsync());
+                _context.Notificaciones.RemoveRange(await _context.Notificaciones.Where(n => n.UsuarioId == id).ToListAsync());
+                _context.InteresesUsuarios.RemoveRange(await _context.InteresesUsuarios.Where(i => i.UsuarioId == id).ToListAsync());
+                _context.PreferenciasAlgoritmoUsuario.RemoveRange(await _context.PreferenciasAlgoritmoUsuario.Where(p => p.UsuarioId == id).ToListAsync());
+
+                var ladoCoin = await _context.LadoCoins.FirstOrDefaultAsync(l => l.UsuarioId == id);
+                if (ladoCoin != null) _context.LadoCoins.Remove(ladoCoin);
+
+                _context.TransaccionesLadoCoins.RemoveRange(await _context.TransaccionesLadoCoins.Where(t => t.UsuarioId == id).ToListAsync());
+
+                var racha = await _context.RachasUsuarios.FirstOrDefaultAsync(r => r.UsuarioId == id);
+                if (racha != null) _context.RachasUsuarios.Remove(racha);
+
+                _context.RefreshTokens.RemoveRange(await _context.RefreshTokens.Where(r => r.UserId == id).ToListAsync());
+                _context.ActiveTokens.RemoveRange(await _context.ActiveTokens.Where(a => a.UserId == id).ToListAsync());
+                _context.Feedbacks.RemoveRange(await _context.Feedbacks.Where(f => f.UsuarioId == id).ToListAsync());
+
+                // FASE 3: Entidades principales
+                _context.Contenidos.RemoveRange(await _context.Contenidos.Where(c => c.UsuarioId == id).ToListAsync());
+                _context.Suscripciones.RemoveRange(await _context.Suscripciones.Where(s => s.CreadorId == id || s.FanId == id).ToListAsync());
+                _context.Transacciones.RemoveRange(await _context.Transacciones.Where(t => t.UsuarioId == id).ToListAsync());
+                _context.Likes.RemoveRange(await _context.Likes.Where(l => l.UsuarioId == id).ToListAsync());
+                _context.Comentarios.RemoveRange(await _context.Comentarios.Where(c => c.UsuarioId == id).ToListAsync());
+                _context.Reportes.RemoveRange(await _context.Reportes.Where(r => r.UsuarioReportadorId == id || r.UsuarioReportadoId == id).ToListAsync());
+
+                var verificacion = await _context.CreatorVerificationRequests.FirstOrDefaultAsync(v => v.UserId == id);
+                if (verificacion != null) _context.CreatorVerificationRequests.Remove(verificacion);
+
+                // Guardar cambios
+                await _context.SaveChangesAsync();
+
+                await _logEventoService.RegistrarEventoAsync(
+                    $"[AJAX-ELIMINAR-DELETEUSER] Eliminando con UserManager: {usuarioNombre}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Info,
+                    adminId,
+                    adminNombre,
+                    "Entidades eliminadas, ejecutando DeleteAsync"
+                );
+
+                var result = await _userManager.DeleteAsync(usuario);
+
+                if (result.Succeeded)
+                {
+                    await _logEventoService.RegistrarEventoAsync(
+                        $"[AJAX-ELIMINAR-EXITO] Usuario eliminado: {usuarioNombre}",
+                        CategoriaEvento.Admin,
+                        TipoLogEvento.Evento,
+                        adminId,
+                        adminNombre,
+                        $"Usuario {usuarioNombre} ({usuarioEmail}) eliminado por {adminNombre}"
+                    );
+                    return Json(new { success = true, message = $"Usuario {usuarioNombre} eliminado correctamente", step = "completed" });
+                }
+                else
+                {
+                    var errores = string.Join(", ", result.Errors.Select(e => e.Description));
+                    await _logEventoService.RegistrarEventoAsync(
+                        $"[AJAX-ELIMINAR-ERROR-IDENTITY] {usuarioNombre}",
+                        CategoriaEvento.Admin,
+                        TipoLogEvento.Error,
+                        adminId,
+                        adminNombre,
+                        $"Errores: {errores}"
+                    );
+                    return Json(new { success = false, message = $"Error de Identity: {errores}", step = "delete_user" });
+                }
+            }
+            catch (Exception ex)
+            {
+                await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Admin, adminId, adminNombre);
+                return Json(new {
+                    success = false,
+                    message = $"Error: {ex.Message}",
+                    step = "exception",
+                    details = ex.InnerException?.Message
+                });
+            }
+        }
+
+        public class EliminarUsuarioRequest
+        {
+            public string UserId { get; set; } = string.Empty;
         }
 
         // ========================================
@@ -806,13 +1160,30 @@ namespace Lado.Controllers
         // ========================================
         // CONTENIDO
         // ========================================
-        public async Task<IActionResult> Contenido()
+        public async Task<IActionResult> Contenido(string? tipo = null, string? estado = null)
         {
-            var contenidos = await _context.Contenidos
+            var query = _context.Contenidos
                 .Include(c => c.Usuario)
                 .Include(c => c.Archivos)
                 .Include(c => c.CategoriaInteres)
                 .Include(c => c.ObjetosDetectados)
+                .AsQueryable();
+
+            // Filtrar por tipo
+            if (tipo == "foto")
+                query = query.Where(c => c.TipoContenido == TipoContenido.Foto);
+            else if (tipo == "video")
+                query = query.Where(c => c.TipoContenido == TipoContenido.Video);
+
+            // Filtrar por estado
+            if (estado == "censurado")
+                query = query.Where(c => c.Censurado);
+            else if (estado == "sensible")
+                query = query.Where(c => c.EsContenidoSensible);
+            else if (estado == "shadowhide")
+                query = query.Where(c => c.OcultoSilenciosamente);
+
+            var contenidos = await query
                 .OrderByDescending(c => c.FechaPublicacion)
                 .Take(100)
                 .ToListAsync();
@@ -1152,6 +1523,106 @@ namespace Lado.Controllers
             }
 
             return RedirectToAction(nameof(Contenido));
+        }
+
+        /// <summary>
+        /// Shadow Hide: Oculta el contenido silenciosamente para todos excepto el creador
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> OcultarContenidoSilencioso(int id)
+        {
+            var contenido = await _context.Contenidos.FindAsync(id);
+            if (contenido != null)
+            {
+                var adminId = _userManager.GetUserId(User);
+                contenido.OcultoSilenciosamente = true;
+                contenido.FechaOcultoSilenciosamente = DateTime.Now;
+                contenido.OcultadoPorAdminId = adminId;
+                await _context.SaveChangesAsync();
+                TempData["Success"] = "Contenido ocultado silenciosamente. El creador no lo sabrá.";
+            }
+
+            return RedirectToAction(nameof(Contenido));
+        }
+
+        /// <summary>
+        /// Quita el Shadow Hide y hace visible el contenido nuevamente
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MostrarContenidoSilencioso(int id)
+        {
+            var contenido = await _context.Contenidos.FindAsync(id);
+            if (contenido != null)
+            {
+                contenido.OcultoSilenciosamente = false;
+                contenido.FechaOcultoSilenciosamente = null;
+                contenido.OcultadoPorAdminId = null;
+                await _context.SaveChangesAsync();
+                TempData["Success"] = "Contenido visible nuevamente.";
+            }
+
+            return RedirectToAction(nameof(Contenido));
+        }
+
+        /// <summary>
+        /// Obtiene los archivos de un contenido (para carruseles)
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ObtenerArchivosContenido(int id)
+        {
+            var archivos = await _context.ArchivosContenido
+                .Where(a => a.ContenidoId == id)
+                .OrderBy(a => a.Orden)
+                .Select(a => new
+                {
+                    id = a.Id,
+                    url = a.RutaArchivo,
+                    tipo = a.TipoArchivo.ToString(),
+                    esVideo = a.TipoArchivo == TipoArchivo.Video,
+                    orden = a.Orden,
+                    ocultoSilenciosamente = a.OcultoSilenciosamente
+                })
+                .ToListAsync();
+
+            return Json(new { success = true, archivos });
+        }
+
+        /// <summary>
+        /// Shadow Hide para archivo individual de un carrusel
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> OcultarArchivoSilencioso(int id)
+        {
+            var archivo = await _context.ArchivosContenido.FindAsync(id);
+            if (archivo == null)
+                return Json(new { success = false, message = "Archivo no encontrado" });
+
+            archivo.OcultoSilenciosamente = true;
+            archivo.FechaOcultoSilenciosamente = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true });
+        }
+
+        /// <summary>
+        /// Quita el Shadow Hide de un archivo individual
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MostrarArchivoSilencioso(int id)
+        {
+            var archivo = await _context.ArchivosContenido.FindAsync(id);
+            if (archivo == null)
+                return Json(new { success = false, message = "Archivo no encontrado" });
+
+            archivo.OcultoSilenciosamente = false;
+            archivo.FechaOcultoSilenciosamente = null;
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true });
         }
 
         [HttpGet]
@@ -2467,10 +2938,26 @@ namespace Lado.Controllers
                 pista.Energia = Energia;
                 pista.EstadoAnimo = EstadoAnimo;
 
-                // Procesar archivo de audio
+                // Procesar archivo de audio con validación de seguridad
                 if (ArchivoAudio != null && ArchivoAudio.Length > 0)
                 {
-                    var audioFileName = $"{Guid.NewGuid()}{Path.GetExtension(ArchivoAudio.FileName)}";
+                    // Validar que sea un archivo de audio válido
+                    var audioValidation = await _fileValidationService.ValidarAudioAsync(ArchivoAudio);
+                    if (!audioValidation.EsValido)
+                    {
+                        _logger.LogWarning("Intento de subir archivo de audio inválido: {Error}", audioValidation.MensajeError);
+                        TempData["Error"] = $"El archivo de audio no es válido: {audioValidation.MensajeError}";
+                        return RedirectToAction(nameof(Musica));
+                    }
+
+                    // Validar tamaño máximo (50MB para audio)
+                    if (ArchivoAudio.Length > 50 * 1024 * 1024)
+                    {
+                        TempData["Error"] = "El archivo de audio no puede superar los 50MB.";
+                        return RedirectToAction(nameof(Musica));
+                    }
+
+                    var audioFileName = $"{Guid.NewGuid()}{audioValidation.Extension}";
                     var audioPath = Path.Combine("wwwroot", "audio", "biblioteca", audioFileName);
 
                     // Crear directorio si no existe
@@ -2503,10 +2990,26 @@ namespace Lado.Controllers
                     return RedirectToAction(nameof(Musica));
                 }
 
-                // Procesar imagen de portada
+                // Procesar imagen de portada con validación de seguridad
                 if (ImagenPortada != null && ImagenPortada.Length > 0)
                 {
-                    var coverFileName = $"{Guid.NewGuid()}{Path.GetExtension(ImagenPortada.FileName)}";
+                    // Validar que sea una imagen válida
+                    var imagenValidation = await _fileValidationService.ValidarImagenAsync(ImagenPortada);
+                    if (!imagenValidation.EsValido)
+                    {
+                        _logger.LogWarning("Intento de subir imagen de portada inválida: {Error}", imagenValidation.MensajeError);
+                        TempData["Error"] = $"La imagen de portada no es válida: {imagenValidation.MensajeError}";
+                        return RedirectToAction(nameof(Musica));
+                    }
+
+                    // Validar tamaño máximo (10MB para imagen)
+                    if (ImagenPortada.Length > 10 * 1024 * 1024)
+                    {
+                        TempData["Error"] = "La imagen de portada no puede superar los 10MB.";
+                        return RedirectToAction(nameof(Musica));
+                    }
+
+                    var coverFileName = $"{Guid.NewGuid()}{imagenValidation.Extension}";
                     var coverPath = Path.Combine("wwwroot", "audio", "biblioteca", "covers", coverFileName);
 
                     // Crear directorio si no existe
@@ -3346,7 +3849,8 @@ namespace Lado.Controllers
                 fechaInicio = anuncio.FechaInicio?.ToString("yyyy-MM-dd"),
                 fechaFin = anuncio.FechaFin?.ToString("yyyy-MM-dd"),
                 impresiones = anuncio.Impresiones,
-                clics = anuncio.Clics
+                clics = anuncio.Clics,
+                mostrarEnStoriesGlobal = anuncio.MostrarEnStoriesGlobal
             });
         }
 
@@ -3366,6 +3870,7 @@ namespace Lado.Controllers
             string? FechaInicio,
             string? FechaFin,
             string Estado,
+            bool MostrarEnStoriesGlobal,
             IFormFile? ImagenCreativo)
         {
             try
@@ -3420,6 +3925,20 @@ namespace Lado.Controllers
                 {
                     anuncio.Estado = estadoEnum;
                 }
+
+                // Mostrar en Stories Global - Solo uno puede estar activo
+                if (MostrarEnStoriesGlobal && !anuncio.MostrarEnStoriesGlobal)
+                {
+                    // Desactivar otros anuncios globales
+                    var otrosGlobales = await _context.Anuncios
+                        .Where(a => a.MostrarEnStoriesGlobal && a.Id != Id)
+                        .ToListAsync();
+                    foreach (var otro in otrosGlobales)
+                    {
+                        otro.MostrarEnStoriesGlobal = false;
+                    }
+                }
+                anuncio.MostrarEnStoriesGlobal = MostrarEnStoriesGlobal;
 
                 // Procesar imagen del creativo
                 if (ImagenCreativo != null && ImagenCreativo.Length > 0)
@@ -3587,8 +4106,13 @@ namespace Lado.Controllers
                 case "pendientes":
                     query = query.Where(t => t.EstadoPago == "Pendiente");
                     break;
-                case "aprobados":
-                    query = query.Where(t => t.EstadoPago == "Completado" || t.EstadoPago == "Aprobado");
+                case "porpagar":
+                    // Aprobados pero aún no pagados (pendientes de envío manual en PayPal)
+                    query = query.Where(t => t.EstadoPago == "Aprobado");
+                    break;
+                case "pagados":
+                    // Ya se envió el dinero
+                    query = query.Where(t => t.EstadoPago == "Pagado" || t.EstadoPago == "Completado");
                     break;
                 case "rechazados":
                     query = query.Where(t => t.EstadoPago == "Rechazado");
@@ -3608,13 +4132,22 @@ namespace Lado.Controllers
                 .Where(t => t.TipoTransaccion == TipoTransaccion.Retiro && t.EstadoPago == "Pendiente")
                 .SumAsync(t => (decimal?)t.MontoNeto) ?? 0;
 
-            ViewBag.TotalAprobados = await _context.Transacciones
-                .CountAsync(t => t.TipoTransaccion == TipoTransaccion.Retiro &&
-                    (t.EstadoPago == "Completado" || t.EstadoPago == "Aprobado"));
+            // Por Pagar = Aprobados pero no enviado el dinero todavía
+            ViewBag.TotalPorPagar = await _context.Transacciones
+                .CountAsync(t => t.TipoTransaccion == TipoTransaccion.Retiro && t.EstadoPago == "Aprobado");
 
-            ViewBag.MontoAprobado = await _context.Transacciones
+            ViewBag.MontoPorPagar = await _context.Transacciones
+                .Where(t => t.TipoTransaccion == TipoTransaccion.Retiro && t.EstadoPago == "Aprobado")
+                .SumAsync(t => (decimal?)t.MontoNeto) ?? 0;
+
+            // Pagados = dinero ya enviado
+            ViewBag.TotalPagados = await _context.Transacciones
+                .CountAsync(t => t.TipoTransaccion == TipoTransaccion.Retiro &&
+                    (t.EstadoPago == "Pagado" || t.EstadoPago == "Completado"));
+
+            ViewBag.MontoPagado = await _context.Transacciones
                 .Where(t => t.TipoTransaccion == TipoTransaccion.Retiro &&
-                    (t.EstadoPago == "Completado" || t.EstadoPago == "Aprobado"))
+                    (t.EstadoPago == "Pagado" || t.EstadoPago == "Completado"))
                 .SumAsync(t => (decimal?)t.MontoNeto) ?? 0;
 
             ViewBag.TotalRechazados = await _context.Transacciones
@@ -3626,7 +4159,7 @@ namespace Lado.Controllers
         }
 
         /// <summary>
-        /// Aprobar una solicitud de retiro
+        /// Aprobar una solicitud de retiro (pasa a estado "Aprobado" - pendiente de pago manual)
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -3648,13 +4181,76 @@ namespace Lado.Controllers
                 return RedirectToAction(nameof(Retiros));
             }
 
-            retiro.EstadoPago = "Completado";
-            retiro.EstadoTransaccion = EstadoTransaccion.Completada;
-            retiro.Notas = string.IsNullOrEmpty(notas) ? "Aprobado por administrador" : notas;
+            var adminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var adminName = User.Identity?.Name ?? "Admin";
+
+            // Estado "Aprobado" = listo para pagar manualmente en PayPal
+            retiro.EstadoPago = "Aprobado";
+            retiro.Notas = string.IsNullOrEmpty(notas)
+                ? $"Aprobado por {adminName} - Pendiente de pago"
+                : $"{notas} (Aprobado por {adminName})";
 
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = $"Retiro #{id} aprobado. Monto: ${retiro.MontoNeto:N2} para {retiro.Usuario?.NombreCompleto ?? "Usuario"}";
+            await _logEventoService.RegistrarEventoAsync(
+                $"Retiro #{id} aprobado - Pendiente de pago manual",
+                CategoriaEvento.Pago,
+                TipoLogEvento.Evento,
+                adminId,
+                adminName,
+                $"Usuario: {retiro.Usuario?.UserName}, Monto neto: ${retiro.MontoNeto:N2}, Método: {retiro.MetodoPago}, Cuenta: {retiro.Usuario?.CuentaRetiro}"
+            );
+
+            TempData["Success"] = $"Retiro #{id} aprobado. Ahora debes enviar ${retiro.MontoNeto:N2} a {retiro.Usuario?.CuentaRetiro ?? "cuenta del usuario"} por {retiro.MetodoPago}";
+            return RedirectToAction("Retiros", new { filtro = "porpagar" });
+        }
+
+        /// <summary>
+        /// Marcar un retiro como pagado (después de enviar el dinero manualmente en PayPal)
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MarcarComoPagado(int id, string? referencia)
+        {
+            var retiro = await _context.Transacciones
+                .Include(t => t.Usuario)
+                .FirstOrDefaultAsync(t => t.Id == id && t.TipoTransaccion == TipoTransaccion.Retiro);
+
+            if (retiro == null)
+            {
+                TempData["Error"] = "Retiro no encontrado.";
+                return RedirectToAction(nameof(Retiros));
+            }
+
+            if (retiro.EstadoPago != "Aprobado")
+            {
+                TempData["Error"] = "Solo se pueden marcar como pagados los retiros aprobados.";
+                return RedirectToAction(nameof(Retiros));
+            }
+
+            var adminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var adminName = User.Identity?.Name ?? "Admin";
+
+            retiro.EstadoPago = "Pagado";
+            retiro.EstadoTransaccion = EstadoTransaccion.Completada;
+
+            var notaAnterior = retiro.Notas ?? "";
+            retiro.Notas = string.IsNullOrEmpty(referencia)
+                ? $"{notaAnterior} | Pagado por {adminName} el {DateTime.Now:dd/MM/yyyy HH:mm}"
+                : $"{notaAnterior} | Pagado por {adminName} el {DateTime.Now:dd/MM/yyyy HH:mm}. Ref: {referencia}";
+
+            await _context.SaveChangesAsync();
+
+            await _logEventoService.RegistrarEventoAsync(
+                $"Retiro #{id} marcado como PAGADO",
+                CategoriaEvento.Pago,
+                TipoLogEvento.Evento,
+                adminId,
+                adminName,
+                $"Usuario: {retiro.Usuario?.UserName}, Monto: ${retiro.MontoNeto:N2}, Referencia: {referencia ?? "N/A"}"
+            );
+
+            TempData["Success"] = $"Retiro #{id} marcado como pagado. ${retiro.MontoNeto:N2} enviado a {retiro.Usuario?.NombreCompleto ?? "Usuario"}";
             return RedirectToAction(nameof(Retiros));
         }
 
@@ -3687,6 +4283,9 @@ namespace Lado.Controllers
                 return RedirectToAction(nameof(Retiros));
             }
 
+            var adminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var adminName = User.Identity?.Name ?? "Admin";
+
             // Devolver el monto al saldo del usuario
             if (retiro.Usuario != null)
             {
@@ -3695,9 +4294,18 @@ namespace Lado.Controllers
 
             retiro.EstadoPago = "Rechazado";
             retiro.EstadoTransaccion = EstadoTransaccion.Cancelada;
-            retiro.Notas = $"Rechazado: {razon}";
+            retiro.Notas = $"Rechazado por {adminName}: {razon}";
 
             await _context.SaveChangesAsync();
+
+            await _logEventoService.RegistrarEventoAsync(
+                $"Retiro #{id} RECHAZADO",
+                CategoriaEvento.Pago,
+                TipoLogEvento.Warning,
+                adminId,
+                adminName,
+                $"Usuario: {retiro.Usuario?.UserName}, Monto devuelto: ${retiro.Monto:N2}, Razón: {razon}"
+            );
 
             TempData["Success"] = $"Retiro #{id} rechazado. Se devolvió ${retiro.Monto:N2} al saldo de {retiro.Usuario?.NombreCompleto ?? "Usuario"}";
             return RedirectToAction(nameof(Retiros));
@@ -4999,6 +5607,53 @@ namespace Lado.Controllers
                 User.Identity?.Name);
 
             return Json(new { success = true, message = $"IP {ip.DireccionIp} desbloqueada" });
+        }
+
+        /// <summary>
+        /// Vista dedicada para gestión de IPs bloqueadas
+        /// </summary>
+        public async Task<IActionResult> IpsBloqueadas(string? filtro = null, string? tipo = null)
+        {
+            var query = _context.IpsBloqueadas.AsQueryable();
+
+            // Filtrar por estado activo/inactivo
+            if (filtro == "activas")
+                query = query.Where(ip => ip.EstaActivo);
+            else if (filtro == "inactivas")
+                query = query.Where(ip => !ip.EstaActivo);
+
+            // Filtrar por tipo de bloqueo
+            if (tipo == "manual")
+                query = query.Where(ip => ip.TipoBloqueo == TipoBloqueoIp.Manual);
+            else if (tipo == "automatico")
+                query = query.Where(ip => ip.TipoBloqueo == TipoBloqueoIp.Automatico);
+
+            var ipsBloqueadas = await query
+                .OrderByDescending(ip => ip.FechaBloqueo)
+                .ToListAsync();
+
+            // Estadísticas
+            var totalActivas = await _context.IpsBloqueadas.CountAsync(ip => ip.EstaActivo);
+            var totalManuales = await _context.IpsBloqueadas.CountAsync(ip => ip.EstaActivo && ip.TipoBloqueo == TipoBloqueoIp.Manual);
+            var totalAutomaticas = await _context.IpsBloqueadas.CountAsync(ip => ip.EstaActivo && ip.TipoBloqueo == TipoBloqueoIp.Automatico);
+            var bloqueosHoy = await _context.IpsBloqueadas.CountAsync(ip => ip.FechaBloqueo.Date == DateTime.Today);
+
+            // Intentos de ataque recientes
+            var intentosRecientes = await _context.IntentosAtaque
+                .OrderByDescending(i => i.Fecha)
+                .Take(20)
+                .ToListAsync();
+
+            ViewBag.IpsBloqueadas = ipsBloqueadas;
+            ViewBag.TotalActivas = totalActivas;
+            ViewBag.TotalManuales = totalManuales;
+            ViewBag.TotalAutomaticas = totalAutomaticas;
+            ViewBag.BloqueosHoy = bloqueosHoy;
+            ViewBag.IntentosRecientes = intentosRecientes;
+            ViewBag.FiltroActual = filtro;
+            ViewBag.TipoActual = tipo;
+
+            return View();
         }
 
         [HttpPost]
@@ -7472,6 +8127,136 @@ Este email fue enviado a {{{{email}}}}
             return Json(new { success = true, message = "Métricas reseteadas" });
         }
 
+        /// <summary>
+        /// Subir imagen para popup
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> SubirImagenPopup(IFormFile archivo)
+        {
+            try
+            {
+                if (archivo == null || archivo.Length == 0)
+                {
+                    return Json(new { success = false, message = "No se recibió ningún archivo" });
+                }
+
+                // Validar extensión
+                var extensionesPermitidas = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg" };
+                var extension = Path.GetExtension(archivo.FileName).ToLowerInvariant();
+
+                if (!extensionesPermitidas.Contains(extension))
+                {
+                    return Json(new { success = false, message = "Formato no permitido. Use: JPG, PNG, GIF, WebP o SVG" });
+                }
+
+                // Validar tamaño (5MB máximo)
+                if (archivo.Length > 5 * 1024 * 1024)
+                {
+                    return Json(new { success = false, message = "El archivo no puede superar los 5MB" });
+                }
+
+                // Crear directorio si no existe
+                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "popups");
+                if (!Directory.Exists(uploadsFolder))
+                {
+                    Directory.CreateDirectory(uploadsFolder);
+                }
+
+                // Generar nombre único
+                var nombreArchivo = $"popup_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N").Substring(0, 8)}{extension}";
+                var rutaCompleta = Path.Combine(uploadsFolder, nombreArchivo);
+
+                // Guardar archivo
+                using (var stream = new FileStream(rutaCompleta, FileMode.Create))
+                {
+                    await archivo.CopyToAsync(stream);
+                }
+
+                var urlArchivo = $"/uploads/popups/{nombreArchivo}";
+
+                return Json(new {
+                    success = true,
+                    url = urlArchivo,
+                    nombre = archivo.FileName,
+                    tamaño = archivo.Length,
+                    message = "Imagen subida correctamente"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al subir imagen de popup");
+                return Json(new { success = false, message = $"Error: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Obtener imágenes de popups disponibles
+        /// </summary>
+        [HttpGet]
+        public IActionResult ObtenerImagenesPopup()
+        {
+            try
+            {
+                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "popups");
+
+                if (!Directory.Exists(uploadsFolder))
+                {
+                    return Json(new { success = true, imagenes = new List<object>() });
+                }
+
+                var extensiones = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg" };
+                var archivos = Directory.GetFiles(uploadsFolder)
+                    .Where(f => extensiones.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                    .Select(f => new {
+                        url = $"/uploads/popups/{Path.GetFileName(f)}",
+                        nombre = Path.GetFileName(f),
+                        fecha = System.IO.File.GetCreationTime(f)
+                    })
+                    .OrderByDescending(f => f.fecha)
+                    .Take(50)
+                    .ToList();
+
+                return Json(new { success = true, imagenes = archivos });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener imágenes de popup");
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Eliminar imagen de popup
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult EliminarImagenPopup(string url)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(url) || !url.StartsWith("/uploads/popups/"))
+                {
+                    return Json(new { success = false, message = "URL inválida" });
+                }
+
+                var nombreArchivo = Path.GetFileName(url);
+                var rutaCompleta = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "popups", nombreArchivo);
+
+                if (System.IO.File.Exists(rutaCompleta))
+                {
+                    System.IO.File.Delete(rutaCompleta);
+                    return Json(new { success = true, message = "Imagen eliminada" });
+                }
+
+                return Json(new { success = false, message = "Archivo no encontrado" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al eliminar imagen de popup");
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
         // ========================================
         // MIGRACIÓN DE MEDIOS A FORMATOS ESTÁNDAR
         // ========================================
@@ -9904,6 +10689,369 @@ Este email fue enviado a {{{{email}}}}
             ViewBag.TiposTransaccion = Enum.GetNames(typeof(TipoTransaccionLadoCoin));
 
             return View(transacciones);
+        }
+
+        #endregion
+
+        #region SEO
+
+        /// <summary>
+        /// Vista principal de configuración SEO
+        /// </summary>
+        public async Task<IActionResult> ConfiguracionSeo()
+        {
+            var config = await _seoConfigService.ObtenerConfiguracionAsync();
+            var redirecciones = await _seoConfigService.ObtenerTodasRedireccionesAsync();
+            var rutasRobots = await _seoConfigService.ObtenerTodasRutasRobotsAsync();
+            var botsRobots = await _seoConfigService.ObtenerTodosBotsRobotsAsync();
+
+            ViewBag.Redirecciones = redirecciones;
+            ViewBag.RutasRobots = rutasRobots;
+            ViewBag.BotsRobots = botsRobots;
+
+            return View(config);
+        }
+
+        /// <summary>
+        /// Actualizar configuración general de SEO
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ActualizarConfiguracionSeo(ConfiguracionSeo config)
+        {
+            try
+            {
+                var resultado = await _seoConfigService.ActualizarConfiguracionAsync(
+                    config, User.Identity?.Name ?? "Admin");
+
+                if (resultado)
+                {
+                    await _logEventoService.RegistrarEventoAsync(
+                        "Configuración SEO actualizada",
+                        CategoriaEvento.Admin,
+                        TipoLogEvento.Info,
+                        User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                        User.Identity?.Name,
+                        "Se actualizó la configuración SEO del sitio"
+                    );
+
+                    TempData["Success"] = "Configuración SEO actualizada correctamente";
+                }
+                else
+                {
+                    TempData["Error"] = "Error al actualizar la configuración SEO";
+                }
+            }
+            catch (Exception ex)
+            {
+                await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Admin,
+                    User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                    User.Identity?.Name);
+                TempData["Error"] = "Error al actualizar la configuración SEO";
+            }
+
+            return RedirectToAction(nameof(ConfiguracionSeo));
+        }
+
+        /// <summary>
+        /// Crear nueva redirección 301/302
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CrearRedireccion(Redireccion301 redireccion)
+        {
+            try
+            {
+                // Normalizar URL origen
+                if (!redireccion.UrlOrigen.StartsWith("/"))
+                    redireccion.UrlOrigen = "/" + redireccion.UrlOrigen;
+
+                redireccion.CreadoPor = User.Identity?.Name;
+
+                await _seoConfigService.CrearRedireccionAsync(redireccion);
+
+                await _logEventoService.RegistrarEventoAsync(
+                    $"Redirección creada: {redireccion.UrlOrigen} → {redireccion.UrlDestino}",
+                    CategoriaEvento.Admin,
+                    TipoLogEvento.Info,
+                    User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                    User.Identity?.Name
+                );
+
+                TempData["Success"] = "Redirección creada correctamente";
+            }
+            catch (Exception ex)
+            {
+                await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Admin);
+                TempData["Error"] = "Error al crear la redirección. Puede que la URL de origen ya exista.";
+            }
+
+            return RedirectToAction(nameof(ConfiguracionSeo));
+        }
+
+        /// <summary>
+        /// Eliminar redirección
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarRedireccion(int id)
+        {
+            try
+            {
+                var resultado = await _seoConfigService.EliminarRedireccionAsync(id);
+                if (resultado)
+                {
+                    TempData["Success"] = "Redirección eliminada correctamente";
+                }
+                else
+                {
+                    TempData["Error"] = "No se encontró la redirección";
+                }
+            }
+            catch (Exception ex)
+            {
+                await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Admin);
+                TempData["Error"] = "Error al eliminar la redirección";
+            }
+
+            return RedirectToAction(nameof(ConfiguracionSeo));
+        }
+
+        /// <summary>
+        /// Toggle estado de redirección
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleRedireccion(int id)
+        {
+            try
+            {
+                var redireccion = await _context.Redirecciones301.FindAsync(id);
+                if (redireccion != null)
+                {
+                    redireccion.Activa = !redireccion.Activa;
+                    await _context.SaveChangesAsync();
+                    _seoConfigService.LimpiarCache();
+
+                    TempData["Success"] = $"Redirección {(redireccion.Activa ? "activada" : "desactivada")}";
+                }
+            }
+            catch (Exception ex)
+            {
+                await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Admin);
+                TempData["Error"] = "Error al cambiar estado de la redirección";
+            }
+
+            return RedirectToAction(nameof(ConfiguracionSeo));
+        }
+
+        /// <summary>
+        /// Crear nueva ruta de robots.txt
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CrearRutaRobots(RutaRobotsTxt ruta)
+        {
+            try
+            {
+                await _seoConfigService.CrearRutaRobotsAsync(ruta);
+                TempData["Success"] = "Ruta agregada correctamente";
+            }
+            catch (Exception ex)
+            {
+                await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Admin);
+                TempData["Error"] = "Error al crear la ruta";
+            }
+
+            return RedirectToAction(nameof(ConfiguracionSeo));
+        }
+
+        /// <summary>
+        /// Eliminar ruta de robots.txt
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarRutaRobots(int id)
+        {
+            try
+            {
+                var resultado = await _seoConfigService.EliminarRutaRobotsAsync(id);
+                if (resultado)
+                {
+                    TempData["Success"] = "Ruta eliminada correctamente";
+                }
+                else
+                {
+                    TempData["Error"] = "No se encontró la ruta";
+                }
+            }
+            catch (Exception ex)
+            {
+                await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Admin);
+                TempData["Error"] = "Error al eliminar la ruta";
+            }
+
+            return RedirectToAction(nameof(ConfiguracionSeo));
+        }
+
+        /// <summary>
+        /// Toggle estado de ruta robots
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleRutaRobots(int id)
+        {
+            try
+            {
+                var ruta = await _context.RutasRobotsTxt.FindAsync(id);
+                if (ruta != null)
+                {
+                    ruta.Activa = !ruta.Activa;
+                    await _context.SaveChangesAsync();
+                    _seoConfigService.LimpiarCache();
+
+                    TempData["Success"] = $"Ruta {(ruta.Activa ? "activada" : "desactivada")}";
+                }
+            }
+            catch (Exception ex)
+            {
+                await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Admin);
+                TempData["Error"] = "Error al cambiar estado de la ruta";
+            }
+
+            return RedirectToAction(nameof(ConfiguracionSeo));
+        }
+
+        /// <summary>
+        /// Crear nuevo bot de robots.txt
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CrearBotRobots(BotRobotsTxt bot)
+        {
+            try
+            {
+                await _seoConfigService.CrearBotRobotsAsync(bot);
+                TempData["Success"] = "Bot agregado correctamente";
+            }
+            catch (Exception ex)
+            {
+                await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Admin);
+                TempData["Error"] = "Error al crear el bot. Puede que ya exista.";
+            }
+
+            return RedirectToAction(nameof(ConfiguracionSeo));
+        }
+
+        /// <summary>
+        /// Eliminar bot de robots.txt
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarBotRobots(int id)
+        {
+            try
+            {
+                var resultado = await _seoConfigService.EliminarBotRobotsAsync(id);
+                if (resultado)
+                {
+                    TempData["Success"] = "Bot eliminado correctamente";
+                }
+                else
+                {
+                    TempData["Error"] = "No se encontró el bot";
+                }
+            }
+            catch (Exception ex)
+            {
+                await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Admin);
+                TempData["Error"] = "Error al eliminar el bot";
+            }
+
+            return RedirectToAction(nameof(ConfiguracionSeo));
+        }
+
+        /// <summary>
+        /// Toggle estado de bot (activar/desactivar)
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleBotRobots(int id)
+        {
+            try
+            {
+                var bot = await _context.BotsRobotsTxt.FindAsync(id);
+                if (bot != null)
+                {
+                    bot.Activo = !bot.Activo;
+                    await _context.SaveChangesAsync();
+                    _seoConfigService.LimpiarCache();
+
+                    TempData["Success"] = $"Bot {(bot.Activo ? "activado" : "desactivado")}";
+                }
+            }
+            catch (Exception ex)
+            {
+                await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Admin);
+                TempData["Error"] = "Error al cambiar estado del bot";
+            }
+
+            return RedirectToAction(nameof(ConfiguracionSeo));
+        }
+
+        /// <summary>
+        /// Toggle bloqueo de bot
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleBloqueoBot(int id)
+        {
+            try
+            {
+                var bot = await _context.BotsRobotsTxt.FindAsync(id);
+                if (bot != null)
+                {
+                    bot.Bloqueado = !bot.Bloqueado;
+                    await _context.SaveChangesAsync();
+                    _seoConfigService.LimpiarCache();
+
+                    TempData["Success"] = $"Bot {(bot.Bloqueado ? "bloqueado" : "permitido")}";
+                }
+            }
+            catch (Exception ex)
+            {
+                await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Admin);
+                TempData["Error"] = "Error al cambiar bloqueo del bot";
+            }
+
+            return RedirectToAction(nameof(ConfiguracionSeo));
+        }
+
+        /// <summary>
+        /// Limpiar caché de SEO y sitemaps
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult LimpiarCacheSeo()
+        {
+            try
+            {
+                _seoConfigService.LimpiarCache();
+                _cache.Remove("sitemap_index");
+                _cache.Remove("sitemap_paginas");
+                _cache.Remove("sitemap_perfiles");
+                _cache.Remove("sitemap_contenido");
+
+                _logger.LogInformation("Caché SEO limpiado por {User}", User.Identity?.Name);
+                TempData["Success"] = "Caché de SEO y sitemaps limpiado correctamente";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al limpiar caché SEO");
+                TempData["Error"] = "Error al limpiar la caché";
+            }
+
+            return RedirectToAction(nameof(ConfiguracionSeo));
         }
 
         #endregion
