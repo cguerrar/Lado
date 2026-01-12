@@ -1,16 +1,28 @@
 ﻿@using Microsoft.AspNetCore.Identity
 @using Lado.Models
 @using Lado.Data
+@using Lado.Services
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
 @inject ApplicationDbContext Context
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@inject ISeoConfigService SeoConfigService
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment HostEnvironment
 
 @{
+	// DEBUG: Verificar qué usuario está en User claims
+	var userIdFromClaims = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+	var userNameFromClaims = User.Identity?.Name;
+	System.Diagnostics.Debug.WriteLine($"🔍 LAYOUT: Claims UserId={userIdFromClaims}, UserName={userNameFromClaims}");
+
 	var usuario = await UserManager.GetUserAsync(User);
+
+	// DEBUG: Verificar qué usuario retornó UserManager
+	System.Diagnostics.Debug.WriteLine($"🔍 LAYOUT: UserManager retornó: {usuario?.UserName} (ID: {usuario?.Id})");
 
 	int mensajesNoLeidos = 0;
 	Lado.Models.Agencia? agenciaUsuario = null;
+	bool esSupervisor = false;
 	if (usuario != null)
 	{
 		mensajesNoLeidos = Context.MensajesPrivados
@@ -19,11 +31,18 @@
 		// Cargar agencia del usuario si existe y está activa
 		agenciaUsuario = Context.Agencias
 			.FirstOrDefault(a => a.UsuarioId == usuario.Id && a.Estado == Lado.Models.EstadoAgencia.Activa);
+
+		// Verificar si el usuario es supervisor
+		esSupervisor = Context.UsuariosSupervisor
+			.Any(s => s.UsuarioId == usuario.Id && s.EstaActivo);
 	}
 
 	// Obtener versión del ensamblado
 	var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
 	var versionString = version != null ? $"v{version.Major}.{version.Minor}.{version.Build}" : "v1.0.0";
+
+	// Cargar configuración SEO desde BD (con caché)
+	var seoConfig = await SeoConfigService.ObtenerConfiguracionAsync();
 }
 
 <!DOCTYPE html>
@@ -39,14 +58,26 @@
 	<link rel="manifest" href="/manifest.json">
 	<meta name="theme-color" content="#4682B4">
 	<link rel="apple-touch-icon" href="/images/icons/icon-192x192.png">
-	<title>@ViewData["Title"] - Lado</title>
+	<title>@ViewData["Title"] - @seoConfig.TituloSitio</title>
 
 	<!-- SEO Meta Tags -->
-	<meta name="description" content="@(ViewData["MetaDescription"] ?? ViewData["OgDescription"] ?? "Lado - Plataforma de contenido exclusivo donde los creadores muestran su lado autentico.")" />
-	<meta name="keywords" content="@(ViewData["MetaKeywords"] ?? "red social, contenido exclusivo, creadores, fotos, videos, suscripciones, lado")" />
-	<meta name="author" content="@(ViewData["Author"] ?? "Lado")" />
-	<meta name="robots" content="@(ViewData["Robots"] ?? "index, follow")" />
-	<meta name="googlebot" content="@(ViewData["Robots"] ?? "index, follow")" />
+	<meta name="description" content="@(ViewData["MetaDescription"] ?? ViewData["OgDescription"] ?? seoConfig.DescripcionMeta)" />
+	<meta name="keywords" content="@(ViewData["MetaKeywords"] ?? seoConfig.PalabrasClave)" />
+	<meta name="author" content="@(ViewData["Author"] ?? seoConfig.OrganizacionNombre)" />
+	<meta name="robots" content="@(ViewData["Robots"] ?? (seoConfig.IndexarSitio ? "index, follow" : "noindex, nofollow"))" />
+	<meta name="googlebot" content="@(ViewData["Robots"] ?? (seoConfig.IndexarSitio ? "index, follow" : "noindex, nofollow"))" />
+	@if (!string.IsNullOrEmpty(seoConfig.GoogleSiteVerification))
+	{
+		<meta name="google-site-verification" content="@seoConfig.GoogleSiteVerification" />
+	}
+	@if (!string.IsNullOrEmpty(seoConfig.BingSiteVerification))
+	{
+		<meta name="msvalidate.01" content="@seoConfig.BingSiteVerification" />
+	}
+	@if (!string.IsNullOrEmpty(seoConfig.PinterestSiteVerification))
+	{
+		<meta name="p:domain_verify" content="@seoConfig.PinterestSiteVerification" />
+	}
 
 	<!-- Canonical URL -->
 	@if (ViewData["CanonicalUrl"] != null)
@@ -59,11 +90,11 @@
 	}
 
 	<!-- Open Graph Meta Tags para compartir en redes sociales -->
-	<meta property="og:site_name" content="Lado" />
-	<meta property="og:locale" content="es_ES" />
-	<meta property="og:title" content="@(ViewData["OgTitle"] ?? ViewData["Title"] ?? "Lado")" />
-	<meta property="og:description" content="@(ViewData["OgDescription"] ?? ViewData["MetaDescription"] ?? "Lado - Plataforma de contenido exclusivo")" />
-	<meta property="og:type" content="@(ViewData["OgType"] ?? "website")" />
+	<meta property="og:site_name" content="@seoConfig.OgSiteName" />
+	<meta property="og:locale" content="@seoConfig.OgLocale" />
+	<meta property="og:title" content="@(ViewData["OgTitle"] ?? ViewData["Title"] ?? seoConfig.TituloSitio)" />
+	<meta property="og:description" content="@(ViewData["OgDescription"] ?? ViewData["MetaDescription"] ?? seoConfig.DescripcionMeta)" />
+	<meta property="og:type" content="@(ViewData["OgType"] ?? seoConfig.OgTypeDefault)" />
 	@if (ViewData["OgUrl"] != null)
 	{
 		<meta property="og:url" content="@ViewData["OgUrl"]" />
@@ -75,22 +106,22 @@
 	@if (ViewData["OgImage"] != null)
 	{
 		<meta property="og:image" content="@ViewData["OgImage"]" />
-		<meta property="og:image:width" content="1200" />
-		<meta property="og:image:height" content="630" />
-		<meta property="og:image:alt" content="@(ViewData["OgTitle"] ?? ViewData["Title"] ?? "Lado")" />
+		<meta property="og:image:width" content="@seoConfig.OgImagenAncho" />
+		<meta property="og:image:height" content="@seoConfig.OgImagenAlto" />
+		<meta property="og:image:alt" content="@(ViewData["OgTitle"] ?? ViewData["Title"] ?? seoConfig.TituloSitio)" />
 	}
 	else
 	{
-		<meta property="og:image" content="https://ladoapp.com/images/og-default.jpg" />
-		<meta property="og:image:width" content="1200" />
-		<meta property="og:image:height" content="630" />
+		<meta property="og:image" content="@seoConfig.UrlBase@seoConfig.OgImagenDefault" />
+		<meta property="og:image:width" content="@seoConfig.OgImagenAncho" />
+		<meta property="og:image:height" content="@seoConfig.OgImagenAlto" />
 	}
 
 	<!-- Twitter Card -->
-	<meta name="twitter:card" content="@(ViewData["OgImage"] != null ? "summary_large_image" : "summary")" />
-	<meta name="twitter:site" content="@@ladoapp" />
-	<meta name="twitter:title" content="@(ViewData["OgTitle"] ?? ViewData["Title"] ?? "Lado")" />
-	<meta name="twitter:description" content="@(ViewData["OgDescription"] ?? ViewData["MetaDescription"] ?? "Lado - Plataforma de contenido exclusivo")" />
+	<meta name="twitter:card" content="@(ViewData["OgImage"] != null ? seoConfig.TwitterCardType : "summary")" />
+	<meta name="twitter:site" content="@seoConfig.TwitterSite" />
+	<meta name="twitter:title" content="@(ViewData["OgTitle"] ?? ViewData["Title"] ?? seoConfig.TituloSitio)" />
+	<meta name="twitter:description" content="@(ViewData["OgDescription"] ?? ViewData["MetaDescription"] ?? seoConfig.DescripcionMeta)" />
 	@if (ViewData["OgImage"] != null)
 	{
 		<meta name="twitter:image" content="@ViewData["OgImage"]" />
@@ -214,6 +245,46 @@
 			box-sizing: border-box;
 		}
 
+		/* Focus states accesibles para navegación por teclado */
+		:focus-visible {
+			outline: 2px solid var(--primary);
+			outline-offset: 2px;
+		}
+
+		/* Elementos interactivos sin focus visible para usuarios de mouse */
+		:focus:not(:focus-visible) {
+			outline: none;
+		}
+
+		/* Focus especial para botones y enlaces */
+		button:focus-visible,
+		a:focus-visible,
+		input:focus-visible,
+		select:focus-visible,
+		textarea:focus-visible {
+			outline: 2px solid var(--primary);
+			outline-offset: 2px;
+			box-shadow: 0 0 0 4px rgba(70, 130, 180, 0.2);
+		}
+
+		/* Skip link para accesibilidad */
+		.skip-to-content {
+			position: absolute;
+			top: -100%;
+			left: 50%;
+			transform: translateX(-50%);
+			background: var(--primary);
+			color: white;
+			padding: 12px 24px;
+			border-radius: var(--radius-md);
+			z-index: 10000;
+			transition: top 0.2s;
+		}
+
+		.skip-to-content:focus {
+			top: 16px;
+		}
+
 		body {
 			font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 			background: var(--bg-secondary);
@@ -261,6 +332,7 @@
 			z-index: 1000 !important;
 			overflow-y: auto;
 			transition: transform 0.3s ease, background-color var(--transition-base);
+			padding-top: env(safe-area-inset-top, 0px);
 		}
 
 		/* Logo */
@@ -528,6 +600,7 @@
 			background: var(--surface);
 			box-shadow: var(--shadow-sm);
 			padding: 16px 30px;
+			padding-top: calc(16px + env(safe-area-inset-top, 0px));
 			margin-bottom: 0;
 			position: sticky;
 			top: 0;
@@ -1513,6 +1586,23 @@
 			box-shadow: var(--shadow-sm);
 		}
 
+		/* Respetar bordes de color de Bootstrap */
+		.card.border-primary {
+			border-color: var(--bs-primary) !important;
+		}
+		.card.border-success {
+			border-color: var(--bs-success) !important;
+		}
+		.card.border-warning {
+			border-color: var(--bs-warning) !important;
+		}
+		.card.border-danger {
+			border-color: var(--bs-danger) !important;
+		}
+		.card.border-info {
+			border-color: var(--bs-info) !important;
+		}
+
 		.btn-primary {
 			background: var(--primary-gradient);
 			border: none;
@@ -1601,8 +1691,12 @@
 				align-items: center;
 				justify-content: flex-start;
 				gap: 0;
-				padding: 10px 16px;
-				height: 56px;
+				padding: 14px 16px;
+				/* Padding superior generoso para Dynamic Island/Notch */
+				/* safe-area-inset-top + 18px de separación visual */
+				padding-top: calc(env(safe-area-inset-top, 0px) + 18px);
+				min-height: 56px;
+				height: auto;
 				background: var(--surface);
 				border-bottom: 1px solid var(--line);
 				position: sticky;
@@ -1884,6 +1978,23 @@
 		var tokens = Antiforgery.GetAndStoreTokens(ViewContext.HttpContext);
 	}
 	<script>
+		// Modo de desarrollo para logging
+		window.isDevelopment = @(HostEnvironment.IsDevelopment().ToString().ToLower());
+
+		// Wrapper de console que solo loguea en desarrollo
+		(function() {
+			const noop = function() {};
+			if (!window.isDevelopment) {
+				window.devLog = noop;
+				window.devWarn = noop;
+				window.devError = console.error.bind(console); // Mantener errores
+			} else {
+				window.devLog = console.log.bind(console, '[DEV]');
+				window.devWarn = console.warn.bind(console, '[DEV]');
+				window.devError = console.error.bind(console, '[DEV]');
+			}
+		})();
+
 		// Token CSRF global para peticiones AJAX
 		window.csrfToken = '@tokens.RequestToken';
 		window.csrfHeaderName = '@tokens.HeaderName';
@@ -1912,6 +2023,80 @@
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11.0.5/swiper-bundle.min.css" integrity="sha512-rd0qOHVMOcez6pLWPVFIv7EfSdGKLt+eafXh4RO/12Fgr41hDQxfGvoi1Vy55QIVcQEujUE1LQrATCLl2Fs+ag==" crossorigin="anonymous" />
 </head>
 <body class="@(User.Identity?.IsAuthenticated != true ? "no-sidebar" : "") @(usuario?.LadoPreferido == TipoLado.LadoB ? "modo-lado-b" : "modo-lado-a")">
+	<!-- Enlace para saltar al contenido (accesibilidad) -->
+	<a href="#main-content" class="skip-to-content">Saltar al contenido</a>
+
+	<!-- PWA Splash Screen - Se muestra instantáneamente mientras carga el contenido -->
+	<div id="pwa-splash" style="
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 99999;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		background: #ffffff;
+		transition: opacity 0.3s ease-out, visibility 0.3s ease-out;
+	">
+		<!-- Logo -->
+		<img src="/images/logo.png" alt="Lado" style="
+			width: 120px;
+			height: 120px;
+			border-radius: 24px;
+			box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+		">
+		<!-- Barra de progreso -->
+		<div style="
+			margin-top: 24px;
+			width: 200px;
+			height: 4px;
+			background: rgba(70, 130, 180, 0.2);
+			border-radius: 2px;
+			overflow: hidden;
+		">
+			<div style="
+				width: 40%;
+				height: 100%;
+				background: steelblue;
+				border-radius: 2px;
+				animation: splash-progress 1.2s ease-in-out infinite;
+			"></div>
+		</div>
+	</div>
+	<style>
+		@@keyframes splash-progress {
+			0% { transform: translateX(-100%); }
+			50% { transform: translateX(150%); }
+			100% { transform: translateX(250%); }
+		}
+	</style>
+	<script>
+		// Ocultar splash cuando el DOM esté listo y los estilos cargados
+		(function() {
+			function hideSplash() {
+				var splash = document.getElementById('pwa-splash');
+				if (splash) {
+					splash.style.opacity = '0';
+					splash.style.visibility = 'hidden';
+					setTimeout(function() {
+						splash.remove();
+					}, 300);
+				}
+			}
+			// Esperar a que cargue el contenido principal
+			if (document.readyState === 'complete') {
+				hideSplash();
+			} else {
+				window.addEventListener('load', hideSplash);
+			}
+			// Fallback: ocultar después de 5 segundos máximo
+			setTimeout(hideSplash, 5000);
+		})();
+	</script>
+
 	@if (User.Identity?.IsAuthenticated == true)
 	{
 		<div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -2152,6 +2337,20 @@
 						@Localizer.Get("Nav_Help")
 					</a>
 				</li>
+
+				@if (esSupervisor)
+				{
+				<li class="nav-separator"></li>
+				<li class="nav-item">
+					<a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Supervisor" ? "active" : "")" href="/Supervisor" style="color: #10b981;">
+						<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+							<path d="m9 12 2 2 4-4"></path>
+						</svg>
+						Panel Supervisor
+					</a>
+				</li>
+				}
 
 				<li class="nav-item mt-auto">
 					<a class="nav-link" href="/Account/Logout">
@@ -2404,9 +2603,9 @@
 			</div>
 		</div>
 
-		<div class="content-area">
+		<main id="main-content" class="content-area" role="main">
 			@RenderBody()
-		</div>
+		</main>
 	</div>
 
 	<!-- Toast Notification Global -->
@@ -2428,6 +2627,51 @@
 	<script src="https://cdn.jsdelivr.net/npm/swiper@11.0.5/swiper-bundle.min.js" integrity="sha512-Ysw1DcK1P+uYLqprEAzNQJP+J4hTx4t/3X2nbVwszao8wD+9afLjBQYjz7Uk4ADP+Er++mJoScI42ueGtQOzEA==" crossorigin="anonymous"></script>
 	<!-- iOS Audio/Video Compatibility Fix -->
 	<script src="~/js/ios-audio-fix.js" asp-append-version="true"></script>
+
+	<!-- Safe Area Detection for Dynamic Island / Notch -->
+	<script>
+	(function() {
+		// Detectar y aplicar safe-area insets para iOS
+		function applySafeArea() {
+			// Obtener valores de safe-area del CSS computado
+			var testEl = document.createElement('div');
+			testEl.style.cssText = 'position:fixed;top:env(safe-area-inset-top,0px);visibility:hidden;';
+			document.body.appendChild(testEl);
+			var safeTop = parseInt(getComputedStyle(testEl).top) || 0;
+			document.body.removeChild(testEl);
+
+			// Guardar en CSS custom property para uso en JS
+			document.documentElement.style.setProperty('--safe-area-top-value', safeTop + 'px');
+
+			// Si estamos en iOS y safe-area es 0, intentar detectar por modelo
+			var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+			var isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+			if (isIOS && safeTop === 0 && isStandalone) {
+				// iPhone X+ en modo PWA pero safe-area no detectado
+				// Aplicar un valor por defecto conservador
+				var screenHeight = window.screen.height;
+				var screenWidth = window.screen.width;
+				// iPhone con notch/Dynamic Island tiene ratio específico
+				if (screenHeight >= 812 || screenWidth >= 812) {
+					document.documentElement.classList.add('ios-notch-fallback');
+				}
+			}
+		}
+
+		// Ejecutar al cargar
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', applySafeArea);
+		} else {
+			applySafeArea();
+		}
+
+		// Re-calcular en cambios de orientación
+		window.addEventListener('orientationchange', function() {
+			setTimeout(applySafeArea, 100);
+		});
+	})();
+	</script>
 
 	<!-- FIX GLOBAL: Asegurar que todos los modales Bootstrap funcionen correctamente -->
 	<script>
@@ -2906,10 +3150,16 @@
 		async function marcarNotificacionLeida(id, event) {
 			// No prevenir navegación, solo marcar como leída
 			try {
+				const formData = new FormData();
+				formData.append('NotificacionId', id);
+				const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || window.csrfToken;
+				if (token) {
+					formData.append('__RequestVerificationToken', token);
+				}
+
 				await fetch('/Usuario/MarcarNotificacionLeida', {
 					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ notificacionId: id })
+					body: formData
 				});
 
 				// Marcar visualmente como leída (buscar el contenedor padre)
@@ -2930,9 +3180,15 @@
 
 		async function marcarTodasLeidas() {
 			try {
+				const formData = new FormData();
+				const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || window.csrfToken;
+				if (token) {
+					formData.append('__RequestVerificationToken', token);
+				}
+
 				const response = await fetch('/Usuario/MarcarTodasLeidas', {
 					method: 'POST',
-					headers: { 'Content-Type': 'application/json' }
+					body: formData
 				});
 
 				const data = await response.json();
@@ -4220,6 +4476,11 @@
 
 		// Cargar popups activos
 		async function loadPopups() {
+			// No mostrar popups en paginas de admin
+			if (currentPath.toLowerCase().startsWith('/admin')) {
+				return;
+			}
+
 			try {
 				const response = await fetch(`/Admin/ObtenerPopupsActivos?pagina=${encodeURIComponent(currentPath)}&esLogueado=${isLoggedIn}&esMovil=${isMobile}`);
 				if (!response.ok) return;
