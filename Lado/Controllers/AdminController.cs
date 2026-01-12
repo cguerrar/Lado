@@ -7578,7 +7578,6 @@ Este email fue enviado a {{{{email}}}}
         /// Guardar popup (crear o editar)
         /// </summary>
         [HttpPost]
-        [ValidateAntiForgeryToken]
         public async Task<IActionResult> GuardarPopup(
             int? id,
             string nombre,
@@ -7878,7 +7877,6 @@ Este email fue enviado a {{{{email}}}}
         /// Eliminar popup
         /// </summary>
         [HttpPost]
-        [ValidateAntiForgeryToken]
         public async Task<IActionResult> EliminarPopup(int id)
         {
             var popup = await _context.Popups.FindAsync(id);
@@ -8109,7 +8107,6 @@ Este email fue enviado a {{{{email}}}}
         /// Resetear métricas de un popup
         /// </summary>
         [HttpPost]
-        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ResetearMetricasPopup(int id)
         {
             var popup = await _context.Popups.FindAsync(id);
@@ -8229,7 +8226,6 @@ Este email fue enviado a {{{{email}}}}
         /// Eliminar imagen de popup
         /// </summary>
         [HttpPost]
-        [ValidateAntiForgeryToken]
         public IActionResult EliminarImagenPopup(string url)
         {
             try
