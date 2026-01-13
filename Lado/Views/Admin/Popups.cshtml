@@ -1914,7 +1914,7 @@
 
                         <!-- Seccion especial para Imagen con Marco -->
                         <div class="imagen-marco-section" id="imagenMarcoSection">
-                            <h4>🖼️ Opciones de Marco</h4>
+                            <h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>Opciones de Marco</h4>
 
                             <label style="font-size: 12px; color: var(--text-gray); margin-bottom: 8px; display: block;">Estilo del marco</label>
                             <div class="marcos-grid">
@@ -2998,9 +2998,65 @@
     });
 
     // ========================================
+    // VALIDACION CSS
+    // ========================================
+    function validarCssPersonalizado(css) {
+        if (!css) return { valid: true };
+
+        // Selectores peligrosos que pueden romper la pagina
+        const selectoresPeligrosos = [
+            /\bbody\s*\{/i,
+            /\bhtml\s*\{/i,
+            /\*\s*\{/,
+            /\bhead\s*\{/i,
+            /\b(display|visibility)\s*:\s*none/i,
+            /position\s*:\s*fixed.*inset/i,
+            /z-index\s*:\s*(9999|[1-9]\d{4,})/i
+        ];
+
+        for (const regex of selectoresPeligrosos) {
+            if (regex.test(css)) {
+                return {
+                    valid: false,
+                    mensaje: 'El CSS contiene selectores o propiedades no permitidos que podrian afectar toda la pagina.'
+                };
+            }
+        }
+        return { valid: true };
+    }
+
+    // ========================================
     // CRUD OPERATIONS
     // ========================================
     async function guardarPopup() {
+        // Validar CSS personalizado antes de guardar
+        const cssPersonalizado = document.getElementById('cssPersonalizado')?.value || '';
+        const validacionCss = validarCssPersonalizado(cssPersonalizado);
+        if (!validacionCss.valid) {
+            alert('Error: ' + validacionCss.mensaje);
+            return;
+        }
+
+        // Validar popup con fondo transparente
+        const colorFondo = document.getElementById('colorFondo').value || '';
+        const imagen = document.getElementById('imagenUrl').value || '';
+        const titulo = document.getElementById('titulo').value || '';
+        const contenido = document.getElementById('editorContent').innerHTML || document.getElementById('editorHtml').value || '';
+        const contenidoLimpio = contenido.replace(/<[^>]*>/g, '').trim(); // Quitar tags HTML
+        const esImagenMarco = window.modoImagenMarco || false;
+
+        // Validar: fondo transparente requiere imagen o contenido
+        if (colorFondo.toLowerCase() === 'transparent' || colorFondo === '') {
+            if (!imagen && !contenidoLimpio && !titulo) {
+                alert('Error: Un popup con fondo transparente requiere al menos una imagen, titulo o contenido.');
+                return;
+            }
+            if (esImagenMarco && !imagen) {
+                alert('Error: El modo "Imagen con Marco" requiere subir una imagen.');
+                return;
+            }
+        }
+
         // Sync content
         document.getElementById('contenido').value = document.getElementById('editorContent').innerHTML || document.getElementById('editorHtml').value;
         document.getElementById('botonesJson').value = JSON.stringify(botones);

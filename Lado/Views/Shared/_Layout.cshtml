@@ -4100,7 +4100,6 @@
 		background: white;
 		border-radius: 16px;
 		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-		max-width: 90%;
 		max-height: 90vh;
 		overflow: hidden;
 		transform: scale(0.9) translateY(20px);
@@ -4109,6 +4108,48 @@
 
 	.lado-popup-overlay.active .lado-popup {
 		transform: scale(1) translateY(0);
+	}
+
+	/* Popup solo imagen (fondo transparente) */
+	.lado-popup.imagen-only {
+		background: transparent !important;
+		box-shadow: none !important;
+		border-radius: 0;
+		overflow: visible;
+		/* No bloquear clics al overlay */
+		pointer-events: none;
+	}
+
+	.lado-popup.imagen-only .lado-popup-image-wrapper {
+		position: relative;
+		display: inline-block;
+		/* Restaurar eventos de clic solo en la imagen y botón */
+		pointer-events: auto;
+	}
+
+	.lado-popup.imagen-only .lado-popup-image {
+		max-width: 100%;
+		max-height: 80vh;
+		width: auto;
+		height: auto;
+		border-radius: 12px;
+		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+		display: block;
+	}
+
+	.lado-popup.imagen-only .lado-popup-close {
+		position: absolute;
+		top: -12px;
+		right: -12px;
+		background: white;
+		color: #333;
+		box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+		pointer-events: auto;
+	}
+
+	.lado-popup.imagen-only .lado-popup-close:hover {
+		background: #ef4444;
+		color: white;
 	}
 
 	/* Boton cerrar */
@@ -4127,12 +4168,12 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		transition: background 0.2s ease;
+		transition: all 0.2s ease;
 		z-index: 10;
 	}
 
 	.lado-popup-close:hover {
-		background: rgba(0, 0, 0, 0.15);
+		background: rgba(0, 0, 0, 0.2);
 	}
 
 	/* Imagen del popup */
@@ -4671,10 +4712,11 @@
 				document.body.style.overflow = 'hidden';
 			}
 
-			// Configurar cierre al click fuera
-			if (popup.cerrarAlClickFuera && (popup.tipo === 1 || popup.tipo === 3)) {
+			// Configurar cierre al click fuera (Modal, FullScreen, Slide)
+			if (popup.cerrarAlClickFuera && (popup.tipo === 1 || popup.tipo === 3 || popup.tipo === 4)) {
 				element.addEventListener('click', function(e) {
-					if (e.target === element) {
+					// Cerrar si el clic fue en el overlay (no en el popup interno)
+					if (e.target === element || e.target.classList.contains('lado-popup-overlay')) {
 						closePopup(popup.id);
 					}
 				});
@@ -4794,6 +4836,26 @@
 						</div>`;
 
 				default: // Modal (1)
+					// Detectar si es popup de solo imagen (fondo transparente + imagen + sin contenido real)
+					const esImagenOnly = popup.imagenUrl &&
+						(!popup.colorFondo || popup.colorFondo.toLowerCase() === 'transparent') &&
+						!popup.titulo &&
+						(!contenido || contenido.replace(/<[^>]*>/g, '').trim() === '');
+
+					if (esImagenOnly) {
+						// Popup de solo imagen: estructura especial con botón X en el borde de la imagen
+						return `
+						<div id="lado-popup-${popup.id}" class="lado-popup-overlay ${animClass}">
+							<div class="lado-popup imagen-only" style="max-width:${popup.anchoMaximo || 400}px;">
+								<div class="lado-popup-image-wrapper">
+									<img src="${popup.imagenUrl}" class="lado-popup-image" alt="" style="max-width:${popup.anchoMaximo || 400}px;">
+									${popup.mostrarBotonCerrar ? `<button class="lado-popup-close" onclick="window.closePopup(${popup.id})">&times;</button>` : ''}
+								</div>
+							</div>
+						</div>`;
+					}
+
+					// Modal normal
 					return `
 						<div id="lado-popup-${popup.id}" class="lado-popup-overlay ${animClass}">
 							<div class="lado-popup" style="max-width:${popup.anchoMaximo || 400}px;${customStyle}">

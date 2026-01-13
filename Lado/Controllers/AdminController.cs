@@ -7635,6 +7635,18 @@ Este email fue enviado a {{{{email}}}}
             Console.WriteLine($"  esPWA: {esPWA}");
             Console.WriteLine($"  soloSiInstalable: {soloSiInstalable}");
 
+            // Validacion: fondo transparente requiere contenido o imagen
+            var fondoTransparente = string.IsNullOrWhiteSpace(colorFondo) ||
+                                    colorFondo.Equals("transparent", StringComparison.OrdinalIgnoreCase);
+            var tieneContenido = !string.IsNullOrWhiteSpace(titulo) ||
+                                 !string.IsNullOrWhiteSpace(contenido?.Replace("<br>", "").Replace("&nbsp;", "").Trim());
+            var tieneImagen = !string.IsNullOrWhiteSpace(imagenUrl);
+
+            if (fondoTransparente && !tieneContenido && !tieneImagen)
+            {
+                return Json(new { success = false, message = "Un popup con fondo transparente requiere al menos una imagen, titulo o contenido." });
+            }
+
             try
             {
                 Popup popup;
@@ -7889,6 +7901,27 @@ Este email fue enviado a {{{{email}}}}
             await _context.SaveChangesAsync();
 
             return Json(new { success = true, message = "Popup eliminado" });
+        }
+
+        /// <summary>
+        /// Endpoint de emergencia: Desactivar todos los popups
+        /// Uso: /Admin/DesactivarTodosPopups
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> DesactivarTodosPopups()
+        {
+            var popupsActivos = await _context.Popups.Where(p => p.EstaActivo).ToListAsync();
+            var cantidad = popupsActivos.Count;
+
+            foreach (var popup in popupsActivos)
+            {
+                popup.EstaActivo = false;
+                popup.UltimaModificacion = DateTime.Now;
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Content($"Se desactivaron {cantidad} popups. <a href='/Admin/Popups'>Volver a Popups</a>", "text/html");
         }
 
         /// <summary>
