@@ -348,6 +348,7 @@ namespace Lado.Controllers
                 .Where(c => c.EstaActivo
                         && !c.EsBorrador
                         && !c.Censurado
+                        && !c.OcultoSilenciosamente // Shadow hide
                         && c.TipoLado == TipoLado.LadoB
                         && c.CategoriaInteresId.HasValue
                         && interesesUsuario.Contains(c.CategoriaInteresId.Value)
@@ -486,17 +487,18 @@ namespace Lado.Controllers
                         .ToListAsync();
 
                     // Cargar TODO el contenido LadoB (se mostrará con blur si no tiene acceso)
+                    var esPropio = id == usuarioActual.Id;
                     var contenidoLadoB = await _context.Contenidos
                         .Where(c => c.UsuarioId == id
                                 && c.EstaActivo
                                 && !c.EsBorrador
                                 && !c.Censurado
+                                && (esPropio || !c.OcultoSilenciosamente) // Shadow hide
                                 && c.TipoLado == TipoLado.LadoB)
                         .OrderByDescending(c => c.FechaPublicacion)
                         .ToListAsync();
 
                     // Determinar qué contenidos están desbloqueados (suscrito, comprado, o es el propio usuario)
-                    var esPropio = id == usuarioActual.Id;
                     var contenidosDesbloqueadosIds = esPropio
                         ? contenidoLadoB.Select(c => c.Id).ToList() // Si es propio, todo desbloqueado
                         : estaSuscrito
@@ -522,6 +524,7 @@ namespace Lado.Controllers
                                 && c.EstaActivo
                                 && !c.EsBorrador
                                 && !c.Censurado
+                                && (esPerfilPropio || !c.OcultoSilenciosamente) // Shadow hide
                                 && c.TipoLado == TipoLado.LadoA)
                         .OrderByDescending(c => c.FechaPublicacion)
                         .ToListAsync();
@@ -668,7 +671,17 @@ namespace Lado.Controllers
         {
             try
             {
+                // ⚠️ CRÍTICO: Desactivar cache del navegador para evitar datos de usuario anterior
+                Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private";
+                Response.Headers["Pragma"] = "no-cache";
+                Response.Headers["Expires"] = "0";
+
                 var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var userName = User?.Identity?.Name;
+
+                // DEBUG: Log de autenticación al entrar al Feed
+                _logger.LogWarning("🔐 FEED INDEX: UserId={UserId}, UserName={UserName}",
+                    usuarioId ?? "NULL", userName ?? "NULL");
 
                 if (string.IsNullOrEmpty(usuarioId))
                 {
@@ -764,6 +777,10 @@ namespace Lado.Controllers
                 var anuncios = await _adService.ObtenerAnunciosActivos(anunciosCantidad, usuarioId);
                 ViewBag.Anuncios = anuncios;
                 ViewBag.AnunciosIntervalo = anunciosIntervalo;
+
+                // Mensajes no leídos para badge del FAB
+                ViewBag.MensajesNoLeidos = await _context.ChatMensajes
+                    .CountAsync(m => m.DestinatarioId == usuarioId && !m.Leido);
 
                 // Registrar impresiones
                 var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
@@ -908,12 +925,29 @@ namespace Lado.Controllers
                     .Select(l => l.ContenidoId)
                     .ToListAsync();
 
+                // Cargar comentarios para los posts (2 por post, ordenados por fecha)
+                var comentariosPorPost = await _context.Comentarios
+                    .Where(c => contenidoIds.Contains(c.ContenidoId) && c.ComentarioPadreId == null)
+                    .Include(c => c.Usuario)
+                    .Include(c => c.Respuestas)
+                        .ThenInclude(r => r.Usuario)
+                    .GroupBy(c => c.ContenidoId)
+                    .Select(g => new {
+                        ContenidoId = g.Key,
+                        Comentarios = g.OrderByDescending(c => c.FechaCreacion).Take(3).ToList()
+                    })
+                    .ToListAsync();
+
+                var comentariosDict = comentariosPorPost.ToDictionary(x => x.ContenidoId, x => x.Comentarios);
+
                 // Serializar posts
                 var posts = feedResultado.Contenidos.Select(post =>
                 {
                     var esVideo = post.TipoContenido == TipoContenido.Video;
                     var esAudio = post.TipoContenido == TipoContenido.Audio;
-                    var archivos = post.TodosLosArchivos;
+                    // Shadow Hide: Si no es el creador, excluir archivos ocultos silenciosamente
+                    var esCreadorDelPost = post.UsuarioId == usuarioId;
+                    var archivos = esCreadorDelPost ? post.TodosLosArchivos : post.ArchivosVisibles;
                     var estaBloqueado = feedResultado.ContenidoBloqueadoIds.Contains(post.Id);
 
                     return new
@@ -956,7 +990,25 @@ namespace Lado.Controllers
                             rutaArchivo = post.PistaMusical.RutaArchivo
                         } : null,
                         audioTrimInicio = post.AudioTrimInicio,
-                        musicaVolumen = post.MusicaVolumen
+                        musicaVolumen = post.MusicaVolumen,
+                        comentarios = comentariosDict.TryGetValue(post.Id, out var coms)
+                            ? coms.Take(2).Select(c => new {
+                                id = c.Id,
+                                texto = c.Texto,
+                                fechaCreacion = c.FechaCreacion,
+                                numeroLikes = c.NumeroLikes,
+                                usuario = new {
+                                    userName = c.Usuario?.UserName,
+                                    fotoPerfil = c.Usuario?.FotoPerfil
+                                },
+                                numRespuestas = c.Respuestas?.Count ?? 0,
+                                respuestas = c.Respuestas?.Take(2).Select(r => new {
+                                    usuario = new {
+                                        fotoPerfil = r.Usuario?.FotoPerfil
+                                    }
+                                }).ToList()
+                            }).ToArray()
+                            : Array.Empty<object>()
                     };
                 }).ToList();
 
@@ -973,6 +1025,80 @@ namespace Lado.Controllers
             {
                 _logger.LogError(ex, "Error al cargar más posts");
                 return Json(new { success = false, message = "Error al cargar posts" });
+            }
+        }
+
+        // ========================================
+        // API: VERIFICAR NUEVOS POSTS (Auto-refresh)
+        // ========================================
+        [HttpGet]
+        public async Task<IActionResult> VerificarNuevosPosts(string? idsVistos = null)
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(usuarioId))
+                {
+                    return Json(new { success = false, hayNuevos = false });
+                }
+
+                // Parsear IDs ya vistos
+                var idsYaVistos = new HashSet<int>();
+                if (!string.IsNullOrEmpty(idsVistos))
+                {
+                    var ids = idsVistos.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var idStr in ids.Take(500)) // Limitar para evitar DoS
+                    {
+                        if (int.TryParse(idStr.Trim(), out int id))
+                        {
+                            idsYaVistos.Add(id);
+                        }
+                    }
+                }
+
+                if (idsYaVistos.Count == 0)
+                {
+                    return Json(new { success = true, hayNuevos = false, cantidad = 0 });
+                }
+
+                // Obtener el ID más alto que el usuario ya vio
+                var maxIdVisto = idsYaVistos.Max();
+
+                // Contar posts nuevos que el usuario podría ver
+                var usuario = await _context.Users.FindAsync(usuarioId);
+                if (usuario == null)
+                {
+                    return Json(new { success = false, hayNuevos = false });
+                }
+
+                // IDs de creadores a los que está suscrito
+                var creadoresSuscritos = await _context.Suscripciones
+                    .Where(s => s.FanId == usuarioId && s.EstaActiva)
+                    .Select(s => s.CreadorId)
+                    .ToListAsync();
+
+                // Contar posts nuevos (ID mayor al máximo visto)
+                var cantidadNuevos = await _context.Contenidos
+                    .Where(c => c.EstaActivo &&
+                               !c.EsBorrador &&
+                               c.Id > maxIdVisto &&
+                               !idsYaVistos.Contains(c.Id) &&
+                               (c.TipoLado == TipoLado.LadoA ||
+                                c.UsuarioId == usuarioId ||
+                                creadoresSuscritos.Contains(c.UsuarioId)))
+                    .CountAsync();
+
+                return Json(new
+                {
+                    success = true,
+                    hayNuevos = cantidadNuevos > 0,
+                    cantidad = cantidadNuevos
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al verificar nuevos posts");
+                return Json(new { success = false, hayNuevos = false });
             }
         }
 
@@ -1211,6 +1337,17 @@ namespace Lado.Controllers
                 if (contenido.ComentariosDesactivados)
                 {
                     return Json(new { success = false, message = "Los comentarios están desactivados para esta publicación" });
+                }
+
+                // ⭐ Verificar configuración de privacidad QuienPuedeComentar del creador
+                var creador = await _context.Users.FindAsync(contenido.UsuarioId);
+                if (creador != null && usuarioId != creador.Id)
+                {
+                    var puedeComentarResult = await VerificarQuienPuedeComentar(usuarioId, creador);
+                    if (!puedeComentarResult.puede)
+                    {
+                        return Json(new { success = false, message = puedeComentarResult.mensaje });
+                    }
                 }
 
                 if (contenido.TipoLado == TipoLado.LadoB)
@@ -2141,6 +2278,7 @@ namespace Lado.Controllers
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
+                            && !c.OcultoSilenciosamente // Shadow hide
                             && !c.EsPrivado
                             && c.RutaArchivo != null && c.RutaArchivo != "" // ⚡ Mejor para índices
                             && !usuariosBloqueadosIds.Contains(c.UsuarioId));
@@ -2190,6 +2328,7 @@ namespace Lado.Controllers
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
+                            && !c.OcultoSilenciosamente // Shadow hide
                             && !c.EsPrivado
                             && c.TipoLado == TipoLado.LadoA  // SOLO LadoA
                             && c.NombreUbicacion != null && c.NombreUbicacion != ""
@@ -2209,6 +2348,7 @@ namespace Lado.Controllers
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
+                            && !c.OcultoSilenciosamente // Shadow hide
                             && !c.EsPrivado
                             && c.TipoLado == TipoLado.LadoA  // SOLO LadoA
                             && c.RutaArchivo != null && c.RutaArchivo != ""
@@ -2292,6 +2432,7 @@ namespace Lado.Controllers
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
+                            && !c.OcultoSilenciosamente // Shadow hide
                             && !c.EsPrivado
                             && c.RutaArchivo != null && c.RutaArchivo != ""
                             && !usuariosBloqueadosIds.Contains(c.UsuarioId));
@@ -2433,6 +2574,7 @@ namespace Lado.Controllers
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
+                            && !c.OcultoSilenciosamente // Shadow hide
                             && !c.EsPrivado
                             && c.TipoLado == TipoLado.LadoA  // CRÍTICO: Solo LadoA
                             && c.RutaArchivo != null && c.RutaArchivo != ""
@@ -2553,6 +2695,7 @@ namespace Lado.Controllers
                             && c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
+                            && !c.OcultoSilenciosamente // Shadow hide
                             && !c.EsPrivado
                             && c.TipoLado == TipoLado.LadoA  // Solo LadoA (público)
                             && c.RutaArchivo != null && c.RutaArchivo != ""
@@ -2674,10 +2817,12 @@ namespace Lado.Controllers
         /// Obtiene los usuarios que dieron like a un contenido
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> ObtenerLikesUsuarios(int contenidoId, int limit = 10)
+        public async Task<IActionResult> ObtenerLikesUsuarios(int contenidoId, int limit = 50)
         {
             try
             {
+                var usuarioActualId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
                 var likes = await _context.Likes
                     .AsNoTracking()
                     .Where(l => l.ContenidoId == contenidoId)
@@ -2690,9 +2835,35 @@ namespace Lado.Controllers
                         username = l.Usuario.UserName,
                         nombre = l.Usuario.NombreCompleto ?? l.Usuario.UserName,
                         foto = l.Usuario.FotoPerfil ?? "/images/default-avatar.png",
-                        esVerificado = l.Usuario.EsVerificado
+                        esVerificado = l.Usuario.EsVerificado,
+                        esCreador = l.Usuario.EsCreador
                     })
                     .ToListAsync();
+
+                // Obtener IDs de usuarios que el usuario actual sigue
+                var siguiendoIds = new HashSet<string>();
+                if (!string.IsNullOrEmpty(usuarioActualId))
+                {
+                    siguiendoIds = (await _context.Suscripciones
+                        .AsNoTracking()
+                        .Where(s => s.FanId == usuarioActualId && s.EstaActiva)
+                        .Select(s => s.CreadorId)
+                        .ToListAsync())
+                        .ToHashSet();
+                }
+
+                // Combinar datos con estado de seguimiento
+                var usuariosConSeguimiento = likes.Select(l => new
+                {
+                    l.id,
+                    l.username,
+                    l.nombre,
+                    l.foto,
+                    l.esVerificado,
+                    l.esCreador,
+                    loSigo = siguiendoIds.Contains(l.id),
+                    esSoyYo = l.id == usuarioActualId
+                }).ToList();
 
                 // Obtener total de likes
                 var totalLikes = await _context.Likes
@@ -2701,7 +2872,7 @@ namespace Lado.Controllers
                 return Json(new
                 {
                     success = true,
-                    usuarios = likes,
+                    usuarios = usuariosConSeguimiento,
                     total = totalLikes,
                     hayMas = totalLikes > limit
                 });
@@ -2742,6 +2913,7 @@ namespace Lado.Controllers
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
+                            && !c.OcultoSilenciosamente // Shadow hide
                             && !c.EsPrivado
                             && c.TipoLado == TipoLado.LadoA  // SOLO Lado A
                             && c.Latitud.HasValue
@@ -3322,6 +3494,57 @@ namespace Lado.Controllers
         }
 
         // ========================================
+        // METODO AUXILIAR - VERIFICAR QUIEN PUEDE COMENTAR
+        // ========================================
+
+        private async Task<(bool puede, string mensaje)> VerificarQuienPuedeComentar(string? usuarioId, ApplicationUser creador)
+        {
+            if (string.IsNullOrEmpty(usuarioId))
+            {
+                return (false, "Debes iniciar sesión para comentar");
+            }
+
+            // Si el creador es el mismo usuario, siempre puede comentar
+            if (creador.Id == usuarioId)
+            {
+                return (true, "");
+            }
+
+            var permiso = creador.QuienPuedeComentar;
+
+            switch (permiso)
+            {
+                case PermisoPrivacidad.Todos:
+                    return (true, "");
+
+                case PermisoPrivacidad.Seguidores:
+                    var esSeguidor = await _context.Suscripciones
+                        .AnyAsync(s => s.FanId == usuarioId &&
+                                      s.CreadorId == creador.Id &&
+                                      s.EstaActiva);
+                    return esSeguidor
+                        ? (true, "")
+                        : (false, "Solo los seguidores de este creador pueden comentar");
+
+                case PermisoPrivacidad.Suscriptores:
+                    var esSuscriptor = await _context.Suscripciones
+                        .AnyAsync(s => s.FanId == usuarioId &&
+                                      s.CreadorId == creador.Id &&
+                                      s.EstaActiva &&
+                                      s.TipoLado == TipoLado.LadoB);
+                    return esSuscriptor
+                        ? (true, "")
+                        : (false, "Solo los suscriptores premium pueden comentar en el contenido de este creador");
+
+                case PermisoPrivacidad.Nadie:
+                    return (false, "El creador ha desactivado los comentarios");
+
+                default:
+                    return (true, "");
+            }
+        }
+
+        // ========================================
         // FAVORITOS
         // ========================================
 
@@ -3377,7 +3600,7 @@ namespace Lado.Controllers
                     .ThenInclude(c => c.Usuario)
                 .OrderByDescending(f => f.FechaAgregado)
                 .Select(f => f.Contenido)
-                .Where(c => c.EstaActivo && !c.EsBorrador && !c.Censurado)
+                .Where(c => c.EstaActivo && !c.EsBorrador && !c.Censurado && !c.OcultoSilenciosamente) // Shadow hide
                 .ToListAsync();
 
             var favoritosIds = await _context.Favoritos
@@ -3618,6 +3841,7 @@ namespace Lado.Controllers
                     .Where(c => c.EstaActivo
                         && !c.EsBorrador
                         && !c.Censurado
+                        && !c.OcultoSilenciosamente // Shadow hide
                         && !c.EsPrivado
                         && c.TipoLado == TipoLado.LadoA
                         && c.TipoContenido == TipoContenido.Foto
@@ -3954,6 +4178,7 @@ namespace Lado.Controllers
                 .Where(c => c.EstaActivo
                     && !c.EsBorrador
                     && !c.Censurado
+                    && !c.OcultoSilenciosamente // Shadow hide
                     && !c.EsPrivado
                     && c.TipoLado == TipoLado.LadoA
                     && c.Usuario != null
@@ -3983,6 +4208,7 @@ namespace Lado.Controllers
                 .Where(c => c.EstaActivo
                     && !c.EsBorrador
                     && !c.Censurado
+                    && !c.OcultoSilenciosamente // Shadow hide
                     && c.Tags != null
                     && c.Tags.ToLower().Contains(query))
                 .GroupBy(c => c.Tags)

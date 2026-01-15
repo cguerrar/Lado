@@ -17,6 +17,7 @@
     var anunciosIntervalo = ViewBag.AnunciosIntervalo as int? ?? 8;
     var algoritmoActual = ViewBag.AlgoritmoActual as AlgoritmoFeed;
     var algoritmosDisponibles = ViewBag.AlgoritmosDisponibles as List<AlgoritmoFeed> ?? new List<AlgoritmoFeed>();
+    var mensajesNoLeidos = ViewBag.MensajesNoLeidos as int? ?? 0;
 
     // Función para limpiar comillas de rutas (datos legacy)
     string LimpiarRuta(string ruta) {
@@ -2744,7 +2745,7 @@
     }
 
     /* ========================================
-       PULL TO REFRESH
+       PULL TO REFRESH - MEJORADO PARA PWA
        ======================================== */
     .pull-to-refresh {
         position: fixed;
@@ -2752,8 +2753,8 @@
         top: calc(70px + env(safe-area-inset-top, 0px));
         left: 50%;
         transform: translateX(-50%) translateY(-100%);
-        z-index: 1000;
-        transition: opacity 0.3s ease;
+        z-index: 1001;
+        transition: opacity 0.2s ease, transform 0.2s ease;
         opacity: 0;
         pointer-events: none;
     }
@@ -2767,35 +2768,134 @@
     }
 
     .pull-indicator {
-        background: var(--bg-primary);
-        border: 1px solid var(--border-color);
+        background: var(--primary);
+        border: 2px solid rgba(255,255,255,0.3);
         border-radius: 50%;
-        width: 40px;
-        height: 40px;
+        width: 50px;
+        height: 50px;
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 20px rgba(70, 130, 180, 0.5);
+        transition: transform 0.2s ease, background 0.2s ease;
     }
 
     .pull-indicator svg {
-        width: 20px;
-        height: 20px;
-        color: var(--primary);
+        width: 24px;
+        height: 24px;
+        color: white;
         transition: transform 0.2s ease;
+    }
+
+    .pull-to-refresh.ready .pull-indicator {
+        background: #22c55e;
+        transform: scale(1.15);
+        box-shadow: 0 4px 25px rgba(34, 197, 94, 0.6);
     }
 
     .pull-to-refresh.ready .pull-indicator svg {
         transform: rotate(180deg);
     }
 
+    .pull-to-refresh.refreshing .pull-indicator {
+        background: var(--primary);
+    }
+
     .pull-to-refresh.refreshing .pull-indicator svg {
-        animation: spin 1s linear infinite;
+        animation: spin 0.8s linear infinite;
+    }
+
+    /* Texto de estado del pull */
+    .pull-text {
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-top: 8px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-primary);
+        white-space: nowrap;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        background: var(--bg-primary);
+        padding: 4px 12px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .pull-to-refresh.visible .pull-text {
+        opacity: 1;
     }
 
     @@keyframes spin {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
+    }
+
+    /* ========================================
+       BOTON FLOTANTE DE REFRESH (alternativa)
+       ======================================== */
+    .refresh-fab {
+        position: fixed;
+        bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+        right: 16px;
+        width: 48px;
+        height: 48px;
+        background: var(--primary);
+        border: none;
+        border-radius: 50%;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 15px rgba(70, 130, 180, 0.4);
+        cursor: pointer;
+        z-index: 999;
+        transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+        opacity: 0;
+    }
+
+    .refresh-fab.visible {
+        display: flex;
+        opacity: 1;
+    }
+
+    .refresh-fab:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 20px rgba(70, 130, 180, 0.5);
+    }
+
+    .refresh-fab:active {
+        transform: scale(0.95);
+    }
+
+    .refresh-fab svg {
+        width: 22px;
+        height: 22px;
+        color: white;
+    }
+
+    .refresh-fab.refreshing svg {
+        animation: spin 0.8s linear infinite;
+    }
+
+    /* Badge de nuevos posts en el FAB */
+    .refresh-fab-badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        min-width: 20px;
+        height: 20px;
+        background: #ef4444;
+        border-radius: 10px;
+        color: white;
+        font-size: 11px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 6px;
+        border: 2px solid var(--bg-primary);
     }
 
     /* ========================================
@@ -7148,7 +7248,7 @@
     }
 
     /* ========================================
-       MODAL DE LIKES (Móvil - long press)
+       MODAL DE LIKES (Instagram style)
        ======================================== */
     .likes-modal-overlay {
         position: fixed;
@@ -7156,14 +7256,14 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
+        background: rgba(0, 0, 0, 0.65);
         z-index: 9999;
         display: flex;
-        align-items: flex-end;
+        align-items: center;
         justify-content: center;
         opacity: 0;
         visibility: hidden;
-        transition: all 0.3s ease;
+        transition: opacity 0.2s ease;
     }
 
     .likes-modal-overlay.visible {
@@ -7173,18 +7273,40 @@
 
     .likes-modal {
         background: var(--surface, #fff);
-        border-radius: 16px 16px 0 0;
-        width: 100%;
-        max-width: 500px;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 400px;
         max-height: 70vh;
-        transform: translateY(100%);
-        transition: transform 0.3s ease;
+        transform: scale(0.9);
+        opacity: 0;
+        transition: transform 0.2s ease, opacity 0.2s ease;
         display: flex;
         flex-direction: column;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
     }
 
     .likes-modal-overlay.visible .likes-modal {
-        transform: translateY(0);
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    /* En móvil: bottom sheet */
+    @@media (max-width: 480px) {
+        .likes-modal-overlay {
+            align-items: flex-end;
+        }
+
+        .likes-modal {
+            width: 100%;
+            max-width: 100%;
+            border-radius: 16px 16px 0 0;
+            max-height: 80vh;
+            transform: translateY(100%);
+        }
+
+        .likes-modal-overlay.visible .likes-modal {
+            transform: translateY(0);
+        }
     }
 
     .likes-modal-header {
@@ -7268,6 +7390,53 @@
         color: var(--muted, #8e8e8e);
     }
 
+    /* Botón de seguir en modal de likes */
+    .likes-modal-follow-btn {
+        padding: 7px 16px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+        border: none;
+    }
+
+    .likes-modal-follow-btn.seguir {
+        background: var(--primary, #4682B4);
+        color: white;
+    }
+
+    .likes-modal-follow-btn.seguir:hover {
+        background: var(--primary-dark, #3a6d94);
+        transform: scale(1.02);
+    }
+
+    .likes-modal-follow-btn.siguiendo {
+        background: var(--bg-tertiary, #efefef);
+        color: var(--fg, #262626);
+        border: 1px solid var(--line, #dbdbdb);
+    }
+
+    .likes-modal-follow-btn.siguiendo:hover {
+        background: var(--bg-hover, #fafafa);
+    }
+
+    .likes-modal-follow-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    /* Contador de likes clickeable */
+    .post-likes-count.clickable {
+        cursor: pointer;
+        transition: opacity 0.2s;
+    }
+
+    .post-likes-count.clickable:hover {
+        opacity: 0.7;
+    }
+
     .likes-modal-empty {
         text-align: center;
         padding: 40px 20px;
@@ -7280,11 +7449,24 @@
         opacity: 0.5;
     }
 
+    .likes-modal-loading-more {
+        text-align: center;
+        padding: 16px;
+        color: var(--muted, #8e8e8e);
+        font-size: 13px;
+    }
+
     @@media (prefers-color-scheme: dark) {
         .likes-tooltip,
         .likes-modal {
             background: var(--surface, #262626);
             border-color: var(--line, #363636);
+        }
+
+        .likes-modal-follow-btn.siguiendo {
+            background: var(--bg-tertiary, #363636);
+            color: var(--fg, #f5f5f5);
+            border-color: var(--line, #484848);
         }
     }
 
@@ -7474,6 +7656,40 @@
         .pull-to-refresh {
             /* Navbar móvil es ~56px + safe-area + padding extra */
             top: calc(76px + env(safe-area-inset-top, 0px));
+        }
+
+        .pull-indicator {
+            width: 44px;
+            height: 44px;
+        }
+
+        .pull-indicator svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .pull-text {
+            font-size: 11px;
+            padding: 3px 10px;
+        }
+
+        /* Refresh FAB ajustado para móvil */
+        .refresh-fab {
+            width: 44px;
+            height: 44px;
+            bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+            right: 12px;
+        }
+
+        .refresh-fab svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .refresh-fab-badge {
+            min-width: 18px;
+            height: 18px;
+            font-size: 10px;
         }
 
         /* Carrusel optimizado */
@@ -7678,15 +7894,25 @@
 
 <div class="feed-page-layout">
     <!-- MAIN FEED -->
-    <!-- Pull to Refresh Indicator -->
+    <!-- Pull to Refresh Indicator - Mejorado -->
     <div class="pull-to-refresh" id="pullToRefresh">
         <div class="pull-indicator">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <polyline points="23 4 23 10 17 10"></polyline>
                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
             </svg>
         </div>
+        <span class="pull-text" id="pullText">Desliza para actualizar</span>
     </div>
+
+    <!-- Boton flotante de refresh (alternativa al gesto) -->
+    <button class="refresh-fab" id="refreshFab" onclick="refreshFeedFromFab()" title="Actualizar feed">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </svg>
+        <span class="refresh-fab-badge" id="refreshFabBadge" style="display: none;">0</span>
+    </button>
 
     <!-- Banner de nuevos posts -->
     <div class="new-posts-banner" id="newPostsBanner" onclick="cargarNuevosPosts()">
@@ -9163,14 +9389,15 @@
 
     // ========================================
     // PULL TO REFRESH & INFINITE SCROLL
-    // ⚡ MEJORADO: Usa IDs ya vistos en lugar de paginación
+    // ⚡ MEJORADO: Mayor sensibilidad, haptic feedback, mejor UX
     // ========================================
     let isLoadingMore = false;
     let hasMorePosts = @(Model.Count() > 10 ? "true" : "false");
     let isPulling = false;
     let pullStartY = 0;
     let pullDistance = 0;
-    const PULL_THRESHOLD = 80;
+    const PULL_THRESHOLD = 50; // ⚡ Reducido de 80 a 50 para mayor sensibilidad
+    let hasTriggeredHaptic = false; // Para evitar múltiples vibraciones
 
     // ⚡ NUEVO: Set de IDs de posts ya cargados (evita duplicados)
     const loadedPostIds = new Set();
@@ -9189,32 +9416,61 @@
     // Llamar al cargar la página
     initLoadedPostIds();
 
-    // Pull to Refresh
+    // ⚡ Haptic feedback (vibración táctil)
+    function triggerHaptic() {
+        if (hasTriggeredHaptic) return;
+        hasTriggeredHaptic = true;
+
+        if ('vibrate' in navigator) {
+            navigator.vibrate(15); // Vibración corta de 15ms
+        }
+    }
+
+    // Pull to Refresh - MEJORADO
     function initPullToRefresh() {
         const pullIndicator = document.getElementById('pullToRefresh');
+        const pullText = document.getElementById('pullText');
         const feedMain = document.querySelector('.feed-main');
 
         if (!pullIndicator || !feedMain) return;
 
         let touchStartY = 0;
         let touchCurrentY = 0;
+        let isRefreshing = false;
 
         // Detectar si estamos en la parte superior (con tolerancia para iOS bounce)
         function isAtTop() {
             const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
-            return scrollY <= 5; // Tolerancia de 5px para el bounce de iOS
+            return scrollY <= 10; // ⚡ Aumentado tolerancia a 10px
+        }
+
+        // Actualizar texto según estado
+        function updatePullText(state) {
+            if (!pullText) return;
+            switch(state) {
+                case 'pull':
+                    pullText.textContent = 'Desliza para actualizar';
+                    break;
+                case 'ready':
+                    pullText.textContent = '¡Suelta para actualizar!';
+                    break;
+                case 'refreshing':
+                    pullText.textContent = 'Actualizando...';
+                    break;
+            }
         }
 
         // Escuchar en window para mejor compatibilidad móvil
         window.addEventListener('touchstart', (e) => {
-            if (isAtTop()) {
+            if (isAtTop() && !isRefreshing) {
                 touchStartY = e.touches[0].clientY;
                 isPulling = true;
+                hasTriggeredHaptic = false; // Reset haptic flag
             }
         }, { passive: true });
 
         window.addEventListener('touchmove', (e) => {
-            if (!isPulling) return;
+            if (!isPulling || isRefreshing) return;
 
             // Si el usuario hizo scroll hacia abajo, cancelar pull
             if (!isAtTop() && pullDistance <= 0) {
@@ -9226,17 +9482,25 @@
             touchCurrentY = e.touches[0].clientY;
             pullDistance = touchCurrentY - touchStartY;
 
-            if (pullDistance > 0 && pullDistance < 150) {
+            if (pullDistance > 0 && pullDistance < 200) {
                 pullIndicator.classList.add('visible');
 
-                // Mover el indicador según el pull
-                const translateY = Math.min(pullDistance * 0.5, 60);
+                // ⚡ Resistencia mejorada: más natural al principio
+                const resistance = 0.6;
+                const translateY = Math.min(pullDistance * resistance, 80);
                 pullIndicator.style.transform = `translateX(-50%) translateY(${translateY}px)`;
+
+                // Rotar el icono proporcionalmente
+                const rotation = Math.min((pullDistance / PULL_THRESHOLD) * 180, 180);
+                pullIndicator.querySelector('svg').style.transform = `rotate(${rotation}deg)`;
 
                 if (pullDistance > PULL_THRESHOLD) {
                     pullIndicator.classList.add('ready');
+                    updatePullText('ready');
+                    triggerHaptic(); // ⚡ Vibración al alcanzar threshold
                 } else {
                     pullIndicator.classList.remove('ready');
+                    updatePullText('pull');
                 }
             } else if (pullDistance <= 0) {
                 pullIndicator.classList.remove('visible', 'ready');
@@ -9244,15 +9508,45 @@
         }, { passive: true });
 
         window.addEventListener('touchend', () => {
-            if (isPulling && pullDistance > PULL_THRESHOLD) {
-                refreshFeed();
+            if (!isPulling || isRefreshing) return;
+
+            if (pullDistance > PULL_THRESHOLD) {
+                isRefreshing = true;
+                updatePullText('refreshing');
+                pullIndicator.classList.add('refreshing');
+                pullIndicator.classList.remove('ready');
+                pullIndicator.style.transform = 'translateX(-50%) translateY(30px)';
+                pullIndicator.querySelector('svg').style.transform = '';
+
+                refreshFeed().finally(() => {
+                    isRefreshing = false;
+                    pullIndicator.classList.remove('visible', 'ready', 'refreshing');
+                    pullIndicator.style.transform = 'translateX(-50%) translateY(-100%)';
+                    updatePullText('pull');
+                });
             } else {
                 pullIndicator.classList.remove('visible', 'ready');
                 pullIndicator.style.transform = 'translateX(-50%) translateY(-100%)';
+                pullIndicator.querySelector('svg').style.transform = '';
             }
             isPulling = false;
             pullDistance = 0;
         });
+    }
+
+    // ⚡ Refresh desde el botón flotante (FAB)
+    async function refreshFeedFromFab() {
+        const fab = document.getElementById('refreshFab');
+        if (!fab || fab.classList.contains('refreshing')) return;
+
+        fab.classList.add('refreshing');
+        triggerHaptic();
+
+        try {
+            await refreshFeed();
+        } finally {
+            fab.classList.remove('refreshing');
+        }
     }
 
     async function refreshFeed() {
@@ -10518,11 +10812,15 @@
     }
 
     // ========================================
-    // AUTO-REFRESH: Verificar nuevos posts
+    // AUTO-REFRESH: Sistema mejorado para PWA
+    // ⚡ Auto-actualiza cuando vuelve del background
     // ========================================
     let autoRefreshInterval = null;
     let pendingNewPosts = 0;
-    const AUTO_REFRESH_DELAY = 30000; // 30 segundos
+    const AUTO_REFRESH_DELAY = 30000; // 30 segundos para verificación periódica
+    const BACKGROUND_AUTO_REFRESH_THRESHOLD = 60000; // 60 segundos en background = auto-refresh
+    let lastVisibleTime = Date.now();
+    let hiddenTime = null;
 
     async function checkForNewPosts() {
         if (loadedPostIds.size === 0) return;
@@ -10535,6 +10833,7 @@
             if (data.success && data.hayNuevos && data.cantidad > 0) {
                 pendingNewPosts = data.cantidad;
                 showNewPostsBanner(data.cantidad);
+                showRefreshFab(data.cantidad); // ⚡ También mostrar el FAB
             }
         } catch (error) {
             console.log('[Feed] Error verificando nuevos posts:', error);
@@ -10546,7 +10845,7 @@
         const text = document.getElementById('newPostsText');
         if (banner && text) {
             text.textContent = cantidad === 1
-                ? '1 nueva publicacion'
+                ? '1 nueva publicación'
                 : `${cantidad} nuevas publicaciones`;
             banner.classList.add('visible');
         }
@@ -10557,12 +10856,37 @@
         if (banner) {
             banner.classList.remove('visible');
         }
+    }
+
+    // ⚡ Mostrar FAB con badge de nuevos posts
+    function showRefreshFab(cantidad) {
+        const fab = document.getElementById('refreshFab');
+        const badge = document.getElementById('refreshFabBadge');
+        if (fab) {
+            fab.classList.add('visible');
+            if (badge && cantidad > 0) {
+                badge.textContent = cantidad > 99 ? '99+' : cantidad;
+                badge.style.display = 'flex';
+            }
+        }
+    }
+
+    function hideRefreshFab() {
+        const fab = document.getElementById('refreshFab');
+        const badge = document.getElementById('refreshFabBadge');
+        if (fab) {
+            fab.classList.remove('visible');
+            if (badge) {
+                badge.style.display = 'none';
+            }
+        }
         pendingNewPosts = 0;
     }
 
     // Cargar nuevos posts cuando el usuario hace clic en el banner
     window.cargarNuevosPosts = async function() {
         hideNewPostsBanner();
+        hideRefreshFab();
 
         // Scroll al inicio
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -10586,16 +10910,81 @@
         }
     }
 
-    // Pausar auto-refresh cuando la ventana no esta visible
-    document.addEventListener('visibilitychange', function() {
+    // ⚡ MEJORADO: Auto-refresh cuando vuelve del background
+    document.addEventListener('visibilitychange', async function() {
         if (document.hidden) {
+            // App va al background
+            hiddenTime = Date.now();
+            lastVisibleTime = Date.now();
             stopAutoRefresh();
         } else {
-            // Al volver, verificar inmediatamente y reanudar
-            checkForNewPosts();
+            // App vuelve al frente
+            const timeInBackground = hiddenTime ? Date.now() - hiddenTime : 0;
+            console.log('[Feed] Volviendo del background, tiempo:', Math.round(timeInBackground/1000), 'segundos');
+
+            // Si estuvo más de 60 segundos en background, auto-actualizar
+            if (timeInBackground > BACKGROUND_AUTO_REFRESH_THRESHOLD) {
+                console.log('[Feed] Auto-actualizando por tiempo en background');
+
+                // Mostrar indicador de refresh brevemente
+                const pullIndicator = document.getElementById('pullToRefresh');
+                const pullText = document.getElementById('pullText');
+                if (pullIndicator && pullText) {
+                    pullIndicator.classList.add('visible', 'refreshing');
+                    pullIndicator.style.transform = 'translateX(-50%) translateY(30px)';
+                    pullText.textContent = 'Actualizando...';
+                }
+
+                // Scroll al inicio suavemente
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+
+                try {
+                    await refreshFeed();
+                } finally {
+                    if (pullIndicator) {
+                        pullIndicator.classList.remove('visible', 'refreshing');
+                        pullIndicator.style.transform = 'translateX(-50%) translateY(-100%)';
+                    }
+                }
+
+                // Ocultar banners ya que acabamos de actualizar
+                hideNewPostsBanner();
+                hideRefreshFab();
+            } else {
+                // Solo verificar si hay nuevos posts
+                checkForNewPosts();
+            }
+
+            hiddenTime = null;
             startAutoRefresh();
         }
     });
+
+    // ⚡ Mostrar FAB también cuando el usuario hace scroll hacia arriba
+    let lastScrollY = window.scrollY;
+    let fabScrollTimeout = null;
+
+    function handleFabOnScroll() {
+        const currentScrollY = window.scrollY;
+        const fab = document.getElementById('refreshFab');
+
+        // Si hay posts pendientes y el usuario hace scroll hacia arriba
+        if (pendingNewPosts > 0 && currentScrollY < lastScrollY) {
+            showRefreshFab(pendingNewPosts);
+        }
+
+        // Si está en la parte superior, mostrar FAB si hay posts pendientes
+        if (currentScrollY < 100 && pendingNewPosts > 0) {
+            showRefreshFab(pendingNewPosts);
+        }
+
+        lastScrollY = currentScrollY;
+    }
+
+    window.addEventListener('scroll', () => {
+        if (fabScrollTimeout) clearTimeout(fabScrollTimeout);
+        fabScrollTimeout = setTimeout(handleFabOnScroll, 100);
+    }, { passive: true });
 
     // Inicializar al cargar
     document.addEventListener('DOMContentLoaded', function() {
@@ -12663,7 +13052,7 @@
         }
     }
 
-    // Renderizar lista de usuarios
+    // Renderizar lista de usuarios con botón de seguir
     function renderLikesUsuarios(usuarios, total, hayMas, isModal = false) {
         if (!usuarios || usuarios.length === 0) {
             return isModal
@@ -12676,14 +13065,28 @@
 
         usuarios.forEach(u => {
             const verifiedBadge = u.esVerificado ? '<i class="fas fa-check-circle verified"></i>' : '';
+
+            // Botón de seguir solo en modal y si no soy yo
+            let followBtn = '';
+            if (isModal && !u.esSoyYo) {
+                if (u.loSigo) {
+                    followBtn = `<button class="likes-modal-follow-btn siguiendo" data-userid="${u.id}" onclick="seguirDesdeModalLikes(event, '${u.id}', this)">Siguiendo</button>`;
+                } else {
+                    followBtn = `<button class="likes-modal-follow-btn seguir" data-userid="${u.id}" onclick="seguirDesdeModalLikes(event, '${u.id}', this)">Seguir</button>`;
+                }
+            }
+
             html += `
-                <a href="/Feed/Perfil/${u.id}" class="${prefix}-user">
-                    <img src="${u.foto}" alt="" class="${prefix}-avatar" onerror="this.src='/images/default-avatar.svg'">
-                    <div class="${prefix}-info">
-                        <div class="${prefix}-username">${escapeHtml(u.username)}${verifiedBadge}</div>
-                        <div class="${prefix}-name">${escapeHtml(u.nombre)}</div>
-                    </div>
-                </a>
+                <div class="${prefix}-user">
+                    <a href="/Feed/Perfil/${u.id}" class="${prefix}-user-link" style="display:flex;align-items:center;gap:12px;flex:1;text-decoration:none;color:inherit;">
+                        <img src="${u.foto}" alt="" class="${prefix}-avatar" onerror="this.src='/images/default-avatar.svg'">
+                        <div class="${prefix}-info">
+                            <div class="${prefix}-username">${escapeHtml(u.username)}${verifiedBadge}</div>
+                            <div class="${prefix}-name">${escapeHtml(u.nombre)}</div>
+                        </div>
+                    </a>
+                    ${followBtn}
+                </div>
             `;
         });
 
@@ -12691,8 +13094,63 @@
             html += `<div class="likes-tooltip-more">y ${total - usuarios.length} más...</div>`;
         }
 
+        if (hayMas && isModal) {
+            html += `<div class="likes-modal-loading-more">y ${total - usuarios.length} personas más</div>`;
+        }
+
         return html;
     }
+
+    // Función para seguir/dejar de seguir desde el modal de likes
+    window.seguirDesdeModalLikes = async function(event, userId, btn) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (btn.disabled) return;
+        btn.disabled = true;
+
+        const estaSiguiendo = btn.classList.contains('siguiendo');
+
+        try {
+            const response = await fetch(estaSiguiendo ? '/Feed/DejarDeSeguir' : '/Feed/Seguir', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                },
+                body: `id=${userId}`
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                if (data.siguiendo) {
+                    btn.classList.remove('seguir');
+                    btn.classList.add('siguiendo');
+                    btn.textContent = 'Siguiendo';
+                } else {
+                    btn.classList.remove('siguiendo');
+                    btn.classList.add('seguir');
+                    btn.textContent = 'Seguir';
+                }
+
+                // Limpiar cache para refrescar datos
+                Object.keys(likesCache).forEach(key => delete likesCache[key]);
+
+                // Feedback haptico
+                if (window.LadoHaptic) {
+                    window.LadoHaptic.light();
+                }
+            } else {
+                _feedToast(data.message || 'Error al procesar');
+            }
+        } catch (error) {
+            console.error('Error al seguir:', error);
+            _feedToast('Error de conexión');
+        } finally {
+            btn.disabled = false;
+        }
+    };
 
     // Mostrar tooltip (Desktop)
     function showLikesTooltip(element, contenidoId) {
@@ -12727,7 +13185,7 @@
         tooltip.classList.remove('visible');
     }
 
-    // Mostrar modal (Móvil)
+    // Mostrar modal de likes
     function showLikesModal(contenidoId) {
         const overlay = document.getElementById('likesModalOverlay');
         const list = document.getElementById('likesModalList');
@@ -12735,7 +13193,11 @@
         // Mostrar loading
         list.innerHTML = '<div class="likes-tooltip-loading"><i class="fas fa-spinner fa-spin"></i></div>';
         overlay.classList.add('visible');
+
+        // Prevenir scroll del body sin causar shift
+        const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
         document.body.style.overflow = 'hidden';
+        document.body.style.paddingRight = scrollbarWidth + 'px';
 
         // Cargar datos
         fetchLikesUsuarios(contenidoId).then(data => {
@@ -12753,6 +13215,7 @@
         const overlay = document.getElementById('likesModalOverlay');
         overlay.classList.remove('visible');
         document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
     };
 
     // Inicializar eventos de likes en elementos .post-likes
@@ -12768,51 +13231,20 @@
 
             if (!postId) return;
 
-            // Agregar cursor pointer
+            // Agregar clase clickable y cursor pointer
+            const likesCount = likesEl.querySelector('.post-likes-count');
+            if (likesCount) {
+                likesCount.classList.add('clickable');
+            }
             likesEl.style.cursor = 'pointer';
 
-            // Desktop: hover
-            likesEl.addEventListener('mouseenter', function() {
-                clearTimeout(likesTooltipTimeout);
-                likesTooltipTimeout = setTimeout(() => {
-                    showLikesTooltip(this, postId);
-                }, 300);
+            // Click para abrir modal (tanto desktop como móvil)
+            likesEl.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                // Mostrar modal
+                showLikesModal(postId);
             });
-
-            likesEl.addEventListener('mouseleave', function() {
-                clearTimeout(likesTooltipTimeout);
-                likesTooltipTimeout = setTimeout(() => {
-                    hideLikesTooltip();
-                }, 200);
-            });
-
-            // Móvil: long press
-            likesEl.addEventListener('touchstart', function(e) {
-                longPressTimer = setTimeout(() => {
-                    e.preventDefault();
-                    showLikesModal(postId);
-                }, LONG_PRESS_DURATION);
-            }, { passive: false });
-
-            likesEl.addEventListener('touchend', function() {
-                clearTimeout(longPressTimer);
-            });
-
-            likesEl.addEventListener('touchmove', function() {
-                clearTimeout(longPressTimer);
-            });
-        });
-
-        // Mantener tooltip visible al hover sobre él
-        const tooltip = document.getElementById('likesTooltip');
-        tooltip.addEventListener('mouseenter', function() {
-            clearTimeout(likesTooltipTimeout);
-        });
-
-        tooltip.addEventListener('mouseleave', function() {
-            likesTooltipTimeout = setTimeout(() => {
-                hideLikesTooltip();
-            }, 200);
         });
     }
 
@@ -13729,13 +14161,13 @@
             </button>
 
             <!-- Enlace al editor avanzado -->
-            <a href="/Stories/Editor" class="create-story-editor-link">
+            <button type="button" class="create-story-editor-link" onclick="abrirEditorAvanzado()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                     <path d="M12 20h9"></path>
                     <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                 </svg>
                 Usar editor avanzado
-            </a>
+            </button>
         </div>
     </div>
 </div>
@@ -13747,7 +14179,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
         </svg>
-        <span class="dm-badge" id="dmBadge" style="display: none;">0</span>
+        <span class="dm-badge" id="dmBadge" style="display: @(mensajesNoLeidos > 0 ? "flex" : "none");">@mensajesNoLeidos</span>
     </button>
 
     <!-- Modal -->
@@ -13756,7 +14188,7 @@
         <div class="dm-header">
             <div class="dm-header-left">
                 <h5 class="dm-header-title">Mensajes</h5>
-                <span class="dm-header-badge" id="dmHeaderBadge" style="display: none;">0</span>
+                <span class="dm-header-badge" id="dmHeaderBadge" style="display: @(mensajesNoLeidos > 0 ? "flex" : "none");">@mensajesNoLeidos</span>
             </div>
             <div class="dm-header-actions">
                 <a href="/Mensajes" class="dm-header-btn" title="Expandir">
@@ -17311,7 +17743,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'RequestVerificationToken': token || ''
+                    'X-CSRF-TOKEN': token || ''
                 },
                 body: JSON.stringify({
                     storyId: currentDestacadoStoryId,
@@ -17320,13 +17752,20 @@
                 })
             });
 
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Error HTTP:', response.status, errorText);
+                showToast('Error al guardar en destacados');
+                return;
+            }
+
             const data = await response.json();
 
             if (data.success) {
                 showToast('Guardado en destacados');
                 cerrarModalDestacados();
             } else {
-                showToast(data.message || 'Error al guardar');
+                showToast(data.error || 'Error al guardar');
             }
         } catch (error) {
             console.error('Error guardando destacado:', error);
@@ -18744,6 +19183,49 @@
         }
     }
 
+    // Abrir editor avanzado (pasando archivo si existe)
+    async function abrirEditorAvanzado() {
+        // Si hay un archivo seleccionado, guardarlo en sessionStorage para el editor
+        if (storyArchivoSeleccionado) {
+            try {
+                // Mostrar loading
+                showToast('Preparando editor...');
+
+                // Convertir archivo a base64
+                const base64 = await fileToBase64(storyArchivoSeleccionado);
+
+                // Guardar en sessionStorage
+                sessionStorage.setItem('editorPendingFile', JSON.stringify({
+                    data: base64,
+                    type: storyArchivoSeleccionado.type,
+                    name: storyArchivoSeleccionado.name
+                }));
+
+                // Cerrar modal y navegar al editor
+                cerrarModalCrearStory();
+                window.location.href = '/Stories/Editor?fromPopup=true';
+            } catch (error) {
+                console.error('Error preparando archivo para editor:', error);
+                showToast('Error al preparar archivo');
+                // Navegar al editor sin archivo
+                window.location.href = '/Stories/Editor';
+            }
+        } else {
+            // No hay archivo, ir directo al editor
+            window.location.href = '/Stories/Editor';
+        }
+    }
+
+    // Convertir File a base64
+    function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
+    }
+
     // Actualizar barra de stories
     async function actualizarBarraStories() {
         try {
@@ -18901,3 +19383,4 @@
         </div>
     </div>
 }
+
