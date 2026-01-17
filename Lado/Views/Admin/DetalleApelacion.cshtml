@@ -1,0 +1,711 @@
+@model Lado.Models.Apelacion
+@{
+    ViewData["Title"] = "Revisar Apelacion";
+    Layout = "_Layout";
+    var apelacionesAnteriores = ViewBag.ApelacionesAnteriores as List<Lado.Models.Apelacion>;
+}
+
+@Html.AntiForgeryToken()
+
+<style>
+    .detalle-apelacion-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px 16px;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .page-header-left h1 {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-color);
+        margin: 0 0 8px 0;
+    }
+
+    .ref-badge {
+        font-family: monospace;
+        font-size: 14px;
+        color: var(--text-muted);
+        background: var(--bg-secondary);
+        padding: 6px 12px;
+        border-radius: 6px;
+    }
+
+    .estado-badge {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .estado-pendiente { background: #fef3c7; color: #92400e; }
+    .estado-enrevision { background: #dbeafe; color: #1e40af; }
+    .estado-aprobada { background: #d1fae5; color: #065f46; }
+    .estado-rechazada { background: #fee2e2; color: #991b1b; }
+    .estado-escalada { background: #ede9fe; color: #5b21b6; }
+
+    .content-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 24px;
+    }
+
+    @@media (max-width: 992px) {
+        .content-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        margin-bottom: 20px;
+        overflow: hidden;
+    }
+
+    .card-header {
+        background: var(--bg-secondary);
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-color);
+        font-weight: 600;
+        color: var(--text-color);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .card-header i {
+        color: var(--primary-color);
+    }
+
+    .card-body {
+        padding: 20px;
+    }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .info-row:last-child {
+        border-bottom: none;
+    }
+
+    .info-label {
+        font-weight: 500;
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    .info-value {
+        font-weight: 500;
+        color: var(--text-color);
+        text-align: right;
+    }
+
+    .argumentos-box {
+        background: var(--bg-secondary);
+        padding: 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--text-color);
+        white-space: pre-wrap;
+    }
+
+    .razon-box {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border: 1px solid #fca5a5;
+        padding: 16px;
+        border-radius: 8px;
+    }
+
+    .razon-box strong {
+        color: #991b1b;
+        font-size: 12px;
+        text-transform: uppercase;
+        display: block;
+        margin-bottom: 8px;
+    }
+
+    .razon-box p {
+        color: #7f1d1d;
+        margin: 0;
+    }
+
+    .contenido-preview {
+        border-radius: 8px;
+        overflow: hidden;
+        max-height: 400px;
+    }
+
+    .contenido-preview img,
+    .contenido-preview video {
+        width: 100%;
+        max-height: 400px;
+        object-fit: contain;
+        background: #000;
+    }
+
+    .user-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: var(--bg-secondary);
+        border-radius: 8px;
+    }
+
+    .user-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .user-info h4 {
+        margin: 0 0 4px 0;
+        font-size: 14px;
+    }
+
+    .user-info p {
+        margin: 0;
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+
+    .action-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .btn-aprobar {
+        padding: 14px 24px;
+        background: #10b981;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+
+    .btn-aprobar:hover {
+        background: #059669;
+    }
+
+    .btn-rechazar {
+        padding: 14px 24px;
+        background: #ef4444;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+
+    .btn-rechazar:hover {
+        background: #dc2626;
+    }
+
+    .btn-escalar {
+        padding: 14px 24px;
+        background: transparent;
+        color: #8b5cf6;
+        border: 1px solid #8b5cf6;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+
+    .btn-escalar:hover {
+        background: #8b5cf6;
+        color: white;
+    }
+
+    .comentario-input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        font-size: 14px;
+        resize: vertical;
+        min-height: 100px;
+        margin-bottom: 12px;
+        background: var(--input-bg);
+        color: var(--text-color);
+    }
+
+    .checkbox-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+        font-size: 14px;
+    }
+
+    .historial-item {
+        padding: 10px;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 13px;
+    }
+
+    .historial-item:last-child {
+        border-bottom: none;
+    }
+
+    .historial-item .ref {
+        font-family: monospace;
+        color: var(--text-muted);
+    }
+
+    .historial-item .estado {
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+
+    .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        background: var(--bg-secondary);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 14px;
+        transition: all 0.2s;
+        margin-top: 24px;
+    }
+
+    .back-btn:hover {
+        background: var(--border-color);
+        color: var(--text-color);
+    }
+
+    .resolved-banner {
+        padding: 16px 20px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .resolved-banner.aprobada {
+        background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+        border: 1px solid #10b981;
+    }
+
+    .resolved-banner.rechazada {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border: 1px solid #ef4444;
+    }
+
+    .resolved-banner i {
+        font-size: 24px;
+    }
+
+    .resolved-banner.aprobada i { color: #10b981; }
+    .resolved-banner.rechazada i { color: #ef4444; }
+</style>
+
+<div class="detalle-apelacion-container">
+    <div class="page-header">
+        <div class="page-header-left">
+            <h1><i class="fas fa-gavel me-2"></i>Revisar Apelacion</h1>
+            <span class="ref-badge">@Model.NumeroReferencia</span>
+        </div>
+        <span class="estado-badge estado-@Model.Estado.ToString().ToLower()">
+            @switch (Model.Estado)
+            {
+                case Lado.Models.EstadoApelacion.Pendiente:
+                    <i class="fas fa-clock me-1"></i>@:Pendiente
+                    break;
+                case Lado.Models.EstadoApelacion.EnRevision:
+                    <i class="fas fa-search me-1"></i>@:En Revision
+                    break;
+                case Lado.Models.EstadoApelacion.Aprobada:
+                    <i class="fas fa-check me-1"></i>@:Aprobada
+                    break;
+                case Lado.Models.EstadoApelacion.Rechazada:
+                    <i class="fas fa-times me-1"></i>@:Rechazada
+                    break;
+                case Lado.Models.EstadoApelacion.Escalada:
+                    <i class="fas fa-arrow-up me-1"></i>@:Escalada
+                    break;
+            }
+        </span>
+    </div>
+
+    @if (Model.Estado == Lado.Models.EstadoApelacion.Aprobada || Model.Estado == Lado.Models.EstadoApelacion.Rechazada)
+    {
+        <div class="resolved-banner @(Model.Estado == Lado.Models.EstadoApelacion.Aprobada ? "aprobada" : "rechazada")">
+            <i class="fas @(Model.Estado == Lado.Models.EstadoApelacion.Aprobada ? "fa-check-circle" : "fa-times-circle")"></i>
+            <div>
+                <strong>Esta apelacion ya fue resuelta</strong>
+                @if (Model.FechaResolucion.HasValue)
+                {
+                    <p style="margin: 4px 0 0 0; font-size: 13px;">
+                        Resuelta el @Model.FechaResolucion.Value.ToString("dd MMM yyyy, HH:mm")
+                        @if (Model.Administrador != null)
+                        {
+                            <span>por @Model.Administrador.UserName</span>
+                        }
+                    </p>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="content-grid">
+        <div class="main-content">
+            <!-- Contenido Reportado -->
+            @if (Model.Contenido != null)
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-image"></i>
+                        Contenido Apelado
+                    </div>
+                    <div class="card-body">
+                        <div class="contenido-preview">
+                            @if (Model.Contenido.Archivos?.Any() == true)
+                            {
+                                var archivo = Model.Contenido.Archivos.First();
+                                @if (archivo.TipoArchivo == Lado.Models.TipoArchivo.Video)
+                                {
+                                    <video src="@archivo.RutaArchivo" controls></video>
+                                }
+                                else
+                                {
+                                    <img src="@archivo.RutaArchivo" alt="Contenido">
+                                }
+                            }
+                            else if (!string.IsNullOrEmpty(Model.Contenido.RutaArchivo))
+                            {
+                                <img src="@Model.Contenido.RutaArchivo" alt="Contenido">
+                            }
+                        </div>
+                        @if (!string.IsNullOrEmpty(Model.Contenido.Descripcion))
+                        {
+                            <p style="margin-top: 16px; color: var(--text-color);">@Model.Contenido.Descripcion</p>
+                        }
+                    </div>
+                </div>
+            }
+            else if (Model.Story != null)
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-circle"></i>
+                        Story Apelada
+                    </div>
+                    <div class="card-body">
+                        <div class="contenido-preview">
+                            @if (Model.Story.TipoContenido == Lado.Models.TipoContenido.Video)
+                            {
+                                <video src="@Model.Story.RutaArchivo" controls></video>
+                            }
+                            else
+                            {
+                                <img src="@Model.Story.RutaArchivo" alt="Story">
+                            }
+                        </div>
+                        @if (!string.IsNullOrEmpty(Model.Story.Texto))
+                        {
+                            <p style="margin-top: 16px; color: var(--text-color);">@Model.Story.Texto</p>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- Razon del Rechazo -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-ban" style="color: #ef4444;"></i>
+                    Razon del Rechazo Original
+                </div>
+                <div class="card-body">
+                    <div class="razon-box">
+                        <strong>Motivo Indicado</strong>
+                        <p>@Model.RazonRechazo</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Argumentos del Usuario -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-comment-alt"></i>
+                    Argumentos del Usuario
+                </div>
+                <div class="card-body">
+                    <div class="argumentos-box">@Model.Argumentos</div>
+                    @if (!string.IsNullOrEmpty(Model.EvidenciaAdicional))
+                    {
+                        <div style="margin-top: 16px;">
+                            <strong style="display: block; margin-bottom: 8px; font-size: 13px; color: var(--text-muted);">Evidencia Adicional:</strong>
+                            <div class="argumentos-box">@Model.EvidenciaAdicional</div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Resolucion (si ya se resolvio) -->
+            @if (!string.IsNullOrEmpty(Model.ResolucionComentario))
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-clipboard-check"></i>
+                        Comentario de Resolucion
+                    </div>
+                    <div class="card-body">
+                        <div class="argumentos-box">@Model.ResolucionComentario</div>
+                        @if (Model.ContenidoRestaurado)
+                        {
+                            <div style="margin-top: 16px; padding: 12px; background: #ecfdf5; border-radius: 8px; border: 1px solid #10b981;">
+                                <i class="fas fa-check-circle me-2" style="color: #10b981;"></i>
+                                <strong style="color: #065f46;">Contenido restaurado</strong>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="sidebar">
+            <!-- Usuario -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-user"></i>
+                    Usuario
+                </div>
+                <div class="card-body">
+                    @if (Model.Usuario != null)
+                    {
+                        <div class="user-card">
+                            <img src="@(Model.Usuario.FotoPerfil ?? "/images/default-avatar.svg")" alt="Avatar" class="user-avatar">
+                            <div class="user-info">
+                                <h4>@(Model.Usuario.NombreCompleto ?? Model.Usuario.UserName)</h4>
+                                <p>@@@Model.Usuario.UserName</p>
+                                @if (Model.Usuario.EsCreador)
+                                {
+                                    <span style="background: #8b5cf6; color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px;">Creador</span>
+                                }
+                            </div>
+                        </div>
+                        <div style="margin-top: 12px;">
+                            <a href="@Url.Action("DetalleUsuario", "Admin", new { id = Model.Usuario.Id })" style="font-size: 13px; color: var(--primary-color);">
+                                Ver perfil completo <i class="fas fa-external-link-alt ms-1"></i>
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Informacion -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-info-circle"></i>
+                    Informacion
+                </div>
+                <div class="card-body">
+                    <div class="info-row">
+                        <span class="info-label">Tipo</span>
+                        <span class="info-value">@Model.TipoContenido</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Prioridad</span>
+                        <span class="info-value">
+                            <span class="prioridad-badge prioridad-@Model.Prioridad.ToString().ToLower()">@Model.Prioridad</span>
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Fecha Envio</span>
+                        <span class="info-value">@Model.FechaCreacion.ToString("dd MMM yyyy, HH:mm")</span>
+                    </div>
+                    @if (Model.FechaResolucion.HasValue)
+                    {
+                        <div class="info-row">
+                            <span class="info-label">Fecha Resolucion</span>
+                            <span class="info-value">@Model.FechaResolucion.Value.ToString("dd MMM yyyy, HH:mm")</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Acciones (si no esta resuelta) -->
+            @if (Model.Estado == Lado.Models.EstadoApelacion.Pendiente || Model.Estado == Lado.Models.EstadoApelacion.EnRevision || Model.Estado == Lado.Models.EstadoApelacion.Escalada)
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-gavel"></i>
+                        Resolver Apelacion
+                    </div>
+                    <div class="card-body">
+                        <textarea id="comentarioResolucion" class="comentario-input" placeholder="Comentario de resolucion (opcional)..."></textarea>
+
+                        <div class="checkbox-option">
+                            <input type="checkbox" id="restaurarContenido" checked>
+                            <label for="restaurarContenido">Restaurar contenido al aprobar</label>
+                        </div>
+
+                        <div class="action-buttons">
+                            <button class="btn-aprobar" onclick="resolverApelacion(@Model.Id, true)">
+                                <i class="fas fa-check"></i>
+                                Aprobar Apelacion
+                            </button>
+                            <button class="btn-rechazar" onclick="resolverApelacion(@Model.Id, false)">
+                                <i class="fas fa-times"></i>
+                                Rechazar Apelacion
+                            </button>
+                            @if (Model.Estado != Lado.Models.EstadoApelacion.Escalada)
+                            {
+                                <button class="btn-escalar" onclick="escalarApelacion(@Model.Id)">
+                                    <i class="fas fa-arrow-up"></i>
+                                    Escalar
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Historial del usuario -->
+            @if (apelacionesAnteriores?.Any() == true)
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-history"></i>
+                        Apelaciones Anteriores
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        @foreach (var ap in apelacionesAnteriores)
+                        {
+                            <div class="historial-item">
+                                <span class="ref">@ap.NumeroReferencia</span>
+                                <span class="estado estado-@ap.Estado.ToString().ToLower()" style="float: right;">
+                                    @ap.Estado
+                                </span>
+                                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                                    @ap.FechaCreacion.ToString("dd MMM yyyy")
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <a href="@Url.Action("Apelaciones", "Admin")" class="back-btn">
+        <i class="fas fa-arrow-left"></i>
+        Volver a Apelaciones
+    </a>
+</div>
+
+@section Scripts {
+    <script>
+        async function resolverApelacion(id, aprobar) {
+            const comentario = document.getElementById('comentarioResolucion').value;
+            const restaurar = document.getElementById('restaurarContenido').checked;
+
+            const accion = aprobar ? 'aprobar' : 'rechazar';
+            if (!confirm(`¿Estas seguro de ${accion} esta apelacion?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/Admin/ResolverApelacion', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                    },
+                    body: JSON.stringify({
+                        id: id,
+                        aprobar: aprobar,
+                        comentario: comentario,
+                        restaurarContenido: restaurar
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message);
+                    window.location.reload();
+                } else {
+                    alert(result.message || 'Error al procesar la apelacion');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al procesar la solicitud');
+            }
+        }
+
+        async function escalarApelacion(id) {
+            const motivo = prompt('Ingresa el motivo de la escalacion:');
+            if (!motivo) return;
+
+            try {
+                const response = await fetch('/Admin/EscalarApelacion', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                    },
+                    body: JSON.stringify({
+                        id: id,
+                        motivo: motivo
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message);
+                    window.location.reload();
+                } else {
+                    alert(result.message || 'Error al escalar');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al procesar la solicitud');
+            }
+        }
+    </script>
+}

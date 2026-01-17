@@ -489,6 +489,7 @@ namespace Lado.Controllers
                     // Cargar TODO el contenido LadoB (se mostrará con blur si no tiene acceso)
                     var esPropio = id == usuarioActual.Id;
                     var contenidoLadoB = await _context.Contenidos
+                        .Include(c => c.Archivos)
                         .Where(c => c.UsuarioId == id
                                 && c.EstaActivo
                                 && !c.EsBorrador
@@ -520,6 +521,7 @@ namespace Lado.Controllers
                     _logger.LogInformation("Mostrando perfil LadoA para {Username}", usuario.UserName);
 
                     var contenidoLadoA = await _context.Contenidos
+                        .Include(c => c.Archivos)
                         .Where(c => c.UsuarioId == id
                                 && c.EstaActivo
                                 && !c.EsBorrador
@@ -547,8 +549,13 @@ namespace Lado.Controllers
                     .OrderByDescending(c => c.FechaCreacion)
                     .ToListAsync();
 
+                // Seguidores (personas que siguen a este usuario)
                 ViewBag.NumeroSuscriptores = await _context.Suscripciones
                     .CountAsync(s => s.CreadorId == id && s.EstaActiva);
+
+                // Siguiendo (personas que este usuario sigue)
+                ViewBag.NumeroSiguiendo = await _context.Suscripciones
+                    .CountAsync(s => s.FanId == id && s.EstaActiva);
 
                 var contenidosTotales = ViewBag.Contenidos as List<Contenido>;
                 ViewBag.TotalLikes = contenidosTotales?.Sum(c => c.NumeroLikes) ?? 0;
@@ -614,6 +621,118 @@ namespace Lado.Controllers
             }
         }
 
+
+        // ========================================
+        // OBTENER LISTA DE SEGUIDORES
+        // ========================================
+        [HttpGet]
+        public async Task<IActionResult> ObtenerListaSeguidores(string id)
+        {
+            try
+            {
+                // Obtener personas que siguen a este usuario (sus fans)
+                var seguidores = await _context.Suscripciones
+                    .Where(s => s.CreadorId == id && s.EstaActiva)
+                    .Include(s => s.Fan)
+                    .Select(s => new
+                    {
+                        id = s.Fan.Id,
+                        username = "@" + s.Fan.UserName,
+                        nombre = s.Fan.NombreCompleto,
+                        fotoPerfil = s.Fan.FotoPerfil,
+                        verificado = s.Fan.CreadorVerificado
+                    })
+                    .Take(100)
+                    .ToListAsync();
+
+                return Json(new { success = true, usuarios = seguidores });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener seguidores de {UserId}", id);
+                return Json(new { success = false, message = "Error al cargar seguidores" });
+            }
+        }
+
+        // ========================================
+        // OBTENER LISTA DE SIGUIENDO
+        // ========================================
+        [HttpGet]
+        public async Task<IActionResult> ObtenerListaSiguiendo(string id)
+        {
+            try
+            {
+                // Obtener personas que este usuario sigue
+                var siguiendo = await _context.Suscripciones
+                    .Where(s => s.FanId == id && s.EstaActiva)
+                    .Include(s => s.Creador)
+                    .Select(s => new
+                    {
+                        id = s.Creador.Id,
+                        username = "@" + s.Creador.UserName,
+                        nombre = s.Creador.NombreCompleto,
+                        fotoPerfil = s.Creador.FotoPerfil,
+                        verificado = s.Creador.CreadorVerificado
+                    })
+                    .Take(100)
+                    .ToListAsync();
+
+                return Json(new { success = true, usuarios = siguiendo });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener siguiendo de {UserId}", id);
+                return Json(new { success = false, message = "Error al cargar siguiendo" });
+            }
+        }
+
+        // ========================================
+        // OBTENER LISTA DE USUARIOS QUE DIERON LIKE
+        // ========================================
+        [HttpGet]
+        public async Task<IActionResult> ObtenerListaLikes(string id)
+        {
+            try
+            {
+                var usuarioActualId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                // Obtener usuarios únicos que dieron like al contenido de este creador
+                var usuariosQueDieronLike = await _context.Likes
+                    .Where(l => l.Contenido.UsuarioId == id)
+                    .Select(l => l.UsuarioId)
+                    .Distinct()
+                    .Take(100)
+                    .ToListAsync();
+
+                // Obtener los IDs de usuarios que el usuario actual ya sigue
+                var usuariosQueSigo = await _context.Suscripciones
+                    .Where(s => s.FanId == usuarioActualId && s.EstaActiva)
+                    .Select(s => s.CreadorId)
+                    .ToListAsync();
+
+                var usuarios = await _context.Users
+                    .Where(u => usuariosQueDieronLike.Contains(u.Id))
+                    .Select(u => new
+                    {
+                        id = u.Id,
+                        username = "@" + u.UserName,
+                        nombre = u.NombreCompleto,
+                        fotoPerfil = u.FotoPerfil,
+                        verificado = u.CreadorVerificado,
+                        esCreador = u.EsCreador,
+                        loSigo = usuariosQueSigo.Contains(u.Id),
+                        soyYo = u.Id == usuarioActualId
+                    })
+                    .ToListAsync();
+
+                return Json(new { success = true, usuarios });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener likes de {UserId}", id);
+                return Json(new { success = false, message = "Error al cargar likes" });
+            }
+        }
 
         // ========================================
         // OBTENER LIKES DEL USUARIO ACTUAL
@@ -1579,6 +1698,72 @@ namespace Lado.Controllers
             {
                 _logger.LogError(ex, "Error al obtener comentarios del contenido {Id}", contenidoId);
                 return Json(new { success = false, message = "Error al cargar comentarios" });
+            }
+        }
+
+        // ========================================
+        // OBTENER RESPUESTAS DE UN COMENTARIO (PAGINADO)
+        // ========================================
+
+        [HttpGet]
+        public async Task<IActionResult> ObtenerRespuestasComentario(int comentarioId, int skip = 0, int take = 10)
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                var comentario = await _context.Comentarios.FindAsync(comentarioId);
+                if (comentario == null || !comentario.EstaActivo)
+                {
+                    return Json(new { success = false, message = "Comentario no encontrado" });
+                }
+
+                var totalRespuestas = await _context.Comentarios
+                    .CountAsync(c => c.ComentarioPadreId == comentarioId && c.EstaActivo);
+
+                var respuestas = await _context.Comentarios
+                    .Include(c => c.Usuario)
+                    .Where(c => c.ComentarioPadreId == comentarioId && c.EstaActivo)
+                    .OrderBy(c => c.FechaCreacion)
+                    .Skip(skip)
+                    .Take(take)
+                    .ToListAsync();
+
+                // Obtener likes del usuario
+                var respuestaIds = respuestas.Select(r => r.Id).ToList();
+                var misLikes = !string.IsNullOrEmpty(usuarioId)
+                    ? await _context.LikesComentarios
+                        .Where(l => respuestaIds.Contains(l.ComentarioId) && l.UsuarioId == usuarioId)
+                        .Select(l => l.ComentarioId)
+                        .ToListAsync()
+                    : new List<int>();
+
+                return Json(new
+                {
+                    success = true,
+                    respuestas = respuestas.Select(r => new
+                    {
+                        id = r.Id,
+                        texto = r.Texto,
+                        fechaCreacion = r.FechaCreacion,
+                        numeroLikes = r.NumeroLikes,
+                        meDioLike = misLikes.Contains(r.Id),
+                        usuario = new
+                        {
+                            id = r.Usuario?.Id,
+                            username = r.Usuario?.UserName,
+                            nombreCompleto = r.Usuario?.NombreCompleto,
+                            fotoPerfil = r.Usuario?.FotoPerfil
+                        }
+                    }),
+                    totalRespuestas,
+                    hasMore = skip + take < totalRespuestas
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener respuestas del comentario {Id}", comentarioId);
+                return Json(new { success = false, message = "Error al cargar respuestas" });
             }
         }
 
@@ -2834,7 +3019,7 @@ namespace Lado.Controllers
                         id = l.UsuarioId,
                         username = l.Usuario.UserName,
                         nombre = l.Usuario.NombreCompleto ?? l.Usuario.UserName,
-                        foto = l.Usuario.FotoPerfil ?? "/images/default-avatar.png",
+                        foto = l.Usuario.FotoPerfil ?? "/images/default-avatar.svg",
                         esVerificado = l.Usuario.EsVerificado,
                         esCreador = l.Usuario.EsCreador
                     })

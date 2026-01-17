@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using Lado.Attributes;
 using Lado.Models; // IMPORTANTE: Importar Models para usar TipoUsuario
 
 namespace Lado.ViewModels
@@ -38,7 +39,7 @@ namespace Lado.ViewModels
         [Display(Name = "Tipo de cuenta")]
         public TipoUsuario TipoUsuario { get; set; } = TipoUsuario.Creador;
 
-        [Range(typeof(bool), "true", "true", ErrorMessage = "Debes aceptar los términos y condiciones")]
+        [MustBeTrue(ErrorMessage = "Debes aceptar los términos y condiciones")]
         [Display(Name = "Acepto los términos")]
         public bool AceptaTerminos { get; set; }
 

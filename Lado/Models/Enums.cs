@@ -244,6 +244,21 @@
     }
 
     // ====================================
+    // ENUMS PARA CONTROLES DE PRIVACIDAD
+    // ====================================
+
+    /// <summary>
+    /// Define quién puede realizar ciertas acciones en el perfil del usuario
+    /// </summary>
+    public enum PermisoPrivacidad
+    {
+        Todos = 0,          // Cualquier usuario
+        Seguidores = 1,     // Solo quienes me siguen
+        Suscriptores = 2,   // Solo suscriptores de pago
+        Nadie = 3           // Nadie (deshabilitado)
+    }
+
+    // ====================================
     // ENUMS PARA SISTEMA PHOTOWALL (MURO)
     // ====================================
 

@@ -15,6 +15,12 @@
         public Contenido? ContenidoReportado { get; set; }
         public Contenido? Contenido { get; set; }
 
+        public int? StoryId { get; set; }
+        public Story? Story { get; set; }
+
+        public int? ComentarioId { get; set; }
+        public Comentario? Comentario { get; set; }
+
         public string TipoReporte { get; set; } = string.Empty;
         public string Motivo { get; set; } = string.Empty;
         public string? Descripcion { get; set; }

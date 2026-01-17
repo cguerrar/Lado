@@ -1150,6 +1150,64 @@
         margin-top: 8px;
     }
 
+    /* Botones de cargar más comentarios y respuestas */
+    .load-more-comments-container {
+        padding: 16px 0;
+        text-align: center;
+    }
+
+    .load-more-comments-btn,
+    .load-more-replies-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 24px;
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        color: var(--primary);
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .load-more-comments-btn:hover,
+    .load-more-replies-btn:hover {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+
+    .load-more-comments-btn:disabled,
+    .load-more-replies-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .load-more-comments-btn i,
+    .load-more-replies-btn i {
+        font-size: 12px;
+        transition: transform 0.2s;
+    }
+
+    .load-more-comments-btn.loading i,
+    .load-more-replies-btn.loading i {
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .load-more-replies-btn {
+        margin: 12px 0 12px 16px;
+        padding: 8px 16px;
+        font-size: 13px;
+        border-radius: 16px;
+    }
+
     .comment-respuesta {
         padding: 10px 0 !important;
     }
@@ -3443,8 +3501,13 @@
             <div id="commentsList">
                 @if (Model.Comentarios != null && Model.Comentarios.Any())
                 {
-                    // Separar comentarios principales de respuestas
-                    var comentariosPrincipales = Model.Comentarios.Where(c => c.ComentarioPadreId == null).OrderByDescending(c => c.FechaCreacion);
+                    // Separar comentarios principales de respuestas - LIMITAR A 10 INICIALES
+                    var comentariosPrincipales = Model.Comentarios
+                        .Where(c => c.ComentarioPadreId == null)
+                        .OrderByDescending(c => c.FechaCreacion)
+                        .Take(10)  // Solo cargar 10 inicialmente
+                        .ToList();
+                    var totalComentariosPrincipales = Model.Comentarios.Count(c => c.ComentarioPadreId == null);
                     var respuestasPorPadre = Model.Comentarios.Where(c => c.ComentarioPadreId != null)
                         .GroupBy(c => c.ComentarioPadreId)
                         .ToDictionary(g => g.Key ?? 0, g => g.OrderBy(r => r.FechaCreacion).ToList());
@@ -3529,12 +3592,14 @@
                             </div>
                         </div>
 
-                        @* Respuestas anidadas *@
+                        @* Respuestas anidadas - LIMITAR A 3 INICIALES *@
                         @if (respuestasPorPadre.ContainsKey(comentario.Id))
                         {
-                            var respuestas = respuestasPorPadre[comentario.Id];
-                            <div class="respuestas-container ocultas" id="respuestas-@comentario.Id">
-                                @foreach (var respuesta in respuestas)
+                            var todasRespuestas = respuestasPorPadre[comentario.Id];
+                            var respuestasIniciales = todasRespuestas.Take(3).ToList();
+                            var totalRespuestas = todasRespuestas.Count;
+                            <div class="respuestas-container ocultas" id="respuestas-@comentario.Id" data-total="@totalRespuestas" data-loaded="@respuestasIniciales.Count">
+                                @foreach (var respuesta in respuestasIniciales)
                                 {
                                     var tiempoResp = DateTime.Now - respuesta.FechaCreacion;
                                     var tiempoTextoResp = tiempoResp.TotalDays >= 1 ? $"{(int)tiempoResp.TotalDays} h" :
@@ -3584,6 +3649,17 @@
                                         </div>
                                     </div>
                                 }
+                                @* Botón para cargar más respuestas *@
+                                @if (totalRespuestas > 3)
+                                {
+                                    <button class="load-more-replies-btn"
+                                            id="load-more-replies-@comentario.Id"
+                                            onclick="cargarMasRespuestas(@comentario.Id, this)"
+                                            data-comment-id="@comentario.Id">
+                                        <i class="fas fa-chevron-down"></i>
+                                        Ver @(totalRespuestas - 3) respuestas más
+                                    </button>
+                                }
                             </div>
                         }
 
@@ -3594,6 +3670,22 @@
                                 <button type="button" class="btn-cancel-reply" onclick="ocultarFormularioRespuesta(@comentario.Id)">Cancelar</button>
                                 <button type="button" class="btn-submit-reply" onclick="publicarRespuesta(@comentario.Id)">Responder</button>
                             </div>
+                        </div>
+                    }
+
+                    @* Botón para cargar más comentarios *@
+                    @if (totalComentariosPrincipales > 10)
+                    {
+                        <div id="loadMoreCommentsContainer" class="load-more-comments-container">
+                            <button class="load-more-comments-btn"
+                                    id="loadMoreCommentsBtn"
+                                    onclick="cargarMasComentarios()"
+                                    data-page="1"
+                                    data-total="@totalComentariosPrincipales"
+                                    data-contenido-id="@Model.Id">
+                                <i class="fas fa-chevron-down"></i>
+                                <span>Cargar más comentarios (@(totalComentariosPrincipales - 10) restantes)</span>
+                            </button>
                         </div>
                     }
                 }
@@ -4613,6 +4705,238 @@
             } else {
                 button.textContent = button.textContent.replace('Ver', 'Ocultar');
             }
+        }
+    }
+
+    // ========================================
+    // CARGAR MÁS COMENTARIOS (PAGINACIÓN)
+    // ========================================
+
+    async function cargarMasComentarios() {
+        const btn = document.getElementById('loadMoreCommentsBtn');
+        if (!btn || btn.disabled) return;
+
+        const currentPage = parseInt(btn.dataset.page) || 1;
+        const total = parseInt(btn.dataset.total) || 0;
+        const contenidoIdVal = parseInt(btn.dataset.contenidoId);
+        const pageSize = 10;
+
+        btn.disabled = true;
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Cargando...</span>';
+
+        try {
+            const response = await fetch(`/Feed/ObtenerComentarios?contenidoId=${contenidoIdVal}&page=${currentPage + 1}&pageSize=${pageSize}`);
+            const data = await response.json();
+
+            if (data.success && data.comentarios && data.comentarios.length > 0) {
+                const commentsList = document.getElementById('commentsList');
+
+                for (const comentario of data.comentarios) {
+                    const commentHtml = renderComentarioHtml(comentario);
+                    // Insertar antes del contenedor de "cargar más"
+                    const loadMoreContainer = document.getElementById('loadMoreCommentsContainer');
+                    if (loadMoreContainer) {
+                        loadMoreContainer.insertAdjacentHTML('beforebegin', commentHtml);
+                    } else {
+                        commentsList.insertAdjacentHTML('beforeend', commentHtml);
+                    }
+                }
+
+                // Actualizar el botón
+                const loaded = (currentPage + 1) * pageSize;
+                const remaining = total - loaded;
+
+                if (remaining > 0) {
+                    btn.dataset.page = currentPage + 1;
+                    btn.innerHTML = `<i class="fas fa-chevron-down"></i> <span>Cargar más comentarios (${remaining} restantes)</span>`;
+                    btn.disabled = false;
+                } else {
+                    // Ocultar botón si no hay más
+                    const container = document.getElementById('loadMoreCommentsContainer');
+                    if (container) container.style.display = 'none';
+                }
+            } else {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error al cargar comentarios:', error);
+            mostrarNotificacion('Error al cargar comentarios', 'error');
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }
+    }
+
+    function renderComentarioHtml(comentario) {
+        const tiempo = calcularTiempoRelativo(new Date(comentario.fechaCreacion));
+        const username = comentario.usuario?.username || 'usuario';
+        const foto = comentario.usuario?.fotoPerfil;
+        const likedClass = comentario.meDioLike ? 'liked' : '';
+        const likesCount = comentario.numeroLikes > 0 ? comentario.numeroLikes : '';
+        const respuestasCount = comentario.totalRespuestas || 0;
+
+        let avatarHtml = foto
+            ? `<img src="${escapeHtml(foto)}" alt="${escapeHtml(username)}">`
+            : `<div class="comment-avatar-initial">${escapeHtml(username.substring(0, 1).toUpperCase())}</div>`;
+
+        let respuestasHtml = '';
+        if (comentario.respuestas && comentario.respuestas.length > 0) {
+            const respuestasIniciales = comentario.respuestas.slice(0, 3);
+            const respuestasListHtml = respuestasIniciales.map(r => renderRespuestaHtml(r, comentario.id)).join('');
+            const masRespuestas = respuestasCount > 3
+                ? `<button class="load-more-replies-btn" id="load-more-replies-${comentario.id}" onclick="cargarMasRespuestas(${comentario.id}, this)" data-comment-id="${comentario.id}"><i class="fas fa-chevron-down"></i> Ver ${respuestasCount - 3} respuestas más</button>`
+                : '';
+            respuestasHtml = `<div class="respuestas-container" id="respuestas-${comentario.id}" data-total="${respuestasCount}" data-loaded="${respuestasIniciales.length}">${respuestasListHtml}${masRespuestas}</div>`;
+        }
+
+        return `
+            <div class="comment-item comment-principal" data-comment-id="${comentario.id}">
+                <div class="comment-avatar-wrapper">
+                    <div class="comment-avatar">${avatarHtml}</div>
+                </div>
+                <div class="comment-content">
+                    <div class="comment-header">
+                        <a href="/Feed/Perfil/${escapeHtml(username)}" class="comment-username">${escapeHtml(username)}</a>
+                        <span class="comment-time">${tiempo}</span>
+                        <button class="comment-menu-btn" onclick="event.stopPropagation();">...</button>
+                    </div>
+                    <p class="comment-text">${escapeHtml(comentario.texto)}</p>
+                    <div class="comment-actions">
+                        <button class="comment-action-btn like-btn" onclick="toggleLikeComentario(${comentario.id}, this)" data-comment-id="${comentario.id}">
+                            <svg class="${likedClass}" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                            <span class="count">${likesCount}</span>
+                        </button>
+                        <button class="comment-action-btn reply-btn" onclick="mostrarFormularioRespuesta(${comentario.id}, '${escapeHtml(username)}')">
+                            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            <span class="count">${respuestasCount > 0 ? respuestasCount : ''}</span>
+                        </button>
+                        <button class="comment-action-btn repost-btn" onclick="event.stopPropagation();">
+                            <svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                        </button>
+                        <button class="comment-action-btn share-btn" onclick="event.stopPropagation();">
+                            <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="reply-form-container" id="reply-form-${comentario.id}" style="display: none;">
+                <textarea class="reply-textarea" placeholder="Escribe tu respuesta..." rows="2"></textarea>
+                <div class="reply-actions">
+                    <button type="button" class="btn-cancel-reply" onclick="ocultarFormularioRespuesta(${comentario.id})">Cancelar</button>
+                    <button type="button" class="btn-submit-reply" onclick="publicarRespuesta(${comentario.id})">Responder</button>
+                </div>
+            </div>
+            ${respuestasHtml}
+        `;
+    }
+
+    function renderRespuestaHtml(respuesta, comentarioPadreId) {
+        const tiempo = calcularTiempoRelativo(new Date(respuesta.fechaCreacion));
+        const username = respuesta.usuario?.username || 'usuario';
+        const foto = respuesta.usuario?.fotoPerfil;
+        const likedClass = respuesta.meDioLike ? 'liked' : '';
+        const likesCount = respuesta.numeroLikes > 0 ? respuesta.numeroLikes : '';
+
+        let avatarHtml = foto
+            ? `<img src="${escapeHtml(foto)}" alt="${escapeHtml(username)}">`
+            : `<div class="comment-avatar-initial">${escapeHtml(username.substring(0, 1).toUpperCase())}</div>`;
+
+        return `
+            <div class="comment-item comment-respuesta" data-comment-id="${respuesta.id}">
+                <div class="comment-avatar-wrapper">
+                    <div class="comment-avatar">${avatarHtml}</div>
+                </div>
+                <div class="comment-content">
+                    <div class="comment-header">
+                        <a href="/Feed/Perfil/${escapeHtml(username)}" class="comment-username">${escapeHtml(username)}</a>
+                        <span class="comment-time">${tiempo}</span>
+                        <button class="comment-menu-btn" onclick="event.stopPropagation();">...</button>
+                    </div>
+                    <p class="comment-text">${escapeHtml(respuesta.texto)}</p>
+                    <div class="comment-actions">
+                        <button class="comment-action-btn like-btn" onclick="toggleLikeComentario(${respuesta.id}, this)" data-comment-id="${respuesta.id}">
+                            <svg class="${likedClass}" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                            <span class="count">${likesCount}</span>
+                        </button>
+                        <button class="comment-action-btn reply-btn" onclick="mostrarFormularioRespuesta(${comentarioPadreId}, '${escapeHtml(username)}')">
+                            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        </button>
+                        <button class="comment-action-btn repost-btn" onclick="event.stopPropagation();">
+                            <svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                        </button>
+                        <button class="comment-action-btn share-btn" onclick="event.stopPropagation();">
+                            <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function calcularTiempoRelativo(fecha) {
+        const ahora = new Date();
+        const diff = ahora - fecha;
+        const minutos = Math.floor(diff / 60000);
+        const horas = Math.floor(diff / 3600000);
+        const dias = Math.floor(diff / 86400000);
+
+        if (minutos < 1) return 'Ahora';
+        if (minutos < 60) return `${minutos} m`;
+        if (horas < 24) return `${horas} h`;
+        if (dias < 7) return `${dias} d`;
+        return fecha.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    }
+
+    // ========================================
+    // CARGAR MÁS RESPUESTAS (PAGINACIÓN)
+    // ========================================
+
+    async function cargarMasRespuestas(comentarioId, btn) {
+        if (!btn || btn.disabled) return;
+
+        const container = document.getElementById(`respuestas-${comentarioId}`);
+        if (!container) return;
+
+        const total = parseInt(container.dataset.total) || 0;
+        const loaded = parseInt(container.dataset.loaded) || 0;
+
+        btn.disabled = true;
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+
+        try {
+            const response = await fetch(`/Feed/ObtenerRespuestasComentario?comentarioId=${comentarioId}&skip=${loaded}&take=10`);
+            const data = await response.json();
+
+            if (data.success && data.respuestas && data.respuestas.length > 0) {
+                // Insertar respuestas antes del botón
+                for (const respuesta of data.respuestas) {
+                    const respuestaHtml = renderRespuestaHtml(respuesta, comentarioId);
+                    btn.insertAdjacentHTML('beforebegin', respuestaHtml);
+                }
+
+                // Actualizar contador
+                const newLoaded = loaded + data.respuestas.length;
+                container.dataset.loaded = newLoaded;
+
+                const remaining = total - newLoaded;
+                if (remaining > 0) {
+                    btn.innerHTML = `<i class="fas fa-chevron-down"></i> Ver ${remaining} respuestas más`;
+                    btn.disabled = false;
+                } else {
+                    // Ocultar botón
+                    btn.style.display = 'none';
+                }
+            } else {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error al cargar respuestas:', error);
+            mostrarNotificacion('Error al cargar respuestas', 'error');
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
         }
     }
 

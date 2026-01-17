@@ -1,0 +1,474 @@
+@model List<Lado.Models.Apelacion>
+@{
+    ViewData["Title"] = "Gestionar Apelaciones";
+    Layout = "_Layout";
+}
+
+@Html.AntiForgeryToken()
+
+<style>
+    .apelaciones-admin-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 24px 16px;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .page-header h1 {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-color);
+        margin: 0;
+    }
+
+    .stats-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .stat-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 16px;
+        text-align: center;
+    }
+
+    .stat-card.pendiente { border-left: 4px solid #f59e0b; }
+    .stat-card.enrevision { border-left: 4px solid #3b82f6; }
+    .stat-card.aprobada { border-left: 4px solid #10b981; }
+    .stat-card.rechazada { border-left: 4px solid #ef4444; }
+    .stat-card.escalada { border-left: 4px solid #8b5cf6; }
+
+    .stat-number {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text-color);
+    }
+
+    .stat-label {
+        font-size: 12px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+    }
+
+    .filters-section {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 24px;
+    }
+
+    .filters-row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .filter-group {
+        flex: 1;
+        min-width: 150px;
+    }
+
+    .filter-group label {
+        display: block;
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+    }
+
+    .filter-group select,
+    .filter-group input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        font-size: 14px;
+        background: var(--input-bg);
+        color: var(--text-color);
+    }
+
+    .btn-filter {
+        padding: 8px 16px;
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        margin-top: 20px;
+    }
+
+    .btn-filter:hover {
+        background: var(--primary-hover);
+    }
+
+    .apelacion-row {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        display: grid;
+        grid-template-columns: auto 1fr auto auto;
+        gap: 16px;
+        align-items: center;
+        transition: all 0.2s;
+    }
+
+    .apelacion-row:hover {
+        border-color: var(--primary-color);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .apelacion-row.prioridad-alta {
+        border-left: 4px solid #f59e0b;
+    }
+
+    .apelacion-row.prioridad-critica {
+        border-left: 4px solid #ef4444;
+        background: linear-gradient(90deg, rgba(254, 242, 242, 0.5) 0%, var(--card-bg) 10%);
+    }
+
+    .apelacion-ref {
+        font-family: monospace;
+        font-size: 13px;
+        color: var(--text-muted);
+        background: var(--bg-secondary);
+        padding: 4px 8px;
+        border-radius: 4px;
+    }
+
+    .apelacion-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .apelacion-info-main {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .apelacion-usuario {
+        font-weight: 600;
+        color: var(--text-color);
+    }
+
+    .apelacion-tipo {
+        font-size: 12px;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .apelacion-fecha {
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+
+    .estado-badge {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .estado-pendiente { background: #fef3c7; color: #92400e; }
+    .estado-enrevision { background: #dbeafe; color: #1e40af; }
+    .estado-aprobada { background: #d1fae5; color: #065f46; }
+    .estado-rechazada { background: #fee2e2; color: #991b1b; }
+    .estado-escalada { background: #ede9fe; color: #5b21b6; }
+
+    .prioridad-badge {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .prioridad-normal { background: #e5e7eb; color: #374151; }
+    .prioridad-alta { background: #fef3c7; color: #92400e; }
+    .prioridad-critica { background: #fee2e2; color: #991b1b; }
+
+    .btn-revisar {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 13px;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .btn-revisar:hover {
+        background: var(--primary-hover);
+        color: white;
+    }
+
+    .pagination {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 24px;
+    }
+
+    .pagination a,
+    .pagination span {
+        padding: 8px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        text-decoration: none;
+        color: var(--text-color);
+        font-size: 14px;
+    }
+
+    .pagination a:hover {
+        background: var(--bg-secondary);
+    }
+
+    .pagination .active {
+        background: var(--primary-color);
+        color: white;
+        border-color: var(--primary-color);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        background: var(--card-bg);
+        border: 1px dashed var(--border-color);
+        border-radius: 12px;
+    }
+
+    .empty-state i {
+        font-size: 48px;
+        color: var(--text-muted);
+        margin-bottom: 16px;
+    }
+
+    .empty-state h3 {
+        color: var(--text-color);
+        margin-bottom: 8px;
+    }
+
+    .empty-state p {
+        color: var(--text-muted);
+    }
+
+    @@media (max-width: 768px) {
+        .apelacion-row {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+    }
+</style>
+
+<div class="apelaciones-admin-container">
+    <div class="page-header">
+        <h1><i class="fas fa-gavel me-2"></i>Gestion de Apelaciones</h1>
+    </div>
+
+    <!-- Estadisticas -->
+    <div class="stats-cards">
+        <div class="stat-card pendiente">
+            <div class="stat-number">@ViewBag.TotalPendientes</div>
+            <div class="stat-label">Pendientes</div>
+        </div>
+        <div class="stat-card enrevision">
+            <div class="stat-number">@ViewBag.TotalEnRevision</div>
+            <div class="stat-label">En Revision</div>
+        </div>
+        <div class="stat-card aprobada">
+            <div class="stat-number">@ViewBag.TotalAprobadas</div>
+            <div class="stat-label">Aprobadas</div>
+        </div>
+        <div class="stat-card rechazada">
+            <div class="stat-number">@ViewBag.TotalRechazadas</div>
+            <div class="stat-label">Rechazadas</div>
+        </div>
+        <div class="stat-card escalada">
+            <div class="stat-number">@ViewBag.TotalEscaladas</div>
+            <div class="stat-label">Escaladas</div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filters-section">
+        <form method="get" asp-action="Apelaciones">
+            <div class="filters-row">
+                <div class="filter-group">
+                    <label>Estado</label>
+                    <select name="estado">
+                        <option value="">Todos</option>
+                        @if (ViewBag.EstadoFiltro == "Pendiente") { <option value="Pendiente" selected>Pendiente</option> } else { <option value="Pendiente">Pendiente</option> }
+                        @if (ViewBag.EstadoFiltro == "EnRevision") { <option value="EnRevision" selected>En Revision</option> } else { <option value="EnRevision">En Revision</option> }
+                        @if (ViewBag.EstadoFiltro == "Aprobada") { <option value="Aprobada" selected>Aprobada</option> } else { <option value="Aprobada">Aprobada</option> }
+                        @if (ViewBag.EstadoFiltro == "Rechazada") { <option value="Rechazada" selected>Rechazada</option> } else { <option value="Rechazada">Rechazada</option> }
+                        @if (ViewBag.EstadoFiltro == "Escalada") { <option value="Escalada" selected>Escalada</option> } else { <option value="Escalada">Escalada</option> }
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Tipo</label>
+                    <select name="tipo">
+                        <option value="">Todos</option>
+                        @if (ViewBag.TipoFiltro == "Publicacion") { <option value="Publicacion" selected>Publicacion</option> } else { <option value="Publicacion">Publicacion</option> }
+                        @if (ViewBag.TipoFiltro == "Story") { <option value="Story" selected>Story</option> } else { <option value="Story">Story</option> }
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Prioridad</label>
+                    <select name="prioridad">
+                        <option value="">Todas</option>
+                        @if (ViewBag.PrioridadFiltro == "Normal") { <option value="Normal" selected>Normal</option> } else { <option value="Normal">Normal</option> }
+                        @if (ViewBag.PrioridadFiltro == "Alta") { <option value="Alta" selected>Alta</option> } else { <option value="Alta">Alta</option> }
+                        @if (ViewBag.PrioridadFiltro == "Urgente") { <option value="Urgente" selected>Urgente</option> } else { <option value="Urgente">Urgente</option> }
+                    </select>
+                </div>
+                <div class="filter-group" style="flex: 2;">
+                    <label>Buscar</label>
+                    <input type="text" name="busqueda" placeholder="Referencia o usuario..." value="@ViewBag.Busqueda">
+                </div>
+                <button type="submit" class="btn-filter">
+                    <i class="fas fa-search"></i> Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Lista de Apelaciones -->
+    @if (Model.Any())
+    {
+        @foreach (var apelacion in Model)
+        {
+            var claseRow = apelacion.Prioridad == Lado.Models.PrioridadApelacion.Urgente ? "prioridad-critica" :
+                          apelacion.Prioridad == Lado.Models.PrioridadApelacion.Alta ? "prioridad-alta" : "";
+
+            <div class="apelacion-row @claseRow">
+                <span class="apelacion-ref">@apelacion.NumeroReferencia</span>
+
+                <div class="apelacion-info">
+                    <div class="apelacion-info-main">
+                        <span class="apelacion-usuario">
+                            @(apelacion.Usuario?.NombreCompleto ?? apelacion.Usuario?.UserName ?? "Usuario desconocido")
+                        </span>
+                        <span class="apelacion-tipo">
+                            @if (apelacion.TipoContenido == "Publicacion")
+                            {
+                                <i class="fas fa-image"></i>
+                            }
+                            else
+                            {
+                                <i class="fas fa-circle"></i>
+                            }
+                            @apelacion.TipoContenido
+                        </span>
+                        @if (apelacion.Prioridad != Lado.Models.PrioridadApelacion.Normal)
+                        {
+                            <span class="prioridad-badge prioridad-@apelacion.Prioridad.ToString().ToLower()">
+                                @apelacion.Prioridad
+                            </span>
+                        }
+                    </div>
+                    <div class="apelacion-fecha">
+                        <i class="fas fa-clock me-1"></i>
+                        @apelacion.FechaCreacion.ToString("dd MMM yyyy, HH:mm")
+                        @if (apelacion.Estado == Lado.Models.EstadoApelacion.EnRevision && apelacion.Administrador != null)
+                        {
+                            <span style="margin-left: 8px;">
+                                <i class="fas fa-user-shield me-1"></i>
+                                Revisando: @apelacion.Administrador.UserName
+                            </span>
+                        }
+                    </div>
+                </div>
+
+                <span class="estado-badge estado-@apelacion.Estado.ToString().ToLower()">
+                    @switch (apelacion.Estado)
+                    {
+                        case Lado.Models.EstadoApelacion.Pendiente:
+                            <i class="fas fa-clock me-1"></i>@:Pendiente
+                            break;
+                        case Lado.Models.EstadoApelacion.EnRevision:
+                            <i class="fas fa-search me-1"></i>@:En Revision
+                            break;
+                        case Lado.Models.EstadoApelacion.Aprobada:
+                            <i class="fas fa-check me-1"></i>@:Aprobada
+                            break;
+                        case Lado.Models.EstadoApelacion.Rechazada:
+                            <i class="fas fa-times me-1"></i>@:Rechazada
+                            break;
+                        case Lado.Models.EstadoApelacion.Escalada:
+                            <i class="fas fa-arrow-up me-1"></i>@:Escalada
+                            break;
+                    }
+                </span>
+
+                <a href="@Url.Action("DetalleApelacion", "Admin", new { id = apelacion.Id })" class="btn-revisar">
+                    <i class="fas fa-eye"></i>
+                    Revisar
+                </a>
+            </div>
+        }
+
+        <!-- Paginacion -->
+        @if (ViewBag.TotalPaginas > 1)
+        {
+            <div class="pagination">
+                @if (ViewBag.PaginaActual > 1)
+                {
+                    <a href="@Url.Action("Apelaciones", new { pagina = ViewBag.PaginaActual - 1, estado = ViewBag.EstadoFiltro, tipo = ViewBag.TipoFiltro, prioridad = ViewBag.PrioridadFiltro, busqueda = ViewBag.Busqueda })">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                }
+
+                @for (int i = Math.Max(1, ViewBag.PaginaActual - 2); i <= Math.Min(ViewBag.TotalPaginas, ViewBag.PaginaActual + 2); i++)
+                {
+                    if (i == ViewBag.PaginaActual)
+                    {
+                        <span class="active">@i</span>
+                    }
+                    else
+                    {
+                        <a href="@Url.Action("Apelaciones", new { pagina = i, estado = ViewBag.EstadoFiltro, tipo = ViewBag.TipoFiltro, prioridad = ViewBag.PrioridadFiltro, busqueda = ViewBag.Busqueda })">@i</a>
+                    }
+                }
+
+                @if (ViewBag.PaginaActual < ViewBag.TotalPaginas)
+                {
+                    <a href="@Url.Action("Apelaciones", new { pagina = ViewBag.PaginaActual + 1, estado = ViewBag.EstadoFiltro, tipo = ViewBag.TipoFiltro, prioridad = ViewBag.PrioridadFiltro, busqueda = ViewBag.Busqueda })">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-state">
+            <i class="fas fa-inbox"></i>
+            <h3>No hay apelaciones</h3>
+            <p>No se encontraron apelaciones con los filtros seleccionados.</p>
+        </div>
+    }
+</div>

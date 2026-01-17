@@ -1,0 +1,608 @@
+@using Lado.Models.Moderacion
+@using Lado.Services
+@{
+    ViewData["Title"] = "Panel de Supervisor";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    var usuario = ViewBag.Usuario as Lado.Models.ApplicationUser;
+    var supervisor = ViewBag.Supervisor as UsuarioSupervisor;
+    var estadisticas = ViewBag.Estadisticas as EstadisticasCola;
+    var metricasHoy = ViewBag.MetricasHoy as MetricaSupervisor;
+    var itemsAsignados = ViewBag.ItemsAsignados as List<ColaModeracion>;
+    var resumenSemanal = ViewBag.ResumenSemanal as ResumenMetricasSupervisor;
+    var miRanking = (int)ViewBag.MiRanking;
+    var totalSupervisores = (int)ViewBag.TotalSupervisores;
+}
+
+<style>
+    .supervisor-dashboard {
+        padding: 24px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .supervisor-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 32px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .supervisor-title {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .supervisor-title h1 {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--fg);
+        margin: 0;
+    }
+
+    .rol-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        color: white;
+    }
+
+    .disponibilidad-toggle {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--surface);
+        padding: 12px 20px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+    }
+
+    .disponibilidad-toggle label {
+        font-weight: 500;
+        color: var(--fg-secondary);
+    }
+
+    .toggle-switch {
+        position: relative;
+        width: 50px;
+        height: 26px;
+    }
+
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--muted-light);
+        transition: 0.3s;
+        border-radius: 26px;
+    }
+
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 20px;
+        width: 20px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.3s;
+        border-radius: 50%;
+    }
+
+    input:checked + .toggle-slider {
+        background-color: #10b981;
+    }
+
+    input:checked + .toggle-slider:before {
+        transform: translateX(24px);
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+
+    .stat-card {
+        background: var(--surface);
+        border-radius: 16px;
+        padding: 20px;
+        border: 1px solid var(--line);
+    }
+
+    .stat-card.highlight {
+        background: var(--primary-gradient);
+        border: none;
+        color: white;
+    }
+
+    .stat-card.highlight .stat-label {
+        color: rgba(255,255,255,0.8);
+    }
+
+    .stat-card.highlight .stat-value {
+        color: white;
+    }
+
+    .stat-label {
+        font-size: 13px;
+        color: var(--muted);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .stat-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--fg);
+    }
+
+    .stat-change {
+        font-size: 12px;
+        margin-top: 4px;
+    }
+
+    .stat-change.positive {
+        color: #10b981;
+    }
+
+    .stat-change.negative {
+        color: #ef4444;
+    }
+
+    .content-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 24px;
+    }
+
+    @@media (max-width: 1024px) {
+        .content-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .section-card {
+        background: var(--surface);
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        overflow: hidden;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .section-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--fg);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .section-body {
+        padding: 20px;
+    }
+
+    .items-asignados {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .item-card {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px;
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        transition: all 0.2s;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .item-card:hover {
+        background: var(--bg-tertiary);
+        transform: translateX(4px);
+    }
+
+    .item-thumbnail {
+        width: 60px;
+        height: 60px;
+        border-radius: 8px;
+        object-fit: cover;
+        background: var(--line);
+    }
+
+    .item-info {
+        flex: 1;
+    }
+
+    .item-id {
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .item-creador {
+        font-weight: 500;
+        color: var(--fg);
+    }
+
+    .item-prioridad {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .item-prioridad.urgente {
+        background: #fef2f2;
+        color: #dc2626;
+    }
+
+    .item-prioridad.alta {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    .item-prioridad.normal {
+        background: #dbeafe;
+        color: #2563eb;
+    }
+
+    .item-prioridad.baja {
+        background: #d1fae5;
+        color: #059669;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--muted);
+    }
+
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+
+    .empty-state p {
+        margin-bottom: 16px;
+    }
+
+    .btn-primary {
+        background: var(--primary-gradient);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(70, 130, 180, 0.3);
+    }
+
+    .ranking-card {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 24px;
+        text-align: center;
+    }
+
+    .ranking-position {
+        font-size: 48px;
+        font-weight: 800;
+        color: var(--primary);
+    }
+
+    .ranking-label {
+        font-size: 14px;
+        color: var(--muted);
+    }
+
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .quick-action {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 20px;
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        text-decoration: none;
+        color: var(--fg);
+        transition: all 0.2s;
+    }
+
+    .quick-action:hover {
+        background: var(--primary);
+        color: white;
+    }
+
+    .quick-action i {
+        font-size: 24px;
+    }
+
+    .quick-action span {
+        font-size: 13px;
+        font-weight: 500;
+    }
+</style>
+
+<div class="supervisor-dashboard">
+    <!-- Header -->
+    <div class="supervisor-header">
+        <div class="supervisor-title">
+            <h1>Panel de Supervisor</h1>
+            @if (supervisor?.RolSupervisor != null)
+            {
+                <span class="rol-badge" style="background: @supervisor.RolSupervisor.ColorBadge">
+                    <i class="fas @supervisor.RolSupervisor.Icono"></i>
+                    @supervisor.RolSupervisor.Nombre
+                </span>
+            }
+        </div>
+
+        <div class="disponibilidad-toggle">
+            <label>Disponible para asignaciones</label>
+            <label class="toggle-switch">
+                <input type="checkbox" id="disponibilidadToggle" @(supervisor?.EstaDisponible == true ? "checked" : "") onchange="cambiarDisponibilidad(this.checked)">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <!-- Estadísticas rápidas -->
+    <div class="stats-grid">
+        <div class="stat-card highlight">
+            <div class="stat-label"><i class="fas fa-clock"></i> En cola</div>
+            <div class="stat-value">@(estadisticas?.TotalPendientes ?? 0)</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label"><i class="fas fa-check-circle"></i> Revisados hoy</div>
+            <div class="stat-value">@(metricasHoy?.TotalRevisados ?? 0)</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label"><i class="fas fa-thumbs-up"></i> Aprobados hoy</div>
+            <div class="stat-value">@(metricasHoy?.Aprobados ?? 0)</div>
+            @if (metricasHoy != null && metricasHoy.TotalRevisados > 0)
+            {
+                <div class="stat-change positive">@(Math.Round(metricasHoy.TasaAprobacion, 1))% tasa</div>
+            }
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label"><i class="fas fa-stopwatch"></i> Tiempo promedio</div>
+            <div class="stat-value">@(metricasHoy != null ? $"{metricasHoy.TiempoPromedioSegundos:F1}s" : "0s")</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label"><i class="fas fa-users"></i> Supervisores activos</div>
+            <div class="stat-value">@(estadisticas?.SupervisoresActivos ?? 0)</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label"><i class="fas fa-exclamation-triangle"></i> Urgentes</div>
+            <div class="stat-value" style="color: @(estadisticas?.TotalUrgentes > 0 ? "#ef4444" : "inherit")">
+                @(estadisticas?.TotalUrgentes ?? 0)
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido principal -->
+    <div class="content-grid">
+        <!-- Items asignados -->
+        <div class="section-card">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <i class="fas fa-tasks"></i>
+                    Mis items asignados
+                    @if (itemsAsignados?.Count > 0)
+                    {
+                        <span class="badge bg-primary">@itemsAsignados.Count</span>
+                    }
+                </h2>
+                <a href="@Url.Action("Cola")" class="btn-primary">
+                    <i class="fas fa-plus"></i> Obtener más
+                </a>
+            </div>
+            <div class="section-body">
+                @if (itemsAsignados?.Count > 0)
+                {
+                    <div class="items-asignados">
+                        @foreach (var item in itemsAsignados)
+                        {
+                            var prioridadClass = item.Prioridad switch
+                            {
+                                PrioridadModeracion.Urgente => "urgente",
+                                PrioridadModeracion.Alta => "alta",
+                                PrioridadModeracion.Normal => "normal",
+                                _ => "baja"
+                            };
+
+                            <a href="@Url.Action("Revisar", new { id = item.Id })" class="item-card">
+                                @if (item.Contenido?.Archivos?.FirstOrDefault() != null)
+                                {
+                                    <img src="@item.Contenido.Archivos.First().RutaArchivo" class="item-thumbnail" alt="">
+                                }
+                                else
+                                {
+                                    <div class="item-thumbnail" style="display:flex;align-items:center;justify-content:center;">
+                                        <i class="fas fa-image" style="color:var(--muted);"></i>
+                                    </div>
+                                }
+                                <div class="item-info">
+                                    <div class="item-id">#@item.ContenidoId</div>
+                                    <div class="item-creador">@(item.Contenido?.Usuario?.Seudonimo ?? item.Contenido?.Usuario?.UserName ?? "Anónimo")</div>
+                                </div>
+                                <span class="item-prioridad @prioridadClass">@item.Prioridad</span>
+                                <i class="fas fa-chevron-right" style="color: var(--muted);"></i>
+                            </a>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>No tienes items asignados actualmente</p>
+                        <a href="@Url.Action("Cola")" class="btn-primary">
+                            <i class="fas fa-play"></i> Comenzar a revisar
+                        </a>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Panel lateral -->
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+            <!-- Ranking -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 class="section-title"><i class="fas fa-trophy"></i> Tu ranking</h2>
+                </div>
+                <div class="ranking-card">
+                    <div>
+                        <div class="ranking-position">#@(miRanking > 0 ? miRanking : "-")</div>
+                        <div class="ranking-label">de @totalSupervisores supervisores esta semana</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resumen semanal -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 class="section-title"><i class="fas fa-chart-bar"></i> Esta semana</h2>
+                </div>
+                <div class="section-body">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div>
+                            <div style="font-size: 24px; font-weight: 700; color: var(--fg);">@(resumenSemanal?.TotalRevisados ?? 0)</div>
+                            <div style="font-size: 12px; color: var(--muted);">Revisados</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 24px; font-weight: 700; color: #10b981;">@(resumenSemanal?.Aprobados ?? 0)</div>
+                            <div style="font-size: 12px; color: var(--muted);">Aprobados</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 24px; font-weight: 700; color: #ef4444;">@(resumenSemanal?.Rechazados ?? 0)</div>
+                            <div style="font-size: 12px; color: var(--muted);">Rechazados</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 24px; font-weight: 700; color: var(--primary);">@(resumenSemanal != null ? $"{resumenSemanal.TiempoPromedioSegundos:F1}s" : "0s")</div>
+                            <div style="font-size: 12px; color: var(--muted);">Tiempo prom.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones rápidas -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 class="section-title"><i class="fas fa-bolt"></i> Acciones rápidas</h2>
+                </div>
+                <div class="section-body">
+                    <div class="quick-actions">
+                        <a href="@Url.Action("Cola")" class="quick-action">
+                            <i class="fas fa-list"></i>
+                            <span>Ver cola</span>
+                        </a>
+                        <a href="@Url.Action("MisDecisiones")" class="quick-action">
+                            <i class="fas fa-history"></i>
+                            <span>Historial</span>
+                        </a>
+                        <a href="@Url.Action("Estadisticas")" class="quick-action">
+                            <i class="fas fa-chart-line"></i>
+                            <span>Estadísticas</span>
+                        </a>
+                        <a href="@Url.Action("Ranking")" class="quick-action">
+                            <i class="fas fa-medal"></i>
+                            <span>Ranking</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    async function cambiarDisponibilidad(disponible) {
+        try {
+            const formData = new FormData();
+            formData.append('disponible', disponible);
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value || '');
+
+            const response = await fetch('@Url.Action("CambiarDisponibilidad")', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                console.log('Disponibilidad actualizada:', result.disponible);
+            }
+        } catch (error) {
+            console.error('Error al cambiar disponibilidad:', error);
+        }
+    }
+
+    // Actualizar estadísticas cada 30 segundos
+    setInterval(async () => {
+        try {
+            const response = await fetch('@Url.Action("ObtenerEstadisticasCola")');
+            const stats = await response.json();
+            // Actualizar UI si es necesario
+        } catch (error) {
+            console.error('Error al obtener estadísticas:', error);
+        }
+    }, 30000);
+</script>
+}

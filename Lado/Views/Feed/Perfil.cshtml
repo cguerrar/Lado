@@ -69,12 +69,33 @@
         overflow: hidden;
         background: var(--bg-tertiary);
         border: 3px solid var(--line);
+        position: relative;
     }
 
     .profile-pic img {
         width: 100%;
         height: 100%;
         object-fit: cover;
+        transition: transform 0.2s, filter 0.2s;
+    }
+
+    .profile-pic[onclick]:hover img {
+        transform: scale(1.05);
+        filter: brightness(1.1);
+    }
+
+    .profile-pic[onclick]::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,0);
+        border-radius: 50%;
+        transition: background 0.2s;
+        pointer-events: none;
+    }
+
+    .profile-pic[onclick]:hover::after {
+        background: rgba(255,255,255,0.1);
     }
 
     .pic-placeholder {
@@ -315,6 +336,18 @@
         font-weight: 400;
     }
 
+    .stat-clickable {
+        cursor: pointer;
+        padding: 4px 8px;
+        margin: -4px -8px;
+        border-radius: 8px;
+        transition: background 0.2s;
+    }
+
+    .stat-clickable:hover {
+        background: var(--bg-tertiary, rgba(0,0,0,0.05));
+    }
+
     /* BIO - Instagram Style */
     .profile-bio {
         font-size: 14px;
@@ -458,9 +491,14 @@
 
     /* HIGHLIGHTS - Instagram Style */
     .highlights-section {
-        padding: 12px 0 24px;
+        padding: 12px 16px 24px;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .highlights-section::-webkit-scrollbar {
+        display: none;
     }
 
     .highlights-container {
@@ -472,21 +510,27 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         cursor: pointer;
-        min-width: 64px;
+        min-width: 66px;
+        flex-shrink: 0;
+    }
+
+    .highlight-item:hover .highlight-circle {
+        transform: scale(1.05);
     }
 
     .highlight-circle {
-        width: 64px;
-        height: 64px;
+        width: 62px;
+        height: 62px;
         border-radius: 50%;
         background: var(--bg-tertiary);
-        border: 1px solid var(--line);
+        border: 2px solid var(--line);
         display: flex;
         align-items: center;
         justify-content: center;
         overflow: hidden;
+        transition: transform 0.2s ease;
     }
 
     .highlight-circle img {
@@ -495,14 +539,174 @@
         object-fit: cover;
     }
 
+    .highlight-circle.empty {
+        background: linear-gradient(135deg, var(--bg-tertiary), var(--bg));
+    }
+
+    .highlight-circle.empty svg {
+        width: 24px;
+        height: 24px;
+        color: var(--muted);
+    }
+
     .highlight-label {
-        font-size: 12px;
+        font-size: 11px;
         color: var(--fg);
-        max-width: 64px;
+        max-width: 66px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
         text-align: center;
+        font-weight: 500;
+    }
+
+    /* VISOR DE DESTACADOS */
+    .highlights-viewer-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 10000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .highlights-viewer-overlay.active {
+        display: flex;
+    }
+
+    .highlights-viewer {
+        position: relative;
+        width: 100%;
+        max-width: 420px;
+        height: 100%;
+        max-height: 750px;
+        background: #000;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .highlights-viewer-header {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        padding: 16px;
+        background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .highlights-viewer-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid white;
+    }
+
+    .highlights-viewer-info {
+        flex: 1;
+    }
+
+    .highlights-viewer-username {
+        color: white;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .highlights-viewer-group {
+        color: rgba(255,255,255,0.7);
+        font-size: 12px;
+    }
+
+    .highlights-viewer-close {
+        width: 36px;
+        height: 36px;
+        border: none;
+        background: rgba(255,255,255,0.2);
+        border-radius: 50%;
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .highlights-viewer-content {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #000;
+    }
+
+    .highlights-viewer-content img,
+    .highlights-viewer-content video {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+
+    .highlights-viewer-progress {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        display: flex;
+        gap: 4px;
+        z-index: 11;
+    }
+
+    .highlights-progress-bar {
+        flex: 1;
+        height: 3px;
+        background: rgba(255,255,255,0.3);
+        border-radius: 2px;
+        overflow: hidden;
+    }
+
+    .highlights-progress-bar.viewed {
+        background: white;
+    }
+
+    .highlights-progress-bar.active .highlights-progress-fill {
+        animation: highlightProgress 5s linear forwards;
+    }
+
+    .highlights-progress-fill {
+        height: 100%;
+        background: white;
+        width: 0%;
+    }
+
+    @@keyframes highlightProgress {
+        from { width: 0%; }
+        to { width: 100%; }
+    }
+
+    .highlights-viewer-nav {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 40%;
+        height: 60%;
+        cursor: pointer;
+        z-index: 5;
+    }
+
+    .highlights-viewer-nav.prev {
+        left: 0;
+    }
+
+    .highlights-viewer-nav.next {
+        right: 0;
     }
 
     /* TABS - Instagram Style */
@@ -1911,10 +2115,10 @@
     <!-- HEADER -->
     <div class="profile-header">
         <div class="profile-pic-wrapper">
-            <div class="profile-pic">
+            <div class="profile-pic" @(string.IsNullOrEmpty(fotoPerfilMostrar) ? "" : "onclick=\"abrirFotoPerfil(this)\" style=\"cursor:pointer\"") title="@(string.IsNullOrEmpty(fotoPerfilMostrar) ? "" : "Ver foto de perfil")">
                 @if (!string.IsNullOrEmpty(fotoPerfilMostrar))
                 {
-                    <img src="@fotoPerfilMostrar" alt="@nombreMostrado">
+                    <img src="@fotoPerfilMostrar" alt="@nombreMostrado" data-full-src="@fotoPerfilMostrar">
                 }
                 else
                 {
@@ -1995,11 +2199,15 @@
                     <span class="stat-number">@ViewBag.TotalPublicaciones</span>
                     <span class="stat-label">publicaciones</span>
                 </div>
-                <div class="stat">
+                <div class="stat stat-clickable" onclick="mostrarSeguidores('@Model.Id')" title="Ver seguidores">
                     <span class="stat-number">@ViewBag.NumeroSuscriptores</span>
                     <span class="stat-label">seguidores</span>
                 </div>
-                <div class="stat">
+                <div class="stat stat-clickable" onclick="mostrarSiguiendo('@Model.Id')" title="Ver siguiendo">
+                    <span class="stat-number">@(ViewBag.NumeroSiguiendo ?? 0)</span>
+                    <span class="stat-label">siguiendo</span>
+                </div>
+                <div class="stat stat-clickable" onclick="mostrarLikes('@Model.Id')" title="Ver quién dio me gusta">
                     <span class="stat-number">
                         @{
                             var totalLikes = ViewBag.TotalLikes;
@@ -2143,6 +2351,15 @@
         </div>
     </div>
 
+    <!-- ========================================
+         HISTORIAS DESTACADAS - Instagram Style
+         ======================================== -->
+    <div class="highlights-section" id="highlightsSection" style="display: none;">
+        <div class="highlights-container" id="highlightsContainer">
+            <!-- Se carga dinámicamente -->
+        </div>
+    </div>
+
     @* ========================================
        TEASER LADOB - Solo si:
        1. Estamos viendo LadoA (no seudónimo)
@@ -2169,6 +2386,36 @@
             </a>
         </div>
     }
+
+    <!-- Modal Visor de Destacados -->
+    <div class="highlights-viewer-overlay" id="highlightsViewerOverlay" onclick="cerrarVisorDestacados(event)">
+        <div class="highlights-viewer" onclick="event.stopPropagation()">
+            <div class="highlights-viewer-progress" id="highlightsViewerProgress">
+                <!-- Barras de progreso dinámicas -->
+            </div>
+            <div class="highlights-viewer-header">
+                <img src="@(Model.FotoPerfil ?? "/images/default-avatar.svg")"
+                     alt="@Model.UserName"
+                     class="highlights-viewer-avatar"
+                     onerror="this.src='/images/default-avatar.svg'">
+                <div class="highlights-viewer-info">
+                    <div class="highlights-viewer-username">@Model.UserName</div>
+                    <div class="highlights-viewer-group" id="highlightsViewerGroupName"></div>
+                </div>
+                <button class="highlights-viewer-close" onclick="cerrarVisorDestacados()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="highlights-viewer-content" id="highlightsViewerContent">
+                <!-- Contenido dinámico -->
+            </div>
+            <div class="highlights-viewer-nav prev" onclick="navegarDestacado(-1)"></div>
+            <div class="highlights-viewer-nav next" onclick="navegarDestacado(1)"></div>
+        </div>
+    </div>
 
     @{
         // Separar contenidos para los tabs: Posts (no Reels) vs Reels (EsReel=true)
@@ -2229,11 +2476,15 @@
                         : $"/Feed/Detalle/{contenido.Id}";
 
                     <div class="post-item" onclick="window.location.href='@clickUrl'">
+                        @{
+                            // Usar PrimerArchivo para compatibilidad con contenidos con Archivos o RutaArchivo
+                            var rutaMedia = contenido.PrimerArchivo;
+                        }
                         @if (estaBloqueado)
                         {
-                            @if (!string.IsNullOrEmpty(contenido.RutaArchivo))
+                            @if (!string.IsNullOrEmpty(rutaMedia))
                             {
-                                <img src="@contenido.RutaArchivo" alt="Premium" style="filter: blur(20px);">
+                                <img src="@rutaMedia" alt="Premium" style="filter: blur(20px);">
                             }
                             else
                             {
@@ -2249,12 +2500,12 @@
                                 <span class="lock-text">Contenido Premium</span>
                             </div>
                         }
-                        else if (!string.IsNullOrEmpty(contenido.RutaArchivo))
+                        else if (!string.IsNullOrEmpty(rutaMedia))
                         {
                             var esVideo = contenido.TipoContenido == TipoContenido.Video ||
-                                         contenido.RutaArchivo.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase) ||
-                                         contenido.RutaArchivo.EndsWith(".webm", StringComparison.OrdinalIgnoreCase) ||
-                                         contenido.RutaArchivo.EndsWith(".mov", StringComparison.OrdinalIgnoreCase);
+                                         rutaMedia.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase) ||
+                                         rutaMedia.EndsWith(".webm", StringComparison.OrdinalIgnoreCase) ||
+                                         rutaMedia.EndsWith(".mov", StringComparison.OrdinalIgnoreCase);
                             if (esVideo)
                             {
                                 if (!string.IsNullOrEmpty(contenido.Thumbnail))
@@ -2263,7 +2514,7 @@
                                 }
                                 else
                                 {
-                                    <video src="@(contenido.RutaArchivo)#t=0.1" muted preload="metadata" playsinline loop class="video-preview"></video>
+                                    <video src="@(rutaMedia)#t=0.1" muted preload="metadata" playsinline loop class="video-preview"></video>
                                 }
                                 <div class="video-indicator">
                                     <svg viewBox="0 0 24 24" fill="currentColor">
@@ -2273,7 +2524,7 @@
                             }
                             else
                             {
-                                <img src="@contenido.RutaArchivo" alt="Post">
+                                <img src="@rutaMedia" alt="Post">
                             }
                             if (contenido.EsCarrusel)
                             {
@@ -2338,13 +2589,14 @@
                     var clickUrl = estaBloqueado
                         ? $"/Feed/Perfil/{Model.Id}?verSeudonimo=true"
                         : $"/Feed/Detalle/{contenido.Id}";
+                    var rutaMediaReel = contenido.PrimerArchivo;
 
                     <div class="post-item reel-item" onclick="window.location.href='@clickUrl'">
                         @if (estaBloqueado)
                         {
-                            @if (!string.IsNullOrEmpty(contenido.Thumbnail ?? contenido.RutaArchivo))
+                            @if (!string.IsNullOrEmpty(contenido.Thumbnail ?? rutaMediaReel))
                             {
-                                <img src="@(contenido.Thumbnail ?? contenido.RutaArchivo)" alt="Premium" style="filter: blur(20px);">
+                                <img src="@(contenido.Thumbnail ?? rutaMediaReel)" alt="Premium" style="filter: blur(20px);">
                             }
                             else
                             {
@@ -2368,7 +2620,7 @@
                             }
                             else
                             {
-                                <video src="@(contenido.RutaArchivo)#t=0.1" muted preload="metadata" playsinline loop class="video-preview"></video>
+                                <video src="@(rutaMediaReel)#t=0.1" muted preload="metadata" playsinline loop class="video-preview"></video>
                             }
                             <div class="video-indicator">
                                 <svg viewBox="0 0 24 24">
@@ -2813,6 +3065,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            // Confirmación antes de enviar propina
+            if (incluyePropina && montoTotal > 0) {
+                let confirmMsg = `Vas a enviar una propina de $${montoTotal.toFixed(2)}.`;
+                if (montoLadoCoins > 0) {
+                    confirmMsg += `\n\nUsarás $${montoLadoCoins.toFixed(2)} en LadoCoins.\nPago en efectivo: $${montoReal.toFixed(2)}`;
+                }
+                const confirmed = await showConfirm('Confirmar propina', confirmMsg);
+                if (!confirmed) {
+                    submitBtn.innerHTML = originalHtml;
+                    submitBtn.disabled = false;
+                    return;
+                }
+            }
+
             try {
                 const response = await fetch('/Mensajes/EnviarMensajeDirecto', {
                     method: 'POST',
@@ -2902,6 +3168,217 @@ function showMessageSentToast(creadorId, conPropina) {
             toast.remove();
         }
     }, 8000);
+}
+
+// ========================================
+// MODAL DE SEGUIDORES / SIGUIENDO
+// ========================================
+function mostrarSeguidores(userId) {
+    console.log('[Perfil] Mostrando seguidores de:', userId);
+    mostrarListaUsuarios(userId, 'Seguidores', 'Seguidores');
+}
+
+function mostrarSiguiendo(userId) {
+    console.log('[Perfil] Mostrando siguiendo de:', userId);
+    mostrarListaUsuarios(userId, 'Siguiendo', 'Siguiendo');
+}
+
+function mostrarLikes(userId) {
+    console.log('[Perfil] Mostrando likes de:', userId);
+    mostrarListaUsuarios(userId, 'Likes', 'Les gusta tu contenido');
+}
+
+// ========================================
+// LIGHTBOX PARA FOTO DE PERFIL
+// ========================================
+function abrirFotoPerfil(element) {
+    const img = element.querySelector('img');
+    if (!img) return;
+
+    const src = img.getAttribute('data-full-src') || img.src;
+    const alt = img.alt || 'Foto de perfil';
+
+    // Crear lightbox
+    const lightbox = document.createElement('div');
+    lightbox.id = 'profileLightbox';
+    lightbox.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 99999;
+        cursor: zoom-out;
+        animation: fadeIn 0.2s ease;
+    `;
+
+    lightbox.innerHTML = `
+        <style>
+            @@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @@keyframes zoomIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        </style>
+        <button onclick="cerrarLightbox()" style="position:absolute;top:20px;right:20px;background:rgba(0,0,0,0.5);border:2px solid rgba(255,255,255,0.3);color:white;width:44px;height:44px;border-radius:50%;cursor:pointer;font-size:24px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;z-index:10" onmouseover="this.style.background='rgba(0,0,0,0.7)'" onmouseout="this.style.background='rgba(0,0,0,0.5)'">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        </button>
+        <div style="background:#fff;padding:8px;border-radius:4px;box-shadow:0 20px 60px rgba(0,0,0,0.5);animation:zoomIn 0.3s ease">
+            <img src="${src}" alt="${alt}" style="display:block;max-width:min(600px, 90vw);max-height:80vh;object-fit:contain;border-radius:2px">
+        </div>
+    `;
+
+    // Cerrar al hacer clic fuera de la imagen
+    lightbox.addEventListener('click', (e) => {
+        if (e.target === lightbox) cerrarLightbox();
+    });
+
+    // Cerrar con Escape
+    const handleEsc = (e) => {
+        if (e.key === 'Escape') {
+            cerrarLightbox();
+            document.removeEventListener('keydown', handleEsc);
+        }
+    };
+    document.addEventListener('keydown', handleEsc);
+
+    document.body.appendChild(lightbox);
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarLightbox() {
+    const lightbox = document.getElementById('profileLightbox');
+    if (lightbox) {
+        lightbox.style.opacity = '0';
+        setTimeout(() => {
+            lightbox.remove();
+            document.body.style.overflow = '';
+        }, 200);
+    }
+}
+
+function mostrarListaUsuarios(userId, tipo, titulo) {
+    // Crear modal si no existe
+    let modal = document.getElementById('followersModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'followersModal';
+        modal.className = 'modal fade';
+        modal.tabIndex = -1;
+        modal.setAttribute('aria-hidden', 'true');
+        modal.innerHTML = `
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content" style="background:var(--surface, #fff);border-radius:16px;max-height:80vh">
+                    <div class="modal-header" style="border-bottom:1px solid var(--line, #eee);padding:16px 20px">
+                        <h5 class="modal-title" style="font-weight:700;color:var(--fg, #000)"></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body" style="padding:0;max-height:60vh;overflow-y:auto">
+                        <div class="followers-list"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    const modalTitle = modal.querySelector('.modal-title');
+    const listContainer = modal.querySelector('.followers-list');
+
+    modalTitle.textContent = titulo;
+    listContainer.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted, #888)"><div class="spinner-border spinner-border-sm"></div> Cargando...</div>';
+
+    // Mostrar modal
+    try {
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+    } catch (e) {
+        console.error('[Perfil] Error mostrando modal:', e);
+        // Fallback: mostrar modal manualmente
+        modal.classList.add('show');
+        modal.style.display = 'block';
+        document.body.classList.add('modal-open');
+    }
+
+    // Cargar datos
+    const url = '/Feed/ObtenerLista' + tipo + '/' + userId;
+    console.log('[Perfil] Fetch URL:', url);
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            console.log('[Perfil] Datos recibidos:', data);
+            if (data.success && data.usuarios && data.usuarios.length > 0) {
+                listContainer.innerHTML = data.usuarios.map(u => {
+                    const inicial = (u.nombre || u.username || '?')[0].toUpperCase();
+                    const mostrarBotonSeguir = tipo === 'Likes' && !u.loSigo && !u.soyYo;
+                    const textoBoton = u.loSigo ? 'Siguiendo' : 'Seguir';
+                    return `
+                    <div class="follower-item" style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line, #eee)">
+                        <a href="/Feed/Perfil/${u.id}" style="display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--fg, #000);flex:1;min-width:0">
+                            <div style="width:44px;height:44px;border-radius:50%;overflow:hidden;background:var(--bg-tertiary, #f0f0f0);flex-shrink:0">
+                                ${u.fotoPerfil ? `<img src="${u.fotoPerfil}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.innerHTML='<div style=\\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:#888\\'>${inicial}</div>'">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:#888">${inicial}</div>`}
+                            </div>
+                            <div style="flex:1;min-width:0">
+                                <div style="font-weight:600;font-size:14px">${u.username}</div>
+                                <div style="font-size:13px;color:var(--muted, #888);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.nombre || ''}</div>
+                            </div>
+                            ${u.verificado ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="#4682B4"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : ''}
+                        </a>
+                        ${mostrarBotonSeguir ? `<button onclick="seguirDesdeModal('${u.id}', this)" style="background:var(--primary, #0095f6);color:#fff;border:none;border-radius:8px;padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0">Seguir</button>` : ''}
+                    </div>
+                    `;
+                }).join('');
+            } else {
+                const mensajeVacio = tipo === 'Seguidores' ? 'No hay seguidores aún' :
+                                  tipo === 'Siguiendo' ? 'No sigue a nadie aún' :
+                                  'Aún no hay likes en tu contenido';
+            listContainer.innerHTML = `<div style="padding:40px;text-align:center;color:var(--muted, #888)">${mensajeVacio}</div>`;
+            }
+        })
+        .catch(e => {
+            console.error('[Perfil] Error fetch:', e);
+            listContainer.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted, #888)">Error al cargar</div>';
+        });
+}
+
+// Seguir usuario desde el modal de likes
+async function seguirDesdeModal(userId, btn) {
+    try {
+        btn.disabled = true;
+        btn.textContent = '...';
+
+        const res = await fetch('/Feed/Seguir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `id=${userId}&tipoLado=0`
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            if (data.siguiendo) {
+                btn.textContent = 'Siguiendo';
+                btn.style.background = 'transparent';
+                btn.style.color = 'var(--muted, #888)';
+                btn.style.border = '1px solid var(--line, #dbdbdb)';
+            } else {
+                btn.textContent = 'Seguir';
+                btn.style.background = 'var(--primary, #0095f6)';
+                btn.style.color = '#fff';
+                btn.style.border = 'none';
+            }
+        } else {
+            btn.textContent = 'Seguir';
+        }
+    } catch (err) {
+        console.error('[Perfil] Error al seguir:', err);
+        btn.textContent = 'Seguir';
+    } finally {
+        btn.disabled = false;
+    }
 }
 </script>
 
@@ -3132,6 +3609,35 @@ function showMessageSentToast(creadorId, conPropina) {
         if (subscribeModal && subscribeModal.parentElement !== document.body) {
             document.body.appendChild(subscribeModal);
         }
+
+        // Confirmación antes de suscribirse
+        const subscribeForm = document.getElementById('subscribeForm');
+        if (subscribeForm) {
+            subscribeForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+
+                const duracionSeleccionada = document.querySelector('.duration-option.selected');
+                const duracionTexto = duracionSeleccionada ? duracionSeleccionada.querySelector('.duration-period').textContent : 'mensual';
+                const precio = precioSpan ? precioSpan.textContent : '0.00';
+                const montoLC = parseFloat(montoLadoCoinsInput?.value || 0);
+                const pagoReal = (precioActual - montoLC).toFixed(2);
+
+                let mensaje = `Vas a suscribirte por $${precio} (${duracionTexto}).`;
+                if (montoLC > 0) {
+                    mensaje = `Vas a suscribirte por $${precio} (${duracionTexto}).\n\nUsarás $${montoLC.toFixed(2)} en LadoCoins.\nPago en efectivo: $${pagoReal}`;
+                }
+
+                const confirmed = await showConfirm('Confirmar suscripción', mensaje);
+                if (confirmed) {
+                    const btn = document.getElementById('subscribeBtn');
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+                    }
+                    this.submit();
+                }
+            });
+        }
     })();
     </script>
 }
@@ -3140,6 +3646,8 @@ function showMessageSentToast(creadorId, conPropina) {
 document.addEventListener('DOMContentLoaded', function() {
     // Video hover play functionality
     initVideoHover();
+    // Cargar destacados del perfil
+    cargarDestacadosPerfil();
 });
 
 function initVideoHover() {
@@ -3172,4 +3680,237 @@ function initVideoHover() {
         });
     });
 }
+
+// ========================================
+// HISTORIAS DESTACADAS
+// ========================================
+const perfilUsuarioId = '@Model.Id';
+let destacadosData = [];
+let currentHighlightGroupIndex = 0;
+let currentHighlightIndex = 0;
+let highlightTimer = null;
+
+async function cargarDestacadosPerfil() {
+    try {
+        console.log('[Destacados] Cargando para usuario:', perfilUsuarioId);
+        const response = await fetch(`/Stories/ObtenerGruposDestacados?usuarioId=${perfilUsuarioId}`);
+        const data = await response.json();
+        console.log('[Destacados] Respuesta:', data);
+
+        if (data.success && data.grupos && data.grupos.length > 0) {
+            console.log('[Destacados] Mostrando', data.grupos.length, 'grupos');
+            renderizarGruposDestacados(data.grupos);
+            document.getElementById('highlightsSection').style.display = 'block';
+        } else {
+            console.log('[Destacados] No hay grupos o respuesta inválida');
+        }
+    } catch (error) {
+        console.error('[Destacados] Error:', error);
+    }
+}
+
+function renderizarGruposDestacados(grupos) {
+    const container = document.getElementById('highlightsContainer');
+    container.innerHTML = grupos.map((grupo, index) => `
+        <div class="highlight-item" onclick="abrirVisorDestacados(${index}, ${grupo.id})">
+            <div class="highlight-circle ${!grupo.imagenPortada ? 'empty' : ''}">
+                ${grupo.imagenPortada
+                    ? `<img src="${grupo.imagenPortada}" alt="${grupo.nombre}" onerror="this.parentElement.classList.add('empty'); this.remove();">`
+                    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                       </svg>`
+                }
+            </div>
+            <span class="highlight-label">${escapeHtmlHighlights(grupo.nombre)}</span>
+        </div>
+    `).join('');
+
+    // Guardar grupos para uso posterior
+    destacadosData = grupos;
+}
+
+function escapeHtmlHighlights(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+async function abrirVisorDestacados(grupoIndex, grupoId) {
+    currentHighlightGroupIndex = grupoIndex;
+    currentHighlightIndex = 0;
+
+    // Cargar historias del grupo
+    try {
+        const response = await fetch(`/Stories/ObtenerDestacados?usuarioId=${perfilUsuarioId}&grupoId=${grupoId}`);
+        const historias = await response.json();
+
+        if (!historias || historias.length === 0) {
+            showToast('No hay historias en este grupo', 'info');
+            return;
+        }
+
+        // Guardar historias en el grupo
+        destacadosData[grupoIndex].historias = historias;
+
+        // Mostrar nombre del grupo
+        document.getElementById('highlightsViewerGroupName').textContent = destacadosData[grupoIndex].nombre;
+
+        // Renderizar barras de progreso
+        renderizarBarrasProgreso(historias.length);
+
+        // Mostrar primera historia
+        mostrarDestacado(0);
+
+        // Mostrar overlay
+        document.getElementById('highlightsViewerOverlay').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    } catch (error) {
+        console.error('Error cargando historias destacadas:', error);
+        showToast('Error al cargar destacados', 'error');
+    }
+}
+
+function renderizarBarrasProgreso(total) {
+    const container = document.getElementById('highlightsViewerProgress');
+    container.innerHTML = Array(total).fill(0).map((_, i) => `
+        <div class="highlights-progress-bar" data-index="${i}">
+            <div class="highlights-progress-fill"></div>
+        </div>
+    `).join('');
+}
+
+function mostrarDestacado(index) {
+    const grupo = destacadosData[currentHighlightGroupIndex];
+    if (!grupo || !grupo.historias) return;
+
+    const historias = grupo.historias;
+    if (index < 0 || index >= historias.length) {
+        cerrarVisorDestacados();
+        return;
+    }
+
+    currentHighlightIndex = index;
+    const historia = historias[index];
+    const container = document.getElementById('highlightsViewerContent');
+
+    // Limpiar timer anterior
+    if (highlightTimer) {
+        clearTimeout(highlightTimer);
+        highlightTimer = null;
+    }
+
+    // Actualizar barras de progreso
+    actualizarBarrasProgreso(index);
+
+    // Obtener URL del archivo (puede venir como rutaArchivo o mediaUrl)
+    const mediaUrl = historia.rutaArchivo || historia.mediaUrl || '';
+
+    if (!mediaUrl) {
+        console.error('[Destacados] No se encontró URL para historia:', historia);
+        container.innerHTML = `<div style="color: white; text-align: center; padding: 20px;">No se pudo cargar el contenido</div>`;
+        highlightTimer = setTimeout(() => navegarDestacado(1), 2000);
+        return;
+    }
+
+    // Determinar tipo de contenido
+    const esVideo = historia.tipoContenido === 1 || historia.tipoContenido === 'VIDEO' ||
+                    historia.tipoContenido === 'Video' ||
+                    mediaUrl.match(/\.(mp4|webm|mov)$/i);
+
+    if (esVideo) {
+        container.innerHTML = `
+            <video src="${mediaUrl}"
+                   autoplay playsinline muted
+                   style="max-width: 100%; max-height: 100%; object-fit: contain;"
+                   onended="navegarDestacado(1)"
+                   onclick="toggleVideoSound(this)"
+                   onerror="this.parentElement.innerHTML='<div style=\\'color:white;text-align:center;padding:20px;\\'>Error al cargar video</div>'">
+            </video>
+        `;
+        const video = container.querySelector('video');
+        if (video) video.play().catch(() => {});
+    } else {
+        container.innerHTML = `
+            <img src="${mediaUrl}"
+                 alt="Destacado"
+                 style="max-width: 100%; max-height: 100%; object-fit: contain;"
+                 onerror="this.parentElement.innerHTML='<div style=\\'color:white;text-align:center;padding:20px;\\'>Error al cargar imagen</div>'">
+        `;
+        // Timer para imágenes (5 segundos)
+        highlightTimer = setTimeout(() => navegarDestacado(1), 5000);
+    }
+}
+
+function actualizarBarrasProgreso(currentIndex) {
+    const barras = document.querySelectorAll('.highlights-progress-bar');
+    barras.forEach((barra, i) => {
+        barra.classList.remove('viewed', 'active');
+        if (i < currentIndex) {
+            barra.classList.add('viewed');
+        } else if (i === currentIndex) {
+            barra.classList.add('active');
+        }
+    });
+}
+
+function navegarDestacado(direccion) {
+    const grupo = destacadosData[currentHighlightGroupIndex];
+    if (!grupo || !grupo.historias) return;
+
+    const nuevoIndex = currentHighlightIndex + direccion;
+
+    if (nuevoIndex < 0) {
+        // Ir al grupo anterior
+        if (currentHighlightGroupIndex > 0) {
+            const grupoAnterior = destacadosData[currentHighlightGroupIndex - 1];
+            abrirVisorDestacados(currentHighlightGroupIndex - 1, grupoAnterior.id);
+        } else {
+            cerrarVisorDestacados();
+        }
+    } else if (nuevoIndex >= grupo.historias.length) {
+        // Ir al siguiente grupo
+        if (currentHighlightGroupIndex < destacadosData.length - 1) {
+            const grupoSiguiente = destacadosData[currentHighlightGroupIndex + 1];
+            abrirVisorDestacados(currentHighlightGroupIndex + 1, grupoSiguiente.id);
+        } else {
+            cerrarVisorDestacados();
+        }
+    } else {
+        mostrarDestacado(nuevoIndex);
+    }
+}
+
+function toggleVideoSound(video) {
+    video.muted = !video.muted;
+}
+
+function cerrarVisorDestacados(event) {
+    if (event && event.target !== event.currentTarget) return;
+
+    if (highlightTimer) {
+        clearTimeout(highlightTimer);
+        highlightTimer = null;
+    }
+
+    // Pausar video si hay uno
+    const video = document.querySelector('#highlightsViewerContent video');
+    if (video) {
+        video.pause();
+    }
+
+    document.getElementById('highlightsViewerOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+// Cerrar con tecla Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && document.getElementById('highlightsViewerOverlay').classList.contains('active')) {
+        cerrarVisorDestacados();
+    }
+    // Navegación con flechas
+    if (document.getElementById('highlightsViewerOverlay').classList.contains('active')) {
+        if (e.key === 'ArrowLeft') navegarDestacado(-1);
+        if (e.key === 'ArrowRight') navegarDestacado(1);
+    }
+});
 </script>

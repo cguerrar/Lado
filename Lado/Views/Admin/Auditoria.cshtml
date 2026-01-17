@@ -1,0 +1,301 @@
+@model List<Lado.Models.AuditoriaConfiguracion>
+@{
+    ViewData["Title"] = "Auditoría de Configuraciones";
+    Layout = "_AdminLayout";
+    var estadisticas = ViewBag.Estadisticas as Dictionary<string, int> ?? new Dictionary<string, int>();
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0"><i class="bi bi-clock-history me-2"></i>Auditoría de Configuraciones</h2>
+        <button class="btn btn-outline-primary" onclick="exportarAuditoria()">
+            <i class="bi bi-download me-1"></i>Exportar
+        </button>
+    </div>
+
+    <!-- Estadísticas rápidas -->
+    <div class="row g-3 mb-4">
+        @foreach (var stat in estadisticas.OrderByDescending(s => s.Value).Take(6))
+        {
+            <div class="col-lg-2 col-md-4 col-6">
+                <div class="card text-center h-100">
+                    <div class="card-body py-3">
+                        <h4 class="mb-0 text-primary">@stat.Value</h4>
+                        <small class="text-muted">@stat.Key</small>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Tipo de Configuración</label>
+                    <select id="filtroTipo" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="0">Plataforma</option>
+                        <option value="1">Algoritmo</option>
+                        <option value="2">Confianza</option>
+                        <option value="3">LadoCoins</option>
+                        <option value="4">SEO</option>
+                        <option value="5">Retención</option>
+                        <option value="6">Tasa Cambio</option>
+                        <option value="7">Mantenimiento</option>
+                        <option value="8">Permisos</option>
+                        <option value="9">Roles</option>
+                        <option value="10">Popups</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Desde</label>
+                    <input type="date" id="filtroDesde" class="form-control">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Hasta</label>
+                    <input type="date" id="filtroHasta" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Buscar</label>
+                    <input type="text" id="filtroBuscar" class="form-control" placeholder="Campo, valor, admin...">
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-primary w-100" onclick="aplicarFiltros()">
+                        <i class="bi bi-funnel me-1"></i>Filtrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline de cambios -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">Historial de Cambios</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="tablaAuditoria">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 160px;">Fecha</th>
+                            <th style="width: 120px;">Tipo</th>
+                            <th>Campo</th>
+                            <th>Cambio</th>
+                            <th style="width: 150px;">Admin</th>
+                            <th style="width: 120px;">IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Any())
+                        {
+                            foreach (var registro in Model)
+                            {
+                                var tipoBadge = registro.TipoConfiguracion switch
+                                {
+                                    Lado.Models.TipoConfiguracion.Plataforma => "bg-primary",
+                                    Lado.Models.TipoConfiguracion.Algoritmo => "bg-info",
+                                    Lado.Models.TipoConfiguracion.Mantenimiento => "bg-warning text-dark",
+                                    Lado.Models.TipoConfiguracion.Permisos => "bg-danger",
+                                    Lado.Models.TipoConfiguracion.Rol => "bg-danger",
+                                    Lado.Models.TipoConfiguracion.LadoCoins => "bg-success",
+                                    _ => "bg-secondary"
+                                };
+
+                                <tr>
+                                    <td>
+                                        <small>@registro.FechaModificacion.ToString("dd/MM/yyyy")</small><br>
+                                        <strong>@registro.FechaModificacion.ToString("HH:mm:ss")</strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge @tipoBadge">@registro.TipoConfiguracion</span>
+                                    </td>
+                                    <td>
+                                        <strong>@registro.Campo</strong>
+                                        @if (!string.IsNullOrEmpty(registro.EntidadId))
+                                        {
+                                            <br><small class="text-muted">ID: @registro.EntidadId</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(registro.ValorAnterior) || !string.IsNullOrEmpty(registro.ValorNuevo))
+                                        {
+                                            <div class="d-flex align-items-center gap-2" style="font-size: 0.85rem;">
+                                                <span class="badge bg-light text-dark text-truncate" style="max-width: 150px;" title="@registro.ValorAnterior">
+                                                    @(registro.ValorAnterior?.Length > 30 ? registro.ValorAnterior.Substring(0, 30) + "..." : registro.ValorAnterior ?? "(vacío)")
+                                                </span>
+                                                <i class="bi bi-arrow-right text-muted"></i>
+                                                <span class="badge bg-success text-truncate" style="max-width: 150px;" title="@registro.ValorNuevo">
+                                                    @(registro.ValorNuevo?.Length > 30 ? registro.ValorNuevo.Substring(0, 30) + "..." : registro.ValorNuevo ?? "(vacío)")
+                                                </span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <small class="text-muted">@(registro.Descripcion ?? "-")</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        <small>@(registro.ModificadoPor?.NombreCompleto ?? registro.ModificadoPor?.UserName ?? "Admin")</small>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">@(registro.IpOrigen ?? "-")</small>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-muted">
+                                    <i class="bi bi-clock-history fs-1 d-block mb-2"></i>
+                                    <p>No hay registros de auditoría</p>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detalle -->
+<div class="modal fade" id="modalDetalle" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-info-circle me-2"></i>Detalle del Cambio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalDetalleContenido">
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        async function aplicarFiltros() {
+            const tipo = document.getElementById('filtroTipo').value;
+            const desde = document.getElementById('filtroDesde').value;
+            const hasta = document.getElementById('filtroHasta').value;
+            const buscar = document.getElementById('filtroBuscar').value;
+
+            let url = '/Admin/ObtenerHistorialAuditoria?cantidad=200';
+            if (tipo) url += `&tipo=${tipo}`;
+            if (desde) url += `&desde=${desde}`;
+            if (hasta) url += `&hasta=${hasta}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success) {
+                    renderizarTabla(data.registros, buscar);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function renderizarTabla(registros, filtroTexto = '') {
+            const tbody = document.querySelector('#tablaAuditoria tbody');
+
+            // Filtrar por texto si hay
+            if (filtroTexto) {
+                const filtro = filtroTexto.toLowerCase();
+                registros = registros.filter(r =>
+                    r.campo.toLowerCase().includes(filtro) ||
+                    (r.valorAnterior && r.valorAnterior.toLowerCase().includes(filtro)) ||
+                    (r.valorNuevo && r.valorNuevo.toLowerCase().includes(filtro)) ||
+                    r.modificadoPor.toLowerCase().includes(filtro)
+                );
+            }
+
+            if (registros.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="bi bi-search fs-1 d-block mb-2"></i>
+                            <p>No se encontraron registros</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            const tipoBadges = {
+                'Plataforma': 'bg-primary',
+                'Algoritmo': 'bg-info',
+                'Mantenimiento': 'bg-warning text-dark',
+                'Permisos': 'bg-danger',
+                'Rol': 'bg-danger',
+                'LadoCoins': 'bg-success'
+            };
+
+            tbody.innerHTML = registros.map(r => {
+                const badgeClass = tipoBadges[r.tipo] || 'bg-secondary';
+                const valorAnterior = r.valorAnterior?.length > 30 ? r.valorAnterior.substring(0, 30) + '...' : r.valorAnterior || '(vacío)';
+                const valorNuevo = r.valorNuevo?.length > 30 ? r.valorNuevo.substring(0, 30) + '...' : r.valorNuevo || '(vacío)';
+
+                return `
+                    <tr>
+                        <td>
+                            <small>${r.fecha.split(' ')[0]}</small><br>
+                            <strong>${r.fecha.split(' ')[1]}</strong>
+                        </td>
+                        <td><span class="badge ${badgeClass}">${r.tipo}</span></td>
+                        <td>
+                            <strong>${r.campo}</strong>
+                            ${r.entidadId ? `<br><small class="text-muted">ID: ${r.entidadId}</small>` : ''}
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2" style="font-size: 0.85rem;">
+                                <span class="badge bg-light text-dark text-truncate" style="max-width: 150px;" title="${r.valorAnterior}">${valorAnterior}</span>
+                                <i class="bi bi-arrow-right text-muted"></i>
+                                <span class="badge bg-success text-truncate" style="max-width: 150px;" title="${r.valorNuevo}">${valorNuevo}</span>
+                            </div>
+                        </td>
+                        <td><small>${r.modificadoPor}</small></td>
+                        <td><small class="text-muted">${r.ip || '-'}</small></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function exportarAuditoria() {
+            // Crear CSV
+            const table = document.getElementById('tablaAuditoria');
+            const rows = table.querySelectorAll('tbody tr');
+            let csv = 'Fecha,Tipo,Campo,Valor Anterior,Valor Nuevo,Admin,IP\n';
+
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length > 1) {
+                    const fecha = cells[0].textContent.trim().replace(/\n/g, ' ');
+                    const tipo = cells[1].textContent.trim();
+                    const campo = cells[2].textContent.trim().replace(/\n/g, ' ');
+                    const admin = cells[4].textContent.trim();
+                    const ip = cells[5].textContent.trim();
+                    csv += `"${fecha}","${tipo}","${campo}","","","${admin}","${ip}"\n`;
+                }
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `auditoria_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+
+        // Filtrar en tiempo real
+        document.getElementById('filtroBuscar').addEventListener('input', function() {
+            if (this.value.length >= 2 || this.value.length === 0) {
+                aplicarFiltros();
+            }
+        });
+    </script>
+}

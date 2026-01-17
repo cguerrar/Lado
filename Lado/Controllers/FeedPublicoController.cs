@@ -52,6 +52,22 @@ namespace Lado.Controllers
             try
             {
                 var estaAutenticado = User.Identity?.IsAuthenticated ?? false;
+                var userId = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                var userName = User?.Identity?.Name;
+
+                // ⚠️ CRÍTICO: Desactivar cache del navegador para usuarios autenticados
+                // Esto previene que el bfcache muestre datos del usuario anterior
+                if (estaAutenticado)
+                {
+                    Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private";
+                    Response.Headers["Pragma"] = "no-cache";
+                    Response.Headers["Expires"] = "0";
+                }
+
+                // DEBUG: Log de autenticación al entrar al FeedPublico
+                _logger.LogWarning("🔐 FEEDPUBLICO INDEX: EstaAutenticado={EstaAuth}, UserId={UserId}, UserName={UserName}",
+                    estaAutenticado, userId ?? "NULL", userName ?? "NULL");
+
                 ViewBag.EstaAutenticado = estaAutenticado;
 
                 // Configurar SEO
@@ -70,6 +86,7 @@ namespace Lado.Controllers
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
+                            && !c.OcultoSilenciosamente // Shadow hide
                             && !c.EsPrivado
                             && !c.EsContenidoSensible
                             && c.TipoLado == TipoLado.LadoA
@@ -123,6 +140,7 @@ namespace Lado.Controllers
                     .Where(c => c.EstaActivo
                             && !c.EsBorrador
                             && !c.Censurado
+                            && !c.OcultoSilenciosamente // Shadow hide
                             && !c.EsPrivado
                             && c.TipoLado == TipoLado.LadoB
                             && c.Usuario != null
@@ -258,10 +276,28 @@ namespace Lado.Controllers
                 var contenidoPublico = new List<Contenido>();
                 var contenidoPremium = new List<Contenido>();
 
-                // Si es creador LadoB y usuario NO está autenticado, NO mostrar contenido
-                if (esCreadorLadoB && !estaAutenticado)
+                // LÓGICA DE CONTENIDO:
+                // - Creador LadoB: SOLO mostrar contenido LadoB (bloqueado/difuminado)
+                // - Creador LadoA: mostrar contenido LadoA público
+
+                if (esCreadorLadoB)
                 {
-                    // contenidoPublico y contenidoPremium quedan vacíos
+                    // Creador LadoB: SOLO mostrar contenido LadoB (bloqueado para no suscriptores)
+                    // NO mezclar con contenido LadoA
+                    contenidoPremium = await _context.Contenidos
+                        .Where(c => c.UsuarioId == id
+                                && c.EstaActivo
+                                && !c.EsBorrador
+                                && !c.Censurado
+                                && !c.OcultoSilenciosamente
+                                && !c.EsPrivado
+                                && c.TipoLado == TipoLado.LadoB)
+                        .OrderByDescending(c => c.FechaPublicacion)
+                        .Take(18)
+                        .ToListAsync();
+
+                    // NO cargar contenido LadoA para creadores LadoB
+                    contenidoPublico = new List<Contenido>();
                 }
                 else if (!estaAutenticado)
                 {
@@ -271,37 +307,27 @@ namespace Lado.Controllers
                                 && c.EstaActivo
                                 && !c.EsBorrador
                                 && !c.Censurado
+                                && !c.OcultoSilenciosamente
                                 && !c.EsPrivado
                                 && c.TipoLado == TipoLado.LadoA
                                 && c.EsPublicoGeneral)
                         .OrderByDescending(c => c.FechaPublicacion)
-                        .Take(12)
+                        .Take(18)
                         .ToListAsync();
                 }
                 else
                 {
-                    // Usuario autenticado: ve todo el contenido LadoA
+                    // Usuario autenticado viendo creador LadoA: todo el contenido LadoA
                     contenidoPublico = await _context.Contenidos
                         .Where(c => c.UsuarioId == id
                                 && c.EstaActivo
                                 && !c.EsBorrador
                                 && !c.Censurado
+                                && !c.OcultoSilenciosamente
                                 && !c.EsPrivado
                                 && c.TipoLado == TipoLado.LadoA)
                         .OrderByDescending(c => c.FechaPublicacion)
-                        .Take(12)
-                        .ToListAsync();
-
-                    // Contenido premium borroso
-                    contenidoPremium = await _context.Contenidos
-                        .Where(c => c.UsuarioId == id
-                                && c.EstaActivo
-                                && !c.EsBorrador
-                                && !c.Censurado
-                                && !c.EsPrivado
-                                && c.TipoLado == TipoLado.LadoB)
-                        .OrderByDescending(c => c.FechaPublicacion)
-                        .Take(6)
+                        .Take(18)
                         .ToListAsync();
                 }
 
@@ -309,12 +335,40 @@ namespace Lado.Controllers
                 ViewBag.ContenidoPremium = contenidoPremium;
                 ViewBag.ContenidoPremiumIds = contenidoPremium.Select(c => c.Id).ToList();
                 ViewBag.TotalPublicaciones = contenidoPublico.Count + contenidoPremium.Count;
-                ViewBag.TotalLikes = contenidoPublico.Sum(c => c.NumeroLikes);
+                ViewBag.TotalLikes = contenidoPublico.Sum(c => c.NumeroLikes) + contenidoPremium.Sum(c => c.NumeroLikes);
 
                 ViewBag.NumeroSuscriptores = await _context.Suscripciones
                     .CountAsync(s => s.CreadorId == id && s.EstaActiva);
 
                 ViewBag.EstaAutenticado = estaAutenticado;
+
+                // Datos adicionales para creadores LadoB
+                if (esCreadorLadoB)
+                {
+                    ViewBag.PrecioSuscripcion = usuario.PrecioSuscripcionLadoB ?? 0;
+
+                    // Contar total de contenido por tipo
+                    var conteoTipos = await _context.Contenidos
+                        .Where(c => c.UsuarioId == id &&
+                                    c.TipoLado == TipoLado.LadoB &&
+                                    c.EstaActivo &&
+                                    !c.Censurado &&
+                                    !c.OcultoSilenciosamente)
+                        .GroupBy(c => c.TipoContenido)
+                        .Select(g => new { Tipo = g.Key, Cantidad = g.Count() })
+                        .ToListAsync();
+
+                    ViewBag.TotalFotos = conteoTipos.FirstOrDefault(x => x.Tipo == TipoContenido.Foto)?.Cantidad ?? 0;
+                    ViewBag.TotalVideos = conteoTipos.FirstOrDefault(x => x.Tipo == TipoContenido.Video)?.Cantidad ?? 0;
+                    ViewBag.TotalContenidosLadoB = conteoTipos.Sum(x => x.Cantidad);
+                }
+                else
+                {
+                    ViewBag.PrecioSuscripcion = 0m;
+                    ViewBag.TotalFotos = 0;
+                    ViewBag.TotalVideos = 0;
+                    ViewBag.TotalContenidosLadoB = 0;
+                }
 
                 // Determinar datos de perfil a mostrar
                 ConfigurarDatosPerfilViewBag(usuario, esCreadorLadoB);

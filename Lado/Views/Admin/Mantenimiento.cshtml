@@ -1,0 +1,487 @@
+@model Lado.Models.ModoMantenimiento
+@{
+    ViewData["Title"] = "Modo Mantenimiento";
+    Layout = "_AdminLayout";
+    var estaEnMantenimiento = (bool)ViewBag.EstaEnMantenimiento;
+    var historial = ViewBag.Historial as List<Lado.Models.HistorialMantenimiento> ?? new List<Lado.Models.HistorialMantenimiento>();
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">
+            <i class="bi bi-tools me-2"></i>Modo Mantenimiento
+        </h2>
+        <div id="estadoActual" class="d-flex align-items-center">
+            @if (estaEnMantenimiento)
+            {
+                <span class="badge bg-danger fs-6 py-2 px-3">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i> MANTENIMIENTO ACTIVO
+                </span>
+            }
+            else if (Model.FechaInicio.HasValue)
+            {
+                <span class="badge bg-warning text-dark fs-6 py-2 px-3">
+                    <i class="bi bi-clock-fill me-1"></i> Programado: @Model.FechaInicio.Value.ToString("dd/MM HH:mm")
+                </span>
+            }
+            else
+            {
+                <span class="badge bg-success fs-6 py-2 px-3">
+                    <i class="bi bi-check-circle-fill me-1"></i> Sistema Operativo
+                </span>
+            }
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Panel de Control -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="bi bi-toggles me-2"></i>Panel de Control</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Activación Inmediata -->
+                    <div class="mb-4 p-3 border rounded bg-light">
+                        <h6 class="fw-bold mb-3"><i class="bi bi-lightning-fill text-warning me-2"></i>Activación Inmediata</h6>
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <label class="form-label">Mensaje personalizado (opcional)</label>
+                                <textarea id="mensajeInmediato" class="form-control" rows="2" placeholder="Estamos realizando mejoras..."></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Fin estimado (opcional)</label>
+                                <input type="datetime-local" id="finEstimadoInmediato" class="form-control">
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end">
+                                @if (estaEnMantenimiento)
+                                {
+                                    <button class="btn btn-success btn-lg w-100" onclick="desactivarMantenimiento()">
+                                        <i class="bi bi-play-fill me-2"></i>Desactivar Mantenimiento
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-danger btn-lg w-100" onclick="activarMantenimiento()">
+                                        <i class="bi bi-stop-fill me-2"></i>Activar Ahora
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Programar Mantenimiento -->
+                    <div class="p-3 border rounded">
+                        <h6 class="fw-bold mb-3"><i class="bi bi-calendar-event text-primary me-2"></i>Programar Mantenimiento</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Fecha/Hora Inicio</label>
+                                <input type="datetime-local" id="fechaInicioProgramado" class="form-control" min="@DateTime.Now.ToString("yyyy-MM-ddTHH:mm")">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Fecha/Hora Fin Estimado</label>
+                                <input type="datetime-local" id="fechaFinProgramado" class="form-control">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Mensaje</label>
+                                <textarea id="mensajeProgramado" class="form-control" rows="2" placeholder="Mantenimiento programado..."></textarea>
+                            </div>
+                            <div class="col-12 d-flex gap-2">
+                                <button class="btn btn-primary flex-grow-1" onclick="programarMantenimiento()" @(Model.FechaInicio.HasValue && !Model.EstaActivo ? "disabled" : "")>
+                                    <i class="bi bi-calendar-plus me-2"></i>Programar
+                                </button>
+                                @if (Model.FechaInicio.HasValue && !Model.EstaActivo)
+                                {
+                                    <button class="btn btn-outline-danger" onclick="cancelarProgramado()">
+                                        <i class="bi bi-x-lg"></i> Cancelar Programado
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuración -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="bi bi-gear me-2"></i>Configuración</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Título de la página</label>
+                            <input type="text" id="configTitulo" class="form-control" value="@Model.Titulo" maxlength="200">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Mensaje predeterminado</label>
+                            <textarea id="configMensaje" class="form-control" rows="3" maxlength="1000">@Model.Mensaje</textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Rutas siempre permitidas <small class="text-muted">(separadas por coma)</small></label>
+                            <input type="text" id="configRutas" class="form-control" value="@Model.RutasPermitidas" maxlength="500" placeholder="/Status,/Admin,/Account/Login">
+                            <small class="text-muted">Rutas que estarán accesibles durante el mantenimiento</small>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="configCuentaRegresiva" @(Model.MostrarCuentaRegresiva ? "checked" : "")>
+                                <label class="form-check-label" for="configCuentaRegresiva">Mostrar cuenta regresiva</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="configCreadoresVerificados" @(Model.PermitirCreadoresVerificados ? "checked" : "")>
+                                <label class="form-check-label" for="configCreadoresVerificados">Permitir creadores verificados</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Notificar con anticipación</label>
+                            <div class="input-group">
+                                <input type="number" id="configNotificarMinutos" class="form-control" value="@Model.NotificarMinutosAntes" min="5" max="1440">
+                                <span class="input-group-text">minutos antes</span>
+                            </div>
+                        </div>
+                        <div class="col-12 mt-3">
+                            <button class="btn btn-primary w-100" onclick="guardarConfiguracion()">
+                                <i class="bi bi-save me-2"></i>Guardar Configuración
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista previa -->
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-eye me-2"></i>Vista Previa</h5>
+                    <button class="btn btn-sm btn-outline-light" onclick="actualizarVistaPrevia()">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div id="vistaPrevia" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); min-height: 400px; display: flex; align-items: center; justify-content: center; border-radius: 0 0 0.5rem 0.5rem;">
+                        <div style="text-align: center; max-width: 500px; padding: 30px; color: #fff;">
+                            <div style="font-size: 60px; margin-bottom: 15px;">🔧</div>
+                            <h2 id="prevTitulo" style="background: linear-gradient(90deg, #00d4aa, #00b4d8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-size: 2rem; margin-bottom: 15px;">@Model.Titulo</h2>
+                            <div style="width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-bottom: 20px; overflow: hidden;">
+                                <div style="height: 100%; width: 50%; background: linear-gradient(90deg, #00d4aa, #00b4d8); animation: progress 2s ease-in-out infinite;"></div>
+                            </div>
+                            <p id="prevMensaje" style="color: #b0b0b0; font-size: 1.1rem; line-height: 1.6;">@Model.Mensaje</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Historial -->
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Historial de Mantenimientos</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Fecha Inicio</th>
+                                    <th>Fecha Fin</th>
+                                    <th>Duración</th>
+                                    <th>Título</th>
+                                    <th>Activado Por</th>
+                                    <th>Desactivado Por</th>
+                                    <th>Notas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (historial.Any())
+                                {
+                                    foreach (var item in historial)
+                                    {
+                                        <tr>
+                                            <td>@item.FechaInicio.ToString("dd/MM/yyyy HH:mm")</td>
+                                            <td>
+                                                @if (item.FechaFin.HasValue)
+                                                {
+                                                    @item.FechaFin.Value.ToString("dd/MM/yyyy HH:mm")
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-warning text-dark">En curso</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (item.DuracionMinutos.HasValue)
+                                                {
+                                                    if (item.DuracionMinutos < 60)
+                                                    {
+                                                        @($"{item.DuracionMinutos} min")
+                                                    }
+                                                    else
+                                                    {
+                                                        @($"{item.DuracionMinutos / 60}h {item.DuracionMinutos % 60}m")
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                            <td>@(item.Titulo ?? "-")</td>
+                                            <td>@(item.ActivadoPor?.NombreCompleto ?? item.ActivadoPor?.UserName ?? "Sistema")</td>
+                                            <td>
+                                                @if (item.FechaFin.HasValue)
+                                                {
+                                                    @(item.DesactivadoPor?.NombreCompleto ?? item.DesactivadoPor?.UserName ?? "Sistema (auto)")
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                            <td>@(item.Notas ?? "-")</td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4 text-muted">
+                                            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                            No hay historial de mantenimientos
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @@keyframes progress {
+        0% { margin-left: 0; }
+        50% { margin-left: 50%; }
+        100% { margin-left: 100%; }
+    }
+</style>
+
+@section Scripts {
+    <script>
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ||
+                      document.querySelector('meta[name="csrf-token"]')?.content;
+
+        async function activarMantenimiento() {
+            if (!confirm('¿Activar modo mantenimiento AHORA? Los usuarios no podrán acceder al sitio.')) return;
+
+            const mensaje = document.getElementById('mensajeInmediato').value;
+            const finEstimado = document.getElementById('finEstimadoInmediato').value;
+
+            try {
+                const formData = new FormData();
+                formData.append('__RequestVerificationToken', token);
+                if (mensaje) formData.append('mensaje', mensaje);
+                if (finEstimado) formData.append('finEstimado', finEstimado);
+
+                const response = await fetch('/Admin/ActivarMantenimiento', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    mostrarToast('success', data.mensaje);
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    mostrarToast('danger', data.error);
+                }
+            } catch (error) {
+                mostrarToast('danger', 'Error al activar mantenimiento');
+            }
+        }
+
+        async function desactivarMantenimiento() {
+            if (!confirm('¿Desactivar modo mantenimiento? El sitio volverá a estar disponible.')) return;
+
+            try {
+                const formData = new FormData();
+                formData.append('__RequestVerificationToken', token);
+
+                const response = await fetch('/Admin/DesactivarMantenimiento', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    mostrarToast('success', data.mensaje);
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    mostrarToast('danger', data.error);
+                }
+            } catch (error) {
+                mostrarToast('danger', 'Error al desactivar mantenimiento');
+            }
+        }
+
+        async function programarMantenimiento() {
+            const inicio = document.getElementById('fechaInicioProgramado').value;
+            const fin = document.getElementById('fechaFinProgramado').value;
+            const mensaje = document.getElementById('mensajeProgramado').value;
+
+            if (!inicio || !fin) {
+                mostrarToast('warning', 'Debe especificar fecha de inicio y fin');
+                return;
+            }
+
+            if (new Date(fin) <= new Date(inicio)) {
+                mostrarToast('warning', 'La fecha de fin debe ser posterior al inicio');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('__RequestVerificationToken', token);
+                formData.append('inicio', inicio);
+                formData.append('finEstimado', fin);
+                if (mensaje) formData.append('mensaje', mensaje);
+
+                const response = await fetch('/Admin/ProgramarMantenimiento', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    mostrarToast('success', data.mensaje);
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    mostrarToast('danger', data.error);
+                }
+            } catch (error) {
+                mostrarToast('danger', 'Error al programar mantenimiento');
+            }
+        }
+
+        async function cancelarProgramado() {
+            if (!confirm('¿Cancelar el mantenimiento programado?')) return;
+
+            try {
+                const formData = new FormData();
+                formData.append('__RequestVerificationToken', token);
+
+                const response = await fetch('/Admin/CancelarMantenimientoProgramado', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    mostrarToast('success', data.mensaje);
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    mostrarToast('danger', data.error);
+                }
+            } catch (error) {
+                mostrarToast('danger', 'Error al cancelar');
+            }
+        }
+
+        async function guardarConfiguracion() {
+            const config = {
+                titulo: document.getElementById('configTitulo').value,
+                mensaje: document.getElementById('configMensaje').value,
+                rutasPermitidas: document.getElementById('configRutas').value,
+                mostrarCuentaRegresiva: document.getElementById('configCuentaRegresiva').checked,
+                permitirCreadoresVerificados: document.getElementById('configCreadoresVerificados').checked,
+                notificarMinutosAntes: parseInt(document.getElementById('configNotificarMinutos').value) || 30
+            };
+
+            try {
+                const response = await fetch('/Admin/ActualizarConfigMantenimiento', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    mostrarToast('success', data.mensaje);
+                    actualizarVistaPrevia();
+                } else {
+                    mostrarToast('danger', data.error);
+                }
+            } catch (error) {
+                mostrarToast('danger', 'Error al guardar configuración');
+            }
+        }
+
+        function actualizarVistaPrevia() {
+            document.getElementById('prevTitulo').textContent = document.getElementById('configTitulo').value;
+            document.getElementById('prevMensaje').textContent = document.getElementById('configMensaje').value;
+        }
+
+        // Actualizar vista previa en tiempo real
+        document.getElementById('configTitulo').addEventListener('input', actualizarVistaPrevia);
+        document.getElementById('configMensaje').addEventListener('input', actualizarVistaPrevia);
+
+        function mostrarToast(type, message) {
+            // Crear toast si no existe
+            let toastContainer = document.getElementById('toastContainer');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toastContainer';
+                toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+                toastContainer.style.zIndex = '1100';
+                document.body.appendChild(toastContainer);
+            }
+
+            const toastId = 'toast-' + Date.now();
+            const bgClass = type === 'success' ? 'bg-success' : type === 'danger' ? 'bg-danger' : 'bg-warning';
+
+            const toastHtml = `
+                <div id="${toastId}" class="toast align-items-center text-white ${bgClass}" role="alert">
+                    <div class="d-flex">
+                        <div class="toast-body">${message}</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+
+            toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement, { delay: 4000 });
+            toast.show();
+
+            toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
+        }
+
+        // Actualizar estado cada 30 segundos
+        setInterval(async () => {
+            try {
+                const response = await fetch('/Admin/ObtenerEstadoMantenimiento');
+                const data = await response.json();
+                if (data.success) {
+                    const estadoEl = document.getElementById('estadoActual');
+                    if (data.estaActivo) {
+                        estadoEl.innerHTML = '<span class="badge bg-danger fs-6 py-2 px-3"><i class="bi bi-exclamation-triangle-fill me-1"></i> MANTENIMIENTO ACTIVO</span>';
+                    } else if (data.programado) {
+                        estadoEl.innerHTML = `<span class="badge bg-warning text-dark fs-6 py-2 px-3"><i class="bi bi-clock-fill me-1"></i> Programado: ${new Date(data.fechaInicio).toLocaleString('es', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>`;
+                    } else {
+                        estadoEl.innerHTML = '<span class="badge bg-success fs-6 py-2 px-3"><i class="bi bi-check-circle-fill me-1"></i> Sistema Operativo</span>';
+                    }
+                }
+            } catch (e) { }
+        }, 30000);
+    </script>
+}

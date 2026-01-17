@@ -661,9 +661,10 @@
                 document.getElementById('memoryUsed').textContent = formatBytes(data.memory.used);
                 document.getElementById('memoryTotal').textContent = formatBytes(data.memory.total);
 
-                // Update Primary Disk
+                // Update Primary Disk (buscar el disco del sistema)
                 if (data.disks && data.disks.length > 0) {
-                    const primaryDisk = data.disks[0];
+                    // Buscar el disco del sistema, o usar el primero como fallback
+                    const primaryDisk = data.disks.find(d => d.isSystem) || data.disks[0];
                     setProgress('diskProgress', primaryDisk.usagePercent);
                     document.getElementById('diskPercent').textContent = primaryDisk.usagePercent + '%';
                     document.getElementById('diskUsed').textContent = primaryDisk.usedGB + ' GB';
@@ -673,18 +674,41 @@
                     const disksContainer = document.getElementById('disksContainer');
                     disksContainer.innerHTML = data.disks.map(disk => {
                         const statusClass = getStatusClass(disk.usagePercent);
+                        // Icono segun tipo de unidad
+                        let diskIcon = '';
+                        let typeLabel = '';
+                        if (disk.type === 'Network') {
+                            diskIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                                <line x1="6" y1="6" x2="6.01" y2="6"/>
+                                <line x1="6" y1="18" x2="6.01" y2="18"/>
+                            </svg>`;
+                            typeLabel = ' (Red)';
+                        } else if (disk.type === 'Removable') {
+                            diskIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                                <line x1="12" y1="22.08" x2="12" y2="12"/>
+                            </svg>`;
+                            typeLabel = ' (USB)';
+                        } else {
+                            diskIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                            </svg>`;
+                        }
+                        // Badge para disco del sistema
+                        const systemBadge = disk.isSystem ? '<span class="status-badge good" style="margin-left: 8px; font-size: 0.7rem;">Sistema</span>' : '';
                         return `
                             <div class="disk-card">
                                 <div class="disk-header">
                                     <div class="disk-icon">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                                            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-                                            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-                                        </svg>
+                                        ${diskIcon}
                                     </div>
                                     <div class="disk-info">
-                                        <h5>${disk.name} ${disk.label}</h5>
+                                        <h5>${disk.name} ${disk.label}${typeLabel}${systemBadge}</h5>
                                         <p>${disk.format} - ${disk.totalGB} GB Total</p>
                                     </div>
                                 </div>

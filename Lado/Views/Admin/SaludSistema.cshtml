@@ -1,0 +1,339 @@
+@model Lado.Services.ServerMetrics
+@{
+    ViewData["Title"] = "Salud del Sistema";
+    Layout = "_AdminLayout";
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0"><i class="bi bi-heart-pulse me-2"></i>Salud del Sistema</h2>
+        <div class="d-flex gap-2">
+            <span id="ultimaActualizacion" class="text-muted small align-self-center"></span>
+            <button class="btn btn-outline-primary btn-sm" onclick="actualizarTodo()">
+                <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+            </button>
+        </div>
+    </div>
+
+    <!-- Estado General -->
+    <div class="row g-3 mb-4">
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100" id="cardBD">
+                <div class="card-body text-center">
+                    <i class="bi bi-database fs-1 text-primary"></i>
+                    <h5 class="mt-2 mb-1">Base de Datos</h5>
+                    <span class="badge bg-success" id="estadoBD">Verificando...</span>
+                    <p class="small text-muted mt-2 mb-0" id="latenciaBD">-</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100" id="cardCache">
+                <div class="card-body text-center">
+                    <i class="bi bi-lightning-charge fs-1 text-warning"></i>
+                    <h5 class="mt-2 mb-1">Cache</h5>
+                    <span class="badge bg-success" id="estadoCache">Verificando...</span>
+                    <p class="small text-muted mt-2 mb-0">Memory Cache activo</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100" id="cardDisco">
+                <div class="card-body text-center">
+                    <i class="bi bi-hdd fs-1 text-info"></i>
+                    <h5 class="mt-2 mb-1">Disco</h5>
+                    <span class="badge bg-success" id="estadoDisco">Verificando...</span>
+                    <p class="small text-muted mt-2 mb-0" id="espacioDisco">-</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100" id="cardServicios">
+                <div class="card-body text-center">
+                    <i class="bi bi-gear fs-1 text-success"></i>
+                    <h5 class="mt-2 mb-1">Servicios</h5>
+                    <span class="badge bg-success" id="estadoServicios">Activos</span>
+                    <p class="small text-muted mt-2 mb-0">Background services</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metricas de Servidor -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-cpu me-2"></i>CPU</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Uso actual</span>
+                        <strong id="cpuValor">@Model.CpuUsagePercent.ToString("F1")%</strong>
+                    </div>
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar @(Model.CpuUsagePercent > 80 ? "bg-danger" : Model.CpuUsagePercent > 50 ? "bg-warning" : "bg-success")"
+                             id="cpuBarra"
+                             style="width: @Model.CpuUsagePercent%">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-memory me-2"></i>Memoria</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Uso actual</span>
+                        <strong id="memoriaValor">@Model.MemoryUsedMB MB / @Model.MemoryTotalMB MB</strong>
+                    </div>
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar @(Model.MemoryUsagePercent > 80 ? "bg-danger" : Model.MemoryUsagePercent > 50 ? "bg-warning" : "bg-info")"
+                             id="memoriaBarra"
+                             style="width: @Model.MemoryUsagePercent%">
+                            @Model.MemoryUsagePercent.ToString("F1")%
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informacion del Servidor -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Informacion</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm mb-0">
+                        <tr>
+                            <td class="text-muted">Uptime</td>
+                            <td class="text-end"><strong id="uptime">@Model.Uptime.TotalHours.ToString("F1") horas</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Procesadores</td>
+                            <td class="text-end"><strong>@Model.ProcessorCount</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Servidor</td>
+                            <td class="text-end"><strong>@Model.ServerName</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">.NET Version</td>
+                            <td class="text-end"><strong>@Environment.Version</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">OS</td>
+                            <td class="text-end"><strong>@Environment.OSVersion.Platform</strong></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-database me-2"></i>Estadisticas Base de Datos</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3" id="estadisticasBD">
+                        <div class="col-md-3 col-6 text-center">
+                            <div class="p-3 bg-light rounded">
+                                <h4 class="mb-0 text-primary" id="statUsuarios">-</h4>
+                                <small class="text-muted">Usuarios</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6 text-center">
+                            <div class="p-3 bg-light rounded">
+                                <h4 class="mb-0 text-info" id="statContenidos">-</h4>
+                                <small class="text-muted">Contenidos</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6 text-center">
+                            <div class="p-3 bg-light rounded">
+                                <h4 class="mb-0 text-success" id="statSuscripciones">-</h4>
+                                <small class="text-muted">Suscripciones</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6 text-center">
+                            <div class="p-3 bg-light rounded">
+                                <h4 class="mb-0 text-warning" id="statTransacciones">-</h4>
+                                <small class="text-muted">Transacciones</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grafico de uso en tiempo real -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Uso de Recursos (Tiempo Real)</h5>
+        </div>
+        <div class="card-body">
+            <canvas id="chartRecursos" height="200"></canvas>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let chartRecursos;
+        const maxDataPoints = 60; // 5 minutos de datos (cada 5 segundos)
+        const cpuData = [];
+        const memData = [];
+        const labels = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            actualizarTodo();
+            // Actualizar cada 5 segundos
+            setInterval(actualizarMetricas, 5000);
+            // Actualizar estado completo cada 30 segundos
+            setInterval(actualizarEstado, 30000);
+        });
+
+        function initChart() {
+            const ctx = document.getElementById('chartRecursos').getContext('2d');
+            chartRecursos = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'CPU %',
+                        data: cpuData,
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'Memoria %',
+                        data: memData,
+                        borderColor: '#20c997',
+                        backgroundColor: 'rgba(32, 201, 151, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'top' }
+                    }
+                }
+            });
+        }
+
+        async function actualizarTodo() {
+            await Promise.all([
+                actualizarEstado(),
+                actualizarMetricas(),
+                cargarEstadisticasBD()
+            ]);
+        }
+
+        async function actualizarEstado() {
+            try {
+                const response = await fetch('/Admin/ObtenerEstadoSalud');
+                const data = await response.json();
+
+                if (data.success) {
+                    // Base de datos
+                    const bdBadge = document.getElementById('estadoBD');
+                    bdBadge.textContent = data.baseDatos.estado;
+                    bdBadge.className = `badge ${data.baseDatos.estado === 'OK' ? 'bg-success' : 'bg-danger'}`;
+                    document.getElementById('latenciaBD').textContent = data.baseDatos.latencia;
+
+                    // Cache
+                    const cacheBadge = document.getElementById('estadoCache');
+                    cacheBadge.textContent = data.cache.estado;
+                    cacheBadge.className = `badge ${data.cache.estado === 'OK' ? 'bg-success' : 'bg-danger'}`;
+
+                    // Disco
+                    const discoBadge = document.getElementById('estadoDisco');
+                    discoBadge.textContent = data.disco.estado;
+                    discoBadge.className = `badge ${data.disco.estado === 'OK' ? 'bg-success' : data.disco.estado === 'Warning' ? 'bg-warning text-dark' : 'bg-danger'}`;
+                    document.getElementById('espacioDisco').textContent = `${data.disco.libre} libres de ${data.disco.total}`;
+
+                    // Uptime
+                    document.getElementById('uptime').textContent = data.servidor.uptime;
+
+                    document.getElementById('ultimaActualizacion').textContent = `Actualizado: ${data.timestamp}`;
+                }
+            } catch (error) {
+                console.error('Error actualizando estado:', error);
+            }
+        }
+
+        async function actualizarMetricas() {
+            try {
+                const response = await fetch('/Admin/ObtenerMetricasServidor');
+                const data = await response.json();
+
+                if (data.success) {
+                    // CPU
+                    document.getElementById('cpuValor').textContent = `${data.cpu.toFixed(1)}%`;
+                    const cpuBarra = document.getElementById('cpuBarra');
+                    cpuBarra.style.width = `${data.cpu}%`;
+                    cpuBarra.className = `progress-bar ${data.cpu > 80 ? 'bg-danger' : data.cpu > 50 ? 'bg-warning' : 'bg-success'}`;
+
+                    // Memoria
+                    document.getElementById('memoriaValor').textContent = `${data.memoriaUsadaMB} MB / ${data.memoriaTotalMB} MB`;
+                    const memBarra = document.getElementById('memoriaBarra');
+                    memBarra.style.width = `${data.memoria}%`;
+                    memBarra.textContent = `${data.memoria.toFixed(1)}%`;
+                    memBarra.className = `progress-bar ${data.memoria > 80 ? 'bg-danger' : data.memoria > 50 ? 'bg-warning' : 'bg-info'}`;
+
+                    // Actualizar grafico
+                    const ahora = new Date();
+                    labels.push(ahora.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+                    cpuData.push(data.cpu);
+                    memData.push(data.memoria);
+
+                    // Mantener solo los ultimos N puntos
+                    if (labels.length > maxDataPoints) {
+                        labels.shift();
+                        cpuData.shift();
+                        memData.shift();
+                    }
+
+                    chartRecursos.update();
+                }
+            } catch (error) {
+                console.error('Error actualizando metricas:', error);
+            }
+        }
+
+        async function cargarEstadisticasBD() {
+            try {
+                const response = await fetch('/Admin/ObtenerEstadisticasBD');
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('statUsuarios').textContent = data.estadisticas.Usuarios.toLocaleString();
+                    document.getElementById('statContenidos').textContent = data.estadisticas.Contenidos.toLocaleString();
+                    document.getElementById('statSuscripciones').textContent = data.estadisticas.Suscripciones.toLocaleString();
+                    document.getElementById('statTransacciones').textContent = data.estadisticas.Transacciones.toLocaleString();
+                }
+            } catch (error) {
+                console.error('Error cargando estadisticas BD:', error);
+            }
+        }
+    </script>
+}

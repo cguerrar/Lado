@@ -60,7 +60,8 @@ if (!Directory.Exists(keysFolder))
 }
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(keysFolder))
-    .SetApplicationName("Lado");
+    .SetApplicationName("Lado")
+    .SetDefaultKeyLifetime(TimeSpan.FromDays(90)); // Claves duran 90 días
 
 // Configurar Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -196,23 +197,28 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.Name = ".Lado.Antiforgery";
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.Cookie.SameSite = SameSiteMode.Strict;
+    // ⚠️ CRÍTICO: Debe ser Lax (no Strict) para que funcione con formularios POST de login
+    options.Cookie.SameSite = SameSiteMode.Lax;
 });
 
 // Registrar servicios personalizados
 // builder.Services.AddScoped<Lado.Services.MercadoPagoService>(); // Deprecado - Usar PayPal
 builder.Services.AddScoped<Lado.Services.IPayPalService, Lado.Services.PayPalService>(); // PayPal
 
-// Configurar tamaño máximo de archivos (100 MB)
+// Configurar tamaño máximo de archivos (500 MB para videos grandes de iPhone)
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = 104857600; // 100 MB
+    options.MultipartBodyLengthLimit = 524288000; // 500 MB
+    options.ValueLengthLimit = 524288000;
+    options.MemoryBufferThreshold = 104857600; // Buffer de 100MB antes de usar disco
 });
 
 // ⭐ IMPORTANTE: Configurar límite de tamaño para Kestrel también
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
-    serverOptions.Limits.MaxRequestBodySize = 104857600; // 100 MB
+    serverOptions.Limits.MaxRequestBodySize = 524288000; // 500 MB
+    serverOptions.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(15);
+    serverOptions.Limits.RequestHeadersTimeout = TimeSpan.FromMinutes(5);
 });
 
 // Configurar sesiones
@@ -297,11 +303,68 @@ builder.Services.AddScoped<Lado.Services.IRachasService, Lado.Services.RachasSer
 builder.Services.AddHostedService<Lado.Services.LadoCoinsExpirationBackgroundService>();
 
 // ========================================
+// CACHE DE SUSCRIPCIONES
+// ========================================
+builder.Services.AddScoped<Lado.Services.ISuscripcionCacheService, Lado.Services.SuscripcionCacheService>();
+
+// ========================================
+// SEO CONFIG SERVICE
+// ========================================
+builder.Services.AddScoped<Lado.Services.ISeoConfigService, Lado.Services.SeoConfigService>();
+
+// ========================================
 // GIPHY SERVICE (GIFs animados en Stories)
 // ========================================
 builder.Services.AddSingleton<Lado.Services.IGiphyService, Lado.Services.GiphyService>();
 builder.Services.AddHostedService<Lado.Services.RachasResetBackgroundService>();
 builder.Services.AddHostedService<Lado.Services.ReferidosBackgroundService>();
+builder.Services.AddHostedService<Lado.Services.SuspensionExpirationService>();
+
+// ========================================
+// MODO MANTENIMIENTO
+// ========================================
+builder.Services.AddScoped<Lado.Services.IMantenimientoService, Lado.Services.MantenimientoService>();
+builder.Services.AddHostedService<Lado.Services.MantenimientoBackgroundService>();
+
+// ========================================
+// PUBLICACIÓN AUTOMÁTICA (USUARIOS ADMINISTRADOS)
+// ========================================
+builder.Services.AddHostedService<Lado.Services.PublicacionAutomaticaBackgroundService>();
+
+// ========================================
+// DASHBOARD METRICS SERVICE
+// ========================================
+builder.Services.AddScoped<Lado.Services.IDashboardMetricsService, Lado.Services.DashboardMetricsService>();
+
+// ========================================
+// NOTAS INTERNAS SERVICE
+// ========================================
+builder.Services.AddScoped<Lado.Services.INotasInternasService, Lado.Services.NotasInternasService>();
+
+// ========================================
+// AUDITORÍA SERVICE
+// ========================================
+builder.Services.AddScoped<Lado.Services.IAuditoriaService, Lado.Services.AuditoriaService>();
+
+// ========================================
+// BÚSQUEDA GLOBAL SERVICE
+// ========================================
+builder.Services.AddScoped<Lado.Services.IBusquedaGlobalService, Lado.Services.BusquedaGlobalService>();
+
+// ========================================
+// TEMPLATES SERVICE
+// ========================================
+builder.Services.AddScoped<Lado.Services.ITemplatesService, Lado.Services.TemplatesService>();
+
+// ========================================
+// TICKETS INTERNOS SERVICE
+// ========================================
+builder.Services.AddScoped<Lado.Services.ITicketsService, Lado.Services.TicketsService>();
+
+// ========================================
+// CALENDARIO ADMIN SERVICE
+// ========================================
+builder.Services.AddScoped<Lado.Services.ICalendarioService, Lado.Services.CalendarioService>();
 
 // ========================================
 // CONFIGURACIÓN DE SIGNALR (Chat en tiempo real)
@@ -400,7 +463,7 @@ app.Use(async (context, next) =>
                   "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; " +
                   "img-src 'self' data: blob: https://i.giphy.com https://media.giphy.com https://*.googleusercontent.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.paypal.com https://*.paypalobjects.com https:; " +
                   "media-src 'self' data: blob: https://i.giphy.com https://media.giphy.com https:; " +
-                  "connect-src 'self' wss: ws: https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://api.openstreetmap.org https://nominatim.openstreetmap.org https://api.giphy.com https://accounts.google.com https://oauth2.googleapis.com https://www.paypal.com https://*.paypal.com; " +
+                  "connect-src 'self' wss: ws: https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://api.openstreetmap.org https://nominatim.openstreetmap.org https://api.giphy.com https://accounts.google.com https://oauth2.googleapis.com https://www.paypal.com https://*.paypal.com https://storage.googleapis.com; " +
                   "frame-src 'self' https://www.google.com https://www.youtube.com https://accounts.google.com https://www.paypal.com https://*.paypal.com; " +
                   "worker-src 'self' blob:; " +
                   "manifest-src 'self'; " +
@@ -430,6 +493,7 @@ app.UseJwtValidation(); // Validación de tokens JWT contra BD (revocación inme
 app.UseRequestLocalization(); // Localización (i18n)
 app.UseAgeVerification();
 app.UseAuthorization();
+app.UseMantenimiento(); // Modo mantenimiento (bloquea acceso excepto admins)
 app.UseSession();
 
 // Contador de visitas
@@ -500,6 +564,12 @@ app.MapControllerRoute(
     pattern: "sitemap-contenido.xml",
     defaults: new { controller = "Seo", action = "SitemapContenido" });
 
+// Ruta para perfiles públicos /@username
+app.MapControllerRoute(
+    name: "perfil-publico",
+    pattern: "@{username}",
+    defaults: new { controller = "PerfilPublico", action = "Index" });
+
 // ⭐⭐⭐ CORRECCIÓN CRÍTICA: Línea estaba incompleta
 app.MapControllerRoute(
     name: "default",
@@ -508,9 +578,10 @@ app.MapControllerRoute(
 app.MapRazorPages();
 
 // ========================================
-// SIGNALR HUB ENDPOINT
+// SIGNALR HUB ENDPOINTS
 // ========================================
 app.MapHub<ChatHub>("/chatHub");
+app.MapHub<Lado.Hubs.ModeracionHub>("/moderacionHub");
 
 // ========================================
 // INICIALIZACION MEJORADA DEL SISTEMA

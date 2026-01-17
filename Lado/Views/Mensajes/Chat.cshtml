@@ -1622,7 +1622,7 @@
             <div class="chat-user-info" onclick="window.location.href='/Explorar/Perfil/@otroUsuario?.Id'">
                 @if (!string.IsNullOrEmpty(otroUsuario?.FotoPerfil))
                 {
-                    <img src="@otroUsuario.FotoPerfil" alt="" class="chat-avatar">
+                    <img src="@otroUsuario.FotoPerfil" alt="Foto de @otroUsuario.UserName" class="chat-avatar">
                 }
                 else
                 {
@@ -1975,6 +1975,7 @@
         let archivoSeleccionado = null;
         let connection = null;
         let typingTimeout = null;
+        let receivedTypingTimeout = null; // Timeout para ocultar "escribiendo..." automáticamente
 
         // SignalR
         async function iniciarSignalR() {
@@ -1985,6 +1986,7 @@
 
             connection.on("RecibirMensaje", function(mensaje) {
                 if (mensaje.remitenteId === otroUsuarioId) {
+                    ocultarTyping(); // Ocultar indicador al recibir mensaje
                     renderizarMensaje(mensaje, false);
                     marcarMensajesComoLeidos([mensaje.id]);
                 }
@@ -2031,9 +2033,15 @@
         function mostrarTyping() {
             document.getElementById('typingIndicator').classList.add('show');
             document.querySelector('.online-status').style.display = 'none';
+
+            // Timeout de seguridad: ocultar automáticamente después de 4 segundos
+            // Si no recibe más eventos de typing, significa que el otro usuario dejó de escribir
+            clearTimeout(receivedTypingTimeout);
+            receivedTypingTimeout = setTimeout(ocultarTyping, 4000);
         }
 
         function ocultarTyping() {
+            clearTimeout(receivedTypingTimeout);
             document.getElementById('typingIndicator').classList.remove('show');
             document.querySelector('.online-status').style.display = 'inline';
         }

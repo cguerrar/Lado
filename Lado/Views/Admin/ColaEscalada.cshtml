@@ -1,0 +1,543 @@
+@model List<Lado.Models.Moderacion.ColaModeracion>
+@{
+    ViewData["Title"] = "Cola Escalada";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+<style>
+    .escalada-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+
+    .escalada-header h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .count-badge {
+        background: #ef4444;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+
+    .escalada-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+        gap: 20px;
+    }
+
+    .escalada-card {
+        background: var(--bg-white);
+        border: 2px solid #fecaca;
+        border-radius: 12px;
+        overflow: hidden;
+        transition: all 0.2s;
+    }
+
+    .escalada-card:hover {
+        box-shadow: 0 8px 25px rgba(239, 68, 68, 0.15);
+        border-color: #ef4444;
+    }
+
+    .card-media {
+        position: relative;
+        height: 200px;
+        background: #1a1a2e;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .card-media img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+
+    .card-media video {
+        max-width: 100%;
+        max-height: 100%;
+    }
+
+    .media-type-badge {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .priority-badge {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .priority-badge.urgente {
+        background: #ef4444;
+        color: white;
+    }
+
+    .priority-badge.alta {
+        background: #f59e0b;
+        color: white;
+    }
+
+    .priority-badge.normal {
+        background: #3b82f6;
+        color: white;
+    }
+
+    .card-content {
+        padding: 16px;
+    }
+
+    .card-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .creator-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .creator-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 0.8125rem;
+    }
+
+    .creator-name {
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: var(--text-dark);
+    }
+
+    .escalation-date {
+        font-size: 0.75rem;
+        color: var(--text-gray);
+    }
+
+    .escalation-reason {
+        background: #fef3c7;
+        border: 1px solid #f59e0b;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 16px;
+    }
+
+    .escalation-reason h4 {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #92400e;
+        margin: 0 0 6px 0;
+        text-transform: uppercase;
+    }
+
+    .escalation-reason p {
+        font-size: 0.8125rem;
+        color: #78350f;
+        margin: 0;
+    }
+
+    .previous-decisions {
+        margin-bottom: 16px;
+    }
+
+    .previous-decisions h4 {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-gray);
+        margin: 0 0 8px 0;
+        text-transform: uppercase;
+    }
+
+    .decision-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.8125rem;
+    }
+
+    .decision-item:last-child {
+        border-bottom: none;
+    }
+
+    .card-actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .card-actions button {
+        flex: 1;
+        padding: 10px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.8125rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .btn-approve {
+        background: #10b981;
+        color: white;
+    }
+
+    .btn-approve:hover {
+        background: #059669;
+    }
+
+    .btn-reject {
+        background: #ef4444;
+        color: white;
+    }
+
+    .btn-reject:hover {
+        background: #dc2626;
+    }
+
+    .btn-view {
+        background: var(--bg-light);
+        color: var(--text-dark);
+        border: 1px solid var(--border-color) !important;
+    }
+
+    .btn-view:hover {
+        background: var(--primary-pale);
+        border-color: var(--primary) !important;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        background: var(--bg-white);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+    }
+
+    .empty-state svg {
+        width: 80px;
+        height: 80px;
+        color: #10b981;
+        margin-bottom: 20px;
+    }
+
+    .empty-state h3 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0 0 8px 0;
+    }
+
+    .empty-state p {
+        color: var(--text-gray);
+        margin: 0;
+    }
+
+    /* Modal */
+    .modal-backdrop {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        backdrop-filter: blur(4px);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-backdrop.active {
+        display: flex;
+    }
+
+    .modal-content {
+        background: var(--bg-white);
+        border-radius: 16px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow: auto;
+    }
+
+    .modal-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 {
+        font-size: 1.125rem;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: var(--text-gray);
+    }
+
+    .modal-body {
+        padding: 24px;
+    }
+
+    .modal-footer {
+        padding: 16px 24px;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+    }
+
+    .form-group {
+        margin-bottom: 16px;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--text-dark);
+    }
+
+    .form-group textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 0.9375rem;
+        resize: vertical;
+        min-height: 100px;
+    }
+
+    .form-group textarea:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-pale);
+    }
+
+    @@media (max-width: 768px) {
+        .escalada-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="escalada-header">
+    <h2>
+        Cola Escalada
+        @if (Model.Count > 0)
+        {
+            <span class="count-badge">@Model.Count</span>
+        }
+    </h2>
+</div>
+
+@if (Model.Count > 0)
+{
+    <div class="escalada-grid">
+        @foreach (var item in Model)
+        {
+            var contenido = item.Contenido;
+            var usuario = contenido?.Usuario;
+            var nombre = usuario?.Seudonimo ?? usuario?.UserName ?? "Anonimo";
+            var inicial = nombre.Length > 0 ? nombre[0].ToString().ToUpper() : "?";
+            var archivo = contenido?.Archivos?.FirstOrDefault();
+            var esVideo = archivo?.TipoArchivo == Lado.Models.TipoArchivo.Video;
+            var prioridad = item.Prioridad.ToString().ToLower();
+            var ultimaDecision = item.Decisiones?.OrderByDescending(d => d.FechaDecision).FirstOrDefault();
+
+            <div class="escalada-card">
+                <div class="card-media">
+                    @if (archivo != null)
+                    {
+                        if (esVideo)
+                        {
+                            <video src="@archivo.RutaArchivo" muted></video>
+                            <span class="media-type-badge">VIDEO</span>
+                        }
+                        else
+                        {
+                            <img src="@(archivo.Thumbnail ?? archivo.RutaArchivo)" alt="">
+                            <span class="media-type-badge">FOTO</span>
+                        }
+                    }
+                    <span class="priority-badge @prioridad">@item.Prioridad</span>
+                </div>
+
+                <div class="card-content">
+                    <div class="card-meta">
+                        <div class="creator-info">
+                            <div class="creator-avatar">@inicial</div>
+                            <span class="creator-name">@nombre</span>
+                        </div>
+                        <span class="escalation-date">@item.FechaCreacion.ToString("dd/MM HH:mm")</span>
+                    </div>
+
+                    @if (ultimaDecision != null)
+                    {
+                        <div class="escalation-reason">
+                            <h4>Razon de escalamiento</h4>
+                            <p>@(ultimaDecision.Comentario ?? "Sin comentario")</p>
+                        </div>
+                    }
+
+                    @if (item.Decisiones?.Count > 0)
+                    {
+                        <div class="previous-decisions">
+                            <h4>Decisiones previas</h4>
+                            @foreach (var decision in item.Decisiones.OrderByDescending(d => d.FechaDecision).Take(3))
+                            {
+                                var supervisorNombre = decision.Supervisor?.Seudonimo ?? decision.Supervisor?.UserName ?? "Supervisor";
+                                <div class="decision-item">
+                                    <span>@supervisorNombre: <strong>@decision.Decision</strong></span>
+                                    <span style="color: var(--text-light);">@decision.FechaDecision.ToString("dd/MM HH:mm")</span>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <div class="card-actions">
+                        <button class="btn-approve" onclick="resolverEscalado(@item.Id, 'aprobar')">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            Aprobar
+                        </button>
+                        <button class="btn-reject" onclick="resolverEscalado(@item.Id, 'rechazar')">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                            Rechazar
+                        </button>
+                        @if (contenido != null)
+                        {
+                            <a href="/Admin/DetalleContenido/@contenido.Id" class="btn-view" style="text-decoration: none;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                            </a>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+        <h3>Sin items escalados</h3>
+        <p>No hay contenido escalado pendiente de revision por un administrador.</p>
+    </div>
+}
+
+<!-- Modal para resolver -->
+<div class="modal-backdrop" id="resolverModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">Resolver Item</h3>
+            <button class="modal-close" onclick="cerrarModal()">&times;</button>
+        </div>
+        <form id="resolverForm" method="post" asp-action="ResolverEscalado">
+            <div class="modal-body">
+                <input type="hidden" name="colaId" id="colaIdInput">
+                <input type="hidden" name="accion" id="accionInput">
+                @Html.AntiForgeryToken()
+
+                <div class="form-group">
+                    <label for="comentario">Comentario (opcional)</label>
+                    <textarea name="comentario" id="comentarioInput" placeholder="Agrega un comentario sobre tu decision..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-primary" onclick="cerrarModal()">Cancelar</button>
+                <button type="submit" class="btn btn-primary" id="submitBtn">Confirmar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function resolverEscalado(colaId, accion) {
+            document.getElementById('colaIdInput').value = colaId;
+            document.getElementById('accionInput').value = accion;
+            document.getElementById('modalTitle').textContent = accion === 'aprobar' ? 'Aprobar Contenido' : 'Rechazar Contenido';
+            document.getElementById('submitBtn').textContent = accion === 'aprobar' ? 'Aprobar' : 'Rechazar';
+            document.getElementById('submitBtn').className = accion === 'aprobar' ? 'btn btn-approve' : 'btn btn-reject';
+            document.getElementById('resolverModal').classList.add('active');
+        }
+
+        function cerrarModal() {
+            document.getElementById('resolverModal').classList.remove('active');
+            document.getElementById('comentarioInput').value = '';
+        }
+
+        // Cerrar modal con Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                cerrarModal();
+            }
+        });
+
+        // Cerrar modal al hacer clic fuera
+        document.getElementById('resolverModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                cerrarModal();
+            }
+        });
+    </script>
+}

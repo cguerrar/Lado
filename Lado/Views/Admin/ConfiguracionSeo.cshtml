@@ -1,0 +1,855 @@
+@model Lado.Models.ConfiguracionSeo
+@{
+    ViewData["Title"] = "Configuracion SEO";
+    var redirecciones = ViewBag.Redirecciones as List<Lado.Models.Redireccion301> ?? new List<Lado.Models.Redireccion301>();
+    var rutasRobots = ViewBag.RutasRobots as List<Lado.Models.RutaRobotsTxt> ?? new List<Lado.Models.RutaRobotsTxt>();
+    var botsRobots = ViewBag.BotsRobots as List<Lado.Models.BotRobotsTxt> ?? new List<Lado.Models.BotRobotsTxt>();
+}
+
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h2><i class="fas fa-search text-info"></i> Configuracion SEO</h2>
+            <p class="text-muted">Optimizacion para motores de busqueda</p>
+        </div>
+        <div class="col-md-6 text-end">
+            <form method="post" action="@Url.Action("LimpiarCacheSeo")" class="d-inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-outline-warning me-2">
+                    <i class="fas fa-sync"></i> Limpiar Cache SEO
+                </button>
+            </form>
+            <a href="@Url.Action("Index", "Admin")" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Volver al Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Tabs de navegacion -->
+    <ul class="nav nav-tabs mb-4" id="seoTabs" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button">
+                <i class="fas fa-cog"></i> General
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" id="opengraph-tab" data-bs-toggle="tab" data-bs-target="#opengraph" type="button">
+                <i class="fab fa-facebook"></i> Open Graph
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" id="sitemaps-tab" data-bs-toggle="tab" data-bs-target="#sitemaps" type="button">
+                <i class="fas fa-sitemap"></i> Sitemaps
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" id="robots-tab" data-bs-toggle="tab" data-bs-target="#robots" type="button">
+                <i class="fas fa-robot"></i> Robots.txt
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" id="redirecciones-tab" data-bs-toggle="tab" data-bs-target="#redirecciones" type="button">
+                <i class="fas fa-directions"></i> Redirecciones
+                <span class="badge bg-secondary">@redirecciones.Count</span>
+            </button>
+        </li>
+    </ul>
+
+    <form method="post" action="@Url.Action("ActualizarConfiguracionSeo")" id="formSeoConfig">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="Id" />
+
+        <div class="tab-content" id="seoTabsContent">
+            <!-- Tab General -->
+            <div class="tab-pane fade show active" id="general" role="tabpanel">
+                <div class="row g-3">
+                    <!-- Meta Tags Globales -->
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="fas fa-tags"></i> Meta Tags Globales</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label asp-for="TituloSitio" class="form-label">Titulo del Sitio</label>
+                                    <input asp-for="TituloSitio" class="form-control" maxlength="200" required />
+                                    <small class="text-muted">Aparece en el titulo de la pagina y resultados de busqueda</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="DescripcionMeta" class="form-label">Meta Description</label>
+                                    <textarea asp-for="DescripcionMeta" class="form-control" rows="3" maxlength="500"></textarea>
+                                    <small class="text-muted">Descripcion que aparece en resultados de busqueda (ideal: 150-160 caracteres)</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="PalabrasClave" class="form-label">Palabras Clave</label>
+                                    <input asp-for="PalabrasClave" class="form-control" maxlength="500" />
+                                    <small class="text-muted">Separadas por comas</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="UrlBase" class="form-label">URL Base del Sitio</label>
+                                    <input asp-for="UrlBase" class="form-control" placeholder="https://ladoapp.com" />
+                                    <small class="text-muted">Sin barra final. Se usa en sitemaps y canonicals</small>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input asp-for="IndexarSitio" class="form-check-input" />
+                                    <label asp-for="IndexarSitio" class="form-check-label">Permitir indexacion del sitio</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Verificacion de Sitios -->
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="fas fa-check-circle"></i> Verificacion de Sitios</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label asp-for="GoogleSiteVerification" class="form-label">Google Search Console</label>
+                                    <input asp-for="GoogleSiteVerification" class="form-control" placeholder="google-site-verification=..." />
+                                    <small class="text-muted">Codigo de verificacion de Google</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="BingSiteVerification" class="form-label">Bing Webmaster</label>
+                                    <input asp-for="BingSiteVerification" class="form-control" placeholder="msvalidate.01=..." />
+                                    <small class="text-muted">Codigo de verificacion de Bing</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="PinterestSiteVerification" class="form-label">Pinterest</label>
+                                    <input asp-for="PinterestSiteVerification" class="form-control" />
+                                    <small class="text-muted">Codigo de verificacion de Pinterest</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Organizacion (Schema.org) -->
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="fas fa-building"></i> Organizacion (Schema.org)</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label asp-for="OrganizacionNombre" class="form-label">Nombre</label>
+                                    <input asp-for="OrganizacionNombre" class="form-control" />
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="OrganizacionDescripcion" class="form-label">Descripcion</label>
+                                    <textarea asp-for="OrganizacionDescripcion" class="form-control" rows="2"></textarea>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label asp-for="OrganizacionLogo" class="form-label">Logo URL</label>
+                                        <input asp-for="OrganizacionLogo" class="form-control" />
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label asp-for="OrganizacionFundacion" class="form-label">Ano de Fundacion</label>
+                                        <input asp-for="OrganizacionFundacion" class="form-control" maxlength="4" />
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="OrganizacionEmail" class="form-label">Email de Contacto</label>
+                                    <input asp-for="OrganizacionEmail" class="form-control" type="email" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Redes Sociales -->
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-secondary text-white">
+                                <h5 class="mb-0"><i class="fas fa-share-alt"></i> Redes Sociales</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label asp-for="FacebookUrl" class="form-label"><i class="fab fa-facebook text-primary"></i> Facebook</label>
+                                    <input asp-for="FacebookUrl" class="form-control" placeholder="https://facebook.com/..." />
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="InstagramUrl" class="form-label"><i class="fab fa-instagram text-danger"></i> Instagram</label>
+                                    <input asp-for="InstagramUrl" class="form-control" placeholder="https://instagram.com/..." />
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="TwitterUrl" class="form-label"><i class="fab fa-twitter text-info"></i> Twitter/X</label>
+                                    <input asp-for="TwitterUrl" class="form-control" placeholder="https://twitter.com/..." />
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="TikTokUrl" class="form-label"><i class="fab fa-tiktok"></i> TikTok</label>
+                                    <input asp-for="TikTokUrl" class="form-control" placeholder="https://tiktok.com/..." />
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="YouTubeUrl" class="form-label"><i class="fab fa-youtube text-danger"></i> YouTube</label>
+                                    <input asp-for="YouTubeUrl" class="form-control" placeholder="https://youtube.com/..." />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Open Graph -->
+            <div class="tab-pane fade" id="opengraph" role="tabpanel">
+                <div class="row g-3">
+                    <!-- Open Graph -->
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="fab fa-facebook"></i> Open Graph</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label asp-for="OgSiteName" class="form-label">Nombre del Sitio (og:site_name)</label>
+                                    <input asp-for="OgSiteName" class="form-control" />
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="OgImagenDefault" class="form-label">Imagen por Defecto</label>
+                                    <input asp-for="OgImagenDefault" class="form-control" placeholder="/images/og-default.jpg" />
+                                    <small class="text-muted">Se usa cuando una pagina no tiene imagen propia</small>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label asp-for="OgImagenAncho" class="form-label">Ancho Imagen (px)</label>
+                                        <input asp-for="OgImagenAncho" class="form-control" type="number" />
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label asp-for="OgImagenAlto" class="form-label">Alto Imagen (px)</label>
+                                        <input asp-for="OgImagenAlto" class="form-control" type="number" />
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="OgTypeDefault" class="form-label">Tipo por Defecto</label>
+                                    <select asp-for="OgTypeDefault" class="form-select">
+                                        <option value="website">website</option>
+                                        <option value="article">article</option>
+                                        <option value="profile">profile</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="OgLocale" class="form-label">Locale</label>
+                                    <input asp-for="OgLocale" class="form-control" placeholder="es_ES" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Twitter Cards -->
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="fab fa-twitter"></i> Twitter Cards</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label asp-for="TwitterSite" class="form-label">Usuario Twitter (@@handle)</label>
+                                    <input asp-for="TwitterSite" class="form-control" placeholder="@@ladoapp" />
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="TwitterCardType" class="form-label">Tipo de Card</label>
+                                    <select asp-for="TwitterCardType" class="form-select">
+                                        <option value="summary_large_image">summary_large_image (Imagen grande)</option>
+                                        <option value="summary">summary (Imagen pequena)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Sitemaps -->
+            <div class="tab-pane fade" id="sitemaps" role="tabpanel">
+                <div class="row g-3">
+                    <!-- Limites de Sitemap -->
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-warning text-dark">
+                                <h5 class="mb-0"><i class="fas fa-list-ol"></i> Limites de Sitemap</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label asp-for="SitemapLimitePerfiles" class="form-label">Limite de Perfiles</label>
+                                    <input asp-for="SitemapLimitePerfiles" class="form-control" type="number" min="10" max="50000" />
+                                    <small class="text-muted">Maximo de perfiles en sitemap-perfiles.xml</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="SitemapLimiteContenido" class="form-label">Limite de Contenido</label>
+                                    <input asp-for="SitemapLimiteContenido" class="form-control" type="number" min="10" max="50000" />
+                                    <small class="text-muted">Maximo de contenidos en sitemap-contenido.xml</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cache de Sitemaps -->
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-secondary text-white">
+                                <h5 class="mb-0"><i class="fas fa-clock"></i> Cache de Sitemaps (horas)</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label asp-for="SitemapCacheIndexHoras" class="form-label">Index</label>
+                                        <input asp-for="SitemapCacheIndexHoras" class="form-control" type="number" min="1" max="168" />
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label asp-for="SitemapCachePaginasHoras" class="form-label">Paginas</label>
+                                        <input asp-for="SitemapCachePaginasHoras" class="form-control" type="number" min="1" max="168" />
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label asp-for="SitemapCachePerfilesHoras" class="form-label">Perfiles</label>
+                                        <input asp-for="SitemapCachePerfilesHoras" class="form-control" type="number" min="1" max="168" />
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label asp-for="SitemapCacheContenidoHoras" class="form-label">Contenido</label>
+                                        <input asp-for="SitemapCacheContenidoHoras" class="form-control" type="number" min="1" max="168" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Prioridades -->
+                    <div class="col-lg-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="fas fa-sort-amount-down"></i> Prioridades de Sitemap (0.0 - 1.0)</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-2 mb-3">
+                                        <label asp-for="SitemapPrioridadHome" class="form-label">Home</label>
+                                        <input asp-for="SitemapPrioridadHome" class="form-control" type="number" min="0" max="1" step="0.1" />
+                                    </div>
+                                    <div class="col-md-2 mb-3">
+                                        <label asp-for="SitemapPrioridadFeedPublico" class="form-label">Feed Publico</label>
+                                        <input asp-for="SitemapPrioridadFeedPublico" class="form-control" type="number" min="0" max="1" step="0.1" />
+                                    </div>
+                                    <div class="col-md-2 mb-3">
+                                        <label asp-for="SitemapPrioridadPerfiles" class="form-label">Perfiles</label>
+                                        <input asp-for="SitemapPrioridadPerfiles" class="form-control" type="number" min="0" max="1" step="0.1" />
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label asp-for="SitemapPrioridadContenidoVideo" class="form-label">Contenido (Video)</label>
+                                        <input asp-for="SitemapPrioridadContenidoVideo" class="form-control" type="number" min="0" max="1" step="0.1" />
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label asp-for="SitemapPrioridadContenidoNormal" class="form-label">Contenido (Normal)</label>
+                                        <input asp-for="SitemapPrioridadContenidoNormal" class="form-control" type="number" min="0" max="1" step="0.1" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Links a Sitemaps -->
+                    <div class="col-lg-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="fas fa-external-link-alt"></i> Sitemaps Generados</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <a href="/sitemap.xml" target="_blank" class="btn btn-outline-primary w-100">
+                                            <i class="fas fa-sitemap"></i> sitemap.xml (Index)
+                                        </a>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <a href="/sitemap-paginas.xml" target="_blank" class="btn btn-outline-secondary w-100">
+                                            <i class="fas fa-file"></i> sitemap-paginas.xml
+                                        </a>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <a href="/sitemap-perfiles.xml" target="_blank" class="btn btn-outline-info w-100">
+                                            <i class="fas fa-users"></i> sitemap-perfiles.xml
+                                        </a>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <a href="/sitemap-contenido.xml" target="_blank" class="btn btn-outline-success w-100">
+                                            <i class="fas fa-images"></i> sitemap-contenido.xml
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Robots.txt -->
+            <div class="tab-pane fade" id="robots" role="tabpanel">
+                <div class="row g-3">
+                    <!-- Crawl Delays -->
+                    <div class="col-lg-4">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-dark text-white">
+                                <h5 class="mb-0"><i class="fas fa-tachometer-alt"></i> Crawl Delays (segundos)</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label asp-for="RobotsCrawlDelayGoogle" class="form-label">Googlebot</label>
+                                    <input asp-for="RobotsCrawlDelayGoogle" class="form-control" type="number" min="0" max="60" />
+                                    <small class="text-muted">0 = sin limite</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="RobotsCrawlDelayBing" class="form-label">Bingbot</label>
+                                    <input asp-for="RobotsCrawlDelayBing" class="form-control" type="number" min="0" max="60" />
+                                </div>
+                                <div class="mb-3">
+                                    <label asp-for="RobotsCrawlDelayOtros" class="form-label">Otros Bots</label>
+                                    <input asp-for="RobotsCrawlDelayOtros" class="form-control" type="number" min="0" max="60" />
+                                </div>
+                                <a href="/robots.txt" target="_blank" class="btn btn-outline-dark w-100">
+                                    <i class="fas fa-robot"></i> Ver robots.txt
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rutas de Robots -->
+                    <div class="col-lg-8">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="fas fa-road"></i> Rutas en Robots.txt</h5>
+                                <button type="button" class="btn btn-sm btn-dark" data-bs-toggle="modal" data-bs-target="#modalNuevaRuta">
+                                    <i class="fas fa-plus"></i> Agregar Ruta
+                                </button>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="table table-hover table-sm mb-0">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th>Ruta</th>
+                                                <th>Tipo</th>
+                                                <th>User-Agent</th>
+                                                <th>Estado</th>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var ruta in rutasRobots)
+                                            {
+                                                <tr class="@(!ruta.Activa ? "table-secondary" : "")">
+                                                    <td><code>@ruta.Ruta</code></td>
+                                                    <td>
+                                                        @if (ruta.Tipo == Lado.Models.TipoReglaRobots.Allow)
+                                                        {
+                                                            <span class="badge bg-success">Allow</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-danger">Disallow</span>
+                                                        }
+                                                    </td>
+                                                    <td><small>@ruta.UserAgent</small></td>
+                                                    <td>
+                                                        @if (ruta.Activa)
+                                                        {
+                                                            <span class="badge bg-success">Activa</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-secondary">Inactiva</span>
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm">
+                                                            <form method="post" action="@Url.Action("ToggleRutaRobots")" class="d-inline">
+                                                                @Html.AntiForgeryToken()
+                                                                <input type="hidden" name="id" value="@ruta.Id" />
+                                                                <button type="submit" class="btn btn-outline-secondary btn-sm" title="Toggle">
+                                                                    <i class="fas fa-power-off"></i>
+                                                                </button>
+                                                            </form>
+                                                            <form method="post" action="@Url.Action("EliminarRutaRobots")" class="d-inline" onsubmit="return confirm('Eliminar esta ruta?');">
+                                                                @Html.AntiForgeryToken()
+                                                                <input type="hidden" name="id" value="@ruta.Id" />
+                                                                <button type="submit" class="btn btn-outline-danger btn-sm" title="Eliminar">
+                                                                    <i class="fas fa-trash"></i>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bots -->
+                    <div class="col-lg-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="fas fa-robot"></i> Bots / Crawlers</h5>
+                                <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#modalNuevoBot">
+                                    <i class="fas fa-plus"></i> Agregar Bot
+                                </button>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="table table-hover table-sm mb-0">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th>User-Agent</th>
+                                                <th>Descripcion</th>
+                                                <th>Crawl-delay</th>
+                                                <th>Importante</th>
+                                                <th>Bloqueado</th>
+                                                <th>Estado</th>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var bot in botsRobots)
+                                            {
+                                                <tr class="@(!bot.Activo ? "table-secondary" : (bot.Bloqueado ? "table-danger" : ""))">
+                                                    <td><code>@bot.UserAgent</code></td>
+                                                    <td><small>@bot.Descripcion</small></td>
+                                                    <td>@bot.CrawlDelay s</td>
+                                                    <td>
+                                                        @if (bot.EsBotImportante)
+                                                        {
+                                                            <i class="fas fa-star text-warning"></i>
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        @if (bot.Bloqueado)
+                                                        {
+                                                            <span class="badge bg-danger">Bloqueado</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-success">Permitido</span>
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        @if (bot.Activo)
+                                                        {
+                                                            <span class="badge bg-success">Activo</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-secondary">Inactivo</span>
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm">
+                                                            <form method="post" action="@Url.Action("ToggleBloqueoBot")" class="d-inline">
+                                                                @Html.AntiForgeryToken()
+                                                                <input type="hidden" name="id" value="@bot.Id" />
+                                                                <button type="submit" class="btn btn-outline-@(bot.Bloqueado ? "success" : "danger") btn-sm" title="@(bot.Bloqueado ? "Permitir" : "Bloquear")">
+                                                                    <i class="fas fa-@(bot.Bloqueado ? "check" : "ban")"></i>
+                                                                </button>
+                                                            </form>
+                                                            <form method="post" action="@Url.Action("ToggleBotRobots")" class="d-inline">
+                                                                @Html.AntiForgeryToken()
+                                                                <input type="hidden" name="id" value="@bot.Id" />
+                                                                <button type="submit" class="btn btn-outline-secondary btn-sm" title="Toggle">
+                                                                    <i class="fas fa-power-off"></i>
+                                                                </button>
+                                                            </form>
+                                                            <form method="post" action="@Url.Action("EliminarBotRobots")" class="d-inline" onsubmit="return confirm('Eliminar este bot?');">
+                                                                @Html.AntiForgeryToken()
+                                                                <input type="hidden" name="id" value="@bot.Id" />
+                                                                <button type="submit" class="btn btn-outline-danger btn-sm" title="Eliminar">
+                                                                    <i class="fas fa-trash"></i>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Redirecciones -->
+            <div class="tab-pane fade" id="redirecciones" role="tabpanel">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="fas fa-directions"></i> Redirecciones 301/302</h5>
+                                <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#modalNuevaRedireccion">
+                                    <i class="fas fa-plus"></i> Nueva Redireccion
+                                </button>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>URL Origen</th>
+                                                <th>URL Destino</th>
+                                                <th>Tipo</th>
+                                                <th>Query String</th>
+                                                <th>Usos</th>
+                                                <th>Estado</th>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @if (!redirecciones.Any())
+                                            {
+                                                <tr>
+                                                    <td colspan="7" class="text-center text-muted py-4">
+                                                        <i class="fas fa-directions fa-2x mb-2 d-block"></i>
+                                                        No hay redirecciones configuradas
+                                                    </td>
+                                                </tr>
+                                            }
+                                            @foreach (var redir in redirecciones)
+                                            {
+                                                <tr class="@(!redir.Activa ? "table-secondary" : "")">
+                                                    <td><code>@redir.UrlOrigen</code></td>
+                                                    <td>
+                                                        <a href="@redir.UrlDestino" target="_blank">@redir.UrlDestino</a>
+                                                    </td>
+                                                    <td>
+                                                        @if (redir.Tipo == Lado.Models.TipoRedireccion.Permanente301)
+                                                        {
+                                                            <span class="badge bg-success">301</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-warning text-dark">302</span>
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        @if (redir.PreservarQueryString)
+                                                        {
+                                                            <i class="fas fa-check text-success"></i>
+                                                        }
+                                                        else
+                                                        {
+                                                            <i class="fas fa-times text-muted"></i>
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-secondary">@redir.ContadorUso</span>
+                                                        @if (redir.UltimoUso.HasValue)
+                                                        {
+                                                            <small class="text-muted d-block">@redir.UltimoUso.Value.ToString("dd/MM HH:mm")</small>
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        @if (redir.Activa)
+                                                        {
+                                                            <span class="badge bg-success">Activa</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-secondary">Inactiva</span>
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm">
+                                                            <form method="post" action="@Url.Action("ToggleRedireccion")" class="d-inline">
+                                                                @Html.AntiForgeryToken()
+                                                                <input type="hidden" name="id" value="@redir.Id" />
+                                                                <button type="submit" class="btn btn-outline-secondary btn-sm" title="Toggle">
+                                                                    <i class="fas fa-power-off"></i>
+                                                                </button>
+                                                            </form>
+                                                            <form method="post" action="@Url.Action("EliminarRedireccion")" class="d-inline" onsubmit="return confirm('Eliminar esta redireccion?');">
+                                                                @Html.AntiForgeryToken()
+                                                                <input type="hidden" name="id" value="@redir.Id" />
+                                                                <button type="submit" class="btn btn-outline-danger btn-sm" title="Eliminar">
+                                                                    <i class="fas fa-trash"></i>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Boton Guardar (fijo) -->
+        <div class="position-fixed bottom-0 end-0 p-4" style="z-index: 1000;">
+            <button type="submit" class="btn btn-primary btn-lg shadow">
+                <i class="fas fa-save"></i> Guardar Configuracion SEO
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Modal Nueva Redireccion -->
+<div class="modal fade" id="modalNuevaRedireccion" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="@Url.Action("CrearRedireccion")">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-plus"></i> Nueva Redireccion</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">URL de Origen</label>
+                        <input type="text" name="UrlOrigen" class="form-control" placeholder="/old-page" required />
+                        <small class="text-muted">Sin dominio, ej: /old-page</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">URL de Destino</label>
+                        <input type="text" name="UrlDestino" class="form-control" placeholder="/new-page o https://..." required />
+                        <small class="text-muted">Puede ser relativa o absoluta</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Redireccion</label>
+                        <select name="Tipo" class="form-select">
+                            <option value="@((int)Lado.Models.TipoRedireccion.Permanente301)">301 - Permanente</option>
+                            <option value="@((int)Lado.Models.TipoRedireccion.Temporal302)">302 - Temporal</option>
+                        </select>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" name="PreservarQueryString" value="true" class="form-check-input" id="preservarQS" checked />
+                        <label class="form-check-label" for="preservarQS">Preservar Query String</label>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nota (opcional)</label>
+                        <input type="text" name="Nota" class="form-control" placeholder="Razon de la redireccion" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Crear Redireccion</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nueva Ruta Robots -->
+<div class="modal fade" id="modalNuevaRuta" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="@Url.Action("CrearRutaRobots")">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="fas fa-plus"></i> Nueva Ruta</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Ruta</label>
+                        <input type="text" name="Ruta" class="form-control" placeholder="/admin/" required />
+                        <small class="text-muted">Ej: /admin/, /*?page=, /api/</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Regla</label>
+                        <select name="Tipo" class="form-select">
+                            <option value="@((int)Lado.Models.TipoReglaRobots.Disallow)">Disallow (Bloquear)</option>
+                            <option value="@((int)Lado.Models.TipoReglaRobots.Allow)">Allow (Permitir)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">User-Agent</label>
+                        <input type="text" name="UserAgent" class="form-control" value="*" />
+                        <small class="text-muted">* = todos los bots</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Orden</label>
+                        <input type="number" name="Orden" class="form-control" value="100" min="1" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descripcion (opcional)</label>
+                        <input type="text" name="Descripcion" class="form-control" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">Crear Ruta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nuevo Bot -->
+<div class="modal fade" id="modalNuevoBot" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="@Url.Action("CrearBotRobots")">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="fas fa-plus"></i> Nuevo Bot</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">User-Agent</label>
+                        <input type="text" name="UserAgent" class="form-control" placeholder="NuevoBot" required />
+                        <small class="text-muted">Nombre exacto del bot</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descripcion</label>
+                        <input type="text" name="Descripcion" class="form-control" placeholder="Bot de ejemplo" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Crawl-delay (segundos)</label>
+                        <input type="number" name="CrawlDelay" class="form-control" value="0" min="0" max="120" />
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" name="Bloqueado" value="true" class="form-check-input" id="botBloqueado" />
+                        <label class="form-check-label" for="botBloqueado">Bloquear completamente</label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" name="EsBotImportante" value="true" class="form-check-input" id="botImportante" />
+                        <label class="form-check-label" for="botImportante">Es bot importante (Google, Bing, etc.)</label>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Orden</label>
+                        <input type="number" name="Orden" class="form-control" value="100" min="1" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-dark">Crear Bot</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Mantener el tab activo despues de recargar
+        document.addEventListener('DOMContentLoaded', function() {
+            var activeTab = localStorage.getItem('seoActiveTab');
+            if (activeTab) {
+                var tab = document.querySelector('[data-bs-target="' + activeTab + '"]');
+                if (tab) {
+                    new bootstrap.Tab(tab).show();
+                }
+            }
+        });
+
+        document.querySelectorAll('#seoTabs button').forEach(function(tab) {
+            tab.addEventListener('shown.bs.tab', function(e) {
+                localStorage.setItem('seoActiveTab', e.target.getAttribute('data-bs-target'));
+            });
+        });
+    </script>
+}

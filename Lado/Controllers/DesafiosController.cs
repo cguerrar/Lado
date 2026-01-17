@@ -216,27 +216,97 @@ namespace Lado.Controllers
                     return View(model);
                 }
 
+                // Validar presupuesto
+                if (model.PresupuestoMinimo < 5 || model.PresupuestoMinimo > 10000)
+                {
+                    TempData["Error"] = "El presupuesto debe estar entre $5 y $10,000";
+                    return View(model);
+                }
+
+                // Validar presupuesto máximo si es rango
+                if (model.TipoPresupuesto == TipoPresupuesto.Rango)
+                {
+                    if (!model.PresupuestoMaximo.HasValue || model.PresupuestoMaximo <= model.PresupuestoMinimo)
+                    {
+                        TempData["Error"] = "El presupuesto máximo debe ser mayor al mínimo";
+                        return View(model);
+                    }
+                }
+
+                // Calcular fecha de expiración según los días
+                var diasExpiracion = model.DiasPlazoPlazo > 0 ? model.DiasPlazoPlazo : 7;
+                if (model.EsRelampago)
+                {
+                    diasExpiracion = 1; // Relámpago = 24 horas
+                }
+
                 var desafio = new Desafio
                 {
                     FanId = usuarioId!,
                     TipoDesafio = TipoDesafio.Publico,
                     Titulo = model.Titulo.Trim(),
                     Descripcion = model.Descripcion.Trim(),
-                    Presupuesto = 10.00m,
-                    DiasPlazoPlazo = 3,
+                    // Presupuesto flexible
+                    PresupuestoMinimo = model.PresupuestoMinimo,
+                    PresupuestoMaximo = model.TipoPresupuesto == TipoPresupuesto.Rango ? model.PresupuestoMaximo : null,
+                    TipoPresupuesto = model.TipoPresupuesto,
+                    Presupuesto = model.PresupuestoMinimo, // Mantener compatibilidad con campo antiguo
+                    // Duración y categoría
+                    DiasPlazoPlazo = diasExpiracion,
                     Categoria = model.Categoria,
+                    // Tipo de contenido
                     TipoContenido = model.TipoContenido,
+                    TipoContenidoRequerido = model.TipoContenidoRequerido,
+                    // Opciones especiales
+                    EsRelampago = model.EsRelampago,
+                    EsDestacado = model.EsDestacado,
+                    TipoEspecial = model.TipoEspecial,
+                    // Tags
+                    Tags = !string.IsNullOrWhiteSpace(model.Tags) ? model.Tags.Trim() : null,
+                    // Estado inicial
                     Visibilidad = VisibilidadDesafio.Publico,
                     Estado = EstadoDesafio.RecibiendoPropuestas,
                     FechaCreacion = DateTime.Now,
-                    FechaExpiracion = DateTime.Now.AddDays(7),
-                    EstadoPago = EstadoPago.Hold
+                    FechaExpiracion = DateTime.Now.AddDays(diasExpiracion),
+                    EstadoPago = EstadoPago.Hold,
+                    // Stats iniciales
+                    NumeroVistas = 0,
+                    NumeroGuardados = 0
                 };
 
                 _context.Desafios.Add(desafio);
                 await _context.SaveChangesAsync();
 
-                TempData["Success"] = "🎮 ¡Desafío creado! Los creadores comenzarán a enviar propuestas.";
+                // Actualizar estadísticas del usuario
+                var estadisticas = await _context.EstadisticasDesafiosUsuario
+                    .FirstOrDefaultAsync(e => e.UsuarioId == usuarioId);
+
+                if (estadisticas == null)
+                {
+                    estadisticas = new EstadisticasDesafiosUsuario
+                    {
+                        UsuarioId = usuarioId,
+                        DesafiosCreadosComoFan = 1,
+                        TotalGastadoDesafios = 0,
+                        NivelFan = 1,
+                        PuntosFan = 10
+                    };
+                    _context.EstadisticasDesafiosUsuario.Add(estadisticas);
+                }
+                else
+                {
+                    estadisticas.DesafiosCreadosComoFan++;
+                    estadisticas.PuntosFan += 10;
+                    // Subir de nivel cada 100 puntos
+                    estadisticas.NivelFan = (estadisticas.PuntosFan / 100) + 1;
+                }
+
+                await _context.SaveChangesAsync();
+
+                TempData["Success"] = model.EsRelampago
+                    ? "⚡ ¡Desafío Relámpago creado! Los creadores tienen 24h para enviar propuestas."
+                    : "🎮 ¡Desafío creado! Los creadores comenzarán a enviar propuestas.";
+
                 return RedirectToAction(nameof(MisDesafios));
             }
             catch (Exception ex)
@@ -368,38 +438,197 @@ namespace Lado.Controllers
         // ========================================
         // FEED PÚBLICO (SOLO CREADORES)
         // ========================================
-        public async Task<IActionResult> FeedPublico(string? categoria, decimal? presupuestoMin, decimal? presupuestoMax)
+        [AllowAnonymous]
+        public async Task<IActionResult> FeedPublico(
+            string? categoria,
+            decimal? presupuestoMin,
+            decimal? presupuestoMax,
+            string? orden,
+            string? tipoContenido,
+            string? tipoEspecial)
         {
-            // Obtener usuario actual
-            var usuario = await _userManager.GetUserAsync(User);
-
-        
-            // Solo los creadores pueden ver el feed público
+            // Query base con includes necesarios
             var query = _context.Desafios
                 .Include(d => d.Fan)
+                    .ThenInclude(f => f.EstadisticasDesafios)
                 .Include(d => d.Propuestas)
+                    .ThenInclude(p => p.Creador)
                 .Where(d => d.TipoDesafio == TipoDesafio.Publico &&
                            d.Estado == EstadoDesafio.RecibiendoPropuestas &&
                            d.FechaExpiracion > DateTime.Now);
 
-            // Aplicar filtros
+            // Filtro por categoría
             if (!string.IsNullOrWhiteSpace(categoria))
             {
                 query = query.Where(d => d.Categoria == categoria);
             }
 
+            // Filtro por presupuesto mínimo
             if (presupuestoMin.HasValue)
             {
-                query = query.Where(d => d.Presupuesto >= presupuestoMin.Value);
+                query = query.Where(d => d.PresupuestoMinimo >= presupuestoMin.Value);
             }
 
+            // Filtro por presupuesto máximo
             if (presupuestoMax.HasValue)
             {
-                query = query.Where(d => d.Presupuesto <= presupuestoMax.Value);
+                query = query.Where(d => d.PresupuestoMinimo <= presupuestoMax.Value);
             }
 
-            var desafios = await query
-                .OrderByDescending(d => d.FechaCreacion)
+            // Filtro por tipo de contenido
+            if (!string.IsNullOrWhiteSpace(tipoContenido) && Enum.TryParse<TipoContenidoDesafio>(tipoContenido, out var tipoContenidoEnum))
+            {
+                query = query.Where(d => d.TipoContenidoRequerido == tipoContenidoEnum);
+            }
+
+            // Filtro por tipo especial
+            if (!string.IsNullOrWhiteSpace(tipoEspecial))
+            {
+                if (tipoEspecial == "relampago")
+                {
+                    query = query.Where(d => d.EsRelampago);
+                }
+                else if (tipoEspecial == "destacado")
+                {
+                    query = query.Where(d => d.EsDestacado);
+                }
+            }
+
+            // Ordenamiento
+            IOrderedQueryable<Desafio> orderedQuery = orden switch
+            {
+                "pago_alto" => query.OrderByDescending(d => d.PresupuestoMinimo),
+                "expira_pronto" => query.OrderBy(d => d.FechaExpiracion),
+                "menos_competencia" => query.OrderBy(d => d.Propuestas.Count),
+                "mejor_valorado" => query.OrderByDescending(d => d.Fan.EstadisticasDesafios != null ? d.Fan.EstadisticasDesafios.PromedioRating : 0),
+                _ => query.OrderByDescending(d => d.FechaCreacion)
+            };
+
+            var desafios = await orderedQuery.ToListAsync();
+
+            // Incrementar vistas
+            var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            foreach (var desafio in desafios)
+            {
+                desafio.NumeroVistas++;
+            }
+            await _context.SaveChangesAsync();
+
+            // Pasar filtros a la vista
+            ViewBag.Categoria = categoria;
+            ViewBag.Orden = orden ?? "recientes";
+            ViewBag.TipoContenido = tipoContenido;
+            ViewBag.TipoEspecial = tipoEspecial;
+            ViewBag.PresupuestoMin = presupuestoMin;
+            ViewBag.PresupuestoMax = presupuestoMax;
+
+            return View(desafios);
+        }
+
+        // ========================================
+        // GUARDAR/DESGUARDAR DESAFÍO
+        // ========================================
+        [HttpPost]
+        public async Task<IActionResult> ToggleGuardar(int id)
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(usuarioId))
+                {
+                    return Unauthorized();
+                }
+
+                var guardado = await _context.DesafiosGuardados
+                    .FirstOrDefaultAsync(g => g.DesafioId == id && g.UsuarioId == usuarioId);
+
+                bool estaGuardado;
+
+                if (guardado != null)
+                {
+                    // Ya está guardado, lo quitamos
+                    _context.DesafiosGuardados.Remove(guardado);
+
+                    // Decrementar contador
+                    var desafio = await _context.Desafios.FindAsync(id);
+                    if (desafio != null && desafio.NumeroGuardados > 0)
+                    {
+                        desafio.NumeroGuardados--;
+                    }
+
+                    estaGuardado = false;
+                }
+                else
+                {
+                    // No está guardado, lo agregamos
+                    _context.DesafiosGuardados.Add(new DesafioGuardado
+                    {
+                        DesafioId = id,
+                        UsuarioId = usuarioId,
+                        FechaGuardado = DateTime.Now
+                    });
+
+                    // Incrementar contador
+                    var desafio = await _context.Desafios.FindAsync(id);
+                    if (desafio != null)
+                    {
+                        desafio.NumeroGuardados++;
+                    }
+
+                    estaGuardado = true;
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, guardado = estaGuardado });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al guardar/desguardar desafío {Id}", id);
+                return Json(new { success = false });
+            }
+        }
+
+        // ========================================
+        // OBTENER MIS DESAFÍOS GUARDADOS (IDs)
+        // ========================================
+        [HttpGet]
+        public async Task<IActionResult> MisGuardados()
+        {
+            var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(usuarioId))
+            {
+                return Json(new int[0]);
+            }
+
+            var ids = await _context.DesafiosGuardados
+                .Where(g => g.UsuarioId == usuarioId)
+                .Select(g => g.DesafioId)
+                .ToListAsync();
+
+            return Json(ids);
+        }
+
+        // ========================================
+        // VER DESAFÍOS GUARDADOS (PÁGINA)
+        // ========================================
+        public async Task<IActionResult> Guardados()
+        {
+            var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(usuarioId))
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            var desafios = await _context.DesafiosGuardados
+                .Include(g => g.Desafio)
+                    .ThenInclude(d => d.Fan)
+                        .ThenInclude(f => f.EstadisticasDesafios)
+                .Include(g => g.Desafio)
+                    .ThenInclude(d => d.Propuestas)
+                .Where(g => g.UsuarioId == usuarioId)
+                .OrderByDescending(g => g.FechaGuardado)
+                .Select(g => g.Desafio)
                 .ToListAsync();
 
             return View(desafios);

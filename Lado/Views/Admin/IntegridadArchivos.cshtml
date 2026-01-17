@@ -168,6 +168,14 @@
 
 @section Scripts {
     <script>
+        // Helper CSRF para llamadas AJAX seguras
+        function getCsrfToken() {
+            return document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+        }
+        function csrfHeaders() {
+            return { 'X-CSRF-TOKEN': getCsrfToken(), 'Content-Type': 'application/json' };
+        }
+
         function mostrarResultado(mensaje, tipo = 'info') {
             const container = document.getElementById('resultadoContainer');
             const toast = document.getElementById('resultadoToast');
@@ -204,7 +212,7 @@
 
         async function simularLimpieza() {
             try {
-                const response = await fetch('/Admin/SimularLimpiezaArchivos', { method: 'POST' });
+                const response = await fetch('/Admin/SimularLimpiezaArchivos', { method: 'POST', headers: csrfHeaders() });
                 const data = await response.json();
                 if (data.success) {
                     mostrarResultado(data.mensaje, 'warning');
@@ -220,7 +228,7 @@
             }
 
             try {
-                const response = await fetch('/Admin/EjecutarLimpiezaArchivos', { method: 'POST' });
+                const response = await fetch('/Admin/EjecutarLimpiezaArchivos', { method: 'POST', headers: csrfHeaders() });
                 const data = await response.json();
                 if (data.success) {
                     mostrarResultado(data.mensaje, 'success');
@@ -233,7 +241,7 @@
 
         async function limpiarCache() {
             try {
-                const response = await fetch('/Admin/LimpiarCacheIntegridad', { method: 'POST' });
+                const response = await fetch('/Admin/LimpiarCacheIntegridad', { method: 'POST', headers: csrfHeaders() });
                 const data = await response.json();
                 if (data.success) {
                     mostrarResultado(data.mensaje, 'success');

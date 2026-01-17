@@ -28,59 +28,136 @@
     }
 
     /* ========================================
-       PULL TO REFRESH
+       PULL TO REFRESH - MEJORADO PARA PWA
        ======================================== */
     .pull-to-refresh {
         position: fixed;
-        top: 70px;
+        top: calc(70px + env(safe-area-inset-top, 0px));
         left: 50%;
         transform: translateX(-50%) translateY(-100%);
-        z-index: 1000;
-        transition: transform 0.3s ease, opacity 0.3s ease;
+        z-index: 1001;
+        transition: opacity 0.2s ease, transform 0.2s ease;
         opacity: 0;
         pointer-events: none;
     }
 
     .pull-to-refresh.visible {
-        transform: translateX(-50%) translateY(0);
         opacity: 1;
     }
 
     .pull-to-refresh.refreshing {
-        transform: translateX(-50%) translateY(0);
         opacity: 1;
     }
 
     .pull-indicator {
-        background: var(--surface);
-        border: 1px solid var(--line);
+        background: var(--primary);
+        border: 2px solid rgba(255,255,255,0.3);
         border-radius: 50%;
-        width: 40px;
-        height: 40px;
+        width: 50px;
+        height: 50px;
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 20px rgba(70, 130, 180, 0.5);
+        transition: transform 0.2s ease, background 0.2s ease;
     }
 
     .pull-indicator svg {
-        width: 20px;
-        height: 20px;
-        color: var(--primary);
+        width: 24px;
+        height: 24px;
+        color: white;
         transition: transform 0.2s ease;
+    }
+
+    .pull-to-refresh.ready .pull-indicator {
+        background: #22c55e;
+        transform: scale(1.15);
+        box-shadow: 0 4px 25px rgba(34, 197, 94, 0.6);
     }
 
     .pull-to-refresh.ready .pull-indicator svg {
         transform: rotate(180deg);
     }
 
+    .pull-to-refresh.refreshing .pull-indicator {
+        background: var(--primary);
+    }
+
     .pull-to-refresh.refreshing .pull-indicator svg {
-        animation: spin 1s linear infinite;
+        animation: spin 0.8s linear infinite;
+    }
+
+    /* Texto de estado del pull */
+    .pull-text {
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-top: 8px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--fg);
+        white-space: nowrap;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        background: var(--surface);
+        padding: 4px 12px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .pull-to-refresh.visible .pull-text {
+        opacity: 1;
     }
 
     @@keyframes spin {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
+    }
+
+    /* ========================================
+       BOTON FLOTANTE DE REFRESH (alternativa)
+       ======================================== */
+    .refresh-fab {
+        position: fixed;
+        bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+        right: 16px;
+        width: 48px;
+        height: 48px;
+        background: var(--primary);
+        border: none;
+        border-radius: 50%;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 15px rgba(70, 130, 180, 0.4);
+        cursor: pointer;
+        z-index: 999;
+        transition: transform 0.2s ease, opacity 0.2s ease;
+        opacity: 0;
+    }
+
+    .refresh-fab.visible {
+        display: flex;
+        opacity: 1;
+    }
+
+    .refresh-fab:hover {
+        transform: scale(1.1);
+    }
+
+    .refresh-fab:active {
+        transform: scale(0.95);
+    }
+
+    .refresh-fab svg {
+        width: 22px;
+        height: 22px;
+        color: white;
+    }
+
+    .refresh-fab.refreshing svg {
+        animation: spin 0.8s linear infinite;
     }
 
     /* ========================================
@@ -1303,12 +1380,33 @@
 
         /* === PULL TO REFRESH === */
         .pull-to-refresh {
-            top: 60px;
+            top: calc(60px + env(safe-area-inset-top, 0px));
         }
 
         .pull-indicator {
-            width: 36px;
-            height: 36px;
+            width: 44px;
+            height: 44px;
+        }
+
+        .pull-indicator svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .pull-text {
+            font-size: 11px;
+        }
+
+        /* === REFRESH FAB === */
+        .refresh-fab {
+            width: 44px;
+            height: 44px;
+            bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+        }
+
+        .refresh-fab svg {
+            width: 20px;
+            height: 20px;
         }
     }
 
@@ -1989,14 +2087,24 @@
 
 </style>
 
-<!-- Pull to Refresh Indicator -->
+<!-- Pull to Refresh Indicator - Mejorado -->
 <div class="pull-to-refresh" id="pullToRefresh">
     <div class="pull-indicator">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
         </svg>
     </div>
+    <span class="pull-text" id="pullText">Desliza para actualizar</span>
 </div>
+
+<!-- Boton flotante de refresh (alternativa al gesto) -->
+<button class="refresh-fab" id="refreshFab" onclick="refreshExplorarFromFab()" title="Actualizar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="23 4 23 10 17 10"></polyline>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+    </svg>
+</button>
 
 <div class="explorar-container">
     <!-- Barra de búsqueda -->
@@ -2926,23 +3034,52 @@
         }
 
         // ========================================
-        // PULL TO REFRESH
+        // PULL TO REFRESH - MEJORADO PARA PWA
+        // ⚡ Mayor sensibilidad, haptic feedback, auto-refresh
         // ========================================
+        const PULL_THRESHOLD = 50; // ⚡ Reducido de 80 a 50 para mayor sensibilidad
+        const BACKGROUND_AUTO_REFRESH_THRESHOLD = 60000; // 60 segundos
+        let hasTriggeredHaptic = false;
+        let hiddenTime = null;
+
+        // ⚡ Haptic feedback (vibración táctil)
+        function triggerHaptic() {
+            if (hasTriggeredHaptic) return;
+            hasTriggeredHaptic = true;
+            if ('vibrate' in navigator) {
+                navigator.vibrate(15);
+            }
+        }
+
         function initPullToRefresh() {
             const pullIndicator = document.getElementById('pullToRefresh');
+            const pullText = document.getElementById('pullText');
             let startY = 0;
             let currentY = 0;
             let isPulling = false;
             let isRefreshing = false;
             let touchStartElement = null;
 
-            const threshold = 80; // Distancia necesaria para activar refresh
+            // Actualizar texto según estado
+            function updatePullText(state) {
+                if (!pullText) return;
+                switch(state) {
+                    case 'pull':
+                        pullText.textContent = 'Desliza para actualizar';
+                        break;
+                    case 'ready':
+                        pullText.textContent = '¡Suelta para actualizar!';
+                        break;
+                    case 'refreshing':
+                        pullText.textContent = 'Actualizando...';
+                        break;
+                }
+            }
 
             // Elementos que no deben activar pull-to-refresh
             function shouldIgnoreElement(element) {
                 if (!element) return true;
 
-                // Ignorar si el touch es en el sidebar, hamburger, top-navbar, o tabs
                 const ignoredSelectors = [
                     '.sidebar',
                     '.sidebar-overlay',
@@ -2962,16 +3099,16 @@
             document.addEventListener('touchstart', function(e) {
                 touchStartElement = e.target;
 
-                // No activar si el touch es en elementos interactivos
                 if (shouldIgnoreElement(touchStartElement)) {
                     isPulling = false;
                     return;
                 }
 
-                // Solo activar si estamos en la parte superior de la página
-                if (window.scrollY <= 0 && !isRefreshing) {
+                // ⚡ Aumentado tolerancia a 10px
+                if (window.scrollY <= 10 && !isRefreshing) {
                     startY = e.touches[0].pageY;
                     isPulling = true;
+                    hasTriggeredHaptic = false;
                 }
             }, { passive: true });
 
@@ -2981,27 +3118,28 @@
                 currentY = e.touches[0].pageY;
                 const pullDistance = currentY - startY;
 
-                if (pullDistance > 0 && window.scrollY <= 0) {
-                    // Prevenir scroll mientras arrastramos
-                    if (pullDistance > 10) {
+                if (pullDistance > 0 && window.scrollY <= 10) {
+                    if (pullDistance > 5) {
                         pullIndicator.classList.add('visible');
                     }
 
-                    // Movimiento con resistencia
-                    const resistance = 0.5;
-                    const adjustedDistance = Math.min(pullDistance * resistance, threshold + 30);
+                    // ⚡ Resistencia mejorada
+                    const resistance = 0.6;
+                    const adjustedDistance = Math.min(pullDistance * resistance, 100);
 
-                    pullIndicator.style.transform = `translateX(-50%) translateY(${adjustedDistance - 40}px)`;
+                    pullIndicator.style.transform = `translateX(-50%) translateY(${adjustedDistance}px)`;
 
-                    // Rotar icono según progreso
-                    const rotation = (adjustedDistance / threshold) * 180;
+                    // Rotar icono proporcionalmente
+                    const rotation = Math.min((adjustedDistance / PULL_THRESHOLD) * 180, 180);
                     pullIndicator.querySelector('svg').style.transform = `rotate(${rotation}deg)`;
 
-                    // Marcar como "listo" si supera el umbral
-                    if (adjustedDistance >= threshold) {
+                    if (adjustedDistance >= PULL_THRESHOLD) {
                         pullIndicator.classList.add('ready');
+                        updatePullText('ready');
+                        triggerHaptic(); // ⚡ Vibración al alcanzar threshold
                     } else {
                         pullIndicator.classList.remove('ready');
+                        updatePullText('pull');
                     }
                 }
             }, { passive: true });
@@ -3010,19 +3148,18 @@
                 if (!isPulling || isRefreshing) return;
 
                 const pullDistance = currentY - startY;
-                const adjustedDistance = pullDistance * 0.5;
+                const adjustedDistance = pullDistance * 0.6;
 
-                if (adjustedDistance >= threshold) {
-                    // Activar refresh
+                if (adjustedDistance >= PULL_THRESHOLD) {
                     isRefreshing = true;
                     pullIndicator.classList.add('refreshing');
                     pullIndicator.classList.remove('ready');
-                    pullIndicator.style.transform = 'translateX(-50%) translateY(20px)';
+                    pullIndicator.style.transform = 'translateX(-50%) translateY(30px)';
+                    pullIndicator.querySelector('svg').style.transform = '';
+                    updatePullText('refreshing');
 
-                    // Ejecutar refresh
                     refreshExplorar();
                 } else {
-                    // Cancelar - volver a estado inicial
                     resetPullIndicator();
                 }
 
@@ -3034,7 +3171,8 @@
             function resetPullIndicator() {
                 pullIndicator.classList.remove('visible', 'ready', 'refreshing');
                 pullIndicator.style.transform = 'translateX(-50%) translateY(-100%)';
-                pullIndicator.querySelector('svg').style.transform = 'rotate(0deg)';
+                pullIndicator.querySelector('svg').style.transform = '';
+                updatePullText('pull');
             }
 
             window.resetPullIndicator = resetPullIndicator;
@@ -3042,19 +3180,68 @@
         }
 
         function refreshExplorar() {
-            // Reset del estado de paginación
             currentPage = 1;
             hasMore = true;
 
-            // Recargar la página
             setTimeout(() => {
                 window.location.reload();
             }, 500);
         }
 
+        // ⚡ Refresh desde el botón flotante (FAB)
+        function refreshExplorarFromFab() {
+            const fab = document.getElementById('refreshFab');
+            if (!fab || fab.classList.contains('refreshing')) return;
+
+            fab.classList.add('refreshing');
+            triggerHaptic();
+
+            setTimeout(() => {
+                window.location.reload();
+            }, 300);
+        }
+
+        // ⚡ Mostrar FAB cuando la página ha estado abierta un rato
+        function showRefreshFabAfterTime() {
+            setTimeout(() => {
+                const fab = document.getElementById('refreshFab');
+                if (fab) {
+                    fab.classList.add('visible');
+                }
+            }, 120000); // Mostrar después de 2 minutos
+        }
+
+        // ⚡ Auto-refresh cuando vuelve del background
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                hiddenTime = Date.now();
+            } else {
+                const timeInBackground = hiddenTime ? Date.now() - hiddenTime : 0;
+
+                if (timeInBackground > BACKGROUND_AUTO_REFRESH_THRESHOLD) {
+                    console.log('[Explorar] Auto-actualizando por tiempo en background');
+
+                    const pullIndicator = document.getElementById('pullToRefresh');
+                    const pullText = document.getElementById('pullText');
+                    if (pullIndicator && pullText) {
+                        pullIndicator.classList.add('visible', 'refreshing');
+                        pullIndicator.style.transform = 'translateX(-50%) translateY(30px)';
+                        pullText.textContent = 'Actualizando...';
+                    }
+
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 500);
+                }
+
+                hiddenTime = null;
+            }
+        });
+
         // Inicializar pull-to-refresh
         document.addEventListener('DOMContentLoaded', function() {
             initPullToRefresh();
+            showRefreshFabAfterTime();
         });
 
         // ========================================

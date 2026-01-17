@@ -299,7 +299,7 @@ namespace Lado.Controllers
             ViewBag.Seudonimo = usuario.Seudonimo;
             ViewBag.FotoPerfil = !string.IsNullOrEmpty(usuario.FotoPerfilLadoB)
                 ? usuario.FotoPerfilLadoB
-                : usuario.FotoPerfil ?? "/images/default-avatar.png";
+                : usuario.FotoPerfil ?? "/images/default-avatar.svg";
             ViewBag.LinkPerfil = $"{baseUrl}/Feed/Creador/{usuario.Seudonimo}";
             ViewBag.Precio = usuario.PrecioSuscripcionLadoB;
             ViewBag.Categoria = usuario.Categoria ?? "Creador";

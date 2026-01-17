@@ -50,9 +50,13 @@ namespace Lado.Services
 
             _logger.LogDebug("Iniciando procesamiento de vencimientos de LadoCoins");
 
+            // Procesar vencimientos (marcar como vencidos los que ya expiraron)
             await ladoCoinsService.ProcesarVencimientosAsync();
 
-            _logger.LogDebug("Procesamiento de vencimientos completado");
+            // Enviar alertas preventivas (7 días y 1 día antes)
+            await ladoCoinsService.EnviarAlertasVencimientoAsync();
+
+            _logger.LogDebug("Procesamiento de vencimientos y alertas completado");
         }
     }
 }

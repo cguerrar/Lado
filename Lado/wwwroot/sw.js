@@ -1,9 +1,10 @@
-// Service Worker para LADO PWA v11.0
+// Service Worker para LADO PWA v12.0
 // Compatible con iOS Safari y Android Chrome
-const CACHE_NAME = 'lado-cache-v11';
+// v12: Optimizado para carga rápida con stale-while-revalidate
+const CACHE_NAME = 'lado-cache-v13';
 const OFFLINE_URL = '/offline.html';
-const DYNAMIC_CACHE = 'lado-dynamic-v11';
-const IMAGE_CACHE = 'lado-images-v11';
+const DYNAMIC_CACHE = 'lado-dynamic-v13';
+const IMAGE_CACHE = 'lado-images-v13';
 
 // Recursos para pre-cachear (shell de la app)
 const PRECACHE_ASSETS = [
@@ -95,6 +96,18 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // ⚠️ CRÍTICO: NO cachear páginas que dependen del usuario autenticado
+    // Esto previene mostrar datos del usuario incorrecto después de login/logout
+    if (url.pathname.toLowerCase().startsWith('/feed') ||
+        url.pathname.toLowerCase().startsWith('/feedpublico') ||
+        url.pathname.toLowerCase().startsWith('/account') ||
+        url.pathname.toLowerCase().startsWith('/usuario') ||
+        url.pathname.toLowerCase().startsWith('/mensajes') ||
+        url.pathname.toLowerCase().startsWith('/admin') ||
+        url.pathname === '/') {
+        return; // No interceptar, dejar que el navegador maneje directamente
+    }
+
     // Ignorar Range requests (causan respuestas 206 que no se pueden cachear)
     if (request.headers.get('Range')) {
         return;
@@ -169,23 +182,34 @@ async function cacheFirst(request) {
     }
 }
 
-// Estrategia: Network First (para paginas HTML)
+// Estrategia: Stale-While-Revalidate (para paginas HTML)
+// Muestra cache inmediatamente si existe, mientras actualiza en background
 async function networkFirst(request) {
+    const cache = await caches.open(CACHE_NAME);
+    const cachedResponse = await caches.match(request);
+
+    // Si hay cache, devolverlo inmediatamente y actualizar en background
+    if (cachedResponse) {
+        // Actualizar cache en background (no bloqueante)
+        fetch(request).then(networkResponse => {
+            if (networkResponse.ok && networkResponse.status === 200) {
+                cache.put(request, networkResponse.clone());
+            }
+        }).catch(() => {
+            // Silenciar errores de actualizacion en background
+        });
+        return cachedResponse;
+    }
+
+    // Sin cache: ir a la red
     try {
         const networkResponse = await fetch(request);
         // Solo cachear respuestas completas (status 200), no parciales (206)
         if (networkResponse.ok && networkResponse.status === 200) {
-            const cache = await caches.open(CACHE_NAME);
             cache.put(request, networkResponse.clone());
         }
         return networkResponse;
     } catch (error) {
-        // Intentar obtener del cache
-        const cachedResponse = await caches.match(request);
-        if (cachedResponse) {
-            return cachedResponse;
-        }
-
         // Si es una pagina HTML, mostrar pagina offline
         if (request.destination === 'document' ||
             request.headers.get('accept')?.includes('text/html')) {
@@ -194,7 +218,6 @@ async function networkFirst(request) {
                 return offlinePage;
             }
         }
-
         throw error;
     }
 }

@@ -1,0 +1,550 @@
+@model Lado.Services.HealthCheckResult
+@{
+    ViewData["Title"] = "Estado del Sistema - Lado";
+    Layout = null;
+
+    var statusColor = Model.OverallStatus switch
+    {
+        Lado.Services.HealthStatus.Healthy => "#10b981",
+        Lado.Services.HealthStatus.Degraded => "#f59e0b",
+        Lado.Services.HealthStatus.Down => "#ef4444",
+        _ => "#6b7280"
+    };
+
+    var statusText = Model.OverallStatus switch
+    {
+        Lado.Services.HealthStatus.Healthy => "Todos los sistemas operacionales",
+        Lado.Services.HealthStatus.Degraded => "Algunos sistemas con problemas",
+        Lado.Services.HealthStatus.Down => "Sistema con interrupciones",
+        _ => "Estado desconocido"
+    };
+
+    var statusIcon = Model.OverallStatus switch
+    {
+        Lado.Services.HealthStatus.Healthy => "check-circle",
+        Lado.Services.HealthStatus.Degraded => "alert-triangle",
+        Lado.Services.HealthStatus.Down => "x-circle",
+        _ => "help-circle"
+    };
+}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta http-equiv="refresh" content="60" />
+    <title>@ViewData["Title"]</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4682B4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-100) 100%);
+            min-height: 100vh;
+            color: var(--gray-800);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .logo img {
+            height: 40px;
+            width: auto;
+            border-radius: 8px;
+        }
+
+        .logo span {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--gray-800);
+        }
+
+        .status-banner {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .status-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .status-icon svg {
+            width: 32px;
+            height: 32px;
+            stroke: white;
+            stroke-width: 2.5;
+            fill: none;
+        }
+
+        .status-info h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 4px;
+        }
+
+        .status-info p {
+            color: var(--gray-500);
+            font-size: 0.95rem;
+        }
+
+        .status-info .uptime {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            padding: 4px 12px;
+            background: var(--gray-100);
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: var(--gray-600);
+        }
+
+        .uptime svg {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            fill: none;
+        }
+
+        .components-section {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .section-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .section-header h2 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--gray-800);
+        }
+
+        .component-list {
+            list-style: none;
+        }
+
+        .component-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--gray-100);
+            transition: background 0.2s;
+        }
+
+        .component-item:last-child {
+            border-bottom: none;
+        }
+
+        .component-item:hover {
+            background: var(--gray-50);
+        }
+
+        .component-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .component-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--gray-100);
+        }
+
+        .component-icon svg {
+            width: 20px;
+            height: 20px;
+            stroke: var(--gray-600);
+            fill: none;
+        }
+
+        .component-details h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--gray-800);
+        }
+
+        .component-details p {
+            font-size: 0.85rem;
+            color: var(--gray-500);
+            margin-top: 2px;
+        }
+
+        .component-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .response-time {
+            font-size: 0.8rem;
+            color: var(--gray-400);
+            font-weight: 500;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-badge.healthy {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .status-badge.degraded {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+        }
+
+        .status-badge.down {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .status-badge.unknown {
+            background: var(--gray-100);
+            color: var(--gray-500);
+        }
+
+        .status-badge svg {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            fill: none;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 32px;
+            padding: 20px;
+        }
+
+        .footer p {
+            color: var(--gray-400);
+            font-size: 0.85rem;
+        }
+
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        .last-updated {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 12px;
+            color: var(--gray-400);
+            font-size: 0.8rem;
+        }
+
+        .last-updated svg {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            fill: none;
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @@keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @@media (max-width: 600px) {
+            .container {
+                padding: 20px 16px;
+            }
+
+            .status-banner {
+                flex-direction: column;
+                text-align: center;
+                padding: 24px;
+            }
+
+            .component-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .component-status {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <img src="/images/logo.png" alt="Lado" onerror="this.style.display='none'">
+                <span>Lado</span>
+            </div>
+        </div>
+
+        <div class="status-banner">
+            <div class="status-icon" style="background: @statusColor;">
+                @if (Model.OverallStatus == Lado.Services.HealthStatus.Healthy)
+                {
+                    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                }
+                else if (Model.OverallStatus == Lado.Services.HealthStatus.Degraded)
+                {
+                    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                }
+                else
+                {
+                    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                    </svg>
+                }
+            </div>
+            <div class="status-info">
+                <h1>@statusText</h1>
+                <p>Ultima verificacion: @Model.CheckedAt.ToString("dd MMM yyyy, HH:mm:ss") UTC</p>
+                <span class="uptime">
+                    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    Uptime: @FormatUptime(Model.Uptime)
+                </span>
+            </div>
+        </div>
+
+        <div class="components-section">
+            <div class="section-header">
+                <h2>Componentes del Sistema</h2>
+            </div>
+            <ul class="component-list">
+                @foreach (var component in Model.Components.OrderBy(c => c.Value.Status))
+                {
+                    var badgeClass = component.Value.Status switch
+                    {
+                        Lado.Services.HealthStatus.Healthy => "healthy",
+                        Lado.Services.HealthStatus.Degraded => "degraded",
+                        Lado.Services.HealthStatus.Down => "down",
+                        _ => "unknown"
+                    };
+
+                    var badgeText = component.Value.Status switch
+                    {
+                        Lado.Services.HealthStatus.Healthy => "Operacional",
+                        Lado.Services.HealthStatus.Degraded => "Degradado",
+                        Lado.Services.HealthStatus.Down => "Caido",
+                        _ => "Desconocido"
+                    };
+
+                    <li class="component-item">
+                        <div class="component-info">
+                            <div class="component-icon">
+                                @switch (component.Key)
+                                {
+                                    case "database":
+                                        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                                            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                                            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                                            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                                        </svg>
+                                        break;
+                                    case "storage":
+                                        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                                        </svg>
+                                        break;
+                                    case "paypal":
+                                        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                                            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                                            <line x1="1" y1="10" x2="23" y2="10"></line>
+                                        </svg>
+                                        break;
+                                    case "email":
+                                        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                            <polyline points="22,6 12,13 2,6"></polyline>
+                                        </svg>
+                                        break;
+                                    case "giphy":
+                                        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                            <polyline points="21 15 16 10 5 21"></polyline>
+                                        </svg>
+                                        break;
+                                    default:
+                                        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                        </svg>
+                                        break;
+                                }
+                            </div>
+                            <div class="component-details">
+                                <h3>@component.Value.Name</h3>
+                                <p>@(component.Value.Message ?? "Sin informacion")</p>
+                            </div>
+                        </div>
+                        <div class="component-status">
+                            @if (component.Value.ResponseTimeMs.HasValue)
+                            {
+                                <span class="response-time">@component.Value.ResponseTimeMs ms</span>
+                            }
+                            <span class="status-badge @badgeClass">
+                                @if (component.Value.Status == Lado.Services.HealthStatus.Healthy)
+                                {
+                                    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                }
+                                else if (component.Value.Status == Lado.Services.HealthStatus.Degraded)
+                                {
+                                    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="12" y1="2" x2="12" y2="6"></line>
+                                        <line x1="12" y1="18" x2="12" y2="22"></line>
+                                    </svg>
+                                }
+                                else
+                                {
+                                    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                }
+                                @badgeText
+                            </span>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </div>
+
+        <div class="footer">
+            <p>
+                <a href="/">Volver a Lado</a> &middot;
+                <a href="/status/json">API JSON</a> &middot;
+                Version @Model.Version
+            </p>
+            <div class="last-updated">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" class="pulse">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                Actualizacion automatica cada 60 segundos
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-refresh cada 60 segundos
+        setTimeout(function() {
+            location.reload();
+        }, 60000);
+    </script>
+</body>
+</html>
+
+@functions {
+    string FormatUptime(TimeSpan uptime)
+    {
+        if (uptime.TotalDays >= 1)
+        {
+            return $"{(int)uptime.TotalDays}d {uptime.Hours}h {uptime.Minutes}m";
+        }
+        if (uptime.TotalHours >= 1)
+        {
+            return $"{(int)uptime.TotalHours}h {uptime.Minutes}m";
+        }
+        return $"{uptime.Minutes}m {uptime.Seconds}s";
+    }
+}

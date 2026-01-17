@@ -2,6 +2,9 @@ using PayPalCheckoutSdk.Core;
 using PayPalCheckoutSdk.Orders;
 using PayPalHttp;
 using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 
 namespace Lado.Services
 {
@@ -225,26 +228,111 @@ namespace Lado.Services
         public async Task<bool> VerificarWebhookAsync(string webhookId, string transmissionId, string transmissionTime,
             string certUrl, string authAlgo, string transmissionSig, string webhookEvent)
         {
-            // Para una implementación completa de verificación de webhooks,
-            // PayPal recomienda usar su API de verificación.
-            // Por simplicidad, aquí validamos que los headers existan.
-            // En producción, deberías implementar la verificación completa.
-
+            // Validar que los headers requeridos existan
             if (string.IsNullOrEmpty(transmissionId) ||
                 string.IsNullOrEmpty(transmissionTime) ||
-                string.IsNullOrEmpty(transmissionSig))
+                string.IsNullOrEmpty(transmissionSig) ||
+                string.IsNullOrEmpty(certUrl) ||
+                string.IsNullOrEmpty(authAlgo))
             {
-                _logger.LogWarning("Webhook PayPal con headers inválidos");
+                _logger.LogWarning("Webhook PayPal con headers incompletos");
                 return false;
             }
 
-            // En un entorno de producción, aquí deberías:
-            // 1. Verificar la firma del webhook usando la API de PayPal
-            // 2. Validar que el webhook viene de PayPal
-            // Por ahora, en sandbox, aceptamos todos los webhooks con headers válidos
+            // Validar que certUrl sea de PayPal (seguridad básica)
+            if (!certUrl.StartsWith("https://api.paypal.com/") &&
+                !certUrl.StartsWith("https://api.sandbox.paypal.com/"))
+            {
+                _logger.LogWarning("Webhook PayPal con certUrl sospechoso: {CertUrl}", certUrl);
+                return false;
+            }
 
-            _logger.LogInformation("Webhook PayPal recibido: {TransmissionId}", transmissionId);
-            return true;
+            try
+            {
+                // Verificar firma usando la API de PayPal
+                var clientId = _configuration["PayPal:ClientId"];
+                var clientSecret = _configuration["PayPal:ClientSecret"];
+                var baseUrl = _isSandbox
+                    ? "https://api-m.sandbox.paypal.com"
+                    : "https://api-m.paypal.com";
+
+                using var httpClient = new System.Net.Http.HttpClient();
+
+                // Obtener access token
+                var authBytes = Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}");
+                httpClient.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
+
+                var tokenResponse = await httpClient.PostAsync(
+                    $"{baseUrl}/v1/oauth2/token",
+                    new StringContent("grant_type=client_credentials", Encoding.UTF8, "application/x-www-form-urlencoded")
+                );
+
+                if (!tokenResponse.IsSuccessStatusCode)
+                {
+                    _logger.LogError("Error al obtener token de PayPal para verificar webhook");
+                    return false;
+                }
+
+                var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
+                var tokenDoc = JsonDocument.Parse(tokenJson);
+                var accessToken = tokenDoc.RootElement.GetProperty("access_token").GetString();
+
+                // Verificar la firma del webhook
+                httpClient.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", accessToken);
+
+                var verifyRequest = new
+                {
+                    auth_algo = authAlgo,
+                    cert_url = certUrl,
+                    transmission_id = transmissionId,
+                    transmission_sig = transmissionSig,
+                    transmission_time = transmissionTime,
+                    webhook_id = webhookId,
+                    webhook_event = JsonDocument.Parse(webhookEvent).RootElement
+                };
+
+                var verifyContent = new StringContent(
+                    System.Text.Json.JsonSerializer.Serialize(verifyRequest),
+                    Encoding.UTF8,
+                    "application/json"
+                );
+
+                var verifyResponse = await httpClient.PostAsync(
+                    $"{baseUrl}/v1/notifications/verify-webhook-signature",
+                    verifyContent
+                );
+
+                if (!verifyResponse.IsSuccessStatusCode)
+                {
+                    var errorBody = await verifyResponse.Content.ReadAsStringAsync();
+                    _logger.LogWarning("PayPal rechazó verificación de webhook: {Status} - {Error}",
+                        verifyResponse.StatusCode, errorBody);
+                    return false;
+                }
+
+                var verifyJson = await verifyResponse.Content.ReadAsStringAsync();
+                var verifyDoc = JsonDocument.Parse(verifyJson);
+                var verificationStatus = verifyDoc.RootElement.GetProperty("verification_status").GetString();
+
+                if (verificationStatus == "SUCCESS")
+                {
+                    _logger.LogInformation("Webhook PayPal verificado exitosamente: {TransmissionId}", transmissionId);
+                    return true;
+                }
+                else
+                {
+                    _logger.LogWarning("Webhook PayPal falló verificación: {Status}", verificationStatus);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al verificar webhook de PayPal");
+                // En caso de error de verificación, rechazar el webhook por seguridad
+                return false;
+            }
         }
     }
 

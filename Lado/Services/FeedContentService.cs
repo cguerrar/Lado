@@ -203,6 +203,8 @@ namespace Lado.Services
 
             // 1. Contenido público (LadoA)
             var contenidoPublico = await _context.Contenidos
+                .AsNoTracking()
+                .AsSplitQuery()
                 .Include(c => c.Usuario)
                 .Include(c => c.PistaMusical)
                 .Include(c => c.Archivos.OrderBy(a => a.Orden))
@@ -210,6 +212,7 @@ namespace Lado.Services
                         && !c.EsBorrador
                         && !c.Censurado
                         && (c.UsuarioId == usuarioId || !c.EsPrivado)
+                        && (c.UsuarioId == usuarioId || !c.OcultoSilenciosamente) // Shadow hide
                         && c.TipoLado == TipoLado.LadoA
                         && c.Usuario != null
                         && (creadoresIds.Contains(c.UsuarioId) || c.UsuarioId == usuarioId))
@@ -220,6 +223,8 @@ namespace Lado.Services
             // 2. Contenido premium (LadoB) de suscripciones
             var contenidoPremiumSuscripciones = creadoresLadoBIds.Any()
                 ? await _context.Contenidos
+                    .AsNoTracking()
+                    .AsSplitQuery()
                     .Include(c => c.Usuario)
                     .Include(c => c.PistaMusical)
                     .Include(c => c.Archivos.OrderBy(a => a.Orden))
@@ -228,6 +233,7 @@ namespace Lado.Services
                             && !c.EsBorrador
                             && !c.Censurado
                             && !c.EsPrivado
+                            && !c.OcultoSilenciosamente // Shadow hide
                             && c.TipoLado == TipoLado.LadoB
                             && c.Usuario != null)
                     .OrderByDescending(c => c.FechaPublicacion)
@@ -238,6 +244,8 @@ namespace Lado.Services
             // 3. Contenido premium propio
             var contenidoPremiumPropio = !ocultarLadoB
                 ? await _context.Contenidos
+                    .AsNoTracking()
+                    .AsSplitQuery()
                     .Include(c => c.Usuario)
                     .Include(c => c.PistaMusical)
                     .Include(c => c.Archivos.OrderBy(a => a.Orden))
@@ -255,6 +263,8 @@ namespace Lado.Services
             // 4. Contenido comprado
             var contenidoPremiumComprado = contenidosCompradosIds.Any()
                 ? await _context.Contenidos
+                    .AsNoTracking()
+                    .AsSplitQuery()
                     .Include(c => c.Usuario)
                     .Include(c => c.PistaMusical)
                     .Include(c => c.Archivos.OrderBy(a => a.Orden))
@@ -263,6 +273,7 @@ namespace Lado.Services
                             && !c.EsBorrador
                             && !c.Censurado
                             && !c.EsPrivado
+                            && !c.OcultoSilenciosamente // Shadow hide
                             && c.Usuario != null
                             && (!ocultarLadoB || c.TipoLado != TipoLado.LadoB))
                     .OrderByDescending(c => c.FechaPublicacion)
@@ -275,6 +286,8 @@ namespace Lado.Services
             if (descubrimientoLadoACant > 0)
             {
                 var candidatosLadoA = await _context.Contenidos
+                    .AsNoTracking()
+                    .AsSplitQuery()
                     .Include(c => c.Usuario)
                     .Include(c => c.PistaMusical)
                     .Include(c => c.Archivos.OrderBy(a => a.Orden))
@@ -282,6 +295,7 @@ namespace Lado.Services
                             && !c.EsBorrador
                             && !c.Censurado
                             && !c.EsPrivado
+                            && !c.OcultoSilenciosamente // Shadow hide
                             && c.TipoLado == TipoLado.LadoA
                             && c.Usuario != null
                             && c.UsuarioId != usuarioId
@@ -300,6 +314,8 @@ namespace Lado.Services
             if (!ocultarLadoB && descubrimientoLadoBCant > 0)
             {
                 var candidatosLadoB = await _context.Contenidos
+                    .AsNoTracking()
+                    .AsSplitQuery()
                     .Include(c => c.Usuario)
                     .Include(c => c.PistaMusical)
                     .Include(c => c.Archivos.OrderBy(a => a.Orden))
@@ -307,6 +323,7 @@ namespace Lado.Services
                             && !c.EsBorrador
                             && !c.Censurado
                             && !c.EsPrivado
+                            && !c.OcultoSilenciosamente // Shadow hide
                             && c.TipoLado == TipoLado.LadoB
                             && c.Usuario != null
                             && c.UsuarioId != usuarioId
@@ -429,6 +446,7 @@ namespace Lado.Services
             // 2. STORIES
             var ahoraStories = DateTime.Now;
             var storiesCreadores = await _context.Stories
+                .AsNoTracking()
                 .Include(s => s.Creador)
                 .Where(s => (creadoresIds.Contains(s.CreadorId) || s.CreadorId == usuarioId)
                         && s.FechaExpiracion > ahoraStories
@@ -436,6 +454,7 @@ namespace Lado.Services
                 .ToListAsync();
 
             var storiesVistosIds = await _context.StoryVistas
+                .AsNoTracking()
                 .Where(sv => sv.UsuarioId == usuarioId)
                 .Select(sv => sv.StoryId)
                 .ToListAsync();
@@ -457,6 +476,8 @@ namespace Lado.Services
 
             // 3. COLECCIONES
             datos.Colecciones = await _context.Colecciones
+                .AsNoTracking()
+                .AsSplitQuery()
                 .Include(c => c.Creador)
                 .Include(c => c.Contenidos)
                 .Where(c => c.EstaActiva

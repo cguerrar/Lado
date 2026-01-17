@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Lado.Models;
+using Lado.Models.Moderacion;
 
 namespace Lado.Data
 {
@@ -23,10 +24,16 @@ namespace Lado.Data
         public DbSet<MensajePrivado> MensajesPrivados { get; set; }
         public DbSet<ChatMensaje> ChatMensajes { get; set; }
         public DbSet<Reporte> Reportes { get; set; }
+        public DbSet<Apelacion> Apelaciones { get; set; }
         public DbSet<AgeVerificationLog> AgeVerificationLogs { get; set; }
         public DbSet<CreatorVerificationRequest> CreatorVerificationRequests { get; set; }
         public DbSet<Desafio> Desafios { get; set; }
         public DbSet<PropuestaDesafio> PropuestasDesafios { get; set; }
+        public DbSet<MensajeDesafio> MensajesDesafio { get; set; }
+        public DbSet<DesafioGuardado> DesafiosGuardados { get; set; }
+        public DbSet<BadgeUsuario> BadgesUsuario { get; set; }
+        public DbSet<EstadisticasDesafiosUsuario> EstadisticasDesafiosUsuario { get; set; }
+        public DbSet<NotificacionDesafio> NotificacionesDesafio { get; set; }
         public DbSet<CompraContenido> ComprasContenido { get; set; }
         public DbSet<Tip> Tips { get; set; }
         public DbSet<Favorito> Favoritos { get; set; }
@@ -38,6 +45,9 @@ namespace Lado.Data
         public DbSet<StoryVista> StoryVistas { get; set; }
         public DbSet<StoryLike> StoryLikes { get; set; }
         public DbSet<StoryDraft> StoryDrafts { get; set; }
+        public DbSet<HistoriaDestacada> HistoriasDestacadas { get; set; }
+        public DbSet<GrupoDestacado> GruposDestacados { get; set; }
+        public DbSet<StoryEnviada> StoriesEnviadas { get; set; }
         public DbSet<Reaccion> Reacciones { get; set; }
         public DbSet<Coleccion> Colecciones { get; set; }
         public DbSet<ContenidoColeccion> ContenidoColecciones { get; set; }
@@ -51,6 +61,7 @@ namespace Lado.Data
         public DbSet<SegmentacionAnuncio> SegmentacionesAnuncios { get; set; }
         public DbSet<ImpresionAnuncio> ImpresionesAnuncios { get; set; }
         public DbSet<ClicAnuncio> ClicsAnuncios { get; set; }
+        public DbSet<VistaAnuncioUsuario> VistasAnunciosUsuarios { get; set; }
         public DbSet<TransaccionAgencia> TransaccionesAgencias { get; set; }
 
         // ========================================
@@ -171,6 +182,64 @@ namespace Lado.Data
         // ⭐ DbSets NUEVOS - PAYPAL
         // ========================================
         public DbSet<OrdenPayPalPendiente> OrdenesPayPalPendientes { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - SEO
+        // ========================================
+        public DbSet<ConfiguracionSeo> ConfiguracionesSeo { get; set; }
+        public DbSet<Redireccion301> Redirecciones301 { get; set; }
+        public DbSet<RutaRobotsTxt> RutasRobotsTxt { get; set; }
+        public DbSet<BotRobotsTxt> BotsRobotsTxt { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - MODO MANTENIMIENTO
+        // ========================================
+        public DbSet<ModoMantenimiento> ModoMantenimiento { get; set; }
+        public DbSet<HistorialMantenimiento> HistorialMantenimiento { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - NOTAS INTERNAS
+        // ========================================
+        public DbSet<NotaInterna> NotasInternas { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - AUDITORÍA DE CONFIGURACIONES
+        // ========================================
+        public DbSet<AuditoriaConfiguracion> AuditoriasConfiguracion { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - TEMPLATES DE RESPUESTAS
+        // ========================================
+        public DbSet<TemplateRespuesta> TemplatesRespuesta { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - SISTEMA DE SUPERVISIÓN Y MODERACIÓN
+        // ========================================
+        public DbSet<PermisoSupervisor> PermisosSupervisor { get; set; }
+        public DbSet<RolSupervisor> RolesSupervisor { get; set; }
+        public DbSet<RolSupervisorPermiso> RolesSupervisorPermisos { get; set; }
+        public DbSet<UsuarioSupervisor> UsuariosSupervisor { get; set; }
+        public DbSet<ColaModeracion> ColaModeracion { get; set; }
+        public DbSet<DecisionModeracion> DecisionesModeracion { get; set; }
+        public DbSet<MetricaSupervisor> MetricasSupervisor { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - SISTEMA DE TICKETS INTERNOS
+        // ========================================
+        public DbSet<TicketInterno> TicketsInternos { get; set; }
+        public DbSet<RespuestaTicket> RespuestasTickets { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - CALENDARIO ADMIN
+        // ========================================
+        public DbSet<EventoAdmin> EventosAdmin { get; set; }
+        public DbSet<ParticipanteEvento> ParticipantesEventos { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - USUARIOS ADMINISTRADOS
+        // ========================================
+        public DbSet<MediaBiblioteca> MediaBiblioteca { get; set; }
+        public DbSet<ConfiguracionPublicacionAutomatica> ConfiguracionesPublicacionAutomatica { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -2057,6 +2126,783 @@ namespace Lado.Data
                 // Índice compuesto para obtener destacados activos
                 entity.HasIndex(f => new { f.FechaInicio, f.FechaExpiracion, f.Nivel })
                     .HasDatabaseName("IX_FotosDestacadas_Activos");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE ORDENES PAYPAL PENDIENTES
+            // ========================================
+            modelBuilder.Entity<OrdenPayPalPendiente>(entity =>
+            {
+                entity.HasKey(o => o.Id);
+
+                entity.HasOne(o => o.Usuario)
+                    .WithMany()
+                    .HasForeignKey(o => o.UsuarioId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // Índice único en OrderId (ID de PayPal)
+                entity.HasIndex(o => o.OrderId)
+                    .IsUnique()
+                    .HasDatabaseName("IX_OrdenesPayPalPendientes_OrderId_Unique");
+
+                // Índice único filtrado en CaptureId (solo para no-nulos)
+                // Esto previene duplicados en CaptureId cuando existe
+                entity.HasIndex(o => o.CaptureId)
+                    .IsUnique()
+                    .HasFilter("[CaptureId] IS NOT NULL")
+                    .HasDatabaseName("IX_OrdenesPayPalPendientes_CaptureId_Unique");
+
+                // Índice para búsquedas por usuario
+                entity.HasIndex(o => o.UsuarioId)
+                    .HasDatabaseName("IX_OrdenesPayPalPendientes_UsuarioId");
+
+                // Índice para búsquedas por estado
+                entity.HasIndex(o => o.Estado)
+                    .HasDatabaseName("IX_OrdenesPayPalPendientes_Estado");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE SEO
+            // ========================================
+            modelBuilder.Entity<ConfiguracionSeo>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+
+                entity.Property(c => c.TituloSitio)
+                    .IsRequired()
+                    .HasMaxLength(200);
+
+                entity.Property(c => c.DescripcionMeta)
+                    .HasMaxLength(500);
+
+                entity.Property(c => c.PalabrasClave)
+                    .HasMaxLength(500);
+
+                entity.Property(c => c.OgSiteName)
+                    .HasMaxLength(100);
+
+                entity.Property(c => c.OgImagenDefault)
+                    .HasMaxLength(500);
+
+                entity.Property(c => c.OgTypeDefault)
+                    .HasMaxLength(50);
+
+                entity.Property(c => c.OgLocale)
+                    .HasMaxLength(20);
+
+                entity.Property(c => c.TwitterSite)
+                    .HasMaxLength(100);
+
+                entity.Property(c => c.TwitterCardType)
+                    .HasMaxLength(50);
+
+                entity.Property(c => c.FacebookUrl)
+                    .HasMaxLength(200);
+
+                entity.Property(c => c.InstagramUrl)
+                    .HasMaxLength(200);
+
+                entity.Property(c => c.TwitterUrl)
+                    .HasMaxLength(200);
+
+                entity.Property(c => c.TikTokUrl)
+                    .HasMaxLength(200);
+
+                entity.Property(c => c.YouTubeUrl)
+                    .HasMaxLength(200);
+
+                entity.Property(c => c.OrganizacionNombre)
+                    .HasMaxLength(200);
+
+                entity.Property(c => c.OrganizacionDescripcion)
+                    .HasMaxLength(500);
+
+                entity.Property(c => c.OrganizacionLogo)
+                    .HasMaxLength(500);
+
+                entity.Property(c => c.OrganizacionFundacion)
+                    .HasMaxLength(4);
+
+                entity.Property(c => c.OrganizacionEmail)
+                    .HasMaxLength(200);
+
+                entity.Property(c => c.UrlBase)
+                    .HasMaxLength(200);
+
+                entity.Property(c => c.GoogleSiteVerification)
+                    .HasMaxLength(100);
+
+                entity.Property(c => c.BingSiteVerification)
+                    .HasMaxLength(100);
+
+                entity.Property(c => c.PinterestSiteVerification)
+                    .HasMaxLength(100);
+
+                entity.Property(c => c.ModificadoPor)
+                    .HasMaxLength(100);
+
+                entity.Property(c => c.SitemapPrioridadHome)
+                    .HasColumnType("decimal(2,1)");
+
+                entity.Property(c => c.SitemapPrioridadFeedPublico)
+                    .HasColumnType("decimal(2,1)");
+
+                entity.Property(c => c.SitemapPrioridadPerfiles)
+                    .HasColumnType("decimal(2,1)");
+
+                entity.Property(c => c.SitemapPrioridadContenidoVideo)
+                    .HasColumnType("decimal(2,1)");
+
+                entity.Property(c => c.SitemapPrioridadContenidoNormal)
+                    .HasColumnType("decimal(2,1)");
+
+                // Datos por defecto
+                entity.HasData(
+                    new ConfiguracionSeo
+                    {
+                        Id = 1,
+                        TituloSitio = "Lado - Crea, Comparte y Monetiza",
+                        DescripcionMeta = "Lado es la plataforma donde creadores y fans se conectan. Crea contenido exclusivo, monetiza tu creatividad y conecta con tu audiencia.",
+                        PalabrasClave = "creadores, contenido exclusivo, monetización, fans, suscripciones, creadores de contenido",
+                        IndexarSitio = true,
+                        OgSiteName = "Lado",
+                        OgImagenDefault = "/images/og-default.jpg",
+                        OgImagenAncho = 1200,
+                        OgImagenAlto = 630,
+                        OgTypeDefault = "website",
+                        OgLocale = "es_ES",
+                        TwitterSite = "@ladoapp",
+                        TwitterCardType = "summary_large_image",
+                        InstagramUrl = "https://instagram.com/ladoapp",
+                        TwitterUrl = "https://twitter.com/ladoapp",
+                        OrganizacionNombre = "Lado",
+                        OrganizacionDescripcion = "Plataforma de contenido exclusivo para creadores",
+                        OrganizacionLogo = "/images/logo-512.png",
+                        OrganizacionFundacion = "2024",
+                        OrganizacionEmail = "soporte@ladoapp.com",
+                        SitemapLimitePerfiles = 500,
+                        SitemapLimiteContenido = 1000,
+                        SitemapCacheIndexHoras = 1,
+                        SitemapCachePaginasHoras = 24,
+                        SitemapCachePerfilesHoras = 1,
+                        SitemapCacheContenidoHoras = 1,
+                        SitemapPrioridadHome = 1.0m,
+                        SitemapPrioridadFeedPublico = 0.9m,
+                        SitemapPrioridadPerfiles = 0.7m,
+                        SitemapPrioridadContenidoVideo = 0.6m,
+                        SitemapPrioridadContenidoNormal = 0.5m,
+                        RobotsCrawlDelayGoogle = 0,
+                        RobotsCrawlDelayBing = 1,
+                        RobotsCrawlDelayOtros = 2,
+                        UrlBase = "https://ladoapp.com",
+                        FechaModificacion = new DateTime(2026, 1, 1)
+                    }
+                );
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE REDIRECCIONES 301
+            // ========================================
+            modelBuilder.Entity<Redireccion301>(entity =>
+            {
+                entity.HasKey(r => r.Id);
+
+                entity.Property(r => r.UrlOrigen)
+                    .IsRequired()
+                    .HasMaxLength(500);
+
+                entity.Property(r => r.UrlDestino)
+                    .IsRequired()
+                    .HasMaxLength(500);
+
+                entity.Property(r => r.Nota)
+                    .HasMaxLength(500);
+
+                entity.Property(r => r.CreadoPor)
+                    .HasMaxLength(100);
+
+                entity.Property(r => r.Activa)
+                    .HasDefaultValue(true);
+
+                entity.Property(r => r.PreservarQueryString)
+                    .HasDefaultValue(true);
+
+                entity.Property(r => r.ContadorUso)
+                    .HasDefaultValue(0);
+
+                // Índice único en URL origen para evitar duplicados
+                entity.HasIndex(r => r.UrlOrigen)
+                    .IsUnique()
+                    .HasDatabaseName("IX_Redirecciones301_UrlOrigen");
+
+                entity.HasIndex(r => r.Activa)
+                    .HasDatabaseName("IX_Redirecciones301_Activa");
+
+                // Índice compuesto para búsqueda eficiente
+                entity.HasIndex(r => new { r.Activa, r.UrlOrigen })
+                    .HasDatabaseName("IX_Redirecciones301_Activa_UrlOrigen");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE RUTAS ROBOTS.TXT
+            // ========================================
+            modelBuilder.Entity<RutaRobotsTxt>(entity =>
+            {
+                entity.HasKey(r => r.Id);
+
+                entity.Property(r => r.Ruta)
+                    .IsRequired()
+                    .HasMaxLength(200);
+
+                entity.Property(r => r.UserAgent)
+                    .HasMaxLength(100)
+                    .HasDefaultValue("*");
+
+                entity.Property(r => r.Descripcion)
+                    .HasMaxLength(200);
+
+                entity.Property(r => r.Activa)
+                    .HasDefaultValue(true);
+
+                entity.Property(r => r.Orden)
+                    .HasDefaultValue(100);
+
+                // Índices
+                entity.HasIndex(r => r.Activa)
+                    .HasDatabaseName("IX_RutasRobotsTxt_Activa");
+
+                entity.HasIndex(r => r.UserAgent)
+                    .HasDatabaseName("IX_RutasRobotsTxt_UserAgent");
+
+                entity.HasIndex(r => new { r.Activa, r.Orden })
+                    .HasDatabaseName("IX_RutasRobotsTxt_Activa_Orden");
+
+                // Datos por defecto
+                entity.HasData(
+                    // Rutas permitidas
+                    new RutaRobotsTxt { Id = 1, Ruta = "/", Tipo = TipoReglaRobots.Allow, UserAgent = "*", Orden = 1, Descripcion = "Permitir raíz", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new RutaRobotsTxt { Id = 2, Ruta = "/FeedPublico", Tipo = TipoReglaRobots.Allow, UserAgent = "*", Orden = 2, Descripcion = "Feed público indexable", FechaCreacion = new DateTime(2026, 1, 1) },
+
+                    // Rutas bloqueadas - Áreas administrativas y privadas
+                    new RutaRobotsTxt { Id = 3, Ruta = "/Admin/", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 10, Descripcion = "Panel de administración", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new RutaRobotsTxt { Id = 4, Ruta = "/Account/", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 11, Descripcion = "Cuentas de usuario", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new RutaRobotsTxt { Id = 5, Ruta = "/api/", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 12, Descripcion = "API endpoints", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new RutaRobotsTxt { Id = 6, Ruta = "/Identity/", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 13, Descripcion = "Identity pages", FechaCreacion = new DateTime(2026, 1, 1) },
+
+                    // Áreas privadas de usuario
+                    new RutaRobotsTxt { Id = 7, Ruta = "/Feed/", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 20, Descripcion = "Feed privado", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new RutaRobotsTxt { Id = 8, Ruta = "/Mensajes/", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 21, Descripcion = "Mensajes privados", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new RutaRobotsTxt { Id = 9, Ruta = "/Billetera/", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 22, Descripcion = "Billetera", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new RutaRobotsTxt { Id = 10, Ruta = "/Suscripciones/", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 23, Descripcion = "Suscripciones", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new RutaRobotsTxt { Id = 11, Ruta = "/Stories/", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 24, Descripcion = "Stories", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new RutaRobotsTxt { Id = 12, Ruta = "/Dashboard/", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 25, Descripcion = "Dashboard", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new RutaRobotsTxt { Id = 13, Ruta = "/Configuracion/", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 26, Descripcion = "Configuración usuario", FechaCreacion = new DateTime(2026, 1, 1) },
+
+                    // Archivos temporales y framework
+                    new RutaRobotsTxt { Id = 14, Ruta = "/Content/temp/", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 30, Descripcion = "Archivos temporales", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new RutaRobotsTxt { Id = 15, Ruta = "/_framework/", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 31, Descripcion = "Framework files", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new RutaRobotsTxt { Id = 16, Ruta = "/_blazor/", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 32, Descripcion = "Blazor files", FechaCreacion = new DateTime(2026, 1, 1) },
+
+                    // Query strings problemáticos (duplicados)
+                    new RutaRobotsTxt { Id = 17, Ruta = "/*?sort=", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 40, Descripcion = "Evita duplicados por sort", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new RutaRobotsTxt { Id = 18, Ruta = "/*?filter=", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 41, Descripcion = "Evita duplicados por filter", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new RutaRobotsTxt { Id = 19, Ruta = "/*?page=", Tipo = TipoReglaRobots.Disallow, UserAgent = "*", Orden = 42, Descripcion = "Evita duplicados por paginación", FechaCreacion = new DateTime(2026, 1, 1) }
+                );
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE BOTS ROBOTS.TXT
+            // ========================================
+            modelBuilder.Entity<BotRobotsTxt>(entity =>
+            {
+                entity.HasKey(b => b.Id);
+
+                entity.Property(b => b.UserAgent)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(b => b.Descripcion)
+                    .HasMaxLength(200);
+
+                entity.Property(b => b.Activo)
+                    .HasDefaultValue(true);
+
+                entity.Property(b => b.Bloqueado)
+                    .HasDefaultValue(false);
+
+                entity.Property(b => b.EsBotImportante)
+                    .HasDefaultValue(false);
+
+                entity.Property(b => b.CrawlDelay)
+                    .HasDefaultValue(0);
+
+                entity.Property(b => b.Orden)
+                    .HasDefaultValue(100);
+
+                // Índice único en UserAgent
+                entity.HasIndex(b => b.UserAgent)
+                    .IsUnique()
+                    .HasDatabaseName("IX_BotsRobotsTxt_UserAgent");
+
+                entity.HasIndex(b => b.Activo)
+                    .HasDatabaseName("IX_BotsRobotsTxt_Activo");
+
+                entity.HasIndex(b => new { b.Activo, b.Orden })
+                    .HasDatabaseName("IX_BotsRobotsTxt_Activo_Orden");
+
+                // Datos por defecto - Bots importantes
+                entity.HasData(
+                    new BotRobotsTxt { Id = 1, UserAgent = "Googlebot", Bloqueado = false, CrawlDelay = 0, EsBotImportante = true, Orden = 1, Descripcion = "Bot de Google", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 2, UserAgent = "Googlebot-Image", Bloqueado = false, CrawlDelay = 0, EsBotImportante = true, Orden = 2, Descripcion = "Bot de Google Images", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 3, UserAgent = "Bingbot", Bloqueado = false, CrawlDelay = 1, EsBotImportante = true, Orden = 3, Descripcion = "Bot de Bing", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 4, UserAgent = "Slurp", Bloqueado = false, CrawlDelay = 2, EsBotImportante = true, Orden = 4, Descripcion = "Bot de Yahoo", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 5, UserAgent = "DuckDuckBot", Bloqueado = false, CrawlDelay = 1, EsBotImportante = true, Orden = 5, Descripcion = "Bot de DuckDuckGo", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 6, UserAgent = "Yandex", Bloqueado = false, CrawlDelay = 2, EsBotImportante = true, Orden = 6, Descripcion = "Bot de Yandex", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 7, UserAgent = "facebookexternalhit", Bloqueado = false, CrawlDelay = 0, EsBotImportante = true, Orden = 7, Descripcion = "Bot de Facebook para previews", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 8, UserAgent = "Twitterbot", Bloqueado = false, CrawlDelay = 0, EsBotImportante = true, Orden = 8, Descripcion = "Bot de Twitter para cards", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 9, UserAgent = "LinkedInBot", Bloqueado = false, CrawlDelay = 0, EsBotImportante = true, Orden = 9, Descripcion = "Bot de LinkedIn para previews", FechaCreacion = new DateTime(2026, 1, 1) },
+
+                    // Bots SEO/análisis - bloquear
+                    new BotRobotsTxt { Id = 10, UserAgent = "SemrushBot", Bloqueado = true, CrawlDelay = 0, EsBotImportante = false, Orden = 50, Descripcion = "Bot de SEMrush (scraping)", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 11, UserAgent = "AhrefsBot", Bloqueado = true, CrawlDelay = 0, EsBotImportante = false, Orden = 51, Descripcion = "Bot de Ahrefs (scraping)", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 12, UserAgent = "MJ12bot", Bloqueado = true, CrawlDelay = 0, EsBotImportante = false, Orden = 52, Descripcion = "Bot de Majestic (scraping)", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 13, UserAgent = "DotBot", Bloqueado = true, CrawlDelay = 0, EsBotImportante = false, Orden = 53, Descripcion = "Bot de Moz (scraping)", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 14, UserAgent = "BLEXBot", Bloqueado = true, CrawlDelay = 0, EsBotImportante = false, Orden = 54, Descripcion = "Bot de BLEXBot (scraping)", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 15, UserAgent = "DataForSeoBot", Bloqueado = true, CrawlDelay = 0, EsBotImportante = false, Orden = 55, Descripcion = "Bot de DataForSEO (scraping)", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 16, UserAgent = "PetalBot", Bloqueado = true, CrawlDelay = 0, EsBotImportante = false, Orden = 56, Descripcion = "Bot de Huawei/Petal", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 17, UserAgent = "Bytespider", Bloqueado = true, CrawlDelay = 0, EsBotImportante = false, Orden = 57, Descripcion = "Bot de ByteDance/TikTok (agresivo)", FechaCreacion = new DateTime(2026, 1, 1) },
+
+                    // AI Crawlers - bloquear
+                    new BotRobotsTxt { Id = 18, UserAgent = "GPTBot", Bloqueado = true, CrawlDelay = 0, EsBotImportante = false, Orden = 60, Descripcion = "Bot de OpenAI/ChatGPT", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 19, UserAgent = "ChatGPT-User", Bloqueado = true, CrawlDelay = 0, EsBotImportante = false, Orden = 61, Descripcion = "Usuario ChatGPT", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 20, UserAgent = "CCBot", Bloqueado = true, CrawlDelay = 0, EsBotImportante = false, Orden = 62, Descripcion = "Bot de Common Crawl", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 21, UserAgent = "anthropic-ai", Bloqueado = true, CrawlDelay = 0, EsBotImportante = false, Orden = 63, Descripcion = "Bot de Anthropic", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 22, UserAgent = "Claude-Web", Bloqueado = true, CrawlDelay = 0, EsBotImportante = false, Orden = 64, Descripcion = "Bot de Claude", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 23, UserAgent = "Google-Extended", Bloqueado = true, CrawlDelay = 0, EsBotImportante = false, Orden = 65, Descripcion = "Bot de Google para AI", FechaCreacion = new DateTime(2026, 1, 1) },
+                    new BotRobotsTxt { Id = 24, UserAgent = "Amazonbot", Bloqueado = true, CrawlDelay = 0, EsBotImportante = false, Orden = 66, Descripcion = "Bot de Amazon", FechaCreacion = new DateTime(2026, 1, 1) }
+                );
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN DE SISTEMA DE SUPERVISIÓN Y MODERACIÓN
+            // ========================================
+
+            // Permisos de Supervisor
+            modelBuilder.Entity<PermisoSupervisor>(entity =>
+            {
+                entity.HasKey(p => p.Id);
+
+                entity.Property(p => p.Codigo)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(p => p.Nombre)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(p => p.Descripcion)
+                    .HasMaxLength(500);
+
+                entity.Property(p => p.Activo)
+                    .HasDefaultValue(true);
+
+                entity.HasIndex(p => p.Codigo)
+                    .IsUnique()
+                    .HasDatabaseName("IX_PermisosSupervisor_Codigo");
+
+                entity.HasIndex(p => p.Modulo)
+                    .HasDatabaseName("IX_PermisosSupervisor_Modulo");
+            });
+
+            // Roles de Supervisor
+            modelBuilder.Entity<RolSupervisor>(entity =>
+            {
+                entity.HasKey(r => r.Id);
+
+                entity.Property(r => r.Nombre)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(r => r.Descripcion)
+                    .HasMaxLength(500);
+
+                entity.Property(r => r.ColorBadge)
+                    .HasMaxLength(20)
+                    .HasDefaultValue("#4682B4");
+
+                entity.Property(r => r.Icono)
+                    .HasMaxLength(50)
+                    .HasDefaultValue("fa-user-shield");
+
+                entity.Property(r => r.Activo)
+                    .HasDefaultValue(true);
+
+                entity.Property(r => r.MaxItemsSimultaneos)
+                    .HasDefaultValue(5);
+
+                entity.HasIndex(r => r.Nombre)
+                    .IsUnique()
+                    .HasDatabaseName("IX_RolesSupervisor_Nombre");
+            });
+
+            // Tabla de unión Rol-Permiso
+            modelBuilder.Entity<RolSupervisorPermiso>(entity =>
+            {
+                entity.HasKey(rp => rp.Id);
+
+                entity.HasOne(rp => rp.RolSupervisor)
+                    .WithMany(r => r.RolesPermisos)
+                    .HasForeignKey(rp => rp.RolSupervisorId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(rp => rp.PermisoSupervisor)
+                    .WithMany(p => p.RolesPermisos)
+                    .HasForeignKey(rp => rp.PermisoSupervisorId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(rp => new { rp.RolSupervisorId, rp.PermisoSupervisorId })
+                    .IsUnique()
+                    .HasDatabaseName("IX_RolesSupervisorPermisos_Rol_Permiso");
+            });
+
+            // Usuario Supervisor
+            modelBuilder.Entity<UsuarioSupervisor>(entity =>
+            {
+                entity.HasKey(us => us.Id);
+
+                entity.HasOne(us => us.Usuario)
+                    .WithMany()
+                    .HasForeignKey(us => us.UsuarioId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(us => us.RolSupervisor)
+                    .WithMany(r => r.Usuarios)
+                    .HasForeignKey(us => us.RolSupervisorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(us => us.AsignadoPor)
+                    .WithMany()
+                    .HasForeignKey(us => us.AsignadoPorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.Property(us => us.EstaActivo)
+                    .HasDefaultValue(true);
+
+                entity.Property(us => us.EstaDisponible)
+                    .HasDefaultValue(true);
+
+                entity.Property(us => us.ItemsAsignados)
+                    .HasDefaultValue(0);
+
+                entity.HasIndex(us => us.UsuarioId)
+                    .HasDatabaseName("IX_UsuariosSupervisor_UsuarioId");
+
+                entity.HasIndex(us => new { us.EstaActivo, us.EstaDisponible })
+                    .HasDatabaseName("IX_UsuariosSupervisor_Activo_Disponible");
+            });
+
+            // Cola de Moderación
+            modelBuilder.Entity<ColaModeracion>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+
+                entity.HasOne(c => c.Contenido)
+                    .WithMany()
+                    .HasForeignKey(c => c.ContenidoId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(c => c.SupervisorAsignado)
+                    .WithMany()
+                    .HasForeignKey(c => c.SupervisorAsignadoId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(c => c.Reporte)
+                    .WithMany()
+                    .HasForeignKey(c => c.ReporteId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.Property(c => c.ConfianzaIA)
+                    .HasColumnType("decimal(5,4)");
+
+                entity.Property(c => c.Estado)
+                    .HasDefaultValue(EstadoModeracion.Pendiente);
+
+                entity.Property(c => c.Prioridad)
+                    .HasDefaultValue(PrioridadModeracion.Normal);
+
+                entity.Property(c => c.VecesReasignado)
+                    .HasDefaultValue(0);
+
+                // Índices para consultas eficientes
+                entity.HasIndex(c => c.Estado)
+                    .HasDatabaseName("IX_ColaModeracion_Estado");
+
+                entity.HasIndex(c => c.Prioridad)
+                    .HasDatabaseName("IX_ColaModeracion_Prioridad");
+
+                entity.HasIndex(c => new { c.Estado, c.Prioridad, c.FechaCreacion })
+                    .HasDatabaseName("IX_ColaModeracion_Estado_Prioridad_Fecha");
+
+                entity.HasIndex(c => c.SupervisorAsignadoId)
+                    .HasDatabaseName("IX_ColaModeracion_SupervisorAsignado");
+
+                entity.HasIndex(c => c.ContenidoId)
+                    .HasDatabaseName("IX_ColaModeracion_ContenidoId");
+            });
+
+            // Decisiones de Moderación
+            modelBuilder.Entity<DecisionModeracion>(entity =>
+            {
+                entity.HasKey(d => d.Id);
+
+                entity.HasOne(d => d.ColaModeracion)
+                    .WithMany(c => c.Decisiones)
+                    .HasForeignKey(d => d.ColaModeracionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(d => d.Supervisor)
+                    .WithMany()
+                    .HasForeignKey(d => d.SupervisorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(d => d.RevertidoPor)
+                    .WithMany()
+                    .HasForeignKey(d => d.RevertidoPorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.Property(d => d.FueRevertida)
+                    .HasDefaultValue(false);
+
+                entity.HasIndex(d => d.SupervisorId)
+                    .HasDatabaseName("IX_DecisionesModeracion_SupervisorId");
+
+                entity.HasIndex(d => d.FechaDecision)
+                    .HasDatabaseName("IX_DecisionesModeracion_FechaDecision");
+
+                entity.HasIndex(d => new { d.SupervisorId, d.FechaDecision })
+                    .HasDatabaseName("IX_DecisionesModeracion_Supervisor_Fecha");
+            });
+
+            // Métricas de Supervisor
+            modelBuilder.Entity<MetricaSupervisor>(entity =>
+            {
+                entity.HasKey(m => m.Id);
+
+                entity.HasOne(m => m.Supervisor)
+                    .WithMany()
+                    .HasForeignKey(m => m.SupervisorId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(m => m.Fecha)
+                    .HasColumnType("date");
+
+                entity.Property(m => m.TiempoPromedioSegundos)
+                    .HasColumnType("decimal(10,2)")
+                    .HasDefaultValue(0);
+
+                entity.Property(m => m.TasaAprobacion)
+                    .HasColumnType("decimal(5,2)")
+                    .HasDefaultValue(0);
+
+                entity.Property(m => m.TasaEscalamiento)
+                    .HasColumnType("decimal(5,2)")
+                    .HasDefaultValue(0);
+
+                entity.Property(m => m.ConcordanciaIA)
+                    .HasColumnType("decimal(5,2)");
+
+                // Índice único por supervisor y fecha
+                entity.HasIndex(m => new { m.SupervisorId, m.Fecha })
+                    .IsUnique()
+                    .HasDatabaseName("IX_MetricasSupervisor_Supervisor_Fecha");
+
+                entity.HasIndex(m => m.Fecha)
+                    .HasDatabaseName("IX_MetricasSupervisor_Fecha");
+            });
+
+            // ==============================================
+            // ÍNDICES CRÍTICOS PARA SEGURIDAD Y RENDIMIENTO
+            // ==============================================
+
+            // IpBloqueada - Crítico para middleware de bloqueo
+            modelBuilder.Entity<IpBloqueada>(entity =>
+            {
+                entity.HasIndex(e => e.DireccionIp)
+                    .HasDatabaseName("IX_IpsBloqueadas_DireccionIp");
+
+                entity.HasIndex(e => e.EstaActivo)
+                    .HasDatabaseName("IX_IpsBloqueadas_EstaActivo");
+
+                entity.HasIndex(e => new { e.DireccionIp, e.EstaActivo })
+                    .HasDatabaseName("IX_IpsBloqueadas_DireccionIp_EstaActivo");
+
+                entity.HasIndex(e => new { e.EstaActivo, e.FechaExpiracion })
+                    .HasDatabaseName("IX_IpsBloqueadas_EstaActivo_FechaExpiracion");
+
+                entity.HasIndex(e => e.TipoBloqueo)
+                    .HasDatabaseName("IX_IpsBloqueadas_TipoBloqueo");
+            });
+
+            // IntentoAtaque - Para estadísticas de seguridad
+            modelBuilder.Entity<IntentoAtaque>(entity =>
+            {
+                entity.HasIndex(e => e.DireccionIp)
+                    .HasDatabaseName("IX_IntentosAtaque_DireccionIp");
+
+                entity.HasIndex(e => e.Fecha)
+                    .HasDatabaseName("IX_IntentosAtaque_Fecha");
+
+                entity.HasIndex(e => e.TipoAtaque)
+                    .HasDatabaseName("IX_IntentosAtaque_TipoAtaque");
+
+                entity.HasIndex(e => new { e.DireccionIp, e.Fecha })
+                    .HasDatabaseName("IX_IntentosAtaque_DireccionIp_Fecha");
+
+                entity.HasIndex(e => new { e.TipoAtaque, e.Fecha })
+                    .HasDatabaseName("IX_IntentosAtaque_TipoAtaque_Fecha");
+
+                entity.HasIndex(e => e.UsuarioId)
+                    .HasDatabaseName("IX_IntentosAtaque_UsuarioId");
+            });
+
+            // LogEvento - Para panel de administración de logs
+            modelBuilder.Entity<LogEvento>(entity =>
+            {
+                entity.HasIndex(e => e.Fecha)
+                    .HasDatabaseName("IX_LogEventos_Fecha");
+
+                entity.HasIndex(e => e.Categoria)
+                    .HasDatabaseName("IX_LogEventos_Categoria");
+
+                entity.HasIndex(e => e.Tipo)
+                    .HasDatabaseName("IX_LogEventos_Tipo");
+
+                entity.HasIndex(e => e.UsuarioId)
+                    .HasDatabaseName("IX_LogEventos_UsuarioId");
+
+                entity.HasIndex(e => new { e.Categoria, e.Tipo })
+                    .HasDatabaseName("IX_LogEventos_Categoria_Tipo");
+
+                entity.HasIndex(e => new { e.Fecha, e.Categoria })
+                    .HasDatabaseName("IX_LogEventos_Fecha_Categoria");
+
+                entity.HasIndex(e => new { e.UsuarioId, e.Fecha })
+                    .HasDatabaseName("IX_LogEventos_UsuarioId_Fecha");
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN CALENDARIO ADMIN
+            // ========================================
+            modelBuilder.Entity<EventoAdmin>(entity =>
+            {
+                entity.HasOne(e => e.CreadoPor)
+                    .WithMany()
+                    .HasForeignKey(e => e.CreadoPorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ParticipanteEvento>(entity =>
+            {
+                entity.HasOne(p => p.Evento)
+                    .WithMany(e => e.Participantes)
+                    .HasForeignKey(p => p.EventoId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(p => p.Usuario)
+                    .WithMany()
+                    .HasForeignKey(p => p.UsuarioId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN TICKETS INTERNOS
+            // ========================================
+            modelBuilder.Entity<TicketInterno>(entity =>
+            {
+                entity.HasOne(t => t.CreadoPor)
+                    .WithMany()
+                    .HasForeignKey(t => t.CreadoPorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(t => t.AsignadoA)
+                    .WithMany()
+                    .HasForeignKey(t => t.AsignadoAId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<RespuestaTicket>(entity =>
+            {
+                entity.HasOne(r => r.Ticket)
+                    .WithMany(t => t.Respuestas)
+                    .HasForeignKey(r => r.TicketId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(r => r.Autor)
+                    .WithMany()
+                    .HasForeignKey(r => r.AutorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN NOTAS INTERNAS
+            // ========================================
+            modelBuilder.Entity<NotaInterna>(entity =>
+            {
+                entity.HasOne(n => n.CreadoPor)
+                    .WithMany()
+                    .HasForeignKey(n => n.CreadoPorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(n => n.EditadoPor)
+                    .WithMany()
+                    .HasForeignKey(n => n.EditadoPorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN TEMPLATES RESPUESTA
+            // ========================================
+            modelBuilder.Entity<TemplateRespuesta>(entity =>
+            {
+                entity.HasOne(t => t.CreadoPor)
+                    .WithMany()
+                    .HasForeignKey(t => t.CreadoPorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN MODO MANTENIMIENTO
+            // ========================================
+            modelBuilder.Entity<ModoMantenimiento>(entity =>
+            {
+                entity.HasOne(m => m.ActivadoPor)
+                    .WithMany()
+                    .HasForeignKey(m => m.ActivadoPorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<HistorialMantenimiento>(entity =>
+            {
+                entity.HasOne(h => h.ActivadoPor)
+                    .WithMany()
+                    .HasForeignKey(h => h.ActivadoPorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(h => h.DesactivadoPor)
+                    .WithMany()
+                    .HasForeignKey(h => h.DesactivadoPorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN AUDITORIA
+            // ========================================
+            modelBuilder.Entity<AuditoriaConfiguracion>(entity =>
+            {
+                entity.HasOne(a => a.ModificadoPor)
+                    .WithMany()
+                    .HasForeignKey(a => a.ModificadoPorId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
         }
     }

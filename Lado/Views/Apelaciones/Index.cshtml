@@ -1,0 +1,417 @@
+@model List<Lado.Models.Apelacion>
+@{
+    ViewData["Title"] = "Mis Apelaciones";
+    Layout = "_Layout";
+}
+
+@Html.AntiForgeryToken()
+
+<style>
+    .apelaciones-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 24px 16px;
+    }
+
+    .apelaciones-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+
+    .apelaciones-header h1 {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-color);
+        margin: 0;
+    }
+
+    .apelaciones-info {
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        border: 1px solid #60a5fa;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .apelaciones-info i {
+        color: #2563eb;
+        font-size: 20px;
+        margin-top: 2px;
+    }
+
+    .apelaciones-info-text {
+        flex: 1;
+    }
+
+    .apelaciones-info-text strong {
+        color: #1e40af;
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    .apelaciones-info-text p {
+        color: #1e3a8a;
+        font-size: 13px;
+        margin: 0;
+    }
+
+    .apelacion-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+        transition: all 0.2s;
+    }
+
+    .apelacion-card:hover {
+        border-color: var(--primary-color);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .apelacion-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 12px;
+    }
+
+    .apelacion-ref {
+        font-family: monospace;
+        font-size: 13px;
+        color: var(--text-muted);
+        background: var(--bg-secondary);
+        padding: 4px 8px;
+        border-radius: 4px;
+    }
+
+    .apelacion-estado {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .estado-pendiente {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .estado-enrevision {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .estado-aprobada {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .estado-rechazada {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .estado-escalada {
+        background: #ede9fe;
+        color: #5b21b6;
+    }
+
+    .apelacion-tipo {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .apelacion-tipo i {
+        color: var(--primary-color);
+    }
+
+    .apelacion-tipo span {
+        font-weight: 500;
+        color: var(--text-color);
+    }
+
+    .apelacion-razon {
+        font-size: 14px;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+        padding: 8px 12px;
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        border-left: 3px solid #ef4444;
+    }
+
+    .apelacion-fecha {
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+
+    .apelacion-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .btn-ver-detalle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 13px;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .btn-ver-detalle:hover {
+        background: var(--primary-hover);
+        color: white;
+    }
+
+    .btn-cancelar {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: transparent;
+        color: #ef4444;
+        border: 1px solid #ef4444;
+        border-radius: 8px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-cancelar:hover {
+        background: #fef2f2;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        background: var(--card-bg);
+        border: 1px dashed var(--border-color);
+        border-radius: 12px;
+    }
+
+    .empty-state i {
+        font-size: 48px;
+        color: var(--text-muted);
+        margin-bottom: 16px;
+    }
+
+    .empty-state h3 {
+        color: var(--text-color);
+        margin-bottom: 8px;
+    }
+
+    .empty-state p {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .resolucion-box {
+        margin-top: 12px;
+        padding: 12px;
+        background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+        border: 1px solid #10b981;
+        border-radius: 8px;
+    }
+
+    .resolucion-box.rechazada {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border-color: #ef4444;
+    }
+
+    .resolucion-box strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 13px;
+    }
+
+    .resolucion-box p {
+        margin: 0;
+        font-size: 13px;
+    }
+</style>
+
+<div class="apelaciones-container">
+    <div class="apelaciones-header">
+        <h1><i class="fas fa-gavel me-2"></i>Mis Apelaciones</h1>
+    </div>
+
+    <div class="apelaciones-info">
+        <i class="fas fa-info-circle"></i>
+        <div class="apelaciones-info-text">
+            <strong>Como funcionan las apelaciones</strong>
+            <p>
+                Puedes apelar si crees que tu contenido fue rechazado o eliminado por error.
+                Un miembro de nuestro equipo revisara tu caso y te notificara la decision.
+                El proceso normalmente toma entre 24-72 horas.
+            </p>
+        </div>
+    </div>
+
+    @if (Model.Any())
+    {
+        @foreach (var apelacion in Model)
+        {
+            <div class="apelacion-card" id="apelacion-@apelacion.Id">
+                <div class="apelacion-header">
+                    <span class="apelacion-ref">@apelacion.NumeroReferencia</span>
+                    <span class="apelacion-estado estado-@apelacion.Estado.ToString().ToLower()">
+                        @switch (apelacion.Estado)
+                        {
+                            case Lado.Models.EstadoApelacion.Pendiente:
+                                @:Pendiente
+                                break;
+                            case Lado.Models.EstadoApelacion.EnRevision:
+                                @:En Revision
+                                break;
+                            case Lado.Models.EstadoApelacion.Aprobada:
+                                @:Aprobada
+                                break;
+                            case Lado.Models.EstadoApelacion.Rechazada:
+                                @:Rechazada
+                                break;
+                            case Lado.Models.EstadoApelacion.Escalada:
+                                @:Escalada
+                                break;
+                        }
+                    </span>
+                </div>
+
+                <div class="apelacion-tipo">
+                    @if (apelacion.TipoContenido == "Publicacion")
+                    {
+                        <i class="fas fa-image"></i>
+                        <span>Publicacion</span>
+                    }
+                    else if (apelacion.TipoContenido == "Story")
+                    {
+                        <i class="fas fa-circle"></i>
+                        <span>Story</span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-file"></i>
+                        <span>@apelacion.TipoContenido</span>
+                    }
+                </div>
+
+                <div class="apelacion-razon">
+                    <strong style="font-size: 11px; color: #ef4444; display: block; margin-bottom: 4px;">RAZON DEL RECHAZO:</strong>
+                    @apelacion.RazonRechazo
+                </div>
+
+                <div class="apelacion-fecha">
+                    <i class="fas fa-clock me-1"></i>
+                    Enviada el @apelacion.FechaCreacion.ToString("dd MMM yyyy, HH:mm")
+                </div>
+
+                @if (apelacion.Estado == Lado.Models.EstadoApelacion.Aprobada || apelacion.Estado == Lado.Models.EstadoApelacion.Rechazada)
+                {
+                    <div class="resolucion-box @(apelacion.Estado == Lado.Models.EstadoApelacion.Rechazada ? "rechazada" : "")">
+                        <strong>
+                            @if (apelacion.Estado == Lado.Models.EstadoApelacion.Aprobada)
+                            {
+                                <i class="fas fa-check-circle me-1" style="color: #10b981;"></i>@:Apelacion Aprobada
+                            }
+                            else
+                            {
+                                <i class="fas fa-times-circle me-1" style="color: #ef4444;"></i>@:Apelacion Rechazada
+                            }
+                        </strong>
+                        @if (!string.IsNullOrEmpty(apelacion.ResolucionComentario))
+                        {
+                            <p>@apelacion.ResolucionComentario</p>
+                        }
+                        @if (apelacion.FechaResolucion.HasValue)
+                        {
+                            <p style="margin-top: 8px; font-size: 12px; color: var(--text-muted);">
+                                Resuelto el @apelacion.FechaResolucion.Value.ToString("dd MMM yyyy")
+                            </p>
+                        }
+                    </div>
+                }
+
+                <div class="apelacion-footer">
+                    <a href="@Url.Action("Detalle", "Apelaciones", new { id = apelacion.Id })" class="btn-ver-detalle">
+                        <i class="fas fa-eye"></i>
+                        Ver detalle
+                    </a>
+                    @if (apelacion.Estado == Lado.Models.EstadoApelacion.Pendiente)
+                    {
+                        <button class="btn-cancelar" onclick="cancelarApelacion(@apelacion.Id)">
+                            <i class="fas fa-times"></i>
+                            Cancelar
+                        </button>
+                    }
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-state">
+            <i class="fas fa-inbox"></i>
+            <h3>No tienes apelaciones</h3>
+            <p>Cuando apeles contenido rechazado o eliminado, aparecera aqui.</p>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        async function cancelarApelacion(id) {
+            if (!confirm('¿Estas seguro de cancelar esta apelacion? Esta accion no se puede deshacer.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/Apelaciones/Cancelar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                    },
+                    body: JSON.stringify(id)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById(`apelacion-${id}`).remove();
+                    showToast(result.message, 'success');
+                } else {
+                    showToast(result.message, 'error');
+                }
+            } catch (error) {
+                showToast('Error al cancelar la apelacion', 'error');
+            }
+        }
+
+        function showToast(message, type) {
+            // Usar la funcion de toast existente si esta disponible
+            if (typeof mostrarToast === 'function') {
+                mostrarToast(message, type);
+            } else {
+                alert(message);
+            }
+        }
+    </script>
+}

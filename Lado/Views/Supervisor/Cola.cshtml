@@ -1,0 +1,554 @@
+@using Lado.Models.Moderacion
+@using Lado.Services
+@{
+    ViewData["Title"] = "Cola de Moderacion";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    var colaPendiente = ViewBag.ColaPendiente as List<ColaModeracion>;
+    var itemsAsignados = ViewBag.ItemsAsignados as List<ColaModeracion>;
+    var estadisticas = ViewBag.Estadisticas as EstadisticasCola;
+}
+
+<style>
+    .cola-container {
+        padding: 24px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .cola-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .cola-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--fg);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .cola-stats {
+        display: flex;
+        gap: 24px;
+        flex-wrap: wrap;
+    }
+
+    .cola-stat {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: var(--surface);
+        border-radius: 20px;
+        border: 1px solid var(--line);
+    }
+
+    .cola-stat.urgente {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #dc2626;
+    }
+
+    .cola-stat-value {
+        font-weight: 700;
+        font-size: 18px;
+    }
+
+    .cola-stat-label {
+        font-size: 13px;
+        color: var(--muted);
+    }
+
+    .tabs-container {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 8px;
+    }
+
+    .tab-btn {
+        padding: 12px 24px;
+        border: none;
+        background: none;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--muted);
+        cursor: pointer;
+        border-radius: 8px 8px 0 0;
+        transition: all 0.2s;
+        position: relative;
+    }
+
+    .tab-btn:hover {
+        color: var(--fg);
+        background: var(--bg-secondary);
+    }
+
+    .tab-btn.active {
+        color: var(--primary);
+        background: var(--surface);
+    }
+
+    .tab-btn.active::after {
+        content: '';
+        position: absolute;
+        bottom: -9px;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--primary);
+        border-radius: 3px 3px 0 0;
+    }
+
+    .tab-badge {
+        background: var(--primary);
+        color: white;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 12px;
+        margin-left: 8px;
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    .cola-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+    }
+
+    .cola-item {
+        background: var(--surface);
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        overflow: hidden;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+
+    .cola-item:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+        border-color: var(--primary);
+    }
+
+    .cola-item-media {
+        position: relative;
+        aspect-ratio: 1;
+        background: var(--bg-tertiary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .cola-item-media img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .cola-item-media .placeholder {
+        font-size: 48px;
+        color: var(--muted-light);
+    }
+
+    .media-badge {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        padding: 4px 10px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        border-radius: 20px;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .prioridad-badge {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .prioridad-badge.urgente {
+        background: #ef4444;
+        color: white;
+    }
+
+    .prioridad-badge.alta {
+        background: #f59e0b;
+        color: white;
+    }
+
+    .prioridad-badge.normal {
+        background: #3b82f6;
+        color: white;
+    }
+
+    .prioridad-badge.baja {
+        background: #10b981;
+        color: white;
+    }
+
+    .cola-item-info {
+        padding: 16px;
+    }
+
+    .cola-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 8px;
+    }
+
+    .cola-item-id {
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .cola-item-time {
+        font-size: 11px;
+        color: var(--muted);
+    }
+
+    .cola-item-creador {
+        font-weight: 600;
+        color: var(--fg);
+        margin-bottom: 8px;
+    }
+
+    .cola-item-tags {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .cola-tag {
+        padding: 3px 8px;
+        background: var(--bg-secondary);
+        border-radius: 4px;
+        font-size: 11px;
+        color: var(--muted);
+    }
+
+    .cola-tag.reporte {
+        background: #fef2f2;
+        color: #dc2626;
+    }
+
+    .cola-tag.ia {
+        background: #ede9fe;
+        color: #7c3aed;
+    }
+
+    .empty-cola {
+        text-align: center;
+        padding: 80px 20px;
+        color: var(--muted);
+    }
+
+    .empty-cola i {
+        font-size: 64px;
+        margin-bottom: 24px;
+        opacity: 0.3;
+    }
+
+    .empty-cola h3 {
+        font-size: 20px;
+        color: var(--fg);
+        margin-bottom: 8px;
+    }
+
+    .btn-obtener {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        padding: 16px 32px;
+        background: var(--primary-gradient);
+        color: white;
+        border: none;
+        border-radius: 30px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: var(--shadow-xl);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: all 0.2s;
+        z-index: 100;
+    }
+
+    .btn-obtener:hover {
+        transform: scale(1.05);
+    }
+
+    .btn-obtener:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    @@media (max-width: 768px) {
+        .cola-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .cola-stats {
+            justify-content: center;
+        }
+
+        .cola-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .btn-obtener {
+            left: 24px;
+            right: 24px;
+            justify-content: center;
+        }
+    }
+</style>
+
+<div class="cola-container">
+    <!-- Header -->
+    <div class="cola-header">
+        <h1 class="cola-title">
+            <i class="fas fa-layer-group"></i>
+            Cola de Moderacion
+        </h1>
+
+        <div class="cola-stats">
+            <div class="cola-stat">
+                <i class="fas fa-clock"></i>
+                <span class="cola-stat-value">@(estadisticas?.TotalPendientes ?? 0)</span>
+                <span class="cola-stat-label">pendientes</span>
+            </div>
+            <div class="cola-stat">
+                <i class="fas fa-eye"></i>
+                <span class="cola-stat-value">@(estadisticas?.TotalEnRevision ?? 0)</span>
+                <span class="cola-stat-label">en revision</span>
+            </div>
+            @if (estadisticas?.TotalUrgentes > 0)
+            {
+                <div class="cola-stat urgente">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span class="cola-stat-value">@estadisticas.TotalUrgentes</span>
+                    <span class="cola-stat-label">urgentes</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs-container">
+        <button class="tab-btn active" onclick="cambiarTab('asignados')">
+            <i class="fas fa-user-check"></i> Mis asignados
+            @if (itemsAsignados?.Count > 0)
+            {
+                <span class="tab-badge">@itemsAsignados.Count</span>
+            }
+        </button>
+        <button class="tab-btn" onclick="cambiarTab('pendientes')">
+            <i class="fas fa-inbox"></i> Pendientes
+            <span class="tab-badge">@(colaPendiente?.Count ?? 0)</span>
+        </button>
+    </div>
+
+    <!-- Tab: Asignados -->
+    <div id="tab-asignados" class="tab-content active">
+        @if (itemsAsignados?.Count > 0)
+        {
+            <div class="cola-grid">
+                @foreach (var item in itemsAsignados)
+                {
+                    var prioridadClass = item.Prioridad.ToString().ToLower();
+                    var archivo = item.Contenido?.Archivos?.FirstOrDefault();
+                    var esVideo = archivo?.TipoArchivo == Lado.Models.TipoArchivo.Video;
+
+                    <div class="cola-item" onclick="window.location.href='@Url.Action("Revisar", new { id = item.Id })'">
+                        <div class="cola-item-media">
+                            @if (archivo != null)
+                            {
+                                <img src="@(esVideo ? archivo.Thumbnail ?? archivo.RutaArchivo : archivo.RutaArchivo)" alt="">
+                                @if (esVideo)
+                                {
+                                    <span class="media-badge"><i class="fas fa-video"></i> Video</span>
+                                }
+                            }
+                            else
+                            {
+                                <i class="fas fa-image placeholder"></i>
+                            }
+                            <span class="prioridad-badge @prioridadClass">@item.Prioridad</span>
+                        </div>
+                        <div class="cola-item-info">
+                            <div class="cola-item-header">
+                                <span class="cola-item-id">#@item.ContenidoId</span>
+                                <span class="cola-item-time">@item.FechaAsignacion?.ToString("HH:mm")</span>
+                            </div>
+                            <div class="cola-item-creador">
+                                @(item.Contenido?.Usuario?.Seudonimo ?? item.Contenido?.Usuario?.UserName ?? "Anonimo")
+                            </div>
+                            <div class="cola-item-tags">
+                                @if (item.EsDeReporte)
+                                {
+                                    <span class="cola-tag reporte"><i class="fas fa-flag"></i> Reportado</span>
+                                }
+                                @if (item.ClasificadoPorIA)
+                                {
+                                    <span class="cola-tag ia"><i class="fas fa-robot"></i> IA: @(item.ConfianzaIA?.ToString("P0") ?? "?")</span>
+                                }
+                                @if (item.Contenido?.Archivos?.Count > 1)
+                                {
+                                    <span class="cola-tag"><i class="fas fa-images"></i> @item.Contenido.Archivos.Count</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="empty-cola">
+                <i class="fas fa-check-circle"></i>
+                <h3>No tienes items asignados</h3>
+                <p>Haz clic en "Obtener siguiente" para comenzar a revisar</p>
+            </div>
+        }
+    </div>
+
+    <!-- Tab: Pendientes -->
+    <div id="tab-pendientes" class="tab-content">
+        @if (colaPendiente?.Count > 0)
+        {
+            <div class="cola-grid">
+                @foreach (var item in colaPendiente)
+                {
+                    var prioridadClass = item.Prioridad.ToString().ToLower();
+                    var archivo = item.Contenido?.Archivos?.FirstOrDefault();
+                    var esVideo = archivo?.TipoArchivo == Lado.Models.TipoArchivo.Video;
+
+                    <div class="cola-item" onclick="asignarYRevisar(@item.Id)">
+                        <div class="cola-item-media">
+                            @if (archivo != null)
+                            {
+                                <img src="@(esVideo ? archivo.Thumbnail ?? archivo.RutaArchivo : archivo.RutaArchivo)" alt="">
+                                @if (esVideo)
+                                {
+                                    <span class="media-badge"><i class="fas fa-video"></i> Video</span>
+                                }
+                            }
+                            else
+                            {
+                                <i class="fas fa-image placeholder"></i>
+                            }
+                            <span class="prioridad-badge @prioridadClass">@item.Prioridad</span>
+                        </div>
+                        <div class="cola-item-info">
+                            <div class="cola-item-header">
+                                <span class="cola-item-id">#@item.ContenidoId</span>
+                                <span class="cola-item-time">@item.FechaCreacion.ToString("dd/MM HH:mm")</span>
+                            </div>
+                            <div class="cola-item-creador">
+                                @(item.Contenido?.Usuario?.Seudonimo ?? item.Contenido?.Usuario?.UserName ?? "Anonimo")
+                            </div>
+                            <div class="cola-item-tags">
+                                @if (item.EsDeReporte)
+                                {
+                                    <span class="cola-tag reporte"><i class="fas fa-flag"></i> Reportado</span>
+                                }
+                                @if (item.ClasificadoPorIA)
+                                {
+                                    <span class="cola-tag ia"><i class="fas fa-robot"></i> IA</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="empty-cola">
+                <i class="fas fa-inbox"></i>
+                <h3>Cola vacia</h3>
+                <p>No hay contenido pendiente de moderacion</p>
+            </div>
+        }
+    </div>
+
+    <!-- Boton flotante -->
+    <button class="btn-obtener" id="btnObtenerSiguiente" onclick="obtenerSiguiente()">
+        <i class="fas fa-play"></i>
+        Obtener siguiente
+    </button>
+</div>
+
+@section Scripts {
+<script>
+    function cambiarTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+        document.querySelector(`[onclick="cambiarTab('${tab}')"]`).classList.add('active');
+        document.getElementById(`tab-${tab}`).classList.add('active');
+    }
+
+    async function obtenerSiguiente() {
+        const btn = document.getElementById('btnObtenerSiguiente');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Obteniendo...';
+
+        try {
+            const formData = new FormData();
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value || '');
+
+            const response = await fetch('@Url.Action("ObtenerSiguiente")', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                window.location.href = result.redirectUrl;
+            } else {
+                alert(result.message || 'No hay items disponibles');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-play"></i> Obtener siguiente';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-play"></i> Obtener siguiente';
+        }
+    }
+
+    function asignarYRevisar(colaId) {
+        window.location.href = '@Url.Action("Revisar")/' + colaId;
+    }
+</script>
+}

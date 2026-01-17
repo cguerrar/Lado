@@ -85,8 +85,8 @@ namespace Lado.Hubs
             // Notificar al destinatario que el usuario está escribiendo
             await Clients.Group($"user_{destinatarioId}").SendAsync("UserTyping", new
             {
-                UserId = userId,
-                UserName = userName
+                userId = userId,
+                userName = userName
             });
         }
 
@@ -100,7 +100,7 @@ namespace Lado.Hubs
 
             await Clients.Group($"user_{destinatarioId}").SendAsync("UserStoppedTyping", new
             {
-                UserId = userId
+                userId = userId
             });
         }
 

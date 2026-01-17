@@ -1,0 +1,644 @@
+@using Lado.Models.Moderacion
+@model List<UsuarioSupervisor>
+@{
+    ViewData["Title"] = "Gestion de Supervisores";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+
+    var roles = ViewBag.Roles as List<RolSupervisor>;
+    var estadisticas = ViewBag.EstadisticasCola;
+}
+
+<style>
+    .supervisores-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .supervisores-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--fg);
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 12px;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+        text-decoration: none;
+    }
+
+    .btn-primary {
+        background: var(--primary);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: var(--primary-dark);
+    }
+
+    .btn-success {
+        background: #10b981;
+        color: white;
+    }
+
+    .btn-outline {
+        background: transparent;
+        border: 1px solid var(--line);
+        color: var(--fg);
+    }
+
+    .btn-outline:hover {
+        background: var(--bg-secondary);
+    }
+
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .stat-mini {
+        background: var(--surface);
+        padding: 16px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        text-align: center;
+    }
+
+    .stat-mini-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--fg);
+    }
+
+    .stat-mini-label {
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .supervisores-table {
+        width: 100%;
+        background: var(--surface);
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        overflow: hidden;
+    }
+
+    .supervisores-table th,
+    .supervisores-table td {
+        padding: 16px;
+        text-align: left;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .supervisores-table th {
+        background: var(--bg-secondary);
+        font-weight: 600;
+        color: var(--fg);
+        font-size: 13px;
+        text-transform: uppercase;
+    }
+
+    .supervisores-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .supervisor-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .supervisor-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: var(--bg-tertiary);
+    }
+
+    .supervisor-name {
+        font-weight: 500;
+        color: var(--fg);
+    }
+
+    .supervisor-email {
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .rol-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        color: white;
+    }
+
+    .estado-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .estado-badge.activo {
+        background: #d1fae5;
+        color: #059669;
+    }
+
+    .estado-badge.inactivo {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+
+    .estado-badge.disponible {
+        background: #dbeafe;
+        color: #2563eb;
+    }
+
+    .acciones-btn {
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        background: var(--bg);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s;
+    }
+
+    .acciones-btn:hover {
+        background: var(--bg-secondary);
+    }
+
+    .acciones-btn.danger:hover {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #dc2626;
+    }
+
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s;
+    }
+
+    .modal.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .modal-content {
+        background: var(--surface);
+        border-radius: 16px;
+        width: 90%;
+        max-width: 500px;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title {
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--muted);
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 8px;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 14px;
+        background: var(--bg);
+    }
+
+    .search-results {
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin-top: 8px;
+    }
+
+    .search-result-item {
+        padding: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .search-result-item:hover {
+        background: var(--bg-secondary);
+    }
+
+    .search-result-item:last-child {
+        border-bottom: none;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--muted);
+    }
+
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+</style>
+
+<div class="supervisores-header">
+    <h1 class="supervisores-title"><i class="fas fa-user-shield"></i> Gestion de Supervisores</h1>
+    <div class="header-actions">
+        @if (roles?.Count > 0)
+        {
+            <button class="btn btn-primary" onclick="mostrarModalCrear()">
+                <i class="fas fa-plus"></i> Nuevo Supervisor
+            </button>
+        }
+        else
+        {
+            <form asp-action="InicializarSistemaSupervisores" method="post" style="display:inline;">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-magic"></i> Inicializar Sistema
+                </button>
+            </form>
+        }
+        <a href="@Url.Action("RolesSupervisor")" class="btn btn-outline">
+            <i class="fas fa-cog"></i> Roles y Permisos
+        </a>
+        <a href="@Url.Action("ColaEscalada")" class="btn btn-outline">
+            <i class="fas fa-arrow-up"></i> Cola Escalada
+        </a>
+    </div>
+</div>
+
+<!-- Estadísticas rápidas -->
+<div class="stats-row">
+    <div class="stat-mini">
+        <div class="stat-mini-value">@Model.Count(s => s.EstaActivo)</div>
+        <div class="stat-mini-label">Supervisores Activos</div>
+    </div>
+    <div class="stat-mini">
+        <div class="stat-mini-value">@Model.Count(s => s.EstaActivo && s.EstaDisponible)</div>
+        <div class="stat-mini-label">Disponibles Ahora</div>
+    </div>
+    <div class="stat-mini">
+        <div class="stat-mini-value">@(estadisticas?.TotalPendientes ?? 0)</div>
+        <div class="stat-mini-label">En Cola</div>
+    </div>
+    <div class="stat-mini">
+        <div class="stat-mini-value">@(estadisticas?.TotalEscalados ?? 0)</div>
+        <div class="stat-mini-label">Escalados</div>
+    </div>
+</div>
+
+@if (Model.Count > 0)
+{
+    <table class="supervisores-table">
+        <thead>
+            <tr>
+                <th>Supervisor</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                <th>Items Asignados</th>
+                <th>Ultima Actividad</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var supervisor in Model)
+            {
+                <tr>
+                    <td>
+                        <div class="supervisor-info">
+                            @if (!string.IsNullOrEmpty(supervisor.Usuario?.FotoPerfil))
+                            {
+                                <img src="@supervisor.Usuario.FotoPerfil" class="supervisor-avatar" alt="">
+                            }
+                            else
+                            {
+                                <div class="supervisor-avatar" style="display:flex;align-items:center;justify-content:center;">
+                                    <i class="fas fa-user" style="color:var(--muted);"></i>
+                                </div>
+                            }
+                            <div>
+                                <div class="supervisor-name">@(supervisor.Usuario?.NombreCompleto ?? supervisor.Usuario?.UserName)</div>
+                                <div class="supervisor-email">@supervisor.Usuario?.Email</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="rol-badge" style="background: @supervisor.RolSupervisor?.ColorBadge">
+                            <i class="fas @supervisor.RolSupervisor?.Icono"></i>
+                            @supervisor.RolSupervisor?.Nombre
+                        </span>
+                    </td>
+                    <td>
+                        @if (supervisor.EstaActivo)
+                        {
+                            <span class="estado-badge activo">Activo</span>
+                            if (supervisor.EstaDisponible)
+                            {
+                                <span class="estado-badge disponible">Disponible</span>
+                            }
+                        }
+                        else
+                        {
+                            <span class="estado-badge inactivo">Inactivo</span>
+                        }
+                    </td>
+                    <td>@supervisor.ItemsAsignados</td>
+                    <td>
+                        @if (supervisor.UltimaActividad.HasValue)
+                        {
+                            var tiempo = DateTime.UtcNow - supervisor.UltimaActividad.Value;
+                            if (tiempo.TotalMinutes < 5)
+                            {
+                                <span style="color:#10b981;">Ahora mismo</span>
+                            }
+                            else if (tiempo.TotalHours < 1)
+                            {
+                                <span>Hace @((int)tiempo.TotalMinutes) min</span>
+                            }
+                            else if (tiempo.TotalDays < 1)
+                            {
+                                <span>Hace @((int)tiempo.TotalHours) horas</span>
+                            }
+                            else
+                            {
+                                <span>@supervisor.UltimaActividad.Value.ToString("dd/MM HH:mm")</span>
+                            }
+                        }
+                        else
+                        {
+                            <span style="color:var(--muted);">Nunca</span>
+                        }
+                    </td>
+                    <td>
+                        @if (supervisor.EstaActivo)
+                        {
+                            <button class="acciones-btn danger" onclick="desactivarSupervisor(@supervisor.Id)">
+                                <i class="fas fa-ban"></i> Desactivar
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="acciones-btn" onclick="reactivarSupervisor(@supervisor.Id)">
+                                <i class="fas fa-check"></i> Reactivar
+                            </button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    <div class="empty-state">
+        <i class="fas fa-user-shield"></i>
+        <h3>No hay supervisores</h3>
+        <p>Crea el primer supervisor para comenzar a moderar contenido</p>
+    </div>
+}
+
+<!-- Modal Crear Supervisor -->
+<div class="modal" id="modalCrear">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span class="modal-title"><i class="fas fa-user-plus"></i> Nuevo Supervisor</span>
+            <button class="modal-close" onclick="cerrarModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form asp-action="CrearSupervisor" method="post" id="formCrearSupervisor">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="usuarioId" id="usuarioIdInput">
+
+                <div class="form-group">
+                    <label>Buscar usuario</label>
+                    <input type="text" id="buscarUsuario" placeholder="Nombre, email o username..." oninput="buscarUsuarios(this.value)">
+                    <div class="search-results" id="resultadosBusqueda" style="display:none;"></div>
+                    <div id="usuarioSeleccionado" style="display:none; margin-top:12px; padding:12px; background:var(--bg-secondary); border-radius:8px;"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Rol de supervisor</label>
+                    <select name="rolId" required>
+                        <option value="">Seleccionar rol...</option>
+                        @if (roles != null)
+                        {
+                            foreach (var rol in roles)
+                            {
+                                <option value="@rol.Id">@rol.Nombre - @rol.Descripcion</option>
+                            }
+                        }
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Turno (opcional)</label>
+                    <select name="turno">
+                        <option value="">Sin turno asignado</option>
+                        <option value="Mañana">Mañana</option>
+                        <option value="Tarde">Tarde</option>
+                        <option value="Noche">Noche</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Notas (opcional)</label>
+                    <textarea name="notas" placeholder="Notas adicionales sobre este supervisor..."></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width:100%;">
+                    <i class="fas fa-check"></i> Crear Supervisor
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function mostrarModalCrear() {
+        document.getElementById('modalCrear').classList.add('active');
+    }
+
+    function cerrarModal() {
+        document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+    }
+
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) cerrarModal();
+        });
+    });
+
+    let debounceTimer;
+    async function buscarUsuarios(query) {
+        clearTimeout(debounceTimer);
+        const resultados = document.getElementById('resultadosBusqueda');
+
+        if (query.length < 2) {
+            resultados.style.display = 'none';
+            return;
+        }
+
+        debounceTimer = setTimeout(async () => {
+            try {
+                const response = await fetch(`/Admin/BuscarUsuariosParaSupervisor?query=${encodeURIComponent(query)}`);
+                const usuarios = await response.json();
+
+                if (usuarios.length > 0) {
+                    resultados.innerHTML = usuarios.map(u => `
+                        <div class="search-result-item" onclick="seleccionarUsuario('${u.id}', '${u.userName}', '${u.email}', '${u.rutaFotoPerfil || ''}')">
+                            ${u.rutaFotoPerfil ? `<img src="${u.rutaFotoPerfil}" style="width:32px;height:32px;border-radius:50%;">` : '<i class="fas fa-user" style="width:32px;"></i>'}
+                            <div>
+                                <div style="font-weight:500;">${u.nombreCompleto || u.userName}</div>
+                                <div style="font-size:12px;color:var(--muted);">${u.email}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                    resultados.style.display = 'block';
+                } else {
+                    resultados.innerHTML = '<div style="padding:12px;color:var(--muted);">No se encontraron usuarios</div>';
+                    resultados.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }, 300);
+    }
+
+    function seleccionarUsuario(id, userName, email, foto) {
+        document.getElementById('usuarioIdInput').value = id;
+        document.getElementById('resultadosBusqueda').style.display = 'none';
+        document.getElementById('buscarUsuario').style.display = 'none';
+
+        const seleccionado = document.getElementById('usuarioSeleccionado');
+        seleccionado.innerHTML = `
+            <div style="display:flex;align-items:center;gap:12px;">
+                ${foto ? `<img src="${foto}" style="width:40px;height:40px;border-radius:50%;">` : '<i class="fas fa-user" style="font-size:24px;"></i>'}
+                <div>
+                    <div style="font-weight:500;">${userName}</div>
+                    <div style="font-size:12px;color:var(--muted);">${email}</div>
+                </div>
+                <button type="button" onclick="limpiarSeleccion()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--muted);">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+        seleccionado.style.display = 'block';
+    }
+
+    function limpiarSeleccion() {
+        document.getElementById('usuarioIdInput').value = '';
+        document.getElementById('buscarUsuario').style.display = 'block';
+        document.getElementById('buscarUsuario').value = '';
+        document.getElementById('usuarioSeleccionado').style.display = 'none';
+    }
+
+    async function desactivarSupervisor(id) {
+        if (!confirm('¿Desactivar este supervisor? Sus items asignados volverán a la cola.')) return;
+
+        const formData = new FormData();
+        formData.append('id', id);
+        formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value || '');
+
+        const response = await fetch('/Admin/DesactivarSupervisor', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            location.reload();
+        } else {
+            alert(result.message || 'Error al desactivar');
+        }
+    }
+
+    async function reactivarSupervisor(id) {
+        const formData = new FormData();
+        formData.append('id', id);
+        formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value || '');
+
+        const response = await fetch('/Admin/ReactivarSupervisor', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            location.reload();
+        } else {
+            alert(result.message || 'Error al reactivar');
+        }
+    }
+</script>
+}

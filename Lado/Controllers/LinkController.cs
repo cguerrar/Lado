@@ -69,6 +69,7 @@ namespace Lado.Controllers
             ViewBag.Biografia = usarLadoB ? (usuario.BiografiaLadoB ?? usuario.Biografia) : usuario.Biografia;
             ViewBag.Username = usuario.UserName;
             ViewBag.Seudonimo = usuario.Seudonimo;
+            ViewBag.UsuarioId = usuario.Id;
 
             // Redes sociales
             ViewBag.Instagram = usuario.Instagram;
@@ -86,6 +87,58 @@ namespace Lado.Controllers
             ViewBag.PrecioSuscripcion = usarLadoB && usuario.PrecioSuscripcionLadoB.HasValue
                 ? usuario.PrecioSuscripcionLadoB.Value
                 : usuario.PrecioSuscripcion;
+
+            // === NUEVO: Cargar contenido premium para preview (solo LadoB) ===
+            if (usarLadoB)
+            {
+                // Obtener contenido LadoB más reciente para mostrar como preview
+                var contenidoPreview = await _context.Contenidos
+                    .Where(c => c.UsuarioId == usuario.Id &&
+                                c.TipoLado == TipoLado.LadoB &&
+                                !c.Censurado &&
+                                !c.OcultoSilenciosamente &&
+                                !c.EsPrivado)
+                    .OrderByDescending(c => c.FechaPublicacion)
+                    .Take(6)
+                    .Select(c => new {
+                        c.Id,
+                        c.RutaArchivo,
+                        c.Thumbnail,
+                        c.TipoContenido,
+                        c.NumeroLikes,
+                        c.NumeroComentarios,
+                        Precio = c.PrecioDesbloqueo ?? usuario.PrecioSuscripcionLadoB ?? 0
+                    })
+                    .ToListAsync();
+
+                ViewBag.ContenidoPreview = contenidoPreview;
+
+                // Total de likes del creador en LadoB
+                var totalLikes = await _context.Contenidos
+                    .Where(c => c.UsuarioId == usuario.Id && c.TipoLado == TipoLado.LadoB)
+                    .SumAsync(c => c.NumeroLikes);
+                ViewBag.TotalLikes = totalLikes;
+
+                // Contar fotos y videos
+                var conteoTipos = await _context.Contenidos
+                    .Where(c => c.UsuarioId == usuario.Id &&
+                                c.TipoLado == TipoLado.LadoB &&
+                                !c.Censurado &&
+                                !c.OcultoSilenciosamente)
+                    .GroupBy(c => c.TipoContenido)
+                    .Select(g => new { Tipo = g.Key, Cantidad = g.Count() })
+                    .ToListAsync();
+
+                ViewBag.TotalFotos = conteoTipos.FirstOrDefault(x => x.Tipo == TipoContenido.Foto)?.Cantidad ?? 0;
+                ViewBag.TotalVideos = conteoTipos.FirstOrDefault(x => x.Tipo == TipoContenido.Video)?.Cantidad ?? 0;
+            }
+            else
+            {
+                ViewBag.ContenidoPreview = new List<object>();
+                ViewBag.TotalLikes = 0;
+                ViewBag.TotalFotos = 0;
+                ViewBag.TotalVideos = 0;
+            }
 
             // Meta tags SEO
             ViewData["Title"] = $"{ViewBag.NombreDisplay} - Lado";

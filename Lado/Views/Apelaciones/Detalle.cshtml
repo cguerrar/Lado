@@ -1,0 +1,434 @@
+@model Lado.Models.Apelacion
+@{
+    ViewData["Title"] = "Detalle de Apelacion";
+    Layout = "_Layout";
+}
+
+<style>
+    .detalle-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 24px 16px;
+    }
+
+    .detalle-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .detalle-header-left h1 {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-color);
+        margin: 0 0 8px 0;
+    }
+
+    .detalle-ref {
+        font-family: monospace;
+        font-size: 14px;
+        color: var(--text-muted);
+        background: var(--bg-secondary);
+        padding: 6px 12px;
+        border-radius: 6px;
+    }
+
+    .estado-badge {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .estado-pendiente { background: #fef3c7; color: #92400e; }
+    .estado-enrevision { background: #dbeafe; color: #1e40af; }
+    .estado-aprobada { background: #d1fae5; color: #065f46; }
+    .estado-rechazada { background: #fee2e2; color: #991b1b; }
+    .estado-escalada { background: #ede9fe; color: #5b21b6; }
+
+    .detalle-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        margin-bottom: 20px;
+        overflow: hidden;
+    }
+
+    .detalle-card-header {
+        background: var(--bg-secondary);
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-color);
+        font-weight: 600;
+        color: var(--text-color);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .detalle-card-header i {
+        color: var(--primary-color);
+    }
+
+    .detalle-card-body {
+        padding: 20px;
+    }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .info-row:last-child {
+        border-bottom: none;
+    }
+
+    .info-label {
+        font-weight: 500;
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    .info-value {
+        font-weight: 500;
+        color: var(--text-color);
+        text-align: right;
+    }
+
+    .argumentos-box {
+        background: var(--bg-secondary);
+        padding: 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--text-color);
+        white-space: pre-wrap;
+    }
+
+    .razon-box {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border: 1px solid #fca5a5;
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+    }
+
+    .razon-box strong {
+        color: #991b1b;
+        font-size: 12px;
+        text-transform: uppercase;
+        display: block;
+        margin-bottom: 8px;
+    }
+
+    .razon-box p {
+        color: #7f1d1d;
+        margin: 0;
+    }
+
+    .resolucion-card {
+        border: 2px solid;
+    }
+
+    .resolucion-card.aprobada {
+        border-color: #10b981;
+    }
+
+    .resolucion-card.rechazada {
+        border-color: #ef4444;
+    }
+
+    .resolucion-card .detalle-card-header {
+        background: #ecfdf5;
+    }
+
+    .resolucion-card.rechazada .detalle-card-header {
+        background: #fef2f2;
+    }
+
+    .timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 10px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--border-color);
+    }
+
+    .timeline-item {
+        position: relative;
+        padding-bottom: 20px;
+    }
+
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -24px;
+        top: 4px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        border: 2px solid white;
+    }
+
+    .timeline-item.pending::before {
+        background: #f59e0b;
+    }
+
+    .timeline-item.success::before {
+        background: #10b981;
+    }
+
+    .timeline-item.error::before {
+        background: #ef4444;
+    }
+
+    .timeline-date {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+    }
+
+    .timeline-text {
+        font-size: 14px;
+        color: var(--text-color);
+    }
+
+    .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        background: var(--bg-secondary);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 14px;
+        transition: all 0.2s;
+        margin-top: 24px;
+    }
+
+    .back-btn:hover {
+        background: var(--border-color);
+        color: var(--text-color);
+    }
+
+    .contenido-preview-mini {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .contenido-preview-mini img {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 8px;
+    }
+</style>
+
+<div class="detalle-container">
+    <div class="detalle-header">
+        <div class="detalle-header-left">
+            <h1><i class="fas fa-gavel me-2"></i>Detalle de Apelacion</h1>
+            <span class="detalle-ref">@Model.NumeroReferencia</span>
+        </div>
+        <span class="estado-badge estado-@Model.Estado.ToString().ToLower()">
+            @switch (Model.Estado)
+            {
+                case Lado.Models.EstadoApelacion.Pendiente:
+                    <i class="fas fa-clock me-1"></i>@:Pendiente
+                    break;
+                case Lado.Models.EstadoApelacion.EnRevision:
+                    <i class="fas fa-search me-1"></i>@:En Revision
+                    break;
+                case Lado.Models.EstadoApelacion.Aprobada:
+                    <i class="fas fa-check me-1"></i>@:Aprobada
+                    break;
+                case Lado.Models.EstadoApelacion.Rechazada:
+                    <i class="fas fa-times me-1"></i>@:Rechazada
+                    break;
+                case Lado.Models.EstadoApelacion.Escalada:
+                    <i class="fas fa-arrow-up me-1"></i>@:Escalada
+                    break;
+            }
+        </span>
+    </div>
+
+    <!-- Informacion General -->
+    <div class="detalle-card">
+        <div class="detalle-card-header">
+            <i class="fas fa-info-circle"></i>
+            Informacion General
+        </div>
+        <div class="detalle-card-body">
+            <div class="info-row">
+                <span class="info-label">Tipo de Contenido</span>
+                <span class="info-value">
+                    @if (Model.TipoContenido == "Publicacion")
+                    {
+                        <i class="fas fa-image me-1"></i>
+                    }
+                    else if (Model.TipoContenido == "Story")
+                    {
+                        <i class="fas fa-circle me-1"></i>
+                    }
+                    @Model.TipoContenido
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Fecha de Envio</span>
+                <span class="info-value">@Model.FechaCreacion.ToString("dd MMM yyyy, HH:mm")</span>
+            </div>
+            @if (Model.FechaResolucion.HasValue)
+            {
+                <div class="info-row">
+                    <span class="info-label">Fecha de Resolucion</span>
+                    <span class="info-value">@Model.FechaResolucion.Value.ToString("dd MMM yyyy, HH:mm")</span>
+                </div>
+            }
+            @if (Model.Contenido != null)
+            {
+                <div class="info-row">
+                    <span class="info-label">Contenido Asociado</span>
+                    <span class="info-value">
+                        <div class="contenido-preview-mini">
+                            @if (Model.Contenido.Archivos != null && Model.Contenido.Archivos.Any())
+                            {
+                                <img src="@Model.Contenido.Archivos.First().RutaArchivo" alt="Preview">
+                            }
+                            <span>Publicacion #@Model.Contenido.Id</span>
+                        </div>
+                    </span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Razon del Rechazo -->
+    <div class="detalle-card">
+        <div class="detalle-card-header">
+            <i class="fas fa-ban" style="color: #ef4444;"></i>
+            Razon del Rechazo
+        </div>
+        <div class="detalle-card-body">
+            <div class="razon-box">
+                <strong>Motivo Indicado</strong>
+                <p>@Model.RazonRechazo</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tus Argumentos -->
+    <div class="detalle-card">
+        <div class="detalle-card-header">
+            <i class="fas fa-comment-alt"></i>
+            Tus Argumentos
+        </div>
+        <div class="detalle-card-body">
+            <div class="argumentos-box">@Model.Argumentos</div>
+            @if (!string.IsNullOrEmpty(Model.EvidenciaAdicional))
+            {
+                <div style="margin-top: 16px;">
+                    <strong style="display: block; margin-bottom: 8px; font-size: 13px; color: var(--text-muted);">Evidencia Adicional:</strong>
+                    <div class="argumentos-box">@Model.EvidenciaAdicional</div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Resolucion (si existe) -->
+    @if (Model.Estado == Lado.Models.EstadoApelacion.Aprobada || Model.Estado == Lado.Models.EstadoApelacion.Rechazada)
+    {
+        <div class="detalle-card resolucion-card @(Model.Estado == Lado.Models.EstadoApelacion.Aprobada ? "aprobada" : "rechazada")">
+            <div class="detalle-card-header">
+                @if (Model.Estado == Lado.Models.EstadoApelacion.Aprobada)
+                {
+                    <i class="fas fa-check-circle" style="color: #10b981;"></i>
+                    <span>Apelacion Aprobada</span>
+                }
+                else
+                {
+                    <i class="fas fa-times-circle" style="color: #ef4444;"></i>
+                    <span>Apelacion Rechazada</span>
+                }
+            </div>
+            <div class="detalle-card-body">
+                @if (!string.IsNullOrEmpty(Model.ResolucionComentario))
+                {
+                    <div class="argumentos-box">@Model.ResolucionComentario</div>
+                }
+                else
+                {
+                    <p style="color: var(--text-muted); font-style: italic;">Sin comentarios adicionales del revisor.</p>
+                }
+
+                @if (Model.ContenidoRestaurado && Model.Estado == Lado.Models.EstadoApelacion.Aprobada)
+                {
+                    <div style="margin-top: 16px; padding: 12px; background: #ecfdf5; border-radius: 8px; border: 1px solid #10b981;">
+                        <i class="fas fa-check-circle me-2" style="color: #10b981;"></i>
+                        <strong style="color: #065f46;">Tu contenido ha sido restaurado</strong>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- Historial -->
+    <div class="detalle-card">
+        <div class="detalle-card-header">
+            <i class="fas fa-history"></i>
+            Historial
+        </div>
+        <div class="detalle-card-body">
+            <div class="timeline">
+                <div class="timeline-item @(Model.Estado == Lado.Models.EstadoApelacion.Aprobada ? "success" : Model.Estado == Lado.Models.EstadoApelacion.Rechazada ? "error" : "pending")">
+                    <div class="timeline-date">@Model.FechaCreacion.ToString("dd MMM yyyy, HH:mm")</div>
+                    <div class="timeline-text">Apelacion enviada</div>
+                </div>
+
+                @if (Model.Estado != Lado.Models.EstadoApelacion.Pendiente)
+                {
+                    <div class="timeline-item @(Model.Estado == Lado.Models.EstadoApelacion.Aprobada ? "success" : Model.Estado == Lado.Models.EstadoApelacion.Rechazada ? "error" : "")">
+                        <div class="timeline-date">En proceso</div>
+                        <div class="timeline-text">
+                            @switch (Model.Estado)
+                            {
+                                case Lado.Models.EstadoApelacion.EnRevision:
+                                    @:En revision por el equipo de moderacion
+                                    break;
+                                case Lado.Models.EstadoApelacion.Aprobada:
+                                    @:Aprobada - @(Model.FechaResolucion?.ToString("dd MMM yyyy") ?? "")
+                                    break;
+                                case Lado.Models.EstadoApelacion.Rechazada:
+                                    @:Rechazada - @(Model.FechaResolucion?.ToString("dd MMM yyyy") ?? "")
+                                    break;
+                                case Lado.Models.EstadoApelacion.Escalada:
+                                    @:Escalada a revision superior
+                                    break;
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <a href="@Url.Action("Index", "Apelaciones")" class="back-btn">
+        <i class="fas fa-arrow-left"></i>
+        Volver a mis apelaciones
+    </a>
+</div>

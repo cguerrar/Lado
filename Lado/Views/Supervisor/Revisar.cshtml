@@ -1,0 +1,771 @@
+@using Lado.Models.Moderacion
+@model ColaModeracion
+@{
+    ViewData["Title"] = "Revisar Contenido";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    var permisos = ViewBag.Permisos as List<string>;
+    var puedeAprobar = (bool)ViewBag.PuedeAprobar;
+    var puedeRechazar = (bool)ViewBag.PuedeRechazar;
+    var puedeCensurar = (bool)ViewBag.PuedeCensurar;
+    var puedeEscalar = (bool)ViewBag.PuedeEscalar;
+    var razonesRechazo = ViewBag.RazonesRechazo as Array;
+}
+
+<style>
+    .revisar-container {
+        display: grid;
+        grid-template-columns: 1fr 400px;
+        height: calc(100vh - 80px);
+        overflow: hidden;
+    }
+
+    @@media (max-width: 1024px) {
+        .revisar-container {
+            grid-template-columns: 1fr;
+            height: auto;
+        }
+    }
+
+    .media-panel {
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .media-panel img,
+    .media-panel video {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+
+    .media-gallery {
+        display: flex;
+        gap: 8px;
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.7);
+        padding: 8px;
+        border-radius: 12px;
+    }
+
+    .gallery-thumb {
+        width: 60px;
+        height: 60px;
+        border-radius: 8px;
+        object-fit: cover;
+        cursor: pointer;
+        opacity: 0.6;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+    }
+
+    .gallery-thumb:hover,
+    .gallery-thumb.active {
+        opacity: 1;
+        border-color: var(--primary);
+    }
+
+    .media-nav {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 50px;
+        height: 50px;
+        background: rgba(0,0,0,0.5);
+        border: none;
+        color: white;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 20px;
+        transition: all 0.2s;
+    }
+
+    .media-nav:hover {
+        background: rgba(0,0,0,0.8);
+    }
+
+    .media-nav.prev { left: 20px; }
+    .media-nav.next { right: 20px; }
+
+    .actions-panel {
+        background: var(--surface);
+        border-left: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    .panel-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .panel-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--fg);
+    }
+
+    .timer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: var(--bg-secondary);
+        border-radius: 20px;
+        font-family: monospace;
+        font-size: 16px;
+        color: var(--fg);
+    }
+
+    .content-info {
+        padding: 20px;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--line-light);
+    }
+
+    .info-row:last-child {
+        border-bottom: none;
+    }
+
+    .info-label {
+        color: var(--muted);
+        font-size: 13px;
+    }
+
+    .info-value {
+        font-weight: 500;
+        color: var(--fg);
+    }
+
+    .prioridad-tag {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .prioridad-tag.urgente { background: #fef2f2; color: #dc2626; }
+    .prioridad-tag.alta { background: #fef3c7; color: #d97706; }
+    .prioridad-tag.normal { background: #dbeafe; color: #2563eb; }
+    .prioridad-tag.baja { background: #d1fae5; color: #059669; }
+
+    .ia-info {
+        padding: 16px;
+        margin: 16px 0;
+        background: #ede9fe;
+        border-radius: 12px;
+        border-left: 4px solid #7c3aed;
+    }
+
+    .ia-info-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        color: #7c3aed;
+        margin-bottom: 8px;
+    }
+
+    .ia-info p {
+        font-size: 13px;
+        color: #5b21b6;
+        margin: 0;
+    }
+
+    .actions-section {
+        padding: 20px;
+        flex: 1;
+    }
+
+    .action-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .action-btn {
+        padding: 16px 24px;
+        border: none;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+        transform: translateY(-2px);
+    }
+
+    .action-btn.aprobar {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+    }
+
+    .action-btn.rechazar {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+    }
+
+    .action-btn.censurar {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+    }
+
+    .action-btn.escalar {
+        background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+        color: white;
+    }
+
+    .action-btn.liberar {
+        background: var(--bg-secondary);
+        color: var(--fg);
+        border: 1px solid var(--line);
+    }
+
+    .action-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s;
+    }
+
+    .modal-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .modal-content {
+        background: var(--surface);
+        border-radius: 16px;
+        width: 90%;
+        max-width: 500px;
+        max-height: 80vh;
+        overflow-y: auto;
+        transform: scale(0.9);
+        transition: all 0.3s;
+    }
+
+    .modal-overlay.active .modal-content {
+        transform: scale(1);
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title {
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--muted);
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 8px;
+        color: var(--fg);
+    }
+
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 14px;
+        background: var(--bg);
+        color: var(--fg);
+    }
+
+    .form-group textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    .razones-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
+    .razon-option {
+        padding: 12px;
+        border: 2px solid var(--line);
+        border-radius: 8px;
+        cursor: pointer;
+        text-align: center;
+        font-size: 13px;
+        transition: all 0.2s;
+    }
+
+    .razon-option:hover {
+        border-color: var(--primary);
+    }
+
+    .razon-option.selected {
+        border-color: #ef4444;
+        background: #fef2f2;
+        color: #dc2626;
+    }
+
+    .keyboard-hints {
+        padding: 16px;
+        background: var(--bg-secondary);
+        border-top: 1px solid var(--line);
+        display: flex;
+        justify-content: center;
+        gap: 24px;
+        flex-wrap: wrap;
+    }
+
+    .keyboard-hint {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .keyboard-key {
+        padding: 4px 10px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        font-family: monospace;
+        font-weight: 600;
+    }
+</style>
+
+<div class="revisar-container">
+    <!-- Panel de media -->
+    <div class="media-panel">
+        @if (Model.Contenido?.Archivos?.Count > 0)
+        {
+            var archivos = Model.Contenido.Archivos.ToList();
+            var primerArchivo = archivos.First();
+            var esVideo = primerArchivo.TipoArchivo == Lado.Models.TipoArchivo.Video;
+
+            if (esVideo)
+            {
+                <video id="mediaViewer" src="@primerArchivo.RutaArchivo" controls autoplay muted loop></video>
+            }
+            else
+            {
+                <img id="mediaViewer" src="@primerArchivo.RutaArchivo" alt="Contenido">
+            }
+
+            if (archivos.Count > 1)
+            {
+                <button class="media-nav prev" onclick="cambiarMedia(-1)"><i class="fas fa-chevron-left"></i></button>
+                <button class="media-nav next" onclick="cambiarMedia(1)"><i class="fas fa-chevron-right"></i></button>
+
+                <div class="media-gallery">
+                    @for (int i = 0; i < archivos.Count; i++)
+                    {
+                        var archivo = archivos[i];
+                        var thumb = archivo.Thumbnail ?? archivo.RutaArchivo;
+                        <img src="@thumb" class="gallery-thumb @(i == 0 ? "active" : "")" onclick="irAMedia(@i)" data-index="@i" data-src="@archivo.RutaArchivo" data-type="@(archivo.TipoArchivo == Lado.Models.TipoArchivo.Video ? "video" : "image")">
+                    }
+                </div>
+            }
+        }
+        else
+        {
+            <div style="color: white; text-align: center;">
+                <i class="fas fa-image" style="font-size: 64px; opacity: 0.5;"></i>
+                <p>Sin archivos</p>
+            </div>
+        }
+    </div>
+
+    <!-- Panel de acciones -->
+    <div class="actions-panel">
+        <div class="panel-header">
+            <span class="panel-title">Revisar #@Model.ContenidoId</span>
+            <div class="timer" id="timer">
+                <i class="fas fa-stopwatch"></i>
+                <span id="timerValue">00:00</span>
+            </div>
+        </div>
+
+        <div class="content-info">
+            <div class="info-row">
+                <span class="info-label">Creador</span>
+                <span class="info-value">@(Model.Contenido?.Usuario?.Seudonimo ?? Model.Contenido?.Usuario?.UserName ?? "Anonimo")</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Fecha subida</span>
+                <span class="info-value">@Model.Contenido?.FechaPublicacion.ToString("dd/MM/yyyy HH:mm")</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Prioridad</span>
+                <span class="prioridad-tag @Model.Prioridad.ToString().ToLower()">@Model.Prioridad</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Archivos</span>
+                <span class="info-value">@(Model.Contenido?.Archivos?.Count ?? 0)</span>
+            </div>
+            @if (Model.EsDeReporte)
+            {
+                <div class="info-row">
+                    <span class="info-label">Origen</span>
+                    <span class="info-value" style="color: #dc2626;"><i class="fas fa-flag"></i> Reportado</span>
+                </div>
+            }
+        </div>
+
+        @if (Model.ClasificadoPorIA)
+        {
+            <div style="padding: 0 20px;">
+                <div class="ia-info">
+                    <div class="ia-info-header">
+                        <i class="fas fa-robot"></i>
+                        Clasificacion IA
+                    </div>
+                    <p>Confianza: @(Model.ConfianzaIA?.ToString("P0") ?? "N/A")</p>
+                    @if (!string.IsNullOrEmpty(Model.CategoriasIA))
+                    {
+                        <p>Categorias: @Model.CategoriasIA</p>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="actions-section">
+            <div class="action-buttons">
+                @if (puedeAprobar)
+                {
+                    <button class="action-btn aprobar" onclick="aprobar()">
+                        <i class="fas fa-check"></i> Aprobar
+                    </button>
+                }
+
+                @if (puedeRechazar)
+                {
+                    <button class="action-btn rechazar" onclick="mostrarModalRechazo()">
+                        <i class="fas fa-times"></i> Rechazar
+                    </button>
+                }
+
+                @if (puedeCensurar)
+                {
+                    <button class="action-btn censurar" onclick="mostrarModalCensura()">
+                        <i class="fas fa-eye-slash"></i> Censurar
+                    </button>
+                }
+
+                @if (puedeEscalar)
+                {
+                    <button class="action-btn escalar" onclick="mostrarModalEscalar()">
+                        <i class="fas fa-arrow-up"></i> Escalar a Admin
+                    </button>
+                }
+
+                <button class="action-btn liberar" onclick="liberar()">
+                    <i class="fas fa-undo"></i> Devolver a cola
+                </button>
+            </div>
+        </div>
+
+        <div class="keyboard-hints">
+            <div class="keyboard-hint"><span class="keyboard-key">A</span> Aprobar</div>
+            <div class="keyboard-hint"><span class="keyboard-key">R</span> Rechazar</div>
+            <div class="keyboard-hint"><span class="keyboard-key">C</span> Censurar</div>
+            <div class="keyboard-hint"><span class="keyboard-key">E</span> Escalar</div>
+            <div class="keyboard-hint"><span class="keyboard-key">←→</span> Navegar</div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Rechazar -->
+<div class="modal-overlay" id="modalRechazo">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span class="modal-title"><i class="fas fa-times" style="color:#ef4444;"></i> Rechazar contenido</span>
+            <button class="modal-close" onclick="cerrarModales()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="formRechazo" asp-action="Rechazar" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="colaId" value="@Model.Id">
+                <input type="hidden" name="tiempoSegundos" id="tiempoRechazo">
+
+                <div class="form-group">
+                    <label>Razon del rechazo</label>
+                    <div class="razones-grid" id="razonesGrid">
+                        <div class="razon-option" data-value="0" onclick="seleccionarRazon(this, 0)">Contenido prohibido</div>
+                        <div class="razon-option" data-value="1" onclick="seleccionarRazon(this, 1)">Menor de edad</div>
+                        <div class="razon-option" data-value="2" onclick="seleccionarRazon(this, 2)">Violencia explicita</div>
+                        <div class="razon-option" data-value="3" onclick="seleccionarRazon(this, 3)">Spam/Publicidad</div>
+                        <div class="razon-option" data-value="4" onclick="seleccionarRazon(this, 4)">Copyright</div>
+                        <div class="razon-option" data-value="5" onclick="seleccionarRazon(this, 5)">Calidad muy baja</div>
+                        <div class="razon-option" data-value="6" onclick="seleccionarRazon(this, 6)">Info personal</div>
+                        <div class="razon-option" data-value="7" onclick="seleccionarRazon(this, 7)">Incitacion odio</div>
+                        <div class="razon-option" data-value="8" onclick="seleccionarRazon(this, 8)">Contenido ilegal</div>
+                        <div class="razon-option" data-value="9" onclick="seleccionarRazon(this, 9)">Otro</div>
+                    </div>
+                    <input type="hidden" name="razon" id="razonSeleccionada" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Detalle adicional (opcional)</label>
+                    <textarea name="detalleRazon" placeholder="Explica brevemente la razon..."></textarea>
+                </div>
+
+                <button type="submit" class="action-btn rechazar" style="width:100%;">
+                    <i class="fas fa-times"></i> Confirmar rechazo
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Censurar -->
+<div class="modal-overlay" id="modalCensura">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span class="modal-title"><i class="fas fa-eye-slash" style="color:#f59e0b;"></i> Censurar contenido</span>
+            <button class="modal-close" onclick="cerrarModales()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form asp-action="Censurar" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="colaId" value="@Model.Id">
+                <input type="hidden" name="tiempoSegundos" id="tiempoCensura">
+
+                <div class="form-group">
+                    <label>Razon de la censura</label>
+                    <textarea name="razonCensura" placeholder="Explica por que el contenido sera censurado..." required></textarea>
+                </div>
+
+                <p style="font-size:13px; color:var(--muted); margin-bottom:16px;">
+                    <i class="fas fa-info-circle"></i> El contenido seguira visible pero con una advertencia
+                </p>
+
+                <button type="submit" class="action-btn censurar" style="width:100%;">
+                    <i class="fas fa-eye-slash"></i> Confirmar censura
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Escalar -->
+<div class="modal-overlay" id="modalEscalar">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span class="modal-title"><i class="fas fa-arrow-up" style="color:#8b5cf6;"></i> Escalar a administrador</span>
+            <button class="modal-close" onclick="cerrarModales()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form asp-action="Escalar" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="colaId" value="@Model.Id">
+                <input type="hidden" name="tiempoSegundos" id="tiempoEscalar">
+
+                <div class="form-group">
+                    <label>Motivo del escalamiento</label>
+                    <textarea name="motivo" placeholder="Explica por que necesitas escalar esto a un administrador..." required></textarea>
+                </div>
+
+                <button type="submit" class="action-btn escalar" style="width:100%;">
+                    <i class="fas fa-arrow-up"></i> Escalar
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Form oculto para aprobar -->
+<form id="formAprobar" asp-action="Aprobar" method="post" style="display:none;">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="colaId" value="@Model.Id">
+    <input type="hidden" name="tiempoSegundos" id="tiempoAprobar">
+</form>
+
+<!-- Form oculto para liberar -->
+<form id="formLiberar" asp-action="Liberar" method="post" style="display:none;">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="colaId" value="@Model.Id">
+</form>
+
+@section Scripts {
+<script>
+    // Timer
+    let segundos = 0;
+    const timerInterval = setInterval(() => {
+        segundos++;
+        const mins = Math.floor(segundos / 60).toString().padStart(2, '0');
+        const secs = (segundos % 60).toString().padStart(2, '0');
+        document.getElementById('timerValue').textContent = `${mins}:${secs}`;
+    }, 1000);
+
+    // Galeria
+    let mediaIndex = 0;
+    const thumbs = document.querySelectorAll('.gallery-thumb');
+
+    function cambiarMedia(delta) {
+        mediaIndex += delta;
+        if (mediaIndex < 0) mediaIndex = thumbs.length - 1;
+        if (mediaIndex >= thumbs.length) mediaIndex = 0;
+        irAMedia(mediaIndex);
+    }
+
+    function irAMedia(index) {
+        mediaIndex = index;
+        const thumb = thumbs[index];
+        const viewer = document.getElementById('mediaViewer');
+        const src = thumb.dataset.src;
+        const type = thumb.dataset.type;
+
+        if (type === 'video') {
+            const video = document.createElement('video');
+            video.id = 'mediaViewer';
+            video.src = src;
+            video.controls = true;
+            video.autoplay = true;
+            video.muted = true;
+            video.loop = true;
+            viewer.replaceWith(video);
+        } else {
+            const img = document.createElement('img');
+            img.id = 'mediaViewer';
+            img.src = src;
+            viewer.replaceWith(img);
+        }
+
+        thumbs.forEach(t => t.classList.remove('active'));
+        thumb.classList.add('active');
+    }
+
+    // Modales
+    function mostrarModalRechazo() {
+        document.getElementById('tiempoRechazo').value = segundos;
+        document.getElementById('modalRechazo').classList.add('active');
+    }
+
+    function mostrarModalCensura() {
+        document.getElementById('tiempoCensura').value = segundos;
+        document.getElementById('modalCensura').classList.add('active');
+    }
+
+    function mostrarModalEscalar() {
+        document.getElementById('tiempoEscalar').value = segundos;
+        document.getElementById('modalEscalar').classList.add('active');
+    }
+
+    function cerrarModales() {
+        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+    }
+
+    function seleccionarRazon(el, value) {
+        document.querySelectorAll('.razon-option').forEach(o => o.classList.remove('selected'));
+        el.classList.add('selected');
+        document.getElementById('razonSeleccionada').value = value;
+    }
+
+    // Acciones
+    function aprobar() {
+        document.getElementById('tiempoAprobar').value = segundos;
+        document.getElementById('formAprobar').submit();
+    }
+
+    function liberar() {
+        if (confirm('¿Devolver este item a la cola?')) {
+            document.getElementById('formLiberar').submit();
+        }
+    }
+
+    // Atajos de teclado
+    document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+
+        switch(e.key.toLowerCase()) {
+            case 'a':
+                aprobar();
+                break;
+            case 'r':
+                mostrarModalRechazo();
+                break;
+            case 'c':
+                mostrarModalCensura();
+                break;
+            case 'e':
+                mostrarModalEscalar();
+                break;
+            case 'arrowleft':
+                cambiarMedia(-1);
+                break;
+            case 'arrowright':
+                cambiarMedia(1);
+                break;
+            case 'escape':
+                cerrarModales();
+                break;
+        }
+    });
+
+    // Cerrar modal con click afuera
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) cerrarModales();
+        });
+    });
+</script>
+}

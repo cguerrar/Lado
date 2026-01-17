@@ -100,6 +100,7 @@
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="?estado=censurado"><i class="fas fa-ban text-danger"></i> Censurados</a></li>
                                 <li><a class="dropdown-item" href="?estado=sensible"><i class="fas fa-eye-slash text-warning"></i> Sensibles</a></li>
+                                <li><a class="dropdown-item" href="?estado=shadowhide"><i class="fas fa-ghost text-secondary"></i> Shadow Hide</a></li>
                             </ul>
                         </div>
                         <a href="@Url.Action("Index", "Admin")" class="btn btn-outline-dark">
@@ -199,6 +200,10 @@
 
                                     <!-- Badges esquina inferior -->
                                     <div class="position-absolute bottom-0 start-0 p-1 d-flex gap-1">
+                                        @if (contenido.OcultoSilenciosamente)
+                                        {
+                                            <span class="badge bg-dark" style="font-size: 0.65rem;" title="Shadow Hide activo"><i class="fas fa-ghost"></i></span>
+                                        }
                                         @if (contenido.EsContenidoSensible && !contenido.Censurado)
                                         {
                                             <span class="badge bg-warning text-dark" style="font-size: 0.65rem;"><i class="fas fa-eye-slash"></i></span>
@@ -353,6 +358,37 @@
                                                             @Html.AntiForgeryToken()
                                                             <button type="submit" class="dropdown-item"><i class="fas fa-eye-slash text-warning"></i> Sensible</button>
                                                         </form>
+                                                    </li>
+                                                }
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li class="dropdown-header">Shadow Hide</li>
+                                                @if (contenido.OcultoSilenciosamente)
+                                                {
+                                                    <li>
+                                                        <form method="post" action="@Url.Action("MostrarContenidoSilencioso", new { id = contenido.Id })">
+                                                            @Html.AntiForgeryToken()
+                                                            <button type="submit" class="dropdown-item"><i class="fas fa-eye text-success"></i> Hacer visible</button>
+                                                        </form>
+                                                    </li>
+                                                }
+                                                else
+                                                {
+                                                    <li>
+                                                        <form method="post" action="@Url.Action("OcultarContenidoSilencioso", new { id = contenido.Id })">
+                                                            @Html.AntiForgeryToken()
+                                                            <button type="submit" class="dropdown-item"><i class="fas fa-ghost text-secondary"></i> Ocultar silencioso</button>
+                                                        </form>
+                                                    </li>
+                                                }
+                                                @if (esCarrusel)
+                                                {
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li class="dropdown-header">Carrusel</li>
+                                                    <li>
+                                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#archivosModal"
+                                                                data-contentid="@contenido.Id">
+                                                            <i class="fas fa-images text-info"></i> Ver archivos (@numArchivos)
+                                                        </button>
                                                     </li>
                                                 }
                                                 <li><hr class="dropdown-divider"></li>
@@ -576,7 +612,37 @@
     </div>
 </div>
 
+<!-- Modal Archivos del Carrusel -->
+<div class="modal fade" id="archivosModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="fas fa-images"></i> Archivos del Carrusel</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="archivosLoading" class="text-center py-4">
+                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                    <p class="mt-2 text-muted">Cargando archivos...</p>
+                </div>
+                <div id="archivosContainer" class="row g-3" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+    // Helper CSRF para llamadas AJAX seguras
+    function getCsrfToken() {
+        return document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+    }
+    function csrfHeaders() {
+        return { 'X-CSRF-TOKEN': getCsrfToken(), 'Content-Type': 'application/json' };
+    }
+
     function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
     async function reclasificarContenido(id) {
@@ -584,7 +650,7 @@
         const cat = document.getElementById('categoria-' + id);
         icon.className = 'fas fa-spinner fa-spin';
         try {
-            const r = await fetch('@Url.Action("ReclasificarContenido", "Admin")?id=' + id, { method: 'POST' });
+            const r = await fetch('@Url.Action("ReclasificarContenido", "Admin")?id=' + id, { method: 'POST', headers: csrfHeaders() });
             const d = await r.json();
             if (d.success) {
                 cat.innerHTML = `<div class="d-flex align-items-center gap-1">
@@ -612,6 +678,110 @@
         document.getElementById('btnTransferir').disabled = true;
         document.getElementById('resultadosUsuarios').style.display = 'none';
     });
+
+    // Modal de archivos del carrusel
+    document.getElementById('archivosModal').addEventListener('show.bs.modal', async e => {
+        const contentId = e.relatedTarget.getAttribute('data-contentid');
+        const loading = document.getElementById('archivosLoading');
+        const container = document.getElementById('archivosContainer');
+
+        loading.style.display = 'block';
+        container.style.display = 'none';
+        container.innerHTML = '';
+
+        try {
+            const response = await fetch('/Admin/ObtenerArchivosContenido/' + contentId);
+            const data = await response.json();
+
+            if (data.success && data.archivos) {
+                container.innerHTML = data.archivos.map((archivo, index) => `
+                    <div class="col-md-4 col-6">
+                        <div class="card h-100 ${archivo.ocultoSilenciosamente ? 'border-dark' : ''}">
+                            <div class="position-relative" style="height: 150px;">
+                                ${archivo.esVideo
+                                    ? `<video src="${archivo.url}" class="w-100 h-100" style="object-fit: cover;" muted></video>
+                                       <div class="position-absolute top-50 start-50 translate-middle">
+                                           <i class="fas fa-play-circle fa-2x text-white" style="text-shadow: 0 2px 6px rgba(0,0,0,0.6);"></i>
+                                       </div>`
+                                    : `<img src="${archivo.url}" class="w-100 h-100" style="object-fit: cover;" alt="">`
+                                }
+                                ${archivo.ocultoSilenciosamente
+                                    ? `<div class="position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex align-items-center justify-content-center">
+                                           <span class="badge bg-dark"><i class="fas fa-ghost"></i> OCULTO</span>
+                                       </div>`
+                                    : ''
+                                }
+                            </div>
+                            <div class="card-body p-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">#${index + 1} - ${archivo.tipo}</small>
+                                    <button type="button" class="btn btn-sm ${archivo.ocultoSilenciosamente ? 'btn-success' : 'btn-outline-dark'}"
+                                            onclick="toggleArchivoShadowHide(${archivo.id}, ${archivo.ocultoSilenciosamente}, this)">
+                                        <i class="fas fa-${archivo.ocultoSilenciosamente ? 'eye' : 'ghost'}"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<div class="col-12 text-center text-muted">No hay archivos</div>';
+            }
+        } catch (err) {
+            container.innerHTML = '<div class="col-12 text-center text-danger">Error al cargar archivos</div>';
+        }
+
+        loading.style.display = 'none';
+        container.style.display = 'flex';
+    });
+
+    async function toggleArchivoShadowHide(archivoId, estaOculto, btn) {
+        const action = estaOculto ? 'MostrarArchivoSilencioso' : 'OcultarArchivoSilencioso';
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        try {
+            const response = await fetch(`/Admin/${action}/${archivoId}`, {
+                method: 'POST',
+                headers: csrfHeaders()
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                // Actualizar el botón y la tarjeta
+                const card = btn.closest('.card');
+                const overlay = card.querySelector('.bg-dark.bg-opacity-50');
+
+                if (estaOculto) {
+                    // Mostrar
+                    card.classList.remove('border-dark');
+                    if (overlay) overlay.remove();
+                    btn.className = 'btn btn-sm btn-outline-dark';
+                    btn.innerHTML = '<i class="fas fa-ghost"></i>';
+                    btn.onclick = () => toggleArchivoShadowHide(archivoId, false, btn);
+                } else {
+                    // Ocultar
+                    card.classList.add('border-dark');
+                    const imgContainer = card.querySelector('.position-relative');
+                    imgContainer.insertAdjacentHTML('beforeend',
+                        `<div class="position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex align-items-center justify-content-center">
+                            <span class="badge bg-dark"><i class="fas fa-ghost"></i> OCULTO</span>
+                        </div>`);
+                    btn.className = 'btn btn-sm btn-success';
+                    btn.innerHTML = '<i class="fas fa-eye"></i>';
+                    btn.onclick = () => toggleArchivoShadowHide(archivoId, true, btn);
+                }
+            } else {
+                alert('Error: ' + (data.message || 'No se pudo actualizar'));
+                btn.innerHTML = '<i class="fas fa-times text-danger"></i>';
+            }
+        } catch (err) {
+            alert('Error de conexión');
+            btn.innerHTML = '<i class="fas fa-times text-danger"></i>';
+        }
+
+        btn.disabled = false;
+    }
 
     let timeout = null;
     document.getElementById('buscarUsuario').addEventListener('input', function() {
@@ -677,11 +847,11 @@
         btnI.disabled = btnP.disabled = true; prog.style.display = 'block'; res.style.display = 'none'; bar.style.width = '5%';
         btnC.textContent = 'Detener'; btnC.onclick = () => cancelado = true;
         try {
-            const l = await (await fetch('@Url.Action("ReclasificarContenidoIA", "Admin")', { method: 'POST' })).json();
+            const l = await (await fetch('@Url.Action("ReclasificarContenidoIA", "Admin")', { method: 'POST', headers: csrfHeaders() })).json();
             if (!l.success) throw new Error(l.message);
             let pend = l.pendientes, total = pend; bar.style.width = '10%';
             while (pend > 0 && !cancelado) {
-                const r = await (await fetch('@Url.Action("ReclasificarLoteIA", "Admin")', { method: 'POST' })).json();
+                const r = await (await fetch('@Url.Action("ReclasificarLoteIA", "Admin")', { method: 'POST', headers: csrfHeaders() })).json();
                 if (!r.success) throw new Error(r.message);
                 totalOk += r.clasificados || 0; totalErr += r.errores || 0; pend = r.pendientes;
                 bar.style.width = (total > 0 ? Math.round(((total - pend) / total) * 90) + 10 : 100) + '%';
@@ -705,7 +875,7 @@
             let pend = e.sinClasificar, total = pend;
             if (!pend) { stat.textContent = 'No hay pendientes'; btnC.textContent = 'Cerrar'; return; }
             while (pend > 0 && !cancelado) {
-                const r = await (await fetch('@Url.Action("ReclasificarLoteIA", "Admin")', { method: 'POST' })).json();
+                const r = await (await fetch('@Url.Action("ReclasificarLoteIA", "Admin")', { method: 'POST', headers: csrfHeaders() })).json();
                 if (!r.success) throw new Error(r.message);
                 totalOk += r.clasificados || 0; totalErr += r.errores || 0; pend = r.pendientes;
                 bar.style.width = (total > 0 ? Math.round(((total - pend) / total) * 100) : 100) + '%';

@@ -49,6 +49,7 @@ namespace Lado.Services
         {
             using var scope = _serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var suscripcionCache = scope.ServiceProvider.GetRequiredService<ISuscripcionCacheService>();
 
             var ahora = DateTime.Now;
 
@@ -96,6 +97,12 @@ namespace Lado.Services
             }
 
             await context.SaveChangesAsync(stoppingToken);
+
+            // Invalidar caché de suscripciones expiradas
+            foreach (var suscripcion in suscripcionesExpiradas)
+            {
+                suscripcionCache.InvalidarCache(suscripcion.FanId, suscripcion.CreadorId);
+            }
 
             _logger.LogInformation("Se expiraron {Count} suscripciones correctamente", suscripcionesExpiradas.Count);
         }

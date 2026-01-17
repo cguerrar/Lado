@@ -396,28 +396,33 @@ namespace Lado.Controllers.Api
             // Obtener IDs de contenidos
             var contenidoIds = contenidos.Select(c => c.Id).ToList();
 
-            // Obtener likes del usuario
-            var misLikes = await _context.Likes
+            // OPTIMIZACIÓN: Ejecutar las 4 queries en paralelo en lugar de secuencial
+            var likesTask = _context.Likes
                 .Where(l => l.UsuarioId == userId && contenidoIds.Contains(l.ContenidoId))
                 .Select(l => l.ContenidoId)
                 .ToListAsync();
 
-            // Obtener favoritos del usuario
-            var misFavoritos = await _context.Favoritos
+            var favoritosTask = _context.Favoritos
                 .Where(f => f.UsuarioId == userId && contenidoIds.Contains(f.ContenidoId))
                 .Select(f => f.ContenidoId)
                 .ToListAsync();
 
-            // Obtener reacciones del usuario
-            var misReacciones = await _context.Reacciones
+            var reaccionesTask = _context.Reacciones
                 .Where(r => r.UsuarioId == userId && contenidoIds.Contains(r.ContenidoId))
                 .ToDictionaryAsync(r => r.ContenidoId, r => r.TipoReaccion.ToString());
 
-            // Obtener compras del usuario
-            var misCompras = await _context.ComprasContenido
+            var comprasTask = _context.ComprasContenido
                 .Where(c => c.UsuarioId == userId && contenidoIds.Contains(c.ContenidoId))
                 .Select(c => c.ContenidoId)
                 .ToListAsync();
+
+            // Esperar todas las queries en paralelo
+            await Task.WhenAll(likesTask, favoritosTask, reaccionesTask, comprasTask);
+
+            var misLikes = likesTask.Result;
+            var misFavoritos = favoritosTask.Result;
+            var misReacciones = reaccionesTask.Result;
+            var misCompras = comprasTask.Result;
 
             return contenidos.Select(c =>
             {

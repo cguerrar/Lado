@@ -697,7 +697,8 @@
                                  alt=""
                                  class="loaded"
                                  loading="eager"
-                                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E'">
+                                 onload="this.parentElement.classList.add('media-loaded');"
+                                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E'; this.parentElement.classList.add('media-loaded');">
                             <div class="video-badge">
                                 <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                             </div>
@@ -729,7 +730,7 @@
                                  alt=""
                                  loading="lazy"
                                  decoding="async"
-                                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E'; this.classList.add('loaded');">
+                                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E'; this.classList.add('loaded'); this.parentElement.classList.add('media-loaded');">
                         }
                         else
                         {
@@ -737,7 +738,8 @@
                                  alt=""
                                  class="loaded"
                                  loading="eager"
-                                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E'">
+                                 onload="this.parentElement.classList.add('media-loaded');"
+                                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E'; this.parentElement.classList.add('media-loaded');">
                         }
                     }
                 </div>
@@ -842,111 +844,228 @@
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
             // ========================================
-            // SISTEMA DE CARGA OPTIMIZADO CON INTERSECTION OBSERVER
+            // SISTEMA DE CARGA ASÍNCRONA CON CONTROL DE CONCURRENCIA
             // ========================================
 
             // Imagen de fallback en caso de error (fondo oscuro simple)
             const fallbackSrc = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%231a1a2e' width='100' height='100'/%3E%3C/svg%3E";
 
-            // Tracking de items cargados
+            // Tracking de items cargados y URLs fallidas
             const loadedItems = new Set();
-            let observerActive = true;
+            const failedUrls = new Set();
+            const pendingLoads = new Map(); // Para cancelar requests en curso
 
-            // Función para cargar una imagen
-            function loadMedia(item) {
+            // Control de concurrencia - máximo 4 cargas simultáneas
+            const MAX_CONCURRENT_LOADS = 4;
+            let activeLoads = 0;
+            const loadQueue = [];
+
+            // Timeout ultra-corto para evitar bloqueos (1.5s para imágenes, 3s para videos)
+            const IMG_TIMEOUT = 1500;
+            const VIDEO_TIMEOUT = 3000;
+
+            // Función para procesar la cola de carga
+            function processLoadQueue() {
+                while (activeLoads < MAX_CONCURRENT_LOADS && loadQueue.length > 0) {
+                    const task = loadQueue.shift();
+                    if (task && !loadedItems.has(task.item)) {
+                        executeLoad(task);
+                    }
+                }
+            }
+
+            // Función para encolar una carga
+            function queueLoad(item, priority = false) {
                 if (loadedItems.has(item)) return;
+
+                const task = { item };
+                if (priority) {
+                    loadQueue.unshift(task);
+                } else {
+                    loadQueue.push(task);
+                }
+                processLoadQueue();
+            }
+
+            // Ejecutar la carga de un item
+            function executeLoad(task) {
+                const { item } = task;
+                if (loadedItems.has(item)) {
+                    processLoadQueue();
+                    return;
+                }
+
+                loadedItems.add(item);
+                activeLoads++;
 
                 const img = item.querySelector('img');
                 const video = item.querySelector('video');
 
+                // Marcar como cargado visualmente (eliminar shimmer)
+                item.classList.add('media-loaded');
+
                 if (img && img.hasAttribute('data-src')) {
-                    const src = img.getAttribute('data-src');
-
-                    // Marcar como en proceso
-                    loadedItems.add(item);
-
-                    // Cargar imagen
-                    img.onload = function() {
-                        img.classList.add('loaded');
-                        item.classList.add('media-loaded');
-                        img.removeAttribute('data-src');
-                    };
-
-                    img.onerror = function() {
-                        // Usar fallback en lugar de ocultar
-                        img.src = fallbackSrc;
-                        img.classList.add('loaded');
-                        item.classList.add('media-loaded');
-                        img.removeAttribute('data-src');
-                    };
-
-                    img.src = src;
-                }
-
-                // Videos con data-video-src (carga lazy de videos)
-                if (video && video.hasAttribute('data-video-src')) {
-                    const src = video.getAttribute('data-video-src');
-                    loadedItems.add(item);
-
-                    // Reemplazar con imagen placeholder inmediatamente
-                    const showPlaceholder = () => {
-                        const placeholder = document.createElement('div');
-                        placeholder.className = 'video-error-placeholder';
-                        placeholder.innerHTML = '<svg viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)"><path d="M8 5v14l11-7z"/></svg>';
-                        video.replaceWith(placeholder);
-                        item.classList.add('media-loaded');
-                    };
-
-                    // Timeout de 15 segundos para videos que no cargan (videos grandes pueden tardar)
-                    const timeout = setTimeout(() => {
-                        if (!video.classList.contains('loaded')) {
-                            console.warn('Video timeout:', src);
-                            showPlaceholder();
-                        }
-                    }, 15000);
-
-                    video.onloadeddata = function() {
-                        clearTimeout(timeout);
-                        video.classList.remove('video-placeholder');
-                        video.classList.add('loaded');
-                        item.classList.add('media-loaded');
-                        // Reproducir automáticamente (silenciado)
-                        video.muted = true;
-                        video.loop = true;
-                        video.play().catch(() => {});
-                    };
-
-                    video.onerror = function(e) {
-                        clearTimeout(timeout);
-                        console.error('Video error:', src, video.error);
-                        if (window.ladoLog) {
-                            window.ladoLog.error('FeedPublico video error', {
-                                src: src.substring(0, 150),
-                                errorCode: video.error?.code,
-                                errorMessage: video.error?.message
-                            });
-                        }
-                        showPlaceholder();
-                    };
-
-                    video.src = src;
-                    video.removeAttribute('data-video-src');
+                    loadImageAsync(img, item);
+                } else if (img && !img.hasAttribute('data-src')) {
+                    img.classList.add('loaded');
+                    activeLoads--;
+                    processLoadQueue();
+                } else if (video && video.hasAttribute('data-video-src')) {
+                    loadVideoAsync(video, item);
+                } else {
+                    activeLoads--;
+                    processLoadQueue();
                 }
             }
 
-            // Crear Intersection Observer con margen más amplio
+            // Cargar imagen de forma asíncrona con AbortController
+            function loadImageAsync(img, item) {
+                const src = img.getAttribute('data-src');
+                img.removeAttribute('data-src');
+
+                // Si la URL ya falló antes, usar fallback inmediatamente
+                if (failedUrls.has(src)) {
+                    img.src = fallbackSrc;
+                    img.classList.add('loaded');
+                    activeLoads--;
+                    processLoadQueue();
+                    return;
+                }
+
+                // Crear controlador de aborto para cancelar si tarda demasiado
+                const controller = new AbortController();
+                const loadId = Date.now() + Math.random();
+                pendingLoads.set(loadId, controller);
+
+                // Timeout agresivo
+                const timeoutId = setTimeout(() => {
+                    controller.abort();
+                    failedUrls.add(src);
+                    if (!img.classList.contains('loaded')) {
+                        img.src = fallbackSrc;
+                        img.classList.add('loaded');
+                    }
+                    pendingLoads.delete(loadId);
+                    activeLoads--;
+                    processLoadQueue();
+                }, IMG_TIMEOUT);
+
+                // Usar fetch con HEAD para verificar rápidamente si existe
+                fetch(src, {
+                    method: 'HEAD',
+                    signal: controller.signal,
+                    cache: 'force-cache'
+                })
+                .then(response => {
+                    clearTimeout(timeoutId);
+                    pendingLoads.delete(loadId);
+
+                    if (response.ok) {
+                        // El archivo existe, cargar la imagen
+                        img.onload = () => {
+                            img.classList.add('loaded');
+                        };
+                        img.onerror = () => {
+                            failedUrls.add(src);
+                            img.src = fallbackSrc;
+                            img.classList.add('loaded');
+                        };
+                        img.src = src;
+                    } else {
+                        // 404 u otro error - usar fallback
+                        failedUrls.add(src);
+                        img.src = fallbackSrc;
+                        img.classList.add('loaded');
+                    }
+                    activeLoads--;
+                    processLoadQueue();
+                })
+                .catch(err => {
+                    clearTimeout(timeoutId);
+                    pendingLoads.delete(loadId);
+
+                    // Error de red o abortado - usar fallback
+                    if (!img.classList.contains('loaded')) {
+                        failedUrls.add(src);
+                        img.src = fallbackSrc;
+                        img.classList.add('loaded');
+                    }
+                    activeLoads--;
+                    processLoadQueue();
+                });
+            }
+
+            // Cargar video de forma asíncrona
+            function loadVideoAsync(video, item) {
+                const src = video.getAttribute('data-video-src');
+                video.removeAttribute('data-video-src');
+
+                // Si la URL ya falló, mostrar placeholder
+                if (failedUrls.has(src)) {
+                    showVideoPlaceholder(video);
+                    activeLoads--;
+                    processLoadQueue();
+                    return;
+                }
+
+                const showVideoPlaceholder = (v) => {
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'video-error-placeholder loaded';
+                    placeholder.innerHTML = '<svg viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)"><path d="M8 5v14l11-7z"/></svg>';
+                    v.replaceWith(placeholder);
+                };
+
+                // Timeout para video
+                const timeoutId = setTimeout(() => {
+                    if (!video.classList.contains('loaded')) {
+                        failedUrls.add(src);
+                        showVideoPlaceholder(video);
+                    }
+                    activeLoads--;
+                    processLoadQueue();
+                }, VIDEO_TIMEOUT);
+
+                video.onloadeddata = function() {
+                    clearTimeout(timeoutId);
+                    video.classList.remove('video-placeholder');
+                    video.classList.add('loaded');
+                    video.muted = true;
+                    video.loop = true;
+                    video.play().catch(() => {});
+                    activeLoads--;
+                    processLoadQueue();
+                };
+
+                video.onerror = function() {
+                    clearTimeout(timeoutId);
+                    failedUrls.add(src);
+                    showVideoPlaceholder(video);
+                    activeLoads--;
+                    processLoadQueue();
+                };
+
+                video.src = src;
+            }
+
+            // Fallback para mostrar placeholder de video
+            function showVideoPlaceholder(video) {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'video-error-placeholder loaded';
+                placeholder.innerHTML = '<svg viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)"><path d="M8 5v14l11-7z"/></svg>';
+                video.replaceWith(placeholder);
+            }
+
+            // Crear Intersection Observer para carga lazy
             const observerOptions = {
                 root: null,
-                rootMargin: '500px', // Pre-cargar 500px antes de entrar en viewport
+                rootMargin: '300px',
                 threshold: 0
             };
 
             const imageObserver = new IntersectionObserver((entries) => {
-                if (!observerActive) return;
-
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
-                        loadMedia(entry.target);
+                        queueLoad(entry.target, true); // Prioridad alta para items visibles
                         imageObserver.unobserve(entry.target);
                     }
                 });
@@ -957,17 +1076,11 @@
                 imageObserver.observe(item);
             });
 
-            // Cola de carga progresiva - una imagen a la vez
-            let loadQueue = [];
-            let isProcessingQueue = false;
-            const LOAD_DELAY = 30; // ms entre cada imagen (rápido pero visible)
-
             // Ordenar y encolar items desde el centro hacia afuera
             function buildLoadQueue() {
                 const centerX = window.innerWidth / 2;
                 const centerY = window.innerHeight / 2;
 
-                // Ordenar por distancia al centro
                 const sortedItems = Array.from(items)
                     .map(item => {
                         const rect = item.getBoundingClientRect();
@@ -982,71 +1095,42 @@
                     .filter(i => i.visible && !loadedItems.has(i.item))
                     .sort((a, b) => a.distance - b.distance);
 
-                // Agregar a la cola
-                loadQueue = sortedItems.map(s => s.item);
+                // Encolar en orden de distancia
+                sortedItems.forEach(s => queueLoad(s.item));
             }
 
-            // Procesar cola uno por uno (efecto visual progresivo)
-            function processQueue() {
-                if (isProcessingQueue || loadQueue.length === 0) return;
-                isProcessingQueue = true;
-
-                function loadNext() {
-                    if (loadQueue.length === 0) {
-                        isProcessingQueue = false;
-                        return;
-                    }
-
-                    const item = loadQueue.shift();
-                    if (item && !loadedItems.has(item)) {
-                        loadMedia(item);
-                    }
-
-                    // Siguiente imagen con delay visible
-                    requestAnimationFrame(() => {
-                        setTimeout(loadNext, LOAD_DELAY);
-                    });
-                }
-
-                loadNext();
-            }
-
-            // Cargar items visibles inmediatamente (los del centro)
-            function loadVisibleItems() {
-                buildLoadQueue();
-                processQueue();
-            }
-
-            // Agregar items restantes a la cola
-            function queueRemainingItems() {
+            // Fallback: revelar todos los items visualmente
+            function forceRevealAll() {
                 items.forEach(item => {
-                    if (!loadedItems.has(item) && !loadQueue.includes(item)) {
-                        loadQueue.push(item);
+                    item.classList.add('media-loaded');
+                    const img = item.querySelector('img');
+                    const video = item.querySelector('video');
+                    if (img) {
+                        img.classList.add('loaded');
+                        if (!img.src || img.src.includes("viewBox='0 0 1 1'")) {
+                            img.src = fallbackSrc;
+                        }
                     }
-                });
-                processQueue();
-            }
-
-            // Forzar carga de TODOS los items (fallback)
-            function forceLoadAll() {
-                items.forEach(item => {
-                    if (!loadedItems.has(item)) {
-                        loadMedia(item);
-                    }
+                    if (video) video.classList.add('loaded');
                 });
             }
 
             // Iniciar carga progresiva
             function initLoading() {
+                // Revelar todos los items visualmente (sin shimmer)
+                forceRevealAll();
+
                 requestAnimationFrame(() => {
-                    // Cargar desde el centro hacia afuera, uno por uno
-                    loadVisibleItems();
+                    // Construir cola ordenada desde el centro
+                    buildLoadQueue();
 
-                    // Agregar resto a la cola después de 800ms
-                    setTimeout(queueRemainingItems, 800);
-
-                    // Fallback: forzar carga de todo después de 6 segundos
-                    setTimeout(forceLoadAll, 6000);
+                    // Fallback total después de 8 segundos
+                    setTimeout(() => {
+                        // Cancelar todas las cargas pendientes
+                        pendingLoads.forEach(controller => controller.abort());
+                        pendingLoads.clear();
+                        forceRevealAll();
+                    }, 8000);
                 });
             }
 
@@ -1098,7 +1182,7 @@
 
                     // Cargar items que ahora son visibles pero no estaban cargados
                     if (shouldShow && !loadedItems.has(item)) {
-                        loadMedia(item);
+                        queueLoad(item);
                     }
                 });
             }

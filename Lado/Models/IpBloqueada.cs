@@ -22,6 +22,9 @@ namespace Lado.Models
         SpamMensajes = 3,       // Muchos mensajes
         SpamRegistro = 4,       // Múltiples registros
         Scraping = 5,           // Acceso excesivo a páginas
+        WebhookAbuse = 6,       // Abuso de webhooks (PayPal, etc.)
+        Fraude = 7,             // Intentos de fraude financiero
+        SpamReportes = 8,       // Muchos reportes abusivos
         Otro = 99
     }
 

@@ -2,82 +2,702 @@
 @{
     ViewData["Title"] = "Publicidad de Lado";
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    var paises = Lado.Models.RetencionesPredeterminadas.Paises;
 }
 
-<div class="container-fluid px-0">
-    <!-- Header con estadísticas -->
-    <div class="row g-4 mb-4">
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="stat-card">
-                <div class="stat-icon bg-primary">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="3" y1="9" x2="21" y2="9"></line>
-                        <line x1="9" y1="21" x2="9" y2="9"></line>
-                    </svg>
-                </div>
-                <div class="stat-content">
-                    <p class="stat-label">Anuncios Lado</p>
-                    <h3 class="stat-value">@ViewBag.TotalAnuncios</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="stat-card">
-                <div class="stat-icon bg-success">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                    </svg>
-                </div>
-                <div class="stat-content">
-                    <p class="stat-label">Activos</p>
-                    <h3 class="stat-value">@ViewBag.AnunciosActivos</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="stat-card">
-                <div class="stat-icon bg-info">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="16" x2="12" y2="12"></line>
-                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                    </svg>
-                </div>
-                <div class="stat-content">
-                    <p class="stat-label">Impresiones</p>
-                    <h3 class="stat-value">@ViewBag.TotalImpresiones.ToString("N0")</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="stat-card">
-                <div class="stat-icon bg-warning">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                        <path d="M15 3h6v6"></path>
-                        <path d="M10 14L21 3"></path>
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                    </svg>
-                </div>
-                <div class="stat-content">
-                    <p class="stat-label">Clics</p>
-                    <h3 class="stat-value">@ViewBag.TotalClics.ToString("N0")</h3>
-                </div>
-            </div>
-        </div>
-    </div>
+<style>
+    :root {
+        --primary: #6366f1;
+        --primary-hover: #4f46e5;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --gray-50: #f9fafb;
+        --gray-100: #f3f4f6;
+        --gray-200: #e5e7eb;
+        --gray-300: #d1d5db;
+        --gray-500: #6b7280;
+        --gray-600: #4b5563;
+        --gray-700: #374151;
+        --gray-800: #1f2937;
+        --border-color: #e5e7eb;
+        --radius: 8px;
+        --radius-lg: 12px;
+    }
 
-    <!-- Información y botón crear -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gray-800);
+        margin: 0;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .stat-card {
+        background: #fff;
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        border: 1px solid var(--border-color);
+        transition: box-shadow 0.2s;
+    }
+
+    .stat-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .stat-icon.blue { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+    .stat-icon.green { background: linear-gradient(135deg, #10b981, #059669); }
+    .stat-icon.orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .stat-icon.pink { background: linear-gradient(135deg, #ec4899, #db2777); }
+
+    .stat-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--gray-800);
+        line-height: 1;
+    }
+
+    .stat-label {
+        font-size: 0.8125rem;
+        color: var(--gray-500);
+        margin-top: 4px;
+    }
+
+    .btn-primary {
+        background: var(--primary);
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: var(--radius);
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .btn-primary:hover {
+        background: var(--primary-hover);
+        color: #fff;
+    }
+
+    .card {
+        background: #fff;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-color);
+        overflow: hidden;
+    }
+
+    .card-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: var(--gray-50);
+    }
+
+    .card-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--gray-800);
+        margin: 0;
+    }
+
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .table th {
+        text-align: left;
+        padding: 12px 16px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--gray-500);
+        background: var(--gray-50);
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    .table td {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border-color);
+        vertical-align: middle;
+    }
+
+    .table tr:hover {
+        background: var(--gray-50);
+    }
+
+    .anuncio-thumb {
+        width: 80px;
+        height: 50px;
+        object-fit: cover;
+        border-radius: 6px;
+    }
+
+    .anuncio-thumb-placeholder {
+        width: 80px;
+        height: 50px;
+        background: var(--gray-100);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .badge-success { background: #d1fae5; color: #059669; }
+    .badge-warning { background: #fef3c7; color: #d97706; }
+    .badge-secondary { background: var(--gray-100); color: var(--gray-600); }
+    .badge-info { background: #dbeafe; color: #2563eb; }
+    .badge-danger { background: #fee2e2; color: #dc2626; }
+
+    .ubicaciones-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .ubicacion-tag {
+        font-size: 0.6875rem;
+        padding: 2px 8px;
+        background: var(--gray-100);
+        border-radius: 4px;
+        color: var(--gray-600);
+    }
+
+    .toggle-switch {
+        position: relative;
+        width: 44px;
+        height: 24px;
+    }
+
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background: var(--gray-200);
+        border-radius: 24px;
+        transition: 0.3s;
+    }
+
+    .toggle-slider:before {
+        content: "";
+        position: absolute;
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background: #fff;
+        border-radius: 50%;
+        transition: 0.3s;
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+        background: var(--success);
+    }
+
+    .toggle-switch input:checked + .toggle-slider:before {
+        transform: translateX(20px);
+    }
+
+    .btn-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        background: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-icon:hover {
+        background: var(--gray-50);
+        border-color: var(--gray-300);
+    }
+
+    .btn-icon.danger:hover {
+        background: #fee2e2;
+        border-color: #fca5a5;
+        color: var(--danger);
+    }
+
+    .actions-group {
+        display: flex;
+        gap: 6px;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .empty-state svg {
+        color: var(--gray-300);
+        margin-bottom: 16px;
+    }
+
+    .empty-state h4 {
+        color: var(--gray-600);
+        margin-bottom: 8px;
+    }
+
+    .empty-state p {
+        color: var(--gray-500);
+        margin: 0;
+    }
+
+    /* Modal Styles */
+    .modal-content {
+        border: none;
+        border-radius: var(--radius-lg);
+    }
+
+    .modal-header {
+        border-bottom: 1px solid var(--border-color);
+        padding: 20px 24px;
+    }
+
+    .modal-title {
+        font-weight: 700;
+        color: var(--gray-800);
+    }
+
+    .modal-body {
+        padding: 24px;
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+
+    .modal-footer {
+        border-top: 1px solid var(--border-color);
+        padding: 16px 24px;
+    }
+
+    .form-section {
+        margin-bottom: 24px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .form-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .form-section-title {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: var(--gray-800);
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .form-section-title svg {
+        color: var(--primary);
+    }
+
+    .form-label {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--gray-700);
+        margin-bottom: 6px;
+        display: block;
+    }
+
+    .form-control, .form-select {
+        width: 100%;
+        padding: 10px 14px;
+        border: 2px solid var(--border-color);
+        border-radius: var(--radius);
+        font-size: 0.9375rem;
+        transition: border-color 0.2s;
+    }
+
+    .form-control:focus, .form-select:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+
+    .form-hint {
+        font-size: 0.75rem;
+        color: var(--gray-500);
+        margin-top: 4px;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+    }
+
+    .ubicacion-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .ubicacion-check {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 12px;
+        background: var(--gray-50);
+        border-radius: var(--radius);
+        border: 2px solid transparent;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .ubicacion-check:hover {
+        background: #f0f0ff;
+    }
+
+    .ubicacion-check.active {
+        background: #eef2ff;
+        border-color: var(--primary);
+    }
+
+    .ubicacion-check input {
+        margin-top: 2px;
+    }
+
+    .ubicacion-check-content {
+        flex: 1;
+    }
+
+    .ubicacion-check-title {
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: var(--gray-800);
+    }
+
+    .ubicacion-check-desc {
+        font-size: 0.75rem;
+        color: var(--gray-500);
+        margin-top: 2px;
+    }
+
+    .segmentacion-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: var(--gray-100);
+        border-radius: 20px;
+        font-size: 0.8125rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+    }
+
+    .chip:hover {
+        background: var(--gray-200);
+    }
+
+    .chip.active {
+        background: #eef2ff;
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .chip input {
+        display: none;
+    }
+
+    /* Preview */
+    .preview-container {
+        background: #1a1a2e;
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        margin-top: 16px;
+    }
+
+    .preview-title {
+        color: #fff;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .preview-device {
+        display: flex;
+        justify-content: center;
+    }
+
+    .preview-phone {
+        width: 280px;
+        background: #000;
+        border-radius: 24px;
+        padding: 12px;
+        border: 3px solid #333;
+    }
+
+    .preview-screen {
+        background: #fff;
+        border-radius: 16px;
+        overflow: hidden;
+        min-height: 400px;
+    }
+
+    .preview-feed-item {
+        padding: 12px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .preview-ad {
+        background: linear-gradient(135deg, #f8f9fa 0%, #fff 100%);
+    }
+
+    .preview-ad-badge {
+        font-size: 0.625rem;
+        color: var(--gray-500);
+        margin-bottom: 8px;
+    }
+
+    .preview-ad-image {
+        width: 100%;
+        height: 140px;
+        object-fit: cover;
+        border-radius: 8px;
+        background: var(--gray-100);
+    }
+
+    .preview-ad-title {
+        font-weight: 600;
+        font-size: 0.875rem;
+        margin-top: 10px;
+        color: var(--gray-800);
+    }
+
+    .preview-ad-desc {
+        font-size: 0.75rem;
+        color: var(--gray-500);
+        margin-top: 4px;
+    }
+
+    .preview-ad-btn {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 8px 16px;
+        background: var(--primary);
+        color: #fff;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    /* Tabs */
+    .nav-tabs-custom {
+        display: flex;
+        gap: 4px;
+        border-bottom: 2px solid var(--border-color);
+        margin-bottom: 20px;
+    }
+
+    .nav-tab {
+        padding: 12px 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--gray-500);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        transition: all 0.2s;
+    }
+
+    .nav-tab:hover {
+        color: var(--gray-700);
+    }
+
+    .nav-tab.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    /* Reportes */
+    .chart-container {
+        height: 250px;
+        margin-top: 16px;
+    }
+
+    .metric-mini {
+        text-align: center;
+        padding: 16px;
+        background: var(--gray-50);
+        border-radius: var(--radius);
+    }
+
+    .metric-mini-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gray-800);
+    }
+
+    .metric-mini-label {
+        font-size: 0.75rem;
+        color: var(--gray-500);
+        margin-top: 4px;
+    }
+
+    .metric-mini-change {
+        font-size: 0.75rem;
+        margin-top: 4px;
+    }
+
+    .metric-mini-change.up { color: var(--success); }
+    .metric-mini-change.down { color: var(--danger); }
+
+    /* Carrusel upload */
+    .carrusel-images {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+    }
+
+    .carrusel-image-item {
+        width: 100px;
+        height: 75px;
+        border-radius: 8px;
+        overflow: hidden;
+        position: relative;
+        border: 2px solid var(--border-color);
+    }
+
+    .carrusel-image-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .carrusel-image-item .remove-btn {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 20px;
+        height: 20px;
+        background: rgba(0,0,0,0.7);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        cursor: pointer;
+        font-size: 12px;
+    }
+
+    .carrusel-add-btn {
+        width: 100px;
+        height: 75px;
+        border: 2px dashed var(--gray-300);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: var(--gray-400);
+        transition: all 0.2s;
+    }
+
+    .carrusel-add-btn:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    @@media (max-width: 768px) {
+        .ubicacion-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+
+        .preview-phone {
+            width: 100%;
+            max-width: 280px;
+        }
+    }
+</style>
+
+<div class="container-fluid px-0">
+    <!-- Header -->
+    <div class="page-header">
         <div>
-            <p class="text-muted mb-0">
-                <strong>@ViewBag.AnunciosAgencias</strong> anuncios de agencias |
-                <strong>@ViewBag.ImpresionesAgencias.ToString("N0")</strong> impresiones de agencias
-            </p>
+            <h1 class="page-title">Publicidad</h1>
+            <p class="text-muted mb-0" style="font-size: 0.875rem;">Gestiona los anuncios de la plataforma</p>
         </div>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAnuncio" onclick="abrirModalNuevo()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2">
+        <button class="btn-primary" onclick="abrirModalNuevo()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
@@ -85,40 +705,99 @@
         </button>
     </div>
 
-    <!-- Lista de anuncios -->
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Anuncios de Lado</h5>
-            <span class="badge bg-primary">@Model.Count anuncios</span>
+    <!-- Stats -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon blue">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="9" cy="9" r="2"></circle>
+                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+                </svg>
+            </div>
+            <div>
+                <div class="stat-value">@ViewBag.TotalAnuncios</div>
+                <div class="stat-label">Total Anuncios</div>
+            </div>
         </div>
-        <div class="card-body p-0">
+        <div class="stat-card">
+            <div class="stat-icon green">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+            </div>
+            <div>
+                <div class="stat-value">@ViewBag.AnunciosActivos</div>
+                <div class="stat-label">Activos</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon orange">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+            </div>
+            <div>
+                <div class="stat-value">@ViewBag.TotalImpresiones.ToString("N0")</div>
+                <div class="stat-label">Impresiones Totales</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon pink">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <path d="M15 3h6v6"></path>
+                    <path d="M10 14L21 3"></path>
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                </svg>
+            </div>
+            <div>
+                <div class="stat-value">@ViewBag.TotalClics.ToString("N0")</div>
+                <div class="stat-label">Clics Totales</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="nav-tabs-custom">
+        <div class="nav-tab active" onclick="cambiarTab('anuncios', this)">Anuncios</div>
+        <div class="nav-tab" onclick="cambiarTab('reportes', this)">Reportes</div>
+    </div>
+
+    <!-- Tab: Anuncios -->
+    <div class="tab-content active" id="tab-anuncios">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">Lista de Anuncios</h5>
+                <span class="badge badge-info">@Model.Count anuncios</span>
+            </div>
             @if (!Model.Any())
             {
-                <div class="text-center py-5">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5" class="mb-3">
+                <div class="empty-state">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                         <circle cx="9" cy="9" r="2"></circle>
                         <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
                     </svg>
-                    <h5 class="text-muted">No hay anuncios de Lado</h5>
-                    <p class="text-muted mb-0">Crea tu primer anuncio para promocionar en la plataforma</p>
+                    <h4>No hay anuncios</h4>
+                    <p>Crea tu primer anuncio para promocionar en la plataforma</p>
                 </div>
             }
             else
             {
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
+                    <table class="table">
                         <thead>
                             <tr>
-                                <th style="width: 80px;">Creativo</th>
-                                <th>Titulo</th>
-                                <th>Prioridad</th>
+                                <th>Creativo</th>
+                                <th>Anuncio</th>
+                                <th>Ubicaciones</th>
                                 <th>Estado</th>
                                 <th>Impresiones</th>
                                 <th>Clics</th>
                                 <th>CTR</th>
-                                <th>Fecha</th>
-                                <th style="width: 140px;">Acciones</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -128,11 +807,42 @@
                                     <td>
                                         @if (!string.IsNullOrEmpty(anuncio.UrlCreativo))
                                         {
-                                            <img src="@anuncio.UrlCreativo" alt="@anuncio.Titulo" class="rounded" style="width: 60px; height: 45px; object-fit: cover;">
+                                            var esVideo = anuncio.TipoCreativo == Lado.Models.TipoCreativo.Video;
+                                            @if (anuncio.EsCarrusel)
+                                            {
+                                                <div style="position:relative">
+                                                    @if (esVideo)
+                                                    {
+                                                        <video src="@anuncio.UrlCreativo" class="anuncio-thumb" muted autoplay loop playsinline></video>
+                                                    }
+                                                    else
+                                                    {
+                                                        <img src="@anuncio.UrlCreativo" alt="@anuncio.Titulo" class="anuncio-thumb">
+                                                    }
+                                                    <span style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.7);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">
+                                                        @(anuncio.ImagenesCarrusel.Count + 1)
+                                                    </span>
+                                                </div>
+                                            }
+                                            else if (esVideo)
+                                            {
+                                                <div style="position:relative">
+                                                    <video src="@anuncio.UrlCreativo" class="anuncio-thumb" muted autoplay loop playsinline></video>
+                                                    <span style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.7);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">
+                                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="#fff" stroke="none">
+                                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                                        </svg>
+                                                    </span>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <img src="@anuncio.UrlCreativo" alt="@anuncio.Titulo" class="anuncio-thumb">
+                                            }
                                         }
                                         else
                                         {
-                                            <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width: 60px; height: 45px;">
+                                            <div class="anuncio-thumb-placeholder">
                                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
                                                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                                                     <circle cx="9" cy="9" r="2"></circle>
@@ -142,66 +852,92 @@
                                         }
                                     </td>
                                     <td>
-                                        <strong>@anuncio.Titulo</strong>
-                                        @if (!string.IsNullOrEmpty(anuncio.Descripcion))
+                                        <div style="font-weight:600;color:var(--gray-800)">@anuncio.Titulo</div>
+                                        @if (!string.IsNullOrEmpty(anuncio.NombreInterno))
                                         {
-                                            <br><small class="text-muted">@(anuncio.Descripcion.Length > 50 ? anuncio.Descripcion.Substring(0, 50) + "..." : anuncio.Descripcion)</small>
+                                            <div style="font-size:0.75rem;color:var(--gray-500)">@anuncio.NombreInterno</div>
+                                        }
+                                        @if (anuncio.MostrarEnStoriesGlobal)
+                                        {
+                                            <span class="badge badge-info" style="margin-top:4px">Stories Global</span>
                                         }
                                     </td>
                                     <td>
-                                        <span class="badge @(anuncio.Prioridad >= 8 ? "bg-danger" : anuncio.Prioridad >= 5 ? "bg-warning" : "bg-secondary")">
-                                            @anuncio.Prioridad
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" role="switch"
-                                                   id="estado_@anuncio.Id"
-                                                   @(anuncio.Estado == Lado.Models.EstadoAnuncio.Activo ? "checked" : "")
-                                                   onchange="toggleEstado(@anuncio.Id, this.checked)">
-                                            <label class="form-check-label" for="estado_@anuncio.Id">
-                                                @(anuncio.Estado == Lado.Models.EstadoAnuncio.Activo ? "Activo" : "Pausado")
-                                            </label>
+                                        <div class="ubicaciones-tags">
+                                            @if (anuncio.MostrarEnFeed)
+                                            {
+                                                <span class="ubicacion-tag">Feed</span>
+                                            }
+                                            @if (anuncio.MostrarEnStories || anuncio.MostrarEnStoriesGlobal)
+                                            {
+                                                <span class="ubicacion-tag">Stories</span>
+                                            }
+                                            @if (anuncio.MostrarEnExplorar)
+                                            {
+                                                <span class="ubicacion-tag">Explorar</span>
+                                            }
+                                            @if (anuncio.MostrarBannerSuperior || anuncio.MostrarBannerInferior)
+                                            {
+                                                <span class="ubicacion-tag">Banner</span>
+                                            }
+                                            @if (anuncio.MostrarEnPerfiles)
+                                            {
+                                                <span class="ubicacion-tag">Perfiles</span>
+                                            }
                                         </div>
                                     </td>
-                                    <td>@anuncio.Impresiones.ToString("N0")</td>
+                                    <td>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" @(anuncio.Estado == Lado.Models.EstadoAnuncio.Activo ? "checked" : "") onchange="toggleEstado(@anuncio.Id, this.checked)">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </td>
+                                    <td>
+                                        <div style="font-weight:600">@anuncio.Impresiones.ToString("N0")</div>
+                                        <div style="font-size:0.75rem;color:var(--gray-500)">@anuncio.UsuariosUnicos usuarios</div>
+                                    </td>
                                     <td>@anuncio.Clics.ToString("N0")</td>
                                     <td>
                                         @{
                                             var ctr = anuncio.Impresiones > 0 ? (double)anuncio.Clics / anuncio.Impresiones * 100 : 0;
+                                            var ctrClass = ctr >= 2 ? "badge-success" : ctr >= 1 ? "badge-warning" : "badge-secondary";
                                         }
-                                        <span class="@(ctr >= 2 ? "text-success" : ctr >= 1 ? "text-warning" : "text-muted")">
-                                            @ctr.ToString("F2")%
-                                        </span>
+                                        <span class="badge @ctrClass">@ctr.ToString("F2")%</span>
                                     </td>
                                     <td>
-                                        <small class="text-muted">@anuncio.FechaCreacion.ToString("dd/MM/yyyy")</small>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-outline-primary" onclick="editarAnuncio(@anuncio.Id)" title="Editar">
+                                        <div class="actions-group">
+                                            <button class="btn-icon" onclick="editarAnuncio(@anuncio.Id)" title="Editar">
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                                 </svg>
                                             </button>
-                                            <a href="@anuncio.UrlDestino" target="_blank" class="btn btn-outline-secondary" title="Ver destino">
+                                            <button class="btn-icon" onclick="duplicarAnuncio(@anuncio.Id)" title="Duplicar">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                                </svg>
+                                            </button>
+                                            <button class="btn-icon" onclick="verReporte(@anuncio.Id)" title="Ver Reporte">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                                                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                                                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                                                </svg>
+                                            </button>
+                                            <a href="@anuncio.UrlDestino" target="_blank" class="btn-icon" title="Ver destino">
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                                                     <polyline points="15 3 21 3 21 9"></polyline>
                                                     <line x1="10" y1="14" x2="21" y2="3"></line>
                                                 </svg>
                                             </a>
-                                            <form asp-action="EliminarAnuncioLado" method="post" style="display: inline;" onsubmit="return confirm('¿Eliminar este anuncio?');">
-                                                @Html.AntiForgeryToken()
-                                                <input type="hidden" name="id" value="@anuncio.Id">
-                                                <button type="submit" class="btn btn-outline-danger" title="Eliminar">
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                        <polyline points="3 6 5 6 21 6"></polyline>
-                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                    </svg>
-                                                </button>
-                                            </form>
+                                            <button class="btn-icon danger" onclick="eliminarAnuncio(@anuncio.Id)" title="Eliminar">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                </svg>
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -212,13 +948,99 @@
             }
         </div>
     </div>
+
+    <!-- Tab: Reportes -->
+    <div class="tab-content" id="tab-reportes">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">Rendimiento General</h5>
+                <select class="form-select" style="width:auto" onchange="cambiarPeriodoReporte(this.value)">
+                    <option value="7">Ultimos 7 dias</option>
+                    <option value="30" selected>Ultimos 30 dias</option>
+                    <option value="90">Ultimos 90 dias</option>
+                </select>
+            </div>
+            <div style="padding: 20px;">
+                <div class="form-row" style="margin-bottom: 20px;">
+                    <div class="metric-mini">
+                        <div class="metric-mini-value" id="reporteImpresiones">-</div>
+                        <div class="metric-mini-label">Impresiones</div>
+                        <div class="metric-mini-change up" id="reporteImpresionesChange">-</div>
+                    </div>
+                    <div class="metric-mini">
+                        <div class="metric-mini-value" id="reporteClics">-</div>
+                        <div class="metric-mini-label">Clics</div>
+                        <div class="metric-mini-change up" id="reporteClicsChange">-</div>
+                    </div>
+                    <div class="metric-mini">
+                        <div class="metric-mini-value" id="reporteCTR">-</div>
+                        <div class="metric-mini-label">CTR Promedio</div>
+                        <div class="metric-mini-change" id="reporteCTRChange">-</div>
+                    </div>
+                    <div class="metric-mini">
+                        <div class="metric-mini-value" id="reporteUsuarios">-</div>
+                        <div class="metric-mini-label">Usuarios Alcanzados</div>
+                        <div class="metric-mini-change up" id="reporteUsuariosChange">-</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="chartRendimiento"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 20px;">
+            <div class="card-header">
+                <h5 class="card-title">Rendimiento por Anuncio</h5>
+                <button class="btn-primary" style="padding:8px 16px;font-size:0.8125rem" onclick="exportarReporte()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Exportar CSV
+                </button>
+            </div>
+            <div class="table-responsive">
+                <table class="table" id="tablaReporteAnuncios">
+                    <thead>
+                        <tr>
+                            <th>Anuncio</th>
+                            <th>Impresiones</th>
+                            <th>Clics</th>
+                            <th>CTR</th>
+                            <th>Usuarios Unicos</th>
+                            <th>Mejor Hora</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var anuncio in Model.Where(a => a.Estado == Lado.Models.EstadoAnuncio.Activo || a.Impresiones > 0))
+                        {
+                            var ctr = anuncio.Impresiones > 0 ? (double)anuncio.Clics / anuncio.Impresiones * 100 : 0;
+                            <tr>
+                                <td>
+                                    <div style="font-weight:600">@anuncio.Titulo</div>
+                                    <div style="font-size:0.75rem;color:var(--gray-500)">@anuncio.UbicacionesResumen</div>
+                                </td>
+                                <td>@anuncio.Impresiones.ToString("N0")</td>
+                                <td>@anuncio.Clics.ToString("N0")</td>
+                                <td>@ctr.ToString("F2")%</td>
+                                <td>@anuncio.UsuariosUnicos.ToString("N0")</td>
+                                <td>-</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Modal Crear/Editar Anuncio -->
 <div class="modal fade" id="modalAnuncio" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
-            <form asp-action="GuardarAnuncioLado" method="post" enctype="multipart/form-data" id="formAnuncio">
+            <form id="formAnuncio" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="Id" id="anuncioId" value="0">
 
@@ -228,106 +1050,376 @@
                 </div>
 
                 <div class="modal-body">
-                    <div class="row g-3">
-                        <!-- Titulo -->
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Titulo *</label>
-                            <input type="text" class="form-control" name="Titulo" id="inputTitulo" required maxlength="100" placeholder="Ej: Promociona tu contenido premium">
-                        </div>
+                    <div style="display: grid; grid-template-columns: 1fr 320px; gap: 24px;">
+                        <!-- Formulario -->
+                        <div>
+                            <!-- Informacion basica -->
+                            <div class="form-section">
+                                <div class="form-section-title">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                    </svg>
+                                    Informacion Basica
+                                </div>
+                                <div class="form-row">
+                                    <div>
+                                        <label class="form-label">Titulo *</label>
+                                        <input type="text" class="form-control" name="Titulo" id="inputTitulo" required maxlength="100" placeholder="Titulo del anuncio" oninput="actualizarPreview()">
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Nombre Interno</label>
+                                        <input type="text" class="form-control" name="NombreInterno" id="inputNombreInterno" maxlength="100" placeholder="Ej: Campaña Navidad 2024">
+                                        <div class="form-hint">Solo visible para ti</div>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 16px;">
+                                    <label class="form-label">Descripcion</label>
+                                    <textarea class="form-control" name="Descripcion" id="inputDescripcion" rows="2" maxlength="500" placeholder="Descripcion breve" oninput="actualizarPreview()"></textarea>
+                                </div>
+                                <div style="margin-top: 16px;">
+                                    <label class="form-label">URL Destino *</label>
+                                    <input type="url" class="form-control" name="UrlDestino" id="inputUrlDestino" required placeholder="https://ejemplo.com/pagina">
+                                </div>
+                            </div>
 
-                        <!-- Descripcion -->
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Descripcion</label>
-                            <textarea class="form-control" name="Descripcion" id="inputDescripcion" rows="2" maxlength="500" placeholder="Descripcion breve del anuncio"></textarea>
-                        </div>
+                            <!-- Creativo -->
+                            <div class="form-section">
+                                <div class="form-section-title">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                        <circle cx="9" cy="9" r="2"></circle>
+                                        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+                                    </svg>
+                                    Creativo
+                                </div>
+                                <div class="form-row">
+                                    <div>
+                                        <label class="form-label">Imagen/Video Principal *</label>
+                                        <input type="file" class="form-control" name="ImagenCreativo" id="inputImagen" accept="image/*,video/mp4,video/webm,.gif" onchange="previewImagen(this)">
+                                        <div class="form-hint">JPG, PNG, GIF, MP4, WebM. Recomendado: 1200x628px</div>
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Texto del Boton</label>
+                                        <select class="form-select" name="TextoBoton" id="inputTextoBoton" onchange="toggleTextoPersonalizado(); actualizarPreview()">
+                                            <option value="VerMas">Ver mas</option>
+                                            <option value="Suscribirse">Suscribirse</option>
+                                            <option value="Comprar">Comprar</option>
+                                            <option value="Descargar">Descargar</option>
+                                            <option value="Registrarse">Registrarse</option>
+                                            <option value="MasInformacion">Mas informacion</option>
+                                            <option value="Personalizado">Personalizado</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div id="divTextoPersonalizado" style="display: none; margin-top: 16px;">
+                                    <label class="form-label">Texto Personalizado</label>
+                                    <input type="text" class="form-control" name="TextoBotonPersonalizado" id="inputTextoPersonalizado" maxlength="50" oninput="actualizarPreview()">
+                                </div>
+                                <div style="margin-top: 16px;">
+                                    <label class="chip" style="cursor: pointer;">
+                                        <input type="checkbox" name="EsCarrusel" id="inputEsCarrusel" onchange="toggleCarrusel()">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+                                            <polyline points="17 2 12 7 7 2"></polyline>
+                                        </svg>
+                                        Carrusel de imagenes
+                                    </label>
+                                </div>
+                                <div id="divCarrusel" style="display: none; margin-top: 16px;">
+                                    <label class="form-label">Imagenes Adicionales del Carrusel</label>
+                                    <div class="carrusel-images" id="carruselImages">
+                                        <label class="carrusel-add-btn">
+                                            <input type="file" accept="image/*" multiple style="display:none" onchange="agregarImagenesCarrusel(this)">
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                            </svg>
+                                        </label>
+                                    </div>
+                                    <div class="form-hint">Maximo 10 imagenes adicionales</div>
+                                </div>
+                            </div>
 
-                        <!-- URL Destino -->
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">URL Destino *</label>
-                            <input type="url" class="form-control" name="UrlDestino" id="inputUrlDestino" required placeholder="https://ejemplo.com/pagina">
-                            <small class="text-muted">URL a donde se redirigira al usuario al hacer clic</small>
-                        </div>
+                            <!-- Ubicaciones -->
+                            <div class="form-section">
+                                <div class="form-section-title">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                        <circle cx="12" cy="10" r="3"></circle>
+                                    </svg>
+                                    Ubicaciones
+                                </div>
+                                <div class="ubicacion-grid">
+                                    <label class="ubicacion-check" id="check-feed">
+                                        <input type="checkbox" name="MostrarEnFeed" id="inputMostrarEnFeed" checked onchange="toggleUbicacion('feed')">
+                                        <div class="ubicacion-check-content">
+                                            <div class="ubicacion-check-title">Feed</div>
+                                            <div class="ubicacion-check-desc">Entre publicaciones del feed principal</div>
+                                        </div>
+                                    </label>
+                                    <label class="ubicacion-check" id="check-stories">
+                                        <input type="checkbox" name="MostrarEnStories" id="inputMostrarEnStories" onchange="toggleUbicacion('stories')">
+                                        <div class="ubicacion-check-content">
+                                            <div class="ubicacion-check-title">Stories</div>
+                                            <div class="ubicacion-check-desc">Como historia patrocinada</div>
+                                        </div>
+                                    </label>
+                                    <label class="ubicacion-check" id="check-explorar">
+                                        <input type="checkbox" name="MostrarEnExplorar" id="inputMostrarEnExplorar" onchange="toggleUbicacion('explorar')">
+                                        <div class="ubicacion-check-content">
+                                            <div class="ubicacion-check-title">Explorar</div>
+                                            <div class="ubicacion-check-desc">En la pagina de explorar</div>
+                                        </div>
+                                    </label>
+                                    <label class="ubicacion-check" id="check-perfiles">
+                                        <input type="checkbox" name="MostrarEnPerfiles" id="inputMostrarEnPerfiles" onchange="toggleUbicacion('perfiles')">
+                                        <div class="ubicacion-check-content">
+                                            <div class="ubicacion-check-title">Perfiles</div>
+                                            <div class="ubicacion-check-desc">En perfiles de creadores</div>
+                                        </div>
+                                    </label>
+                                    <label class="ubicacion-check" id="check-banner-superior">
+                                        <input type="checkbox" name="MostrarBannerSuperior" id="inputBannerSuperior" onchange="toggleUbicacion('banner-superior')">
+                                        <div class="ubicacion-check-content">
+                                            <div class="ubicacion-check-title">Banner Superior</div>
+                                            <div class="ubicacion-check-desc">Parte superior de la pagina</div>
+                                        </div>
+                                    </label>
+                                    <label class="ubicacion-check" id="check-banner-inferior">
+                                        <input type="checkbox" name="MostrarBannerInferior" id="inputBannerInferior" onchange="toggleUbicacion('banner-inferior')">
+                                        <div class="ubicacion-check-content">
+                                            <div class="ubicacion-check-title">Banner Inferior</div>
+                                            <div class="ubicacion-check-desc">Parte inferior fija</div>
+                                        </div>
+                                    </label>
+                                </div>
+                                <div style="margin-top: 16px;" id="divFrecuenciaFeed">
+                                    <label class="form-label">Frecuencia en Feed</label>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <span>Mostrar cada</span>
+                                        <input type="number" class="form-control" name="FrecuenciaEnFeed" id="inputFrecuenciaFeed" value="5" min="2" max="20" style="width: 80px;">
+                                        <span>publicaciones</span>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 16px;">
+                                    <label class="ubicacion-check" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff;" id="check-stories-global">
+                                        <input type="checkbox" name="MostrarEnStoriesGlobal" id="inputStoriesGlobal" onchange="toggleUbicacion('stories-global')">
+                                        <div class="ubicacion-check-content">
+                                            <div class="ubicacion-check-title" style="color: #fff;">Stories Global</div>
+                                            <div class="ubicacion-check-desc" style="color: rgba(255,255,255,0.8);">A TODOS los usuarios sin segmentacion</div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
 
-                        <!-- Imagen Creativo -->
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Imagen del Creativo *</label>
-                            <input type="file" class="form-control" name="ImagenCreativo" id="inputImagen" accept="image/*,video/mp4,video/webm,.gif">
-                            <small class="text-muted">Formatos: JPG, PNG, GIF, MP4, WebM. Tamano recomendado: 1200x628px</small>
-                            <div id="previewImagen" class="mt-2" style="display: none;">
-                                <img id="imgPreview" src="" alt="Preview" class="rounded" style="max-width: 200px; max-height: 150px; object-fit: cover;">
+                            <!-- Segmentacion -->
+                            <div class="form-section">
+                                <div class="form-section-title">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="9" cy="7" r="4"></circle>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                    </svg>
+                                    Segmentacion
+                                </div>
+                                <div style="margin-bottom: 16px;">
+                                    <label class="form-label">Tipo de Usuario</label>
+                                    <div class="segmentacion-chips">
+                                        <label class="chip active" id="chip-todos">
+                                            <input type="radio" name="tipoUsuarioSeg" value="todos" checked onchange="cambiarTipoUsuario()">
+                                            Todos
+                                        </label>
+                                        <label class="chip" id="chip-creadores">
+                                            <input type="radio" name="tipoUsuarioSeg" value="creadores" onchange="cambiarTipoUsuario()">
+                                            Solo Creadores
+                                        </label>
+                                        <label class="chip" id="chip-fans">
+                                            <input type="radio" name="tipoUsuarioSeg" value="fans" onchange="cambiarTipoUsuario()">
+                                            Solo Fans
+                                        </label>
+                                        <label class="chip" id="chip-verificados">
+                                            <input type="radio" name="tipoUsuarioSeg" value="verificados" onchange="cambiarTipoUsuario()">
+                                            Solo Verificados
+                                        </label>
+                                    </div>
+                                </div>
+                                <input type="hidden" name="SoloCreadores" id="inputSoloCreadores" value="false">
+                                <input type="hidden" name="SoloFans" id="inputSoloFans" value="false">
+                                <input type="hidden" name="SoloVerificados" id="inputSoloVerificados" value="false">
+                                <input type="hidden" name="SoloConSuscripciones" id="inputSoloConSuscripciones" value="false">
+                                <input type="hidden" name="ImagenesCarruselJson" id="inputImagenesCarruselJson" value="">
+                                <div class="form-row">
+                                    <div>
+                                        <label class="form-label">Paises</label>
+                                        <select class="form-select" id="inputPaises" multiple style="height: 100px;">
+                                            @foreach (var pais in paises)
+                                            {
+                                                <option value="@pais.Key">@pais.Value.Nombre</option>
+                                            }
+                                        </select>
+                                        <div class="form-hint">Ctrl+Click para seleccionar varios. Vacio = todos</div>
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Rango de Edad</label>
+                                        <div style="display: flex; gap: 10px; align-items: center;">
+                                            <input type="number" class="form-control" id="inputEdadMin" min="18" max="99" placeholder="Min" style="width: 80px;">
+                                            <span>a</span>
+                                            <input type="number" class="form-control" id="inputEdadMax" min="18" max="99" placeholder="Max" style="width: 80px;">
+                                            <span>años</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Control de frecuencia -->
+                            <div class="form-section">
+                                <div class="form-section-title">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    Control de Frecuencia
+                                </div>
+                                <div class="form-row">
+                                    <div>
+                                        <label class="form-label">Max. impresiones por usuario</label>
+                                        <input type="number" class="form-control" name="MaxImpresionesUsuario" id="inputMaxImpresiones" value="0" min="0">
+                                        <div class="form-hint">0 = ilimitado</div>
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Max. por dia por usuario</label>
+                                        <input type="number" class="form-control" name="MaxImpresionesUsuarioDia" id="inputMaxImpresionesdia" value="3" min="0">
+                                        <div class="form-hint">0 = ilimitado</div>
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Minutos entre impresiones</label>
+                                        <input type="number" class="form-control" name="MinutosEntreImpresiones" id="inputMinutosEntre" value="30" min="0">
+                                        <div class="form-hint">0 = sin limite</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Configuracion -->
+                            <div class="form-section">
+                                <div class="form-section-title">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                                    </svg>
+                                    Configuracion
+                                </div>
+                                <div class="form-row">
+                                    <div>
+                                        <label class="form-label">Prioridad</label>
+                                        <select class="form-select" name="Prioridad" id="inputPrioridad">
+                                            <option value="1">1 - Muy Baja</option>
+                                            <option value="2">2 - Baja</option>
+                                            <option value="3">3</option>
+                                            <option value="4">4</option>
+                                            <option value="5" selected>5 - Normal</option>
+                                            <option value="6">6</option>
+                                            <option value="7">7</option>
+                                            <option value="8">8 - Alta</option>
+                                            <option value="9">9 - Muy Alta</option>
+                                            <option value="10">10 - Maxima</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Estado</label>
+                                        <select class="form-select" name="Estado" id="inputEstado">
+                                            <option value="Activo">Activo</option>
+                                            <option value="Pausado">Pausado</option>
+                                            <option value="Borrador" selected>Borrador</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row" style="margin-top: 16px;">
+                                    <div>
+                                        <label class="form-label">Fecha Inicio</label>
+                                        <input type="datetime-local" class="form-control" name="FechaInicio" id="inputFechaInicio">
+                                        <div class="form-hint">Opcional - vacio = ahora</div>
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Fecha Fin</label>
+                                        <input type="datetime-local" class="form-control" name="FechaFin" id="inputFechaFin">
+                                        <div class="form-hint">Opcional - vacio = sin limite</div>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 16px;">
+                                    <label class="form-label">Notas Internas</label>
+                                    <textarea class="form-control" name="NotasInternas" id="inputNotas" rows="2" placeholder="Notas privadas sobre este anuncio"></textarea>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Prioridad y Estado -->
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Prioridad *</label>
-                            <select class="form-select" name="Prioridad" id="inputPrioridad" required>
-                                <option value="1">1 - Muy Baja</option>
-                                <option value="2">2 - Baja</option>
-                                <option value="3">3</option>
-                                <option value="4">4</option>
-                                <option value="5" selected>5 - Normal</option>
-                                <option value="6">6</option>
-                                <option value="7">7</option>
-                                <option value="8">8 - Alta</option>
-                                <option value="9">9 - Muy Alta</option>
-                                <option value="10">10 - Maxima</option>
-                            </select>
-                            <small class="text-muted">Mayor prioridad = mas probabilidad de aparecer</small>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Estado</label>
-                            <select class="form-select" name="Estado" id="inputEstado">
-                                <option value="Activo">Activo</option>
-                                <option value="Pausado">Pausado</option>
-                                <option value="Borrador">Borrador</option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Texto del Boton</label>
-                            <select class="form-select" name="TextoBoton" id="inputTextoBoton" onchange="toggleTextoPersonalizado()">
-                                <option value="VerMas">Ver mas</option>
-                                <option value="Suscribirse">Suscribirse</option>
-                                <option value="Comprar">Comprar</option>
-                                <option value="Descargar">Descargar</option>
-                                <option value="Registrarse">Registrarse</option>
-                                <option value="MasInformacion">Mas informacion</option>
-                                <option value="Personalizado">Personalizado</option>
-                            </select>
-                        </div>
-
-                        <!-- Texto personalizado -->
-                        <div class="col-12" id="divTextoPersonalizado" style="display: none;">
-                            <label class="form-label fw-semibold">Texto Personalizado</label>
-                            <input type="text" class="form-control" name="TextoBotonPersonalizado" id="inputTextoPersonalizado" maxlength="50" placeholder="Texto del boton">
-                        </div>
-
-                        <!-- Fechas -->
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Fecha Inicio</label>
-                            <input type="date" class="form-control" name="FechaInicio" id="inputFechaInicio">
-                            <small class="text-muted">Opcional - dejalo vacio para iniciar ahora</small>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Fecha Fin</label>
-                            <input type="date" class="form-control" name="FechaFin" id="inputFechaFin">
-                            <small class="text-muted">Opcional - dejalo vacio para sin fecha limite</small>
+                        <!-- Preview -->
+                        <div>
+                            <div class="preview-container" style="position: sticky; top: 20px;">
+                                <div class="preview-title">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                    Preview en Vivo
+                                </div>
+                                <div class="preview-device">
+                                    <div class="preview-phone">
+                                        <div class="preview-screen">
+                                            <div class="preview-feed-item" style="background: #f8f9fa;">
+                                                <div style="display: flex; gap: 8px; align-items: center;">
+                                                    <div style="width: 32px; height: 32px; background: #ddd; border-radius: 50%;"></div>
+                                                    <div>
+                                                        <div style="font-size: 12px; font-weight: 600;">Usuario</div>
+                                                        <div style="font-size: 10px; color: #666;">hace 2h</div>
+                                                    </div>
+                                                </div>
+                                                <div style="height: 80px; background: #e5e7eb; border-radius: 8px; margin-top: 8px;"></div>
+                                            </div>
+                                            <div class="preview-feed-item preview-ad">
+                                                <div class="preview-ad-badge">Patrocinado</div>
+                                                <div id="previewImgContainer">
+                                                    <div class="preview-ad-image" id="previewImg" style="display: flex; align-items: center; justify-content: center; color: #94a3b8;">
+                                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                                            <circle cx="9" cy="9" r="2"></circle>
+                                                            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                                <div class="preview-ad-title" id="previewTitulo">Titulo del anuncio</div>
+                                                <div class="preview-ad-desc" id="previewDesc">Descripcion del anuncio</div>
+                                                <div class="preview-ad-btn" id="previewBtn">Ver mas</div>
+                                            </div>
+                                            <div class="preview-feed-item" style="background: #f8f9fa;">
+                                                <div style="display: flex; gap: 8px; align-items: center;">
+                                                    <div style="width: 32px; height: 32px; background: #ddd; border-radius: 50%;"></div>
+                                                    <div>
+                                                        <div style="font-size: 12px; font-weight: 600;">Usuario</div>
+                                                        <div style="font-size: 10px; color: #666;">hace 4h</div>
+                                                    </div>
+                                                </div>
+                                                <div style="height: 60px; background: #e5e7eb; border-radius: 8px; margin-top: 8px;"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1">
+                    <button type="submit" class="btn-primary">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
                             <polyline points="17 21 17 13 7 13 7 21"></polyline>
                             <polyline points="7 3 7 8 15 8"></polyline>
                         </svg>
-                        Guardar
+                        Guardar Anuncio
                     </button>
                 </div>
             </form>
@@ -335,148 +1427,460 @@
     </div>
 </div>
 
-@section Scripts {
-    <script>
-        // Abrir modal para nuevo anuncio
-        function abrirModalNuevo() {
-            document.getElementById('modalTitulo').textContent = 'Nuevo Anuncio';
-            document.getElementById('formAnuncio').reset();
-            document.getElementById('anuncioId').value = '0';
-            document.getElementById('previewImagen').style.display = 'none';
-            document.getElementById('inputImagen').required = true;
-            document.getElementById('divTextoPersonalizado').style.display = 'none';
+<!-- Modal Reporte Individual -->
+<div class="modal fade" id="modalReporte" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reporte del Anuncio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalReporteBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Cargando reporte...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+    let chartRendimiento = null;
+    let carruselFiles = [];
+
+    // Tabs
+    function cambiarTab(tab, el) {
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('tab-' + tab).classList.add('active');
+
+        if (tab === 'reportes') {
+            cargarReporteGeneral();
         }
+    }
 
-        // Editar anuncio existente
-        async function editarAnuncio(id) {
-            try {
-                const response = await fetch(`/Admin/ObtenerAnuncioLado/${id}`);
-                if (!response.ok) throw new Error('Error al cargar anuncio');
+    // Modal nuevo
+    function abrirModalNuevo() {
+        document.getElementById('modalTitulo').textContent = 'Nuevo Anuncio';
+        document.getElementById('formAnuncio').reset();
+        document.getElementById('anuncioId').value = '0';
+        document.getElementById('inputImagen').required = true;
+        document.getElementById('inputMostrarEnFeed').checked = true;
+        document.getElementById('inputImagenesCarruselJson').value = '';
+        document.getElementById('inputSoloCreadores').value = 'false';
+        document.getElementById('inputSoloFans').value = 'false';
+        document.getElementById('inputSoloVerificados').value = 'false';
+        document.getElementById('inputSoloConSuscripciones').value = 'false';
+        // Reset preview
+        document.getElementById('previewImg').innerHTML = `
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="9" cy="9" r="2"></circle>
+                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+            </svg>
+            <div style="font-size: 12px; margin-top: 8px;">Vista previa</div>`;
+        toggleUbicacion('feed');
+        actualizarPreview();
+        carruselFiles = [];
+        renderCarruselPreviews();
+        new bootstrap.Modal(document.getElementById('modalAnuncio')).show();
+    }
 
-                const anuncio = await response.json();
+    // Editar anuncio
+    async function editarAnuncio(id) {
+        try {
+            const response = await fetch(`/Admin/ObtenerAnuncioLado/${id}`);
+            if (!response.ok) throw new Error('Error al cargar');
+            const a = await response.json();
 
-                document.getElementById('modalTitulo').textContent = 'Editar Anuncio';
-                document.getElementById('anuncioId').value = anuncio.id;
-                document.getElementById('inputTitulo').value = anuncio.titulo;
-                document.getElementById('inputDescripcion').value = anuncio.descripcion || '';
-                document.getElementById('inputUrlDestino').value = anuncio.urlDestino;
-                document.getElementById('inputPrioridad').value = anuncio.prioridad;
-                document.getElementById('inputEstado').value = anuncio.estado;
-                document.getElementById('inputTextoBoton').value = anuncio.textoBoton;
-                document.getElementById('inputTextoPersonalizado').value = anuncio.textoBotonPersonalizado || '';
-                document.getElementById('inputFechaInicio').value = anuncio.fechaInicio || '';
-                document.getElementById('inputFechaFin').value = anuncio.fechaFin || '';
+            document.getElementById('modalTitulo').textContent = 'Editar Anuncio';
+            document.getElementById('anuncioId').value = a.id;
+            document.getElementById('inputTitulo').value = a.titulo;
+            document.getElementById('inputNombreInterno').value = a.nombreInterno || '';
+            document.getElementById('inputDescripcion').value = a.descripcion || '';
+            document.getElementById('inputUrlDestino').value = a.urlDestino;
+            document.getElementById('inputTextoBoton').value = a.textoBoton;
+            document.getElementById('inputTextoPersonalizado').value = a.textoBotonPersonalizado || '';
+            document.getElementById('inputPrioridad').value = a.prioridad;
+            document.getElementById('inputEstado').value = a.estado;
+            document.getElementById('inputNotas').value = a.notasInternas || '';
 
-                // Mostrar preview de imagen actual
-                if (anuncio.urlCreativo) {
-                    document.getElementById('imgPreview').src = anuncio.urlCreativo;
-                    document.getElementById('previewImagen').style.display = 'block';
-                }
+            // Ubicaciones
+            document.getElementById('inputMostrarEnFeed').checked = a.mostrarEnFeed;
+            document.getElementById('inputMostrarEnStories').checked = a.mostrarEnStories;
+            document.getElementById('inputMostrarEnExplorar').checked = a.mostrarEnExplorar;
+            document.getElementById('inputMostrarEnPerfiles').checked = a.mostrarEnPerfiles;
+            document.getElementById('inputBannerSuperior').checked = a.mostrarBannerSuperior;
+            document.getElementById('inputBannerInferior').checked = a.mostrarBannerInferior;
+            document.getElementById('inputStoriesGlobal').checked = a.mostrarEnStoriesGlobal;
+            document.getElementById('inputFrecuenciaFeed').value = a.frecuenciaEnFeed || 5;
 
-                // No requerir imagen al editar
-                document.getElementById('inputImagen').required = false;
+            // Frecuencia
+            document.getElementById('inputMaxImpresiones').value = a.maxImpresionesUsuario || 0;
+            document.getElementById('inputMaxImpresionesdia').value = a.maxImpresionesUsuarioDia || 3;
+            document.getElementById('inputMinutosEntre').value = a.minutosEntreImpresiones || 30;
 
-                // Mostrar texto personalizado si aplica
-                toggleTextoPersonalizado();
+            // Fechas
+            if (a.fechaInicio) document.getElementById('inputFechaInicio').value = a.fechaInicio.slice(0, 16);
+            if (a.fechaFin) document.getElementById('inputFechaFin').value = a.fechaFin.slice(0, 16);
 
-                // Abrir modal
-                const modal = new bootstrap.Modal(document.getElementById('modalAnuncio'));
-                modal.show();
-            } catch (error) {
-                showToast('Error al cargar el anuncio', 'error');
-            }
-        }
+            // Segmentacion tipo usuario
+            if (a.soloCreadores) document.querySelector('input[value="creadores"]').checked = true;
+            else if (a.soloFans) document.querySelector('input[value="fans"]').checked = true;
+            else if (a.soloVerificados) document.querySelector('input[value="verificados"]').checked = true;
+            else document.querySelector('input[value="todos"]').checked = true;
+            cambiarTipoUsuario();
 
-        // Toggle estado activo/pausado
-        async function toggleEstado(id, activo) {
-            try {
-                const response = await fetch('/Admin/ToggleEstadoAnuncioLado', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ id, activo })
-                });
+            // Carrusel
+            document.getElementById('inputEsCarrusel').checked = a.esCarrusel;
+            document.getElementById('inputImagenesCarruselJson').value = a.imagenesCarruselJson || '';
+            carruselFiles = []; // Limpiar archivos locales al editar
+            toggleCarrusel();
 
-                const result = await response.json();
-                if (result.success) {
-                    // Actualizar label
-                    const label = document.querySelector(`label[for="estado_${id}"]`);
-                    if (label) {
-                        label.textContent = activo ? 'Activo' : 'Pausado';
-                    }
-                    showToast(activo ? 'Anuncio activado' : 'Anuncio pausado', 'success');
+            // Preview imagen/video
+            if (a.urlCreativo) {
+                const isVideo = a.tipoCreativo === 'Video' || a.urlCreativo.match(/\.(mp4|webm|mov)$/i);
+                if (isVideo) {
+                    document.getElementById('previewImg').innerHTML = `<video src="${a.urlCreativo}" style="width:100%;height:100%;object-fit:cover;border-radius:8px" autoplay muted loop playsinline></video>`;
                 } else {
-                    showToast(result.message || 'Error al cambiar estado', 'error');
-                    // Revertir checkbox
-                    document.getElementById(`estado_${id}`).checked = !activo;
+                    document.getElementById('previewImg').innerHTML = `<img src="${a.urlCreativo}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`;
                 }
-            } catch (error) {
-                showToast('Error al cambiar estado', 'error');
-                document.getElementById(`estado_${id}`).checked = !activo;
             }
-        }
 
-        // Toggle texto personalizado
-        function toggleTextoPersonalizado() {
-            const select = document.getElementById('inputTextoBoton');
-            const div = document.getElementById('divTextoPersonalizado');
-            div.style.display = select.value === 'Personalizado' ? 'block' : 'none';
-        }
+            document.getElementById('inputImagen').required = false;
+            actualizarUbicacionesUI();
+            actualizarPreview();
+            toggleTextoPersonalizado();
 
-        // Preview de imagen
-        document.getElementById('inputImagen').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById('imgPreview').src = e.target.result;
-                    document.getElementById('previewImagen').style.display = 'block';
-                };
-                reader.readAsDataURL(file);
+            new bootstrap.Modal(document.getElementById('modalAnuncio')).show();
+        } catch (error) {
+            alert('Error al cargar el anuncio');
+        }
+    }
+
+    // Duplicar anuncio
+    async function duplicarAnuncio(id) {
+        if (!confirm('¿Crear una copia de este anuncio?')) return;
+        try {
+            const response = await fetch('/Admin/DuplicarAnuncioLado', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': token
+                },
+                body: JSON.stringify({ id: id })
+            });
+            const result = await response.json();
+            if (result.success) {
+                location.reload();
+            } else {
+                alert(result.message || 'Error al duplicar');
+            }
+        } catch (error) {
+            alert('Error al duplicar el anuncio');
+        }
+    }
+
+    // Eliminar anuncio
+    async function eliminarAnuncio(id) {
+        if (!confirm('¿Eliminar este anuncio?')) return;
+        try {
+            const formData = new FormData();
+            formData.append('id', id);
+            formData.append('__RequestVerificationToken', token);
+            const response = await fetch('/Admin/EliminarAnuncioLado', {
+                method: 'POST',
+                body: formData
+            });
+            location.reload();
+        } catch (error) {
+            alert('Error al eliminar');
+        }
+    }
+
+    // Toggle estado
+    async function toggleEstado(id, activo) {
+        try {
+            const response = await fetch('/Admin/ToggleEstadoAnuncioLado', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, activo })
+            });
+            const result = await response.json();
+            if (!result.success) {
+                alert(result.message || 'Error');
+                location.reload();
+            }
+        } catch (error) {
+            alert('Error al cambiar estado');
+            location.reload();
+        }
+    }
+
+    // UI helpers
+    function toggleUbicacion(tipo) {
+        actualizarUbicacionesUI();
+        const feedDiv = document.getElementById('divFrecuenciaFeed');
+        feedDiv.style.display = document.getElementById('inputMostrarEnFeed').checked ? 'block' : 'none';
+    }
+
+    function actualizarUbicacionesUI() {
+        const ubicaciones = ['feed', 'stories', 'explorar', 'perfiles', 'banner-superior', 'banner-inferior', 'stories-global'];
+        ubicaciones.forEach(u => {
+            const check = document.getElementById('check-' + u);
+            const input = check?.querySelector('input');
+            if (check && input) {
+                check.classList.toggle('active', input.checked);
             }
         });
-    </script>
-}
-
-<style>
-    .form-check-input:checked {
-        background-color: var(--primary);
-        border-color: var(--primary);
     }
 
-    .table th {
-        font-weight: 600;
-        font-size: 0.8125rem;
-        text-transform: uppercase;
-        color: var(--text-gray);
-        border-bottom-width: 2px;
+    function toggleTextoPersonalizado() {
+        const select = document.getElementById('inputTextoBoton');
+        document.getElementById('divTextoPersonalizado').style.display = select.value === 'Personalizado' ? 'block' : 'none';
     }
 
-    .table td {
-        vertical-align: middle;
+    function toggleCarrusel() {
+        document.getElementById('divCarrusel').style.display = document.getElementById('inputEsCarrusel').checked ? 'block' : 'none';
     }
 
-    .btn-group .btn {
-        padding: 0.375rem 0.5rem;
+    function cambiarTipoUsuario() {
+        const valor = document.querySelector('input[name="tipoUsuarioSeg"]:checked').value;
+        document.querySelectorAll('.segmentacion-chips .chip').forEach(c => c.classList.remove('active'));
+        document.getElementById('chip-' + valor).classList.add('active');
+
+        document.getElementById('inputSoloCreadores').value = valor === 'creadores';
+        document.getElementById('inputSoloFans').value = valor === 'fans';
+        document.getElementById('inputSoloVerificados').value = valor === 'verificados';
     }
 
-    .modal-content {
-        border: none;
-        border-radius: var(--radius-lg);
+    // Preview
+    function actualizarPreview() {
+        const titulo = document.getElementById('inputTitulo').value || 'Titulo del anuncio';
+        const desc = document.getElementById('inputDescripcion').value || 'Descripcion del anuncio';
+        const textoBtn = document.getElementById('inputTextoBoton');
+        let btnText = textoBtn.options[textoBtn.selectedIndex].text;
+        if (textoBtn.value === 'Personalizado') {
+            btnText = document.getElementById('inputTextoPersonalizado').value || 'Ver mas';
+        }
+
+        document.getElementById('previewTitulo').textContent = titulo;
+        document.getElementById('previewDesc').textContent = desc;
+        document.getElementById('previewBtn').textContent = btnText;
     }
 
-    .modal-header {
-        border-bottom: 1px solid var(--border-color);
-        padding: 1.25rem 1.5rem;
+    function previewImagen(input) {
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            const isVideo = file.type.startsWith('video/');
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (isVideo) {
+                    document.getElementById('previewImg').innerHTML = `<video src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:8px" autoplay muted loop playsinline></video>`;
+                } else {
+                    document.getElementById('previewImg').innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`;
+                }
+            };
+            reader.readAsDataURL(file);
+        }
     }
 
-    .modal-body {
-        padding: 1.5rem;
+    // Carrusel
+    function agregarImagenesCarrusel(input) {
+        if (input.files) {
+            for (let f of input.files) {
+                if (carruselFiles.length < 10) {
+                    carruselFiles.push(f);
+                }
+            }
+            renderCarruselPreviews();
+        }
+        input.value = '';
     }
 
-    .modal-footer {
-        border-top: 1px solid var(--border-color);
-        padding: 1rem 1.5rem;
+    function renderCarruselPreviews() {
+        const container = document.getElementById('carruselImages');
+        let html = '';
+        carruselFiles.forEach((f, i) => {
+            const url = URL.createObjectURL(f);
+            html += `<div class="carrusel-image-item">
+                <img src="${url}" alt="Carrusel ${i+1}">
+                <span class="remove-btn" onclick="removerCarruselImagen(${i})">&times;</span>
+            </div>`;
+        });
+        html += `<label class="carrusel-add-btn">
+            <input type="file" accept="image/*" multiple style="display:none" onchange="agregarImagenesCarrusel(this)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+        </label>`;
+        container.innerHTML = html;
     }
-</style>
+
+    function removerCarruselImagen(index) {
+        carruselFiles.splice(index, 1);
+        renderCarruselPreviews();
+    }
+
+    // Submit form
+    document.getElementById('formAnuncio').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+
+        // Los checkboxes no marcados no se envian, necesitamos enviar false explicitamente
+        const checkboxNames = [
+            'MostrarEnFeed', 'MostrarEnStories', 'MostrarEnExplorar',
+            'MostrarBannerSuperior', 'MostrarBannerInferior', 'MostrarEnPerfiles',
+            'MostrarEnStoriesGlobal', 'EsCarrusel'
+        ];
+        checkboxNames.forEach(name => {
+            const cb = this.querySelector(`[name="${name}"]`);
+            if (cb) {
+                // Eliminar el valor "on" que envia el checkbox marcado
+                formData.delete(name);
+                // Agregar true o false
+                formData.append(name, cb.checked ? 'true' : 'false');
+            }
+        });
+
+        // Agregar archivos carrusel
+        carruselFiles.forEach((f, i) => {
+            formData.append('ImagenesCarrusel', f);
+        });
+
+        // Debug: mostrar que se esta enviando
+        console.log('FormData entries:');
+        for (let [key, value] of formData.entries()) {
+            if (value instanceof File) {
+                console.log(key, ':', value.name, value.size, 'bytes');
+            } else {
+                console.log(key, ':', value);
+            }
+        }
+
+        try {
+            const response = await fetch('/Admin/GuardarAnuncioLado', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok || response.redirected) {
+                window.location.reload();
+            } else {
+                // Intentar leer el error
+                const text = await response.text();
+                console.error('Error response:', text);
+                alert('Error al guardar el anuncio. Codigo: ' + response.status);
+            }
+        } catch (error) {
+            console.error('Submit error:', error);
+            alert('Error: ' + error.message);
+        }
+    });
+
+    // Reportes
+    async function cargarReporteGeneral() {
+        // Datos simulados por ahora - implementar endpoint real
+        document.getElementById('reporteImpresiones').textContent = '@ViewBag.TotalImpresiones.ToString("N0")';
+        document.getElementById('reporteClics').textContent = '@ViewBag.TotalClics.ToString("N0")';
+
+        const totalImp = @ViewBag.TotalImpresiones;
+        const totalClics = @ViewBag.TotalClics;
+        const ctr = totalImp > 0 ? (totalClics / totalImp * 100).toFixed(2) : '0.00';
+        document.getElementById('reporteCTR').textContent = ctr + '%';
+        document.getElementById('reporteUsuarios').textContent = '-';
+
+        // Chart
+        if (chartRendimiento) chartRendimiento.destroy();
+        const ctx = document.getElementById('chartRendimiento').getContext('2d');
+        chartRendimiento = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'],
+                datasets: [{
+                    label: 'Impresiones',
+                    data: [120, 190, 300, 250, 220, 180, 150],
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }, {
+                    label: 'Clics',
+                    data: [12, 25, 35, 28, 22, 18, 15],
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+
+    function cambiarPeriodoReporte(dias) {
+        cargarReporteGeneral();
+    }
+
+    function verReporte(id) {
+        document.getElementById('modalReporteBody').innerHTML = `
+            <div class="form-row" style="margin-bottom: 20px;">
+                <div class="metric-mini">
+                    <div class="metric-mini-value">-</div>
+                    <div class="metric-mini-label">Impresiones</div>
+                </div>
+                <div class="metric-mini">
+                    <div class="metric-mini-value">-</div>
+                    <div class="metric-mini-label">Clics</div>
+                </div>
+                <div class="metric-mini">
+                    <div class="metric-mini-value">-</div>
+                    <div class="metric-mini-label">CTR</div>
+                </div>
+                <div class="metric-mini">
+                    <div class="metric-mini-value">-</div>
+                    <div class="metric-mini-label">Usuarios</div>
+                </div>
+            </div>
+            <p class="text-muted text-center">Implementar endpoint para datos detallados por anuncio</p>
+        `;
+        new bootstrap.Modal(document.getElementById('modalReporte')).show();
+    }
+
+    function exportarReporte() {
+        // Generar CSV simple
+        let csv = 'Anuncio,Impresiones,Clics,CTR,Usuarios Unicos\n';
+        document.querySelectorAll('#tablaReporteAnuncios tbody tr').forEach(row => {
+            const cells = row.querySelectorAll('td');
+            const nombre = cells[0].querySelector('div').textContent.trim();
+            const imp = cells[1].textContent.trim();
+            const clics = cells[2].textContent.trim();
+            const ctr = cells[3].textContent.trim();
+            const usuarios = cells[4].textContent.trim();
+            csv += `"${nombre}",${imp},${clics},${ctr},${usuarios}\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'reporte_anuncios_' + new Date().toISOString().split('T')[0] + '.csv';
+        a.click();
+    }
+
+    // Init
+    actualizarUbicacionesUI();
+</script>

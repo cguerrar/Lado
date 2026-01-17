@@ -1,5 +1,6 @@
 using Lado.Data;
 using Lado.Models;
+using Lado.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -16,17 +17,20 @@ namespace Lado.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IWebHostEnvironment _webHostEnvironment;
         private readonly ILogger<AgenciaController> _logger;
+        private readonly IFileValidationService _fileValidationService;
 
         public AgenciaController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             IWebHostEnvironment webHostEnvironment,
-            ILogger<AgenciaController> logger)
+            ILogger<AgenciaController> logger,
+            IFileValidationService fileValidationService)
         {
             _context = context;
             _userManager = userManager;
             _webHostEnvironment = webHostEnvironment;
             _logger = logger;
+            _fileValidationService = fileValidationService;
         }
 
         // ========================================
@@ -144,16 +148,32 @@ namespace Lado.Controllers
 
             try
             {
-                // Procesar logo si se subio
+                // Procesar logo si se subio con validación de seguridad
                 if (logo != null && logo.Length > 0)
                 {
+                    // Validar que sea una imagen válida usando magic bytes
+                    var validacion = await _fileValidationService.ValidarImagenAsync(logo);
+                    if (!validacion.EsValido)
+                    {
+                        _logger.LogWarning("Intento de subir logo de agencia inválido: {Error}", validacion.MensajeError);
+                        TempData["Error"] = $"El logo no es válido: {validacion.MensajeError}";
+                        return View(model);
+                    }
+
+                    // Validar tamaño máximo (5MB)
+                    if (logo.Length > 5 * 1024 * 1024)
+                    {
+                        TempData["Error"] = "El logo no puede superar los 5MB.";
+                        return View(model);
+                    }
+
                     var uploadsPath = Path.Combine(_webHostEnvironment.WebRootPath, "uploads", "agencias");
                     if (!Directory.Exists(uploadsPath))
                     {
                         Directory.CreateDirectory(uploadsPath);
                     }
 
-                    var fileName = $"{Guid.NewGuid()}{Path.GetExtension(logo.FileName)}";
+                    var fileName = $"{Guid.NewGuid()}{validacion.Extension}";
                     var filePath = Path.Combine(uploadsPath, fileName);
 
                     using (var stream = new FileStream(filePath, FileMode.Create))
@@ -256,16 +276,37 @@ namespace Lado.Controllers
                 return View(model);
             }
 
-            // Procesar creativo
+            // Procesar creativo con validación de seguridad
             if (creativo != null && creativo.Length > 0)
             {
+                // Validar que sea una imagen o video válido usando magic bytes
+                var validacion = await _fileValidationService.ValidarMediaAsync(creativo);
+                if (!validacion.EsValido)
+                {
+                    _logger.LogWarning("Intento de subir creativo de anuncio inválido: {Error}", validacion.MensajeError);
+                    TempData["Error"] = $"El archivo creativo no es válido: {validacion.MensajeError}";
+                    ViewBag.Agencia = agencia;
+                    return View(model);
+                }
+
+                // Validar tamaño máximo (50MB para video, 10MB para imagen)
+                var maxSize = validacion.Tipo == TipoArchivoValidacion.Video ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+                if (creativo.Length > maxSize)
+                {
+                    TempData["Error"] = validacion.Tipo == TipoArchivoValidacion.Video
+                        ? "El video no puede superar los 50MB."
+                        : "La imagen no puede superar los 10MB.";
+                    ViewBag.Agencia = agencia;
+                    return View(model);
+                }
+
                 var uploadsPath = Path.Combine(_webHostEnvironment.WebRootPath, "uploads", "anuncios");
                 if (!Directory.Exists(uploadsPath))
                 {
                     Directory.CreateDirectory(uploadsPath);
                 }
 
-                var fileName = $"{Guid.NewGuid()}{Path.GetExtension(creativo.FileName)}";
+                var fileName = $"{Guid.NewGuid()}{validacion.Extension}";
                 var filePath = Path.Combine(uploadsPath, fileName);
 
                 using (var stream = new FileStream(filePath, FileMode.Create))
@@ -275,13 +316,10 @@ namespace Lado.Controllers
 
                 model.UrlCreativo = $"/uploads/anuncios/{fileName}";
 
-                // Determinar tipo de creativo
-                var extension = Path.GetExtension(creativo.FileName).ToLower();
-                model.TipoCreativo = extension switch
-                {
-                    ".mp4" or ".webm" or ".mov" => TipoCreativo.Video,
-                    _ => TipoCreativo.Imagen
-                };
+                // Determinar tipo de creativo basado en validación real
+                model.TipoCreativo = validacion.Tipo == TipoArchivoValidacion.Video
+                    ? TipoCreativo.Video
+                    : TipoCreativo.Imagen;
             }
 
             model.AgenciaId = agencia.Id;
@@ -391,16 +429,37 @@ namespace Lado.Controllers
             anuncio.FechaFin = model.FechaFin;
             anuncio.UltimaActualizacion = DateTime.Now;
 
-            // Procesar nuevo creativo si se subio
+            // Procesar nuevo creativo con validación de seguridad
             if (creativo != null && creativo.Length > 0)
             {
+                // Validar que sea una imagen o video válido usando magic bytes
+                var validacion = await _fileValidationService.ValidarMediaAsync(creativo);
+                if (!validacion.EsValido)
+                {
+                    _logger.LogWarning("Intento de subir creativo inválido en edición: {Error}", validacion.MensajeError);
+                    TempData["Error"] = $"El archivo creativo no es válido: {validacion.MensajeError}";
+                    ViewBag.Agencia = agencia;
+                    return View("EditarAnuncio", model);
+                }
+
+                // Validar tamaño máximo
+                var maxSize = validacion.Tipo == TipoArchivoValidacion.Video ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+                if (creativo.Length > maxSize)
+                {
+                    TempData["Error"] = validacion.Tipo == TipoArchivoValidacion.Video
+                        ? "El video no puede superar los 50MB."
+                        : "La imagen no puede superar los 10MB.";
+                    ViewBag.Agencia = agencia;
+                    return View("EditarAnuncio", model);
+                }
+
                 var uploadsPath = Path.Combine(_webHostEnvironment.WebRootPath, "uploads", "anuncios");
                 if (!Directory.Exists(uploadsPath))
                 {
                     Directory.CreateDirectory(uploadsPath);
                 }
 
-                var fileName = $"{Guid.NewGuid()}{Path.GetExtension(creativo.FileName)}";
+                var fileName = $"{Guid.NewGuid()}{validacion.Extension}";
                 var filePath = Path.Combine(uploadsPath, fileName);
 
                 using (var stream = new FileStream(filePath, FileMode.Create))
@@ -410,12 +469,10 @@ namespace Lado.Controllers
 
                 anuncio.UrlCreativo = $"/uploads/anuncios/{fileName}";
 
-                var extension = Path.GetExtension(creativo.FileName).ToLower();
-                anuncio.TipoCreativo = extension switch
-                {
-                    ".mp4" or ".webm" or ".mov" => TipoCreativo.Video,
-                    _ => TipoCreativo.Imagen
-                };
+                // Determinar tipo de creativo basado en validación real
+                anuncio.TipoCreativo = validacion.Tipo == TipoArchivoValidacion.Video
+                    ? TipoCreativo.Video
+                    : TipoCreativo.Imagen;
             }
 
             // Actualizar segmentacion
@@ -750,16 +807,32 @@ namespace Lado.Controllers
             agencia.SitioWeb = model.SitioWeb;
             agencia.Descripcion = model.Descripcion;
 
-            // Procesar nuevo logo si se subio
+            // Procesar nuevo logo con validación de seguridad
             if (logo != null && logo.Length > 0)
             {
+                // Validar que sea una imagen válida usando magic bytes
+                var validacion = await _fileValidationService.ValidarImagenAsync(logo);
+                if (!validacion.EsValido)
+                {
+                    _logger.LogWarning("Intento de subir logo de agencia inválido: {Error}", validacion.MensajeError);
+                    TempData["Error"] = $"El logo no es válido: {validacion.MensajeError}";
+                    return RedirectToAction(nameof(Perfil));
+                }
+
+                // Validar tamaño máximo (5MB)
+                if (logo.Length > 5 * 1024 * 1024)
+                {
+                    TempData["Error"] = "El logo no puede superar los 5MB.";
+                    return RedirectToAction(nameof(Perfil));
+                }
+
                 var uploadsPath = Path.Combine(_webHostEnvironment.WebRootPath, "uploads", "agencias");
                 if (!Directory.Exists(uploadsPath))
                 {
                     Directory.CreateDirectory(uploadsPath);
                 }
 
-                var fileName = $"{Guid.NewGuid()}{Path.GetExtension(logo.FileName)}";
+                var fileName = $"{Guid.NewGuid()}{validacion.Extension}";
                 var filePath = Path.Combine(uploadsPath, fileName);
 
                 using (var stream = new FileStream(filePath, FileMode.Create))

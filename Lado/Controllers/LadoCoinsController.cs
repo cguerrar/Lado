@@ -224,18 +224,38 @@ namespace Lado.Controllers
                 return Json(new { success = false, error = "Error al procesar el canje" });
             }
 
-            // TODO: Acreditar al saldo publicitario del usuario/agencia
-            // Por ahora solo registramos la transacción
+            // Acreditar al saldo publicitario
+            // Primero verificar si tiene agencia activa
+            var agencia = await _context.Agencias
+                .FirstOrDefaultAsync(a => a.UsuarioId == usuario.Id && a.Estado == EstadoAgencia.Activa);
 
-            _logger.LogInformation("Usuario {UsuarioId} canjeó ${Monto} LadoCoins por ${Credito} en publicidad",
-                usuario.Id, monto, creditoPublicitario);
+            if (agencia != null)
+            {
+                // Acreditar a la agencia
+                agencia.SaldoPublicitario += creditoPublicitario;
+                _context.Agencias.Update(agencia);
+            }
+            else
+            {
+                // Acreditar al usuario directamente
+                usuario.SaldoPublicitario += creditoPublicitario;
+                _context.Users.Update(usuario);
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Usuario {UsuarioId} canjeó ${Monto} LadoCoins por ${Credito} en publicidad (destino: {Destino})",
+                usuario.Id, monto, creditoPublicitario, agencia != null ? $"Agencia {agencia.Id}" : "Usuario");
 
             return Json(new
             {
                 success = true,
-                mensaje = $"¡Canjeaste ${monto:F2} LadoCoins por ${creditoPublicitario:F2} en crédito publicitario!",
+                mensaje = agencia != null
+                    ? $"¡Canjeaste ${monto:F2} LadoCoins por ${creditoPublicitario:F2} en crédito publicitario para tu agencia!"
+                    : $"¡Canjeaste ${monto:F2} LadoCoins por ${creditoPublicitario:F2} en crédito publicitario!",
                 creditoPublicitario,
-                montoQuemado
+                montoQuemado,
+                destinoAgencia = agencia != null
             });
         }
 
@@ -280,18 +300,42 @@ namespace Lado.Controllers
                 return Json(new { success = false, error = "Error al procesar el canje" });
             }
 
-            // TODO: Activar boost de algoritmo para el usuario
-            // Por ahora solo registramos la transacción
+            // Activar boost de algoritmo para el usuario
+            // El boost dura 7 días y aumenta la visibilidad del contenido
+            var duracionBoostDias = 7;
+            var multiplicadorVisibilidad = 1.5m; // 50% más visibilidad
 
-            _logger.LogInformation("Usuario {UsuarioId} canjeó ${Monto} LadoCoins por ${Credito} en boost",
-                usuario.Id, monto, creditoBoost);
+            // Si ya tiene boost activo, sumar el crédito
+            if (usuario.BoostActivo && usuario.BoostFechaFin > DateTime.Now)
+            {
+                usuario.BoostCredito += creditoBoost;
+                // Extender la fecha de fin si el nuevo crédito lo justifica
+                var diasExtra = (int)Math.Ceiling(creditoBoost / 10); // 1 día extra por cada $10
+                usuario.BoostFechaFin = usuario.BoostFechaFin.Value.AddDays(diasExtra);
+            }
+            else
+            {
+                // Nuevo boost
+                usuario.BoostActivo = true;
+                usuario.BoostCredito = creditoBoost;
+                usuario.BoostFechaFin = DateTime.Now.AddDays(duracionBoostDias);
+                usuario.BoostMultiplicador = multiplicadorVisibilidad;
+            }
+
+            _context.Users.Update(usuario);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Usuario {UsuarioId} activó boost de algoritmo: ${Credito}, válido hasta {FechaFin}",
+                usuario.Id, creditoBoost, usuario.BoostFechaFin);
 
             return Json(new
             {
                 success = true,
-                mensaje = $"¡Canjeaste ${monto:F2} LadoCoins por ${creditoBoost:F2} en boost de algoritmo!",
+                mensaje = $"¡Boost activado! Tu contenido tendrá {(multiplicadorVisibilidad - 1) * 100}% más visibilidad hasta {usuario.BoostFechaFin:dd/MM/yyyy}",
                 creditoBoost,
-                montoQuemado
+                montoQuemado,
+                boostFechaFin = usuario.BoostFechaFin?.ToString("yyyy-MM-dd"),
+                boostMultiplicador = usuario.BoostMultiplicador
             });
         }
 

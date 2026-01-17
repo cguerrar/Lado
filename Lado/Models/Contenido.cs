@@ -156,6 +156,22 @@ namespace Lado.Models
         /// </summary>
         public bool ComentariosDesactivados { get; set; } = false;
 
+        /// <summary>
+        /// Shadow hide: El contenido está oculto para todos excepto el creador.
+        /// El creador no sabe que está oculto (medida de seguridad interna).
+        /// </summary>
+        public bool OcultoSilenciosamente { get; set; } = false;
+
+        /// <summary>
+        /// Fecha en que se ocultó silenciosamente
+        /// </summary>
+        public DateTime? FechaOcultoSilenciosamente { get; set; }
+
+        /// <summary>
+        /// ID del administrador que ocultó el contenido
+        /// </summary>
+        public string? OcultadoPorAdminId { get; set; }
+
         // ========================================
         // UBICACIÓN GEOGRÁFICA (desde EXIF)
         // ========================================
@@ -281,5 +297,20 @@ namespace Lado.Models
         /// </summary>
         [NotMapped]
         public int NumeroArchivos => TodosLosArchivos.Count;
+
+        /// <summary>
+        /// Archivos visibles (excluye archivos con Shadow Hide)
+        /// Usar esto para mostrar a usuarios que no son el creador
+        /// </summary>
+        [NotMapped]
+        public List<ArchivoContenido> ArchivosVisibles =>
+            TodosLosArchivos.Where(a => !a.OcultoSilenciosamente).ToList();
+
+        /// <summary>
+        /// Indica si tiene archivos ocultos silenciosamente
+        /// </summary>
+        [NotMapped]
+        public bool TieneArchivosOcultos =>
+            TodosLosArchivos.Any(a => a.OcultoSilenciosamente);
     }
 }

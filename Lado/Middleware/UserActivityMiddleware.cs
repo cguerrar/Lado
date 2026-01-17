@@ -134,6 +134,35 @@ namespace Lado.Middleware
                 }
             }
         }
+
+        /// <summary>
+        /// Limpia el cache de un usuario específico del cache estático.
+        /// Se usa durante logout para evitar contaminación de sesiones.
+        /// </summary>
+        public static void LimpiarCacheUsuario(string userId)
+        {
+            if (string.IsNullOrEmpty(userId)) return;
+
+            lock (_lock)
+            {
+                if (_ultimaActualizacion.ContainsKey(userId))
+                {
+                    _ultimaActualizacion.Remove(userId);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Limpia completamente el cache estático.
+        /// Se puede usar en caso de emergencia o reinicio del pool.
+        /// </summary>
+        public static void LimpiarCacheCompleto()
+        {
+            lock (_lock)
+            {
+                _ultimaActualizacion.Clear();
+            }
+        }
     }
 
     // Extensión para registrar el middleware

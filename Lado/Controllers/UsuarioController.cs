@@ -618,8 +618,38 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-            // Aquí guardarías las preferencias de notificaciones
-            TempData["Success"] = "Preferencias de notificaciones actualizadas";
+            try
+            {
+                // Interacciones
+                usuario.EmailNuevosMensajes = form.ContainsKey("EmailNuevosMensajes");
+                usuario.EmailComentarios = form.ContainsKey("EmailComentarios");
+                usuario.EmailMenciones = form.ContainsKey("EmailMenciones");
+
+                // Seguidores y suscripciones
+                usuario.EmailNuevosSeguidores = form.ContainsKey("EmailNuevosSeguidores");
+                usuario.EmailNuevasSuscripciones = form.ContainsKey("EmailNuevasSuscripciones");
+                usuario.EmailPropinas = form.ContainsKey("EmailPropinas");
+
+                // Contenido
+                usuario.EmailNuevoContenido = form.ContainsKey("EmailNuevoContenido");
+                usuario.EmailStories = form.ContainsKey("EmailStories");
+
+                // Resúmenes
+                usuario.EmailResumenSemanal = form.ContainsKey("EmailResumenSemanal");
+                usuario.EmailReporteGanancias = form.ContainsKey("EmailReporteGanancias");
+
+                // Consejos
+                usuario.EmailConsejos = form.ContainsKey("EmailConsejos");
+
+                await _userManager.UpdateAsync(usuario);
+                TempData["Success"] = "Preferencias de notificaciones actualizadas correctamente";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al actualizar notificaciones para usuario {UserId}", usuario.Id);
+                TempData["Error"] = "Error al actualizar las preferencias de notificaciones";
+            }
+
             return RedirectToAction(nameof(Configuracion));
         }
 
@@ -634,8 +664,65 @@ namespace Lado.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-            // Aquí guardarías las preferencias de privacidad
-            TempData["Success"] = "Configuración de privacidad actualizada";
+            try
+            {
+                // Perfil privado (requiere aprobación de seguidores)
+                usuario.PerfilPrivado = form.ContainsKey("PerfilPrivado");
+
+                // Mostrar en búsquedas
+                usuario.MostrarEnBusquedas = form.ContainsKey("MostrarBusquedas");
+
+                // Quién puede enviar mensajes
+                if (form.TryGetValue("QuienPuedeMensajear", out var mensajesValue) &&
+                    Enum.TryParse<PermisoPrivacidad>(mensajesValue, out var permisoMensajes))
+                {
+                    usuario.QuienPuedeMensajear = permisoMensajes;
+                }
+                else
+                {
+                    // Compatibilidad con checkbox antiguo "MensajesDesconocidos"
+                    usuario.QuienPuedeMensajear = form.ContainsKey("MensajesDesconocidos")
+                        ? PermisoPrivacidad.Todos
+                        : PermisoPrivacidad.Seguidores;
+                }
+
+                // Quién puede comentar
+                if (form.TryGetValue("QuienPuedeComentar", out var comentarValue) &&
+                    Enum.TryParse<PermisoPrivacidad>(comentarValue, out var permisoComentarios))
+                {
+                    usuario.QuienPuedeComentar = permisoComentarios;
+                }
+
+                // Mostrar seguidores
+                usuario.MostrarSeguidores = form.ContainsKey("MostrarSeguidores");
+
+                // Mostrar siguiendo
+                usuario.MostrarSiguiendo = form.ContainsKey("MostrarSiguiendo");
+
+                // Permitir etiquetas
+                usuario.PermitirEtiquetas = form.ContainsKey("PermitirEtiquetas");
+
+                // Detectar ubicación automáticamente (existente)
+                usuario.DetectarUbicacionAutomaticamente = form.ContainsKey("DetectarUbicacionAutomaticamente");
+
+                // Mostrar estado en línea (existente)
+                usuario.MostrarEstadoEnLinea = form.ContainsKey("MostrarEstadoEnLinea");
+
+                // Ocultar identidad LadoA (existente, solo para creadores LadoB)
+                if (usuario.EsCreador && !string.IsNullOrEmpty(usuario.Seudonimo))
+                {
+                    usuario.OcultarIdentidadLadoA = form.ContainsKey("OcultarIdentidadLadoA");
+                }
+
+                await _userManager.UpdateAsync(usuario);
+                TempData["Success"] = "Configuración de privacidad actualizada correctamente";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al actualizar privacidad para usuario {UserId}", usuario.Id);
+                TempData["Error"] = "Error al actualizar la configuración de privacidad";
+            }
+
             return RedirectToAction(nameof(Configuracion));
         }
 

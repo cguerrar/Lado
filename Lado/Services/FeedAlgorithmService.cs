@@ -141,6 +141,7 @@ namespace Lado.Services
         private async Task<List<Contenido>> AplicarTrendingAsync(List<Contenido> contenidos, ApplicationDbContext context, int semilla)
         {
             var contenidoIds = contenidos.Select(c => c.Id).ToList();
+            var usuarioIds = contenidos.Select(c => c.UsuarioId).Distinct().ToList();
 
             // Obtener reacciones para calcular engagement
             var reaccionesPorContenido = await context.Reacciones
@@ -149,11 +150,22 @@ namespace Lado.Services
                 .Select(g => new { ContenidoId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.ContenidoId, x => x.Count);
 
+            // ⭐ Obtener multiplicadores de boost activos de los usuarios
+            var boostPorUsuario = await context.Users
+                .Where(u => usuarioIds.Contains(u.Id) &&
+                           u.BoostMultiplicador > 1.0m &&
+                           u.BoostFechaFin.HasValue &&
+                           u.BoostFechaFin.Value > DateTime.Now)
+                .ToDictionaryAsync(u => u.Id, u => (double)u.BoostMultiplicador);
+
             return contenidos
                 .Select(c => new
                 {
                     Contenido = c,
-                    Score = CalcularScoreTrending(c, reaccionesPorContenido.GetValueOrDefault(c.Id, 0))
+                    Score = CalcularScoreTrending(
+                        c,
+                        reaccionesPorContenido.GetValueOrDefault(c.Id, 0),
+                        boostPorUsuario.GetValueOrDefault(c.UsuarioId, 1.0))
                 })
                 .OrderByDescending(x => x.Score)
                 .ThenBy(x => CalcularHashDeterministico(x.Contenido.Id, semilla)) // Desempate determinístico
@@ -161,7 +173,7 @@ namespace Lado.Services
                 .ToList();
         }
 
-        private double CalcularScoreTrending(Contenido contenido, int totalReacciones)
+        private double CalcularScoreTrending(Contenido contenido, int totalReacciones, double boostMultiplicador = 1.0)
         {
             var horasDesdePublicacion = (DateTime.Now - contenido.FechaPublicacion).TotalHours;
 
@@ -179,8 +191,8 @@ namespace Lado.Services
             // Boost para contenido muy reciente (< 6 horas)
             double recencyBoost = horasDesdePublicacion < 6 ? 50 : (horasDesdePublicacion < 24 ? 25 : 0);
 
-            // Score final
-            return (engagement * decayFactor) + recencyBoost;
+            // Score final con multiplicador de boost
+            return ((engagement * decayFactor) + recencyBoost) * boostMultiplicador;
         }
         #endregion
 
@@ -287,11 +299,21 @@ namespace Lado.Services
                 .ToDictionaryAsync(i => i.CategoriaInteresId, i => i.PesoInteres);
 
             var contenidoIds = contenidos.Select(c => c.Id).ToList();
+            var usuarioIds = contenidos.Select(c => c.UsuarioId).Distinct().ToList();
+
             var reaccionesPorContenido = await context.Reacciones
                 .Where(r => contenidoIds.Contains(r.ContenidoId))
                 .GroupBy(r => r.ContenidoId)
                 .Select(g => new { ContenidoId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.ContenidoId, x => x.Count);
+
+            // ⭐ Obtener multiplicadores de boost activos de los usuarios
+            var boostPorUsuario = await context.Users
+                .Where(u => usuarioIds.Contains(u.Id) &&
+                           u.BoostMultiplicador > 1.0m &&
+                           u.BoostFechaFin.HasValue &&
+                           u.BoostFechaFin.Value > DateTime.Now)
+                .ToDictionaryAsync(u => u.Id, u => (double)u.BoostMultiplicador);
 
             return contenidos
                 .Select(c => new
@@ -304,7 +326,8 @@ namespace Lado.Services
                         tipoPreferido?.Tipo,
                         reaccionesPorContenido.GetValueOrDefault(c.Id, 0),
                         interesesUsuario,
-                        pesos)
+                        pesos,
+                        boostPorUsuario.GetValueOrDefault(c.UsuarioId, 1.0))
                 })
                 .OrderByDescending(x => x.Score)
                 .ThenBy(x => CalcularHashDeterministico(x.Contenido.Id, semilla)) // Desempate determinístico
@@ -319,7 +342,8 @@ namespace Lado.Services
             TipoContenido? tipoPreferido,
             int totalReacciones,
             Dictionary<int, decimal> interesesUsuario,
-            Dictionary<string, double> pesos)
+            Dictionary<string, double> pesos,
+            double boostMultiplicador = 1.0)
         {
             double score = 0;
 
@@ -377,7 +401,8 @@ namespace Lado.Services
             if (contenido.TipoLado == TipoLado.LadoB)
                 score += 15;
 
-            return score;
+            // ⭐ 8. Aplicar multiplicador de boost comprado con LadoCoins
+            return score * boostMultiplicador;
         }
         #endregion
 

@@ -55,6 +55,15 @@ namespace Lado.Controllers
         }
 
         // ========================================
+        // HELPER: Verificar permisos de privacidad
+        // ========================================
+
+        private async Task<bool> PuedeMensajear(ApplicationUser remitente, ApplicationUser destinatario)
+        {
+            return await MensajesPrivacidadHelper.PuedeMensajearAsync(remitente, destinatario, _context);
+        }
+
+        // ========================================
         // INDEX - LISTA DE CONVERSACIONES
         // ========================================
 
@@ -405,6 +414,12 @@ namespace Lado.Controllers
                 if (!existeRelacion && !tieneConversacion)
                 {
                     return Json(new { success = false, message = "Debes estar suscrito para iniciar una conversación" });
+                }
+
+                // ⭐ Verificar configuración de privacidad QuienPuedeMensajear
+                if (!await PuedeMensajear(usuario, destinatario))
+                {
+                    return Json(new { success = false, message = "Este usuario no acepta mensajes de tu tipo de cuenta" });
                 }
 
                 // Crear mensaje
@@ -1393,5 +1408,52 @@ namespace Lado.Controllers
     public class MarcarLeidosRequest
     {
         public int[] MensajeIds { get; set; } = Array.Empty<int>();
+    }
+
+    // ========================================
+    // HELPER: Verificar si puede enviar mensajes
+    // ========================================
+
+    public static class MensajesPrivacidadHelper
+    {
+        /// <summary>
+        /// Verifica si el remitente puede enviar mensajes al destinatario
+        /// según la configuración QuienPuedeMensajear del destinatario.
+        /// </summary>
+        public static async Task<bool> PuedeMensajearAsync(
+            ApplicationUser remitente,
+            ApplicationUser destinatario,
+            ApplicationDbContext context)
+        {
+            // Si no tiene configuración, permite a todos (comportamiento predeterminado)
+            var permiso = destinatario.QuienPuedeMensajear;
+
+            switch (permiso)
+            {
+                case PermisoPrivacidad.Todos:
+                    return true;
+
+                case PermisoPrivacidad.Seguidores:
+                    // Verificar si el remitente sigue al destinatario
+                    return await context.Suscripciones
+                        .AnyAsync(s => s.FanId == remitente.Id &&
+                                      s.CreadorId == destinatario.Id &&
+                                      s.EstaActiva);
+
+                case PermisoPrivacidad.Suscriptores:
+                    // Verificar si el remitente está suscrito (pagando) al destinatario
+                    return await context.Suscripciones
+                        .AnyAsync(s => s.FanId == remitente.Id &&
+                                      s.CreadorId == destinatario.Id &&
+                                      s.EstaActiva &&
+                                      s.TipoLado == TipoLado.LadoB);
+
+                case PermisoPrivacidad.Nadie:
+                    return false;
+
+                default:
+                    return true;
+            }
+        }
     }
 }

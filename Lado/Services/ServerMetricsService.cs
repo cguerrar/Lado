@@ -26,6 +26,9 @@ namespace Lado.Services
         public long FreeGB { get; set; }
         public double UsagePercent { get; set; }
         public string DriveFormat { get; set; } = "";
+        public string DriveType { get; set; } = "Fixed";
+        public bool IsSystemDrive { get; set; }
+        public int Priority { get; set; }
     }
 
     public interface IServerMetricsService
@@ -312,34 +315,96 @@ namespace Lado.Services
         {
             try
             {
-                var drives = DriveInfo.GetDrives()
-                    .Where(d => d.IsReady && d.DriveType == DriveType.Fixed)
-                    .ToList();
+                // Obtener la unidad del sistema (donde está instalado Windows/el SO)
+                var systemDrive = Path.GetPathRoot(Environment.SystemDirectory)?.ToUpperInvariant() ?? "C:\\";
 
-                foreach (var drive in drives)
+                // Obtener TODAS las unidades disponibles
+                var allDrives = DriveInfo.GetDrives();
+                var diskList = new List<DiskMetrics>();
+
+                foreach (var drive in allDrives)
                 {
                     try
                     {
-                        var totalGB = drive.TotalSize / 1024 / 1024 / 1024;
-                        var freeGB = drive.AvailableFreeSpace / 1024 / 1024 / 1024;
-                        var usedGB = totalGB - freeGB;
+                        // Saltar unidades que no están listas o son CD-ROM
+                        if (!drive.IsReady || drive.DriveType == DriveType.CDRom)
+                            continue;
 
-                        metrics.Disks.Add(new DiskMetrics
+                        // Intentar obtener información del disco
+                        long totalGB = 0;
+                        long freeGB = 0;
+                        long usedGB = 0;
+                        string driveFormat = "Unknown";
+
+                        try
+                        {
+                            totalGB = drive.TotalSize / 1024 / 1024 / 1024;
+                            freeGB = drive.AvailableFreeSpace / 1024 / 1024 / 1024;
+                            usedGB = totalGB - freeGB;
+                            driveFormat = drive.DriveFormat;
+                        }
+                        catch
+                        {
+                            // Si no podemos leer el tamaño, saltar esta unidad
+                            continue;
+                        }
+
+                        // Determinar si es el disco del sistema
+                        var isSystemDrive = drive.Name.ToUpperInvariant() == systemDrive;
+
+                        // Determinar etiqueta según tipo de unidad
+                        string label;
+                        try
+                        {
+                            label = !string.IsNullOrEmpty(drive.VolumeLabel) ? drive.VolumeLabel : "";
+                        }
+                        catch
+                        {
+                            label = "";
+                        }
+
+                        if (string.IsNullOrEmpty(label))
+                        {
+                            label = drive.DriveType switch
+                            {
+                                DriveType.Network => "Unidad de Red",
+                                DriveType.Removable => "Unidad Removible",
+                                DriveType.Ram => "Disco RAM",
+                                _ => isSystemDrive ? "Sistema" : "Disco Local"
+                            };
+                        }
+
+                        // Determinar orden de prioridad
+                        int priority = drive.DriveType switch
+                        {
+                            DriveType.Fixed => isSystemDrive ? 0 : 1,
+                            DriveType.Removable => 2,
+                            DriveType.Network => 3,
+                            _ => 4
+                        };
+
+                        diskList.Add(new DiskMetrics
                         {
                             DriveName = drive.Name,
-                            DriveLabel = string.IsNullOrEmpty(drive.VolumeLabel) ? "Disco Local" : drive.VolumeLabel,
+                            DriveLabel = label,
                             TotalGB = totalGB,
                             FreeGB = freeGB,
                             UsedGB = usedGB,
                             UsagePercent = totalGB > 0 ? Math.Round((double)usedGB / totalGB * 100, 1) : 0,
-                            DriveFormat = drive.DriveFormat
+                            DriveFormat = driveFormat,
+                            DriveType = drive.DriveType.ToString(),
+                            IsSystemDrive = isSystemDrive,
+                            Priority = priority
                         });
                     }
                     catch
                     {
-                        // Ignorar discos con errores
+                        // Ignorar discos con errores de acceso
                     }
                 }
+
+                // Ordenar y agregar a metrics
+                metrics.Disks = diskList.OrderBy(d => d.Priority).ThenBy(d => d.DriveName).ToList();
             }
             catch
             {

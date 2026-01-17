@@ -23,6 +23,7 @@ namespace Lado.Services
         // Vencimiento
         Task<decimal> ObtenerMontoPorVencerAsync(string usuarioId, int diasAnticipacion = 7);
         Task ProcesarVencimientosAsync();
+        Task EnviarAlertasVencimientoAsync();
 
         // Pagos mixtos
         Task<(decimal montoLadoCoins, decimal montoReal)> CalcularPagoMixtoAsync(decimal montoTotal, decimal porcentajeMaxLadoCoins, decimal saldoDisponible);
@@ -476,6 +477,135 @@ namespace Lado.Services
                     await transaction.RollbackAsync();
                     await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Sistema, grupo.Key, null);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Envía alertas preventivas a usuarios con LadoCoins próximos a vencer (7 días y 1 día antes)
+        /// </summary>
+        public async Task EnviarAlertasVencimientoAsync()
+        {
+            if (_notificacionService == null)
+            {
+                _logger.LogWarning("NotificationService no disponible para alertas de vencimiento");
+                return;
+            }
+
+            var ahora = DateTime.Now;
+            var en7Dias = ahora.AddDays(7);
+            var en1Dia = ahora.AddDays(1);
+
+            // Obtener usuarios con LadoCoins que vencen en exactamente 7 días (±12 horas)
+            var alertas7Dias = await _context.TransaccionesLadoCoins
+                .Where(t => !t.Vencido &&
+                           t.MontoRestante > 0 &&
+                           t.FechaVencimiento.HasValue &&
+                           t.FechaVencimiento.Value > en7Dias.AddHours(-12) &&
+                           t.FechaVencimiento.Value <= en7Dias.AddHours(12))
+                .GroupBy(t => t.UsuarioId)
+                .Select(g => new
+                {
+                    UsuarioId = g.Key,
+                    MontoTotal = g.Sum(t => t.MontoRestante),
+                    FechaVencimiento = g.Min(t => t.FechaVencimiento)
+                })
+                .ToListAsync();
+
+            foreach (var alerta in alertas7Dias)
+            {
+                // Verificar si ya enviamos alerta de 7 días hoy
+                var cacheKey = $"alerta_lc_7d_{alerta.UsuarioId}_{ahora:yyyyMMdd}";
+                if (YaEnviadoHoy(cacheKey)) continue;
+
+                try
+                {
+                    await _notificacionService.CrearNotificacionSistemaAsync(
+                        alerta.UsuarioId,
+                        "LadoCoins por vencer",
+                        $"Tienes ${alerta.MontoTotal:F2} LadoCoins que vencerán en 7 días. ¡Úsalos antes de que expiren!",
+                        "/LadoCoins"
+                    );
+
+                    MarcarEnviadoHoy(cacheKey);
+                    _logger.LogInformation("Alerta 7 días enviada a usuario {UsuarioId}: ${Monto}", alerta.UsuarioId, alerta.MontoTotal);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error enviando alerta 7 días a usuario {UsuarioId}", alerta.UsuarioId);
+                }
+            }
+
+            // Obtener usuarios con LadoCoins que vencen en exactamente 1 día (±12 horas)
+            var alertas1Dia = await _context.TransaccionesLadoCoins
+                .Where(t => !t.Vencido &&
+                           t.MontoRestante > 0 &&
+                           t.FechaVencimiento.HasValue &&
+                           t.FechaVencimiento.Value > en1Dia.AddHours(-12) &&
+                           t.FechaVencimiento.Value <= en1Dia.AddHours(12))
+                .GroupBy(t => t.UsuarioId)
+                .Select(g => new
+                {
+                    UsuarioId = g.Key,
+                    MontoTotal = g.Sum(t => t.MontoRestante),
+                    FechaVencimiento = g.Min(t => t.FechaVencimiento)
+                })
+                .ToListAsync();
+
+            foreach (var alerta in alertas1Dia)
+            {
+                // Verificar si ya enviamos alerta de 1 día hoy
+                var cacheKey = $"alerta_lc_1d_{alerta.UsuarioId}_{ahora:yyyyMMdd}";
+                if (YaEnviadoHoy(cacheKey)) continue;
+
+                try
+                {
+                    await _notificacionService.CrearNotificacionSistemaAsync(
+                        alerta.UsuarioId,
+                        "¡LadoCoins vencen mañana!",
+                        $"¡URGENTE! Tienes ${alerta.MontoTotal:F2} LadoCoins que vencerán mañana. ¡Úsalos hoy!",
+                        "/LadoCoins"
+                    );
+
+                    MarcarEnviadoHoy(cacheKey);
+                    _logger.LogInformation("Alerta 1 día enviada a usuario {UsuarioId}: ${Monto}", alerta.UsuarioId, alerta.MontoTotal);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error enviando alerta 1 día a usuario {UsuarioId}", alerta.UsuarioId);
+                }
+            }
+
+            _logger.LogInformation("Alertas de vencimiento procesadas: {Alertas7Dias} de 7 días, {Alertas1Dia} de 1 día",
+                alertas7Dias.Count, alertas1Dia.Count);
+        }
+
+        // Cache simple para evitar enviar múltiples alertas el mismo día
+        private static readonly HashSet<string> _alertasEnviadas = new();
+        private static DateTime _ultimaLimpiezaAlertas = DateTime.MinValue;
+
+        private bool YaEnviadoHoy(string cacheKey)
+        {
+            // Limpiar cache cada día
+            if (DateTime.Now.Date > _ultimaLimpiezaAlertas.Date)
+            {
+                lock (_alertasEnviadas)
+                {
+                    _alertasEnviadas.Clear();
+                    _ultimaLimpiezaAlertas = DateTime.Now;
+                }
+            }
+
+            lock (_alertasEnviadas)
+            {
+                return _alertasEnviadas.Contains(cacheKey);
+            }
+        }
+
+        private void MarcarEnviadoHoy(string cacheKey)
+        {
+            lock (_alertasEnviadas)
+            {
+                _alertasEnviadas.Add(cacheKey);
             }
         }
 

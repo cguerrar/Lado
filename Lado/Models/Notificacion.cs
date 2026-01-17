@@ -17,7 +17,11 @@ namespace Lado.Models
         RetiroCompletado = 9,
         Sistema = 10,            // Notificaciones del sistema
         MencionEnStory = 11,     // Mencionado en una historia
-        LikeEnStory = 12         // Like en una historia
+        LikeEnStory = 12,        // Like en una historia
+        ApelacionResuelta = 13,  // Apelación aprobada o rechazada
+        SuspensionTemporal = 14, // Usuario suspendido temporalmente
+        SuspensionLevantada = 15,// Suspensión temporal levantada
+        ModoMantenimiento = 16   // Aviso de mantenimiento programado
     }
 
     public class Notificacion

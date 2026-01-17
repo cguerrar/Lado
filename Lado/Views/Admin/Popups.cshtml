@@ -1427,6 +1427,41 @@
         color: var(--text-dark);
     }
 
+    /* Slider de ancho porcentaje */
+    .ancho-porcentaje-container {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .ancho-porcentaje-container input[type="range"] {
+        flex: 1;
+        height: 6px;
+        border-radius: 3px;
+        background: linear-gradient(to right, var(--primary) 0%, var(--primary) var(--value, 50%), #e5e7eb var(--value, 50%), #e5e7eb 100%);
+        appearance: none;
+        cursor: pointer;
+    }
+
+    .ancho-porcentaje-container input[type="range"]::-webkit-slider-thumb {
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--primary);
+        border: 2px solid white;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        cursor: pointer;
+    }
+
+    .ancho-porcentaje-valor {
+        min-width: 45px;
+        text-align: center;
+        font-weight: 600;
+        color: var(--primary);
+        font-size: 14px;
+    }
+
     /* Preview con marco */
     .preview-popup.con-marco {
         padding: 0 !important;
@@ -1981,6 +2016,13 @@
                                 </div>
                             </div>
                             <input type="hidden" id="proporcionPopup" name="proporcionPopup" value="1:1">
+
+                            <label style="font-size: 12px; color: var(--text-gray); margin-bottom: 8px; margin-top: 16px; display: block;">Ancho del popup (% de pantalla)</label>
+                            <div class="ancho-porcentaje-container">
+                                <input type="range" id="anchoPorcentaje" name="anchoPorcentaje" value="50" min="20" max="90" step="5" oninput="actualizarAnchoPorcentaje(this.value)">
+                                <span class="ancho-porcentaje-valor" id="anchoPorcentajeValor">50%</span>
+                            </div>
+                            <input type="hidden" id="anchoPorcentajeHidden" name="anchoPorcentajeHidden" value="50">
                         </div>
 
                         <!-- Campos de texto (se ocultan en modo imagen-marco) -->
@@ -2458,7 +2500,7 @@
             'imagen-marco': {
                 tipo: 1, posicion: 0, animacion: 7,
                 titulo: '',
-                colorFondo: 'transparent', colorTexto: '#111111', colorBoton: '#4682B4',
+                colorFondo: '#00000000', colorTexto: '#111111', colorBoton: '#4682B4',
                 contenido: '',
                 esImagenMarco: true
             }
@@ -2480,7 +2522,10 @@
         document.getElementById('animacion').value = t.animacion;
         document.getElementById('titulo').value = t.titulo;
         document.getElementById('colorFondo').value = t.colorFondo;
-        document.getElementById('colorFondoPicker').value = t.colorFondo;
+        // El picker de color no soporta valores transparentes (#00000000), usar blanco como fallback
+        const esTransparenteTpl = t.colorFondo?.toLowerCase() === 'transparent' ||
+                                  t.colorFondo?.toLowerCase() === '#00000000';
+        document.getElementById('colorFondoPicker').value = esTransparenteTpl ? '#ffffff' : t.colorFondo;
         document.getElementById('colorTexto').value = t.colorTexto;
         document.getElementById('colorTextoPicker').value = t.colorTexto;
         document.getElementById('colorBotonPrimario').value = t.colorBoton;
@@ -2798,6 +2843,22 @@
         actualizarPreview();
     }
 
+    // Variable global para ancho porcentaje
+    let anchoPorcentajeSeleccionado = 50;
+
+    function actualizarAnchoPorcentaje(valor) {
+        anchoPorcentajeSeleccionado = parseInt(valor);
+        document.getElementById('anchoPorcentajeValor').textContent = valor + '%';
+        document.getElementById('anchoPorcentajeHidden').value = valor;
+
+        // Actualizar el gradiente del slider
+        const slider = document.getElementById('anchoPorcentaje');
+        const porcentaje = ((valor - 20) / (90 - 20)) * 100;
+        slider.style.setProperty('--value', porcentaje + '%');
+
+        actualizarPreview();
+    }
+
     // Convertir ratio a aspect-ratio CSS
     function getRatioValue(ratio) {
         switch(ratio) {
@@ -2809,15 +2870,9 @@
         }
     }
 
-    // Obtener ancho maximo segun proporcion
-    function getAnchoMaximoSegunProporcion(ratio) {
-        switch(ratio) {
-            case '1:1': return 300;
-            case '4:3': return 400;
-            case '16:9': return 480;
-            case '9:16': return 200;
-            default: return 300;
-        }
+    // Obtener ancho en % para imagen con marco
+    function getAnchoPorcentaje() {
+        return anchoPorcentajeSeleccionado || 50;
     }
 
     // ========================================
@@ -2903,9 +2958,9 @@
         let estiloInline = '';
 
         if (esImagenMarco) {
-            // Modo imagen: fondo transparente, ajustar ancho segun proporcion
-            anchoMaximo = getAnchoMaximoSegunProporcion(proporcion);
-            estiloInline = `background:transparent;max-width:${anchoMaximo}px;`;
+            // Modo imagen: fondo transparente, ancho en porcentaje
+            const anchoPct = getAnchoPorcentaje();
+            estiloInline = `background:transparent;width:${anchoPct}%;max-width:${anchoPct}%;`;
         } else {
             estiloInline = `background:${colorFondo};color:${colorTexto};`;
             // Ancho maximo (no aplica a Banner ni FullScreen)
@@ -3046,7 +3101,10 @@
         const esImagenMarco = window.modoImagenMarco || false;
 
         // Validar: fondo transparente requiere imagen o contenido
-        if (colorFondo.toLowerCase() === 'transparent' || colorFondo === '') {
+        const esTransparente = colorFondo.toLowerCase() === 'transparent' ||
+                               colorFondo === '' ||
+                               colorFondo.toLowerCase() === '#00000000';
+        if (esTransparente) {
             if (!imagen && !contenidoLimpio && !titulo) {
                 alert('Error: Un popup con fondo transparente requiere al menos una imagen, titulo o contenido.');
                 return;
@@ -3060,6 +3118,11 @@
         // Sync content
         document.getElementById('contenido').value = document.getElementById('editorContent').innerHTML || document.getElementById('editorHtml').value;
         document.getElementById('botonesJson').value = JSON.stringify(botones);
+
+        // Si es modo imagen con marco, usar el porcentaje como anchoMaximo
+        if (esImagenMarco) {
+            document.getElementById('anchoMaximo').value = anchoPorcentajeSeleccionado || 50;
+        }
 
         const form = document.getElementById('popupForm');
         const formData = new FormData(form);
@@ -3130,8 +3193,12 @@
 
                 document.getElementById('posicion').value = p.posicion;
                 seleccionarPosicion(p.posicion);
+                // Manejar fondo transparente para el color picker
+                const esTransparenteEdit = p.colorFondo?.toLowerCase() === 'transparent' ||
+                                           p.colorFondo?.toLowerCase() === '#00000000';
                 document.getElementById('colorFondo').value = p.colorFondo || '#ffffff';
-                document.getElementById('colorFondoPicker').value = p.colorFondo || '#ffffff';
+                // El picker de color no soporta transparente, usar blanco como fallback visual
+                document.getElementById('colorFondoPicker').value = esTransparenteEdit ? '#ffffff' : (p.colorFondo || '#ffffff');
                 document.getElementById('colorTexto').value = p.colorTexto || '#111111';
                 document.getElementById('colorTextoPicker').value = p.colorTexto || '#111111';
                 document.getElementById('colorBotonPrimario').value = p.colorBotonPrimario || '#4682B4';

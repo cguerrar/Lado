@@ -4338,6 +4338,38 @@
         font-size: 12px;
     }
 
+    /* Botón de sonido para video ads */
+    .ad-sound-toggle {
+        position: absolute;
+        bottom: 12px;
+        right: 12px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.6);
+        border: none;
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        transition: background 0.2s, transform 0.2s;
+    }
+
+    .ad-sound-toggle:hover {
+        background: rgba(0,0,0,0.8);
+        transform: scale(1.1);
+    }
+
+    .ad-sound-toggle i {
+        font-size: 16px;
+    }
+
+    .ad-sound-toggle.unmuted {
+        background: var(--primary);
+    }
+
     /* EMPTY STATE */
     .empty-feed {
         text-align: center;
@@ -8031,13 +8063,16 @@
             var esVideo = tipoMedia == TipoContenido.Video;
             var esAudio = tipoMedia == TipoContenido.Audio;
             var esPost = tipoMedia == TipoContenido.Post;
-            var tieneArchivo = !string.IsNullOrEmpty(post.RutaArchivo);
 
             // Soporte para carrusel (múltiples archivos)
             // Shadow Hide: Si no es el creador, excluir archivos ocultos silenciosamente
             var esCreadorDelPost = usuarioActual?.Id == post.UsuarioId;
             var archivosCarrusel = esCreadorDelPost ? post.TodosLosArchivos : post.ArchivosVisibles;
             var esCarrusel = archivosCarrusel.Count > 1;
+
+            // Usar PrimerArchivo para compatibilidad con contenidos que solo tienen Archivos (sin RutaArchivo)
+            var rutaArchivoEfectiva = post.PrimerArchivo;
+            var tieneArchivo = !string.IsNullOrEmpty(rutaArchivoEfectiva);
             var yaLeDioLike = likesUsuario.Contains(post.Id);
             var esFavorito = favoritosIds.Contains(post.Id);
             var estaBloqueado = contenidoBloqueadoIds.Contains(post.Id);
@@ -8151,7 +8186,7 @@
                         </div>
                         @if (tieneArchivo)
                         {
-                            var rutaArchivoLimpia = LimpiarRuta(post.RutaArchivo);
+                            var rutaArchivoLimpia = LimpiarRuta(rutaArchivoEfectiva);
                             <div class="post-media" style="aspect-ratio:1/1;max-width:100%;overflow:hidden;">
                                 @if (esImagen || (!esVideo && !esAudio))
                                 {
@@ -8359,7 +8394,7 @@
                     <div class="post-media @(esPreviewBlur ? "preview-blur-wrapper " + blurEffectClass : "")"
                          data-post-id="@post.Id"
                          data-media-type="@(esVideo ? "video" : (esAudio ? "audio" : "image"))"
-                         data-media-src="@post.RutaArchivo"
+                         data-media-src="@rutaArchivoEfectiva"
                          data-is-preview-blur="@esPreviewBlur.ToString().ToLower()"
                          @if (post.PistaMusical != null)
                          {
@@ -8401,7 +8436,7 @@
                                 </a>
                             </div>
                         }
-                        @{var rutaPostMedia = LimpiarRuta(post.RutaArchivo);}
+                        @{var rutaPostMedia = LimpiarRuta(rutaArchivoEfectiva);}
                         @if (esImagen)
                         {
                             <img src="@rutaPostMedia" alt="" loading="lazy" class="carousel-media" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E';">
@@ -8730,25 +8765,33 @@
                             </div>
                         </div>
                     </div>
-                    <a href="@Url.Action("RedirectAnuncio", "FeedPublico", new { id = anuncioFeed.Id })" target="_blank" class="post-ad-media">
-                        @if (anuncioFeed.TipoCreativo == TipoCreativo.Video && !string.IsNullOrEmpty(anuncioFeed.UrlCreativo))
+                    <div class="post-ad-media-container" style="position: relative;">
+                        <a href="@Url.Action("RedirectAnuncio", "FeedPublico", new { id = anuncioFeed.Id })" target="_blank" class="post-ad-media">
+                            @if (anuncioFeed.TipoCreativo == TipoCreativo.Video && !string.IsNullOrEmpty(anuncioFeed.UrlCreativo))
+                            {
+                                var urlCreativoLimpio = Url.Content($"~{anuncioFeed.UrlCreativo}");
+                                var esWebmAnuncio = anuncioFeed.UrlCreativo.EndsWith(".webm", StringComparison.OrdinalIgnoreCase);
+                                var tipoMimeAnuncio = esWebmAnuncio ? "video/webm" : "video/mp4";
+                                <video class="ad-video" muted autoplay loop playsinline webkit-playsinline="true" preload="metadata">
+                                    @if (!esWebmAnuncio)
+                                    {
+                                        <source src="@urlCreativoLimpio" type="video/mp4">
+                                    }
+                                    <source src="@urlCreativoLimpio" type="@tipoMimeAnuncio">
+                                </video>
+                            }
+                            else if (!string.IsNullOrEmpty(anuncioFeed.UrlCreativo))
+                            {
+                                <img src="@Url.Content($"~{anuncioFeed.UrlCreativo}")" alt="Anuncio">
+                            }
+                        </a>
+                        @if (anuncioFeed.TipoCreativo == TipoCreativo.Video)
                         {
-                            var urlCreativoLimpio = Url.Content($"~{anuncioFeed.UrlCreativo}");
-                            var esWebmAnuncio = anuncioFeed.UrlCreativo.EndsWith(".webm", StringComparison.OrdinalIgnoreCase);
-                            var tipoMimeAnuncio = esWebmAnuncio ? "video/webm" : "video/mp4";
-                            <video muted autoplay loop playsinline webkit-playsinline="true" preload="metadata">
-                                @if (!esWebmAnuncio)
-                                {
-                                    <source src="@urlCreativoLimpio" type="video/mp4">
-                                }
-                                <source src="@urlCreativoLimpio" type="@tipoMimeAnuncio">
-                            </video>
+                            <button type="button" class="ad-sound-toggle" onclick="toggleAdSound(this, event)" title="Activar/Desactivar sonido">
+                                <i class="fas fa-volume-mute"></i>
+                            </button>
                         }
-                        else if (!string.IsNullOrEmpty(anuncioFeed.UrlCreativo))
-                        {
-                            <img src="@Url.Content($"~{anuncioFeed.UrlCreativo}")" alt="Anuncio">
-                        }
-                    </a>
+                    </div>
                     <div class="post-ad-content">
                         <a href="@Url.Action("RedirectAnuncio", "FeedPublico", new { id = anuncioFeed.Id })" target="_blank" class="post-ad-cta">
                             @anuncioFeed.TextoBotonDisplay
@@ -14587,6 +14630,38 @@
                 audio.pause();
             }
         });
+    }
+
+    // Toggle sonido de video de anuncio
+    function toggleAdSound(btn, event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const container = btn.closest('.post-ad-media-container');
+        const video = container.querySelector('video.ad-video');
+        if (!video) return;
+
+        const icon = btn.querySelector('i');
+        if (video.muted) {
+            // Mutear otros videos de anuncios primero
+            document.querySelectorAll('video.ad-video').forEach(v => {
+                if (v !== video) {
+                    v.muted = true;
+                    const otherBtn = v.closest('.post-ad-media-container')?.querySelector('.ad-sound-toggle');
+                    if (otherBtn) {
+                        otherBtn.classList.remove('unmuted');
+                        otherBtn.querySelector('i').className = 'fas fa-volume-mute';
+                    }
+                }
+            });
+            video.muted = false;
+            icon.className = 'fas fa-volume-up';
+            btn.classList.add('unmuted');
+        } else {
+            video.muted = true;
+            icon.className = 'fas fa-volume-mute';
+            btn.classList.remove('unmuted');
+        }
     }
 
     // CORREGIDO: Pausar TODOS los audios y videos del fullscreen viewer

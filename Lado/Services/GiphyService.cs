@@ -33,9 +33,9 @@ namespace Lado.Services
             { "deportes", "sports goal win" }
         };
 
-        public GiphyService(IConfiguration configuration, ILogger<GiphyService> logger)
+        public GiphyService(HttpClient httpClient, IConfiguration configuration, ILogger<GiphyService> logger)
         {
-            _httpClient = new HttpClient();
+            _httpClient = httpClient;
             _logger = logger;
             _apiKey = configuration["Giphy:ApiKey"] ?? "";
 

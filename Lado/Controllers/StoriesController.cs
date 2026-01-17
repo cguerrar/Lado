@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using System.Text.Json.Serialization;
 using Lado.Data;
 using Lado.Hubs;
 using Lado.Models;
@@ -157,9 +158,10 @@ namespace Lado.Controllers
                                 inicioSegundos = s.MusicaInicioSegundos ?? 0,
                                 volumen = s.MusicaVolumen ?? 70
                             } : null,
-                            // Likes
+                            // Likes y Vistas
                             likes = s.NumeroLikes,
-                            liked = storiesConLike.Contains(s.Id)
+                            liked = storiesConLike.Contains(s.Id),
+                            vistas = s.NumeroVistas
                         }).ToList(),
                         tieneStorysSinVer = g.Any(s => !storiesVistos.Contains(s.Id))
                     })
@@ -220,6 +222,12 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "Story no encontrada" });
                 }
 
+                // No contar si es el propio creador viendo su historia
+                if (story.CreadorId == usuarioId)
+                {
+                    return Json(new { success = true, message = "Propia historia" });
+                }
+
                 // Verificar si ya la vio
                 var yaVisto = await _context.StoryVistas
                     .AnyAsync(sv => sv.StoryId == storyId && sv.UsuarioId == usuarioId);
@@ -255,6 +263,8 @@ namespace Lado.Controllers
         /// </summary>
         [HttpPost("Crear")]
         [ValidateAntiForgeryToken]
+        [RequestSizeLimit(500_000_000)] // 500MB para videos grandes de iPhone
+        [RequestFormLimits(MultipartBodyLengthLimit = 500_000_000)]
         public async Task<IActionResult> CrearStory(
             IFormFile archivo,
             string? texto,
@@ -474,31 +484,42 @@ namespace Lado.Controllers
             {
                 var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
+                _logger.LogInformation("Intentando eliminar story {StoryId} por usuario {UserId}", storyId, usuarioId);
+
+                if (string.IsNullOrEmpty(usuarioId))
+                {
+                    _logger.LogWarning("Intento de eliminar story {StoryId} sin usuario autenticado", storyId);
+                    return Json(new { success = false, message = "Usuario no autenticado" });
+                }
+
                 var story = await _context.Stories.FindAsync(storyId);
 
                 if (story == null)
                 {
+                    _logger.LogWarning("Story {StoryId} no encontrada para eliminar", storyId);
                     return Json(new { success = false, message = "Story no encontrada" });
                 }
 
                 if (story.CreadorId != usuarioId)
                 {
+                    _logger.LogWarning("Usuario {UserId} intentó eliminar story {StoryId} de otro usuario {CreadorId}",
+                        usuarioId, storyId, story.CreadorId);
                     return Json(new { success = false, message = "No tienes permiso para eliminar esta story" });
                 }
 
                 story.EstaActivo = false;
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Story {StoryId} eliminada por usuario {UserId}", storyId, usuarioId);
+                _logger.LogInformation("Story {StoryId} eliminada exitosamente por usuario {UserId}", storyId, usuarioId);
 
                 return Json(new { success = true, message = "Story eliminada" });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al eliminar story: {StoryId}", storyId);
+                _logger.LogError(ex, "Error al eliminar story: {StoryId}. Error: {Message}", storyId, ex.Message);
                 var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
-                return Json(new { success = false, message = "Error al eliminar la story" });
+                return Json(new { success = false, message = "Error al eliminar la story: " + ex.Message });
             }
         }
 
@@ -1724,16 +1745,103 @@ namespace Lado.Controllers
         /// <summary>
         /// Obtener un anuncio para mostrar entre grupos de historias
         /// </summary>
+        /// <summary>
+        /// Diagnóstico de anuncios para stories (temporal)
+        /// </summary>
+        [HttpGet("DiagnosticoAnuncios")]
+        public async Task<IActionResult> DiagnosticoAnuncios()
+        {
+            var ahora = DateTime.Now;
+
+            // Buscar anuncio global con la misma lógica del endpoint
+            var anuncioGlobal = await _context.Anuncios
+                .Where(a => a.MostrarEnStoriesGlobal
+                        && a.Estado == EstadoAnuncio.Activo
+                        && (a.FechaInicio == null || a.FechaInicio <= ahora)
+                        && (a.FechaFin == null || a.FechaFin >= ahora)
+                        && (a.TipoCreativo == TipoCreativo.Imagen || a.TipoCreativo == TipoCreativo.Video)
+                        && !string.IsNullOrEmpty(a.UrlCreativo)
+                        && (a.PresupuestoTotal == 0 || a.GastoTotal < a.PresupuestoTotal)
+                        && (a.PresupuestoDiario == 0 || a.GastoHoy < a.PresupuestoDiario))
+                .Select(a => new { a.Id, a.Titulo })
+                .FirstOrDefaultAsync();
+
+            var anuncios = await _context.Anuncios
+                .Select(a => new {
+                    a.Id,
+                    a.Titulo,
+                    a.Estado,
+                    EstadoNombre = a.Estado.ToString(),
+                    a.MostrarEnStoriesGlobal,
+                    a.TipoCreativo,
+                    TipoCreativoNombre = a.TipoCreativo.ToString(),
+                    TieneCreativo = !string.IsNullOrEmpty(a.UrlCreativo),
+                    a.UrlCreativo,
+                    a.FechaInicio,
+                    a.FechaFin,
+                    FechaInicioOk = a.FechaInicio == null || a.FechaInicio <= ahora,
+                    FechaFinOk = a.FechaFin == null || a.FechaFin >= ahora,
+                    a.PresupuestoTotal,
+                    a.GastoTotal,
+                    a.PresupuestoDiario,
+                    a.GastoHoy,
+                    PresupuestoOk = (a.PresupuestoTotal == 0 || a.GastoTotal < a.PresupuestoTotal) &&
+                                   (a.PresupuestoDiario == 0 || a.GastoHoy < a.PresupuestoDiario),
+                    a.Prioridad
+                })
+                .ToListAsync();
+
+            return Json(new {
+                total = anuncios.Count,
+                ahora = ahora.ToString("yyyy-MM-dd HH:mm:ss"),
+                estadoActivoValor = (int)EstadoAnuncio.Activo,
+                tipoImagenValor = (int)TipoCreativo.Imagen,
+                anuncioGlobalEncontrado = anuncioGlobal,
+                anuncios
+            });
+        }
+
         [HttpGet("ObtenerAnuncioStory")]
         public async Task<IActionResult> ObtenerAnuncioStory()
         {
             try
             {
                 var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-                // Obtener anuncios activos con tipo imagen o video
                 var ahora = DateTime.Now;
-                var anunciosActivos = await _context.Anuncios
+
+                // Debug: Verificar anuncios disponibles
+                var totalAnuncios = await _context.Anuncios.CountAsync();
+                var countActivos = await _context.Anuncios.CountAsync(a => a.Estado == EstadoAnuncio.Activo);
+                var countGlobales = await _context.Anuncios.CountAsync(a => a.MostrarEnStoriesGlobal);
+                _logger.LogInformation("ObtenerAnuncioStory - Total: {Total}, Activos: {Activos}, Globales: {Globales}",
+                    totalAnuncios, countActivos, countGlobales);
+
+                // 1. Primero buscar anuncio GLOBAL (para todos los usuarios)
+                Anuncio? anuncioGlobal = null;
+                try
+                {
+                    anuncioGlobal = await _context.Anuncios
+                        .Include(a => a.Agencia)
+                        .Where(a => a.MostrarEnStoriesGlobal
+                                && a.Estado == EstadoAnuncio.Activo
+                                && (a.FechaInicio == null || a.FechaInicio <= ahora)
+                                && (a.FechaFin == null || a.FechaFin >= ahora)
+                                && (a.TipoCreativo == TipoCreativo.Imagen || a.TipoCreativo == TipoCreativo.Video)
+                                && !string.IsNullOrEmpty(a.UrlCreativo)
+                                && (a.PresupuestoTotal == 0 || a.GastoTotal < a.PresupuestoTotal)
+                                && (a.PresupuestoDiario == 0 || a.GastoHoy < a.PresupuestoDiario))
+                        .OrderByDescending(a => a.Prioridad)
+                        .FirstOrDefaultAsync();
+
+                    _logger.LogInformation("Anuncio global encontrado: {Id}", anuncioGlobal?.Id ?? 0);
+                }
+                catch (Exception exGlobal)
+                {
+                    _logger.LogError(exGlobal, "Error buscando anuncio global");
+                }
+
+                // 2. Si no hay global, buscar anuncios normales
+                var anunciosActivos = anuncioGlobal ?? await _context.Anuncios
                     .Include(a => a.Agencia)
                     .Where(a => a.Estado == EstadoAnuncio.Activo
                             && (a.FechaInicio == null || a.FechaInicio <= ahora)
@@ -2420,11 +2528,575 @@ namespace Lado.Controllers
                 return Json(new { success = false });
             }
         }
+
+        // ========================================
+        // COMPARTIR A WHATSAPP
+        // ========================================
+
+        /// <summary>
+        /// Genera link para compartir story en WhatsApp
+        /// </summary>
+        [HttpGet("CompartirWhatsApp")]
+        public async Task<IActionResult> CompartirWhatsApp(int storyId)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var story = await _context.Stories
+                .Include(s => s.Creador)
+                .FirstOrDefaultAsync(s => s.Id == storyId && s.EstaActivo);
+
+            if (story == null)
+                return Json(new { success = false, error = "Historia no encontrada" });
+
+            // Generar URL pública de la story
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            var storyUrl = $"{baseUrl}/Stories/Ver/{storyId}";
+
+            var texto = $"Mira esta historia de @{story.Creador?.UserName ?? "usuario"} en Lado: {storyUrl}";
+            var whatsappUrl = $"https://wa.me/?text={Uri.EscapeDataString(texto)}";
+
+            return Json(new { success = true, url = whatsappUrl });
+        }
+
+        // ========================================
+        // HISTORIAS DESTACADAS
+        // ========================================
+
+        /// <summary>
+        /// Guarda una story en destacados
+        /// </summary>
+        [HttpPost("GuardarEnDestacados")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> GuardarEnDestacados([FromBody] GuardarDestacadoRequest request)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var story = await _context.Stories
+                .FirstOrDefaultAsync(s => s.Id == request.StoryId && s.CreadorId == userId);
+
+            if (story == null)
+                return Json(new { success = false, error = "Solo puedes destacar tus propias historias" });
+
+            // Verificar si ya está destacada
+            var yaDestacada = await _context.HistoriasDestacadas
+                .AnyAsync(h => h.StoryOriginalId == request.StoryId && h.UsuarioId == userId);
+
+            if (yaDestacada)
+                return Json(new { success = false, error = "Esta historia ya está en destacados" });
+
+            // Obtener o crear grupo
+            GrupoDestacado? grupo = null;
+            if (request.GrupoId.HasValue)
+            {
+                grupo = await _context.GruposDestacados
+                    .FirstOrDefaultAsync(g => g.Id == request.GrupoId && g.UsuarioId == userId);
+            }
+            else if (!string.IsNullOrEmpty(request.NuevoGrupoNombre))
+            {
+                grupo = new GrupoDestacado
+                {
+                    UsuarioId = userId,
+                    Nombre = request.NuevoGrupoNombre.Trim(),
+                    TipoLado = story.TipoLado,
+                    ImagenPortada = story.RutaArchivo
+                };
+                _context.GruposDestacados.Add(grupo);
+                await _context.SaveChangesAsync();
+            }
+
+            // Obtener siguiente orden
+            var maxOrden = grupo != null
+                ? await _context.HistoriasDestacadas.Where(h => h.GrupoDestacadoId == grupo.Id).MaxAsync(h => (int?)h.Orden) ?? 0
+                : await _context.HistoriasDestacadas.Where(h => h.UsuarioId == userId && h.GrupoDestacadoId == null).MaxAsync(h => (int?)h.Orden) ?? 0;
+
+            var destacada = new HistoriaDestacada
+            {
+                UsuarioId = userId,
+                GrupoDestacadoId = grupo?.Id,
+                RutaArchivo = story.RutaArchivo,
+                TipoContenido = story.TipoContenido,
+                ElementosJson = story.ElementosJson,
+                StoryOriginalId = story.Id,
+                TipoLado = story.TipoLado,
+                PistaMusicalId = story.PistaMusicalId,
+                MusicaInicioSegundos = story.MusicaInicioSegundos ?? 0,
+                MusicaVolumen = story.MusicaVolumen ?? 50,
+                Orden = maxOrden + 1
+            };
+
+            _context.HistoriasDestacadas.Add(destacada);
+            await _context.SaveChangesAsync();
+
+            return Json(new
+            {
+                success = true,
+                destacadaId = destacada.Id,
+                grupoId = grupo?.Id,
+                grupoNombre = grupo?.Nombre
+            });
+        }
+
+        /// <summary>
+        /// Obtiene los grupos de destacados de un usuario
+        /// </summary>
+        [HttpGet("ObtenerGruposDestacados")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ObtenerGruposDestacados(string? usuarioId = null)
+        {
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            // Si no se especifica usuarioId, usar el usuario actual
+            var targetUserId = usuarioId ?? currentUserId;
+
+            if (string.IsNullOrEmpty(targetUserId))
+            {
+                return Json(new { success = false, error = "Usuario no especificado" });
+            }
+
+            var grupos = await _context.GruposDestacados
+                .Where(g => g.UsuarioId == targetUserId)
+                .OrderBy(g => g.Orden)
+                .Select(g => new
+                {
+                    id = g.Id,
+                    nombre = g.Nombre,
+                    imagenPortada = g.ImagenPortada,
+                    portadaUrl = g.ImagenPortada, // Alias para JS
+                    tipoLado = g.TipoLado,
+                    cantidadHistorias = g.Historias.Count,
+                    historias = g.Historias.OrderBy(h => h.Orden).Select(h => new
+                    {
+                        id = h.Id,
+                        mediaUrl = h.RutaArchivo,
+                        esVideo = h.TipoContenido == TipoContenido.Video,
+                        fechaCreacion = h.FechaCreacion
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            // Filtrar LadoB si el usuario actual no está suscrito
+            if (currentUserId != targetUserId)
+            {
+                var estaSuscrito = await _context.Suscripciones
+                    .AnyAsync(s => s.FanId == currentUserId &&
+                                   s.CreadorId == targetUserId &&
+                                   s.EstaActiva &&
+                                   s.TipoLado == TipoLado.LadoB);
+
+                if (!estaSuscrito)
+                {
+                    grupos = grupos.Where(g => g.tipoLado == TipoLado.LadoA).ToList();
+                }
+            }
+
+            return Json(new { success = true, grupos });
+        }
+
+        /// <summary>
+        /// Obtiene las historias destacadas de un grupo
+        /// </summary>
+        [HttpGet("ObtenerDestacados")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ObtenerDestacados(string usuarioId, int? grupoId = null)
+        {
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            var query = _context.HistoriasDestacadas
+                .Where(h => h.UsuarioId == usuarioId);
+
+            if (grupoId.HasValue)
+            {
+                query = query.Where(h => h.GrupoDestacadoId == grupoId);
+            }
+
+            var destacadas = await query
+                .OrderBy(h => h.Orden)
+                .Select(h => new
+                {
+                    id = h.Id,
+                    rutaArchivo = h.RutaArchivo,
+                    tipoContenido = h.TipoContenido,
+                    elementosJson = h.ElementosJson,
+                    tipoLado = h.TipoLado,
+                    numeroVistas = h.NumeroVistas,
+                    fechaCreacion = h.FechaCreacion,
+                    musica = h.PistaMusical != null ? new
+                    {
+                        titulo = h.PistaMusical.Titulo,
+                        artista = h.PistaMusical.Artista,
+                        url = h.PistaMusical.RutaArchivo
+                    } : null,
+                    musicaInicioSegundos = h.MusicaInicioSegundos,
+                    musicaVolumen = h.MusicaVolumen
+                })
+                .ToListAsync();
+
+            // Filtrar LadoB si no está suscrito
+            if (currentUserId != usuarioId)
+            {
+                var estaSuscrito = await _context.Suscripciones
+                    .AnyAsync(s => s.FanId == currentUserId &&
+                                   s.CreadorId == usuarioId &&
+                                   s.EstaActiva &&
+                                   s.TipoLado == TipoLado.LadoB);
+
+                if (!estaSuscrito)
+                {
+                    destacadas = destacadas.Where(h => h.tipoLado == TipoLado.LadoA).ToList();
+                }
+            }
+
+            return Json(destacadas);
+        }
+
+        /// <summary>
+        /// Elimina una historia de destacados
+        /// </summary>
+        [HttpPost("EliminarDestacado")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarDestacado(int destacadoId)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var destacada = await _context.HistoriasDestacadas
+                .FirstOrDefaultAsync(h => h.Id == destacadoId && h.UsuarioId == userId);
+
+            if (destacada == null)
+                return Json(new { success = false, error = "Historia destacada no encontrada" });
+
+            _context.HistoriasDestacadas.Remove(destacada);
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true });
+        }
+
+        /// <summary>
+        /// Crea un nuevo grupo de destacados
+        /// </summary>
+        [HttpPost("CrearGrupoDestacado")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CrearGrupoDestacado([FromBody] CrearGrupoRequest request)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            if (string.IsNullOrWhiteSpace(request.Nombre))
+                return Json(new { success = false, error = "El nombre es requerido" });
+
+            var maxOrden = await _context.GruposDestacados
+                .Where(g => g.UsuarioId == userId)
+                .MaxAsync(g => (int?)g.Orden) ?? 0;
+
+            var grupo = new GrupoDestacado
+            {
+                UsuarioId = userId,
+                Nombre = request.Nombre.Trim(),
+                TipoLado = request.TipoLado,
+                Orden = maxOrden + 1
+            };
+
+            _context.GruposDestacados.Add(grupo);
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, grupoId = grupo.Id });
+        }
+
+        /// <summary>
+        /// Elimina un grupo de destacados
+        /// </summary>
+        [HttpPost("EliminarGrupoDestacado")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarGrupoDestacado(int grupoId)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var grupo = await _context.GruposDestacados
+                .Include(g => g.Historias)
+                .FirstOrDefaultAsync(g => g.Id == grupoId && g.UsuarioId == userId);
+
+            if (grupo == null)
+                return Json(new { success = false, error = "Grupo no encontrado" });
+
+            // Eliminar historias del grupo también
+            _context.HistoriasDestacadas.RemoveRange(grupo.Historias);
+            _context.GruposDestacados.Remove(grupo);
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true });
+        }
+
+        // ========================================
+        // ENVIAR STORY A USUARIO ESPECÍFICO
+        // ========================================
+
+        /// <summary>
+        /// Envía una story directamente a un usuario
+        /// </summary>
+        [HttpPost("EnviarStory")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EnviarStory([FromBody] EnviarStoryRequest request)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var story = await _context.Stories
+                .FirstOrDefaultAsync(s => s.Id == request.StoryId && s.EstaActivo);
+
+            if (story == null)
+                return Json(new { success = false, error = "Historia no encontrada o expirada" });
+
+            var destinatario = await _context.Users.FindAsync(request.DestinatarioId);
+            if (destinatario == null)
+                return Json(new { success = false, error = "Usuario no encontrado" });
+
+            // Verificar bloqueos
+            var estaBloqueado = await _context.BloqueosUsuarios
+                .AnyAsync(b => (b.BloqueadorId == userId && b.BloqueadoId == request.DestinatarioId) ||
+                               (b.BloqueadorId == request.DestinatarioId && b.BloqueadoId == userId));
+
+            if (estaBloqueado)
+                return Json(new { success = false, error = "No puedes enviar a este usuario" });
+
+            // Verificar si ya se envió esta story a este usuario
+            var yaEnviada = await _context.StoriesEnviadas
+                .AnyAsync(se => se.StoryId == request.StoryId &&
+                                se.RemitenteId == userId &&
+                                se.DestinatarioId == request.DestinatarioId);
+
+            if (yaEnviada)
+                return Json(new { success = false, error = "Ya enviaste esta historia a este usuario" });
+
+            var storyEnviada = new StoryEnviada
+            {
+                StoryId = request.StoryId,
+                RemitenteId = userId,
+                DestinatarioId = request.DestinatarioId,
+                Mensaje = request.Mensaje?.Trim()
+            };
+
+            _context.StoriesEnviadas.Add(storyEnviada);
+
+            // Crear notificación
+            var remitente = await _context.Users.FindAsync(userId);
+            var notificacion = new Notificacion
+            {
+                UsuarioId = request.DestinatarioId,
+                UsuarioOrigenId = userId,
+                Tipo = TipoNotificacion.NuevoMensaje,
+                Mensaje = $"{remitente?.UserName ?? "Alguien"} te envió una historia",
+                UrlDestino = $"/Stories/VerEnviada/{storyEnviada.Id}",
+                ImagenUrl = remitente?.FotoPerfil
+            };
+
+            _context.Notificaciones.Add(notificacion);
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, enviadaId = storyEnviada.Id });
+        }
+
+        /// <summary>
+        /// Obtiene las stories enviadas a mí
+        /// </summary>
+        [HttpGet("ObtenerStoriesRecibidas")]
+        public async Task<IActionResult> ObtenerStoriesRecibidas()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var recibidas = await _context.StoriesEnviadas
+                .Include(se => se.Story)
+                .Include(se => se.Remitente)
+                .Where(se => se.DestinatarioId == userId && se.Story != null && se.Story.EstaActivo)
+                .OrderByDescending(se => se.FechaEnvio)
+                .Take(50)
+                .Select(se => new
+                {
+                    se.Id,
+                    se.FechaEnvio,
+                    se.Visto,
+                    se.Mensaje,
+                    Remitente = new
+                    {
+                        se.Remitente!.Id,
+                        se.Remitente.UserName,
+                        se.Remitente.FotoPerfil
+                    },
+                    Story = new
+                    {
+                        se.Story!.Id,
+                        se.Story.RutaArchivo,
+                        se.Story.TipoContenido,
+                        se.Story.ElementosJson
+                    }
+                })
+                .ToListAsync();
+
+            return Json(recibidas);
+        }
+
+        /// <summary>
+        /// Marca una story enviada como vista
+        /// </summary>
+        [HttpPost("MarcarStoryEnviadaVista")]
+        public async Task<IActionResult> MarcarStoryEnviadaVista(int enviadaId)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var enviada = await _context.StoriesEnviadas
+                .FirstOrDefaultAsync(se => se.Id == enviadaId && se.DestinatarioId == userId);
+
+            if (enviada != null && !enviada.Visto)
+            {
+                enviada.Visto = true;
+                enviada.FechaVisto = DateTime.Now;
+                await _context.SaveChangesAsync();
+            }
+
+            return Json(new { success = true });
+        }
+
+        /// <summary>
+        /// Busca usuarios para enviar story (seguidores y seguidos)
+        /// </summary>
+        [HttpGet("BuscarUsuariosParaEnviar")]
+        public async Task<IActionResult> BuscarUsuariosParaEnviar(string query)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+                return Json(new List<object>());
+
+            query = query.ToLower().Trim();
+
+            // Buscar usuarios que coincidan con la búsqueda
+            // Priorizar suscriptores y creadores con los que tengamos relación
+            var suscripcionesIds = await _context.Suscripciones
+                .Where(s => (s.FanId == userId || s.CreadorId == userId) && s.EstaActiva)
+                .Select(s => s.FanId == userId ? s.CreadorId : s.FanId)
+                .ToListAsync();
+
+            // Buscar en usuarios relacionados primero
+            var usuariosRelacionados = await _context.Users
+                .Where(u => suscripcionesIds.Contains(u.Id) &&
+                            u.EstaActivo &&
+                            u.Id != userId &&
+                            (u.UserName!.ToLower().Contains(query) ||
+                             u.NombreCompleto!.ToLower().Contains(query)))
+                .Take(10)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.UserName,
+                    Nombre = u.NombreCompleto,
+                    FotoPerfilUrl = u.FotoPerfil
+                })
+                .ToListAsync();
+
+            // Si no hay suficientes, buscar en todos los usuarios
+            if (usuariosRelacionados.Count() < 10)
+            {
+                var otrosUsuarios = await _context.Users
+                    .Where(u => !suscripcionesIds.Contains(u.Id) &&
+                                u.EstaActivo &&
+                                u.Id != userId &&
+                                (u.UserName!.ToLower().Contains(query) ||
+                                 u.NombreCompleto!.ToLower().Contains(query)))
+                    .Take(10 - usuariosRelacionados.Count())
+                    .Select(u => new
+                    {
+                        u.Id,
+                        u.UserName,
+                        Nombre = u.NombreCompleto,
+                        FotoPerfilUrl = u.FotoPerfil
+                    })
+                    .ToListAsync();
+
+                usuariosRelacionados.AddRange(otrosUsuarios);
+            }
+
+            return Json(new { success = true, usuarios = usuariosRelacionados });
+        }
+
+        // ========================================
+        // VER STORY PÚBLICA (para compartir)
+        // ========================================
+
+        /// <summary>
+        /// Vista pública de una story (para links compartidos)
+        /// </summary>
+        [HttpGet]
+        [AllowAnonymous]
+        [Route("Stories/Ver/{id}")]
+        public async Task<IActionResult> Ver(int id)
+        {
+            var story = await _context.Stories
+                .Include(s => s.Creador)
+                .FirstOrDefaultAsync(s => s.Id == id && s.EstaActivo);
+
+            if (story == null)
+            {
+                TempData["Error"] = "Esta historia ya no está disponible";
+                return RedirectToAction("Index", "Home");
+            }
+
+            // Si es LadoB y no está logueado o no está suscrito, mostrar preview
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (story.TipoLado == TipoLado.LadoB)
+            {
+                var puedeVer = false;
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    puedeVer = userId == story.CreadorId ||
+                               await _context.Suscripciones.AnyAsync(s =>
+                                   s.FanId == userId &&
+                                   s.CreadorId == story.CreadorId &&
+                                   s.EstaActiva &&
+                                   s.TipoLado == TipoLado.LadoB);
+                }
+
+                if (!puedeVer)
+                {
+                    ViewBag.RequiereSuscripcion = true;
+                    ViewBag.Creador = story.Creador;
+                }
+            }
+
+            return View(story);
+        }
     }
 
     // ========================================
     // REQUEST MODEL
     // ========================================
+
+    public class GuardarDestacadoRequest
+    {
+        [JsonPropertyName("storyId")]
+        public int StoryId { get; set; }
+        [JsonPropertyName("grupoId")]
+        public int? GrupoId { get; set; }
+        [JsonPropertyName("nuevoGrupoNombre")]
+        public string? NuevoGrupoNombre { get; set; }
+    }
+
+    public class CrearGrupoRequest
+    {
+        public string Nombre { get; set; } = string.Empty;
+        public TipoLado TipoLado { get; set; } = TipoLado.LadoA;
+    }
+
+    public class EnviarStoryRequest
+    {
+        public int StoryId { get; set; }
+        public string DestinatarioId { get; set; } = string.Empty;
+        public string? Mensaje { get; set; }
+    }
 
     public class FrontendErrorRequest
     {

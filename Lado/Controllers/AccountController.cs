@@ -203,6 +203,11 @@ namespace Lado.Controllers
                     // Iniciar sesion automaticamente
                     await _signInManager.SignInAsync(usuario, isPersistent: false);
 
+                    // Incrementar contador de ingresos (primer login después de registro)
+                    usuario.ContadorIngresos = 1;
+                    usuario.UltimaActividad = DateTime.Now;
+                    await _userManager.UpdateAsync(usuario);
+
                     _logger.LogInformation("Sesion iniciada para: {Username}", usuario.UserName);
 
                     TempData["Success"] = "Bienvenido a LADO! Tu cuenta ha sido creada exitosamente. ¡Recibiste LadoCoins de bienvenida!";
@@ -233,12 +238,45 @@ namespace Lado.Controllers
         // ========================================
 
         [HttpGet]
-        public IActionResult Login(string returnUrl = null)
+        public async Task<IActionResult> Login(string returnUrl = null)
         {
-            if (User.Identity.IsAuthenticated)
+            // ========================================
+            // DEBUG: Verificar estado de autenticación
+            // ========================================
+            var isAuth = User?.Identity?.IsAuthenticated ?? false;
+            var currentUserId = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var currentUserName = User?.Identity?.Name;
+
+            _logger.LogInformation("🔐 LOGIN GET - IsAuth: {IsAuth}, UserId: {UserId}, UserName: {UserName}",
+                isAuth, currentUserId ?? "NULL", currentUserName ?? "NULL");
+
+            if (isAuth)
             {
-                _logger.LogInformation("Usuario ya autenticado, redirigiendo a FeedPublico");
+                _logger.LogInformation("Usuario ya autenticado ({UserName}), redirigiendo a FeedPublico", currentUserName);
                 return RedirectToAction("Index", "FeedPublico");
+            }
+
+            // ⚠️ CRÍTICO: Si hay cookies de auth pero el usuario NO está autenticado,
+            // hay corrupción - limpiar todo
+            var tieneAuthCookie = Request.Cookies.ContainsKey(".Lado.Auth") ||
+                                  Request.Cookies.ContainsKey(".AspNetCore.Identity.Application");
+            if (tieneAuthCookie && !isAuth)
+            {
+                _logger.LogWarning("⚠️ CORRUPCIÓN DETECTADA: Hay cookies de auth pero usuario NO autenticado. Limpiando...");
+
+                await _signInManager.SignOutAsync();
+                HttpContext.Session.Clear();
+
+                var cookiesToDelete = new[] { ".Lado.Auth", ".AspNetCore.Identity.Application", ".AspNetCore.Session" };
+                foreach (var cookieName in cookiesToDelete)
+                {
+                    Response.Cookies.Delete(cookieName);
+                    if (!_environment.IsDevelopment())
+                    {
+                        Response.Cookies.Delete(cookieName, new CookieOptions { Domain = ".ladoapp.com", Path = "/" });
+                        Response.Cookies.Delete(cookieName, new CookieOptions { Domain = "ladoapp.com", Path = "/" });
+                    }
+                }
             }
 
             ViewData["ReturnUrl"] = returnUrl;
@@ -315,17 +353,80 @@ namespace Lado.Controllers
 
                 _logger.LogInformation("✅ Contraseña correcta. Iniciando sesión...");
 
-                // ✅ Hacer login
-                var result = await _signInManager.PasswordSignInAsync(
-                    user.UserName,
-                    model.Contraseña,
-                    isPersistent: model.Recordarme,
-                    lockoutOnFailure: false
-                );
-
-                if (result.Succeeded)
+                // ========================================
+                // ⚠️ CRÍTICO: Limpiar sesión anterior ANTES de crear la nueva
+                // Esto previene mezcla de sesiones entre usuarios
+                // ========================================
+                var userIdAnterior = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (!string.IsNullOrEmpty(userIdAnterior))
                 {
-                    _logger.LogInformation("✅ Login exitoso para: {Username}", user.UserName);
+                    _logger.LogWarning("🔐 LOGIN: Limpiando sesión anterior de userId: {UserIdAnterior}", userIdAnterior);
+                }
+
+                // ========================================
+                // ⚠️ LIMPIEZA AGRESIVA DE SESIÓN
+                // ========================================
+                _logger.LogWarning("🧹 LIMPIEZA: Iniciando limpieza agresiva de sesión anterior");
+
+                // 1. SignOut de cualquier sesión existente
+                await _signInManager.SignOutAsync();
+                _logger.LogWarning("🧹 LIMPIEZA: SignOutAsync completado");
+
+                // 2. Limpiar sesión HTTP completamente
+                HttpContext.Session.Clear();
+
+                // 3. Eliminar TODAS las cookies posibles
+                var cookiesToDelete = new[] {
+                    ".Lado.Auth",
+                    ".AspNetCore.Identity.Application",
+                    ".AspNetCore.Session",
+                    ".AspNetCore.Cookies",
+                    ".Lado.Antiforgery",
+                    ".AspNetCore.Identity.External"
+                };
+
+                foreach (var cookieName in cookiesToDelete)
+                {
+                    // Eliminar sin dominio (localhost)
+                    Response.Cookies.Delete(cookieName);
+                    Response.Cookies.Delete(cookieName, new CookieOptions { Path = "/" });
+
+                    // También con dominios de producción
+                    if (!_environment.IsDevelopment())
+                    {
+                        Response.Cookies.Delete(cookieName, new CookieOptions { Domain = ".ladoapp.com", Path = "/" });
+                        Response.Cookies.Delete(cookieName, new CookieOptions { Domain = "ladoapp.com", Path = "/" });
+                    }
+                }
+                _logger.LogWarning("🧹 LIMPIEZA: Cookies eliminadas");
+
+                // 4. Limpiar cache de UserActivity para AMBOS usuarios
+                if (!string.IsNullOrEmpty(userIdAnterior))
+                {
+                    Middleware.UserActivityMiddleware.LimpiarCacheUsuario(userIdAnterior);
+                    _logger.LogWarning("🧹 LIMPIEZA: Cache de usuario anterior {UserId} limpiado", userIdAnterior);
+                }
+                Middleware.UserActivityMiddleware.LimpiarCacheUsuario(user.Id);
+
+                // 5. Esperar un momento para asegurar que las cookies se procesen
+                await Task.Delay(100);
+
+                _logger.LogInformation("✅ Sesión anterior limpiada. Creando nueva sesión para: {Username} (ID: {UserId})", user.UserName, user.Id);
+
+                // ✅ Hacer login usando SignInAsync directamente
+                // (ya verificamos la contraseña arriba con CheckPasswordAsync)
+                await _signInManager.SignInAsync(user, isPersistent: model.Recordarme);
+
+                // Verificar que se estableció la cookie correcta
+                _logger.LogWarning("🔐 LOGIN: SignInAsync ejecutado para {Username} (ID: {UserId})", user.UserName, user.Id);
+
+                // Verificar el Set-Cookie header
+                var setCookieHeaders = Response.Headers["Set-Cookie"].ToString();
+                _logger.LogWarning("🍪 LOGIN: Set-Cookie headers: {Headers}",
+                    setCookieHeaders.Length > 200 ? setCookieHeaders.Substring(0, 200) + "..." : setCookieHeaders);
+
+                {
+                    _logger.LogInformation("✅ Login exitoso para: {Username} (ID: {UserId})", user.UserName, user.Id);
 
                     // ✅ Actualizar contador de ingresos y ultima actividad
                     user.ContadorIngresos++;
@@ -358,25 +459,10 @@ namespace Lado.Controllers
                     }
 
                     // ✅ Siempre ir a FeedPublico después del login
-                    _logger.LogInformation("Redirigiendo a FeedPublico");
+                    _logger.LogInformation("Redirigiendo a FeedPublico para: {Username}", user.UserName);
                     TempData["Success"] = $"¡Bienvenido de nuevo, {user.NombreCompleto}!";
                     return RedirectToAction("Index", "FeedPublico");
                 }
-
-                if (result.IsLockedOut)
-                {
-                    _logger.LogWarning("❌ Cuenta bloqueada: {Username}", user.UserName);
-                    return View("Lockout");
-                }
-
-                if (result.RequiresTwoFactor)
-                {
-                    _logger.LogInformation("Se requiere autenticación de dos factores");
-                    return RedirectToAction("LoginWith2fa", new { returnUrl, model.Recordarme });
-                }
-
-                _logger.LogError("❌ Login falló para: {Username}. Result: {Result}", user.UserName, result);
-                ModelState.AddModelError(string.Empty, "Error al iniciar sesión. Por favor intenta nuevamente.");
             }
             catch (Exception ex)
             {
@@ -395,14 +481,23 @@ namespace Lado.Controllers
         public async Task<IActionResult> Logout()
         {
             var userName = User?.Identity?.Name;
+            var userId = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             var isProduction = !_environment.IsDevelopment();
 
-            _logger.LogInformation("🔄 Iniciando logout para: {Username}, Entorno: {Env}",
+            _logger.LogInformation("🔄 Iniciando logout para: {Username} (ID: {UserId}), Entorno: {Env}",
                 userName ?? "Unknown",
+                userId ?? "Unknown",
                 isProduction ? "Produccion" : "Desarrollo");
 
             try
             {
+                // 0. ⚠️ CRÍTICO: Limpiar cache de UserActivity PRIMERO
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    Middleware.UserActivityMiddleware.LimpiarCacheUsuario(userId);
+                    _logger.LogInformation("✅ Cache de UserActivity limpiado para: {UserId}", userId);
+                }
+
                 // 1. Cerrar sesión de Identity
                 await _signInManager.SignOutAsync();
                 _logger.LogInformation("✅ SignOutAsync completado");
@@ -883,6 +978,22 @@ namespace Lado.Controllers
             return Challenge(properties, provider);
         }
 
+        /// <summary>
+        /// Login directo con proveedor externo (GET) - para enlaces directos
+        /// </summary>
+        [HttpGet]
+        public IActionResult ExternalLoginDirect(string provider, string returnUrl = null)
+        {
+            if (string.IsNullOrEmpty(provider))
+            {
+                return RedirectToAction(nameof(Login));
+            }
+
+            var redirectUrl = Url.Action("ExternalLoginCallback", "Account", new { returnUrl });
+            var properties = _signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
+            return Challenge(properties, provider);
+        }
+
         [HttpGet]
         public async Task<IActionResult> ExternalLoginCallback(string returnUrl = null, string remoteError = null)
         {
@@ -981,6 +1092,10 @@ namespace Lado.Controllers
                     if (addLoginResult.Succeeded)
                     {
                         await _signInManager.SignInAsync(existingUser, isPersistent: true);
+                        // Incrementar contador de ingresos
+                        existingUser.ContadorIngresos++;
+                        existingUser.UltimaActividad = DateTime.Now;
+                        await _userManager.UpdateAsync(existingUser);
                         _logger.LogInformation("Login externo vinculado a usuario existente: {Email}", email);
                         return RedirectToAction("Index", "FeedPublico");
                     }
@@ -989,6 +1104,10 @@ namespace Lado.Controllers
                         // Si falla porque ya existe el login, simplemente hacer sign in
                         _logger.LogInformation("Login externo ya vinculado, haciendo sign in: {Email}", email);
                         await _signInManager.SignInAsync(existingUser, isPersistent: true);
+                        // Incrementar contador de ingresos
+                        existingUser.ContadorIngresos++;
+                        existingUser.UltimaActividad = DateTime.Now;
+                        await _userManager.UpdateAsync(existingUser);
                         return RedirectToAction("Index", "FeedPublico");
                     }
                 }
@@ -1046,6 +1165,12 @@ namespace Lado.Controllers
                         }
 
                         await _signInManager.SignInAsync(newUser, isPersistent: true);
+
+                        // Incrementar contador de ingresos (primer login después de registro con Google)
+                        newUser.ContadorIngresos = 1;
+                        newUser.UltimaActividad = DateTime.Now;
+                        await _userManager.UpdateAsync(newUser);
+
                         _logger.LogInformation("Nuevo usuario creado con Google: {Email}", email);
                         TempData["Success"] = "¡Bienvenido a LADO! Tu cuenta ha sido creada con Google. ¡Recibiste LadoCoins de bienvenida!";
                         return RedirectToAction("Index", "FeedPublico");

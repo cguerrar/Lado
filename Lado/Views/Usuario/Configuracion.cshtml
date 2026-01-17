@@ -215,6 +215,14 @@
         stroke-linejoin: round;
     }
 
+    /* Nav text - desktop muestra full, móvil muestra short */
+    .nav-text-full {
+        display: inline;
+    }
+    .nav-text-short {
+        display: none;
+    }
+
     /* Cards */
     .config-card {
         background: var(--config-card-bg);
@@ -749,20 +757,36 @@
     }
 
     /* ========================================
-       SIMPLIFICACIÓN MÓVIL - CONFIGURACIÓN
+       REDISEÑO MÓVIL COMPLETO - iOS COMPATIBLE
        ======================================== */
 
-    /* Móvil Grande (< 768px) - Mejoras adicionales */
+    /* ===== TABLETS (< 992px) ===== */
+    @@media (max-width: 991px) {
+        .config-layout {
+            grid-template-columns: 200px 1fr;
+            gap: 20px;
+        }
+    }
+
+    /* ===== MÓVIL GRANDE (< 768px) ===== */
     @@media (max-width: 767px) {
-        /* Layout edge-to-edge */
+        /* Reset layout para móvil */
         .config-page-wrapper {
             padding: 0;
             max-width: 100%;
+            min-height: 100vh;
+            padding-bottom: calc(80px + env(safe-area-inset-bottom, 20px));
         }
 
-        /* Header sticky */
+        .config-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        /* === HEADER COMPACTO === */
         .config-header {
-            padding: 16px 12px;
+            padding: 16px;
             margin-bottom: 0;
             border-bottom: 1px solid var(--config-border);
             background: var(--config-card-bg);
@@ -773,83 +797,528 @@
 
         .config-header h2 {
             font-size: 1.25rem;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
 
         .config-header p {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
+            display: none; /* Ocultar en móvil para ahorrar espacio */
         }
 
-        /* Layout de una columna */
-        .config-layout {
-            display: block;
-        }
+        /* === NAVEGACIÓN HORIZONTAL - REDISEÑO COMPLETO === */
 
-        /* Sidebar como tabs horizontales */
-        .config-sidebar {
+        /* Contenedor wrapper con gradientes fade */
+        .config-sidebar-wrapper {
             position: sticky;
-            top: 120px;
-            border-radius: 0;
-            border-left: none;
-            border-right: none;
-            padding: 8px 12px;
+            top: 105px;
+            z-index: 45;
+            background: var(--config-card-bg);
+            border-bottom: 1px solid var(--config-border);
+        }
+
+        /* Gradientes que indican que hay más contenido */
+        .config-sidebar-wrapper::before,
+        .config-sidebar-wrapper::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 40px;
+            pointer-events: none;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .config-sidebar-wrapper::before {
+            left: 0;
+            background: linear-gradient(to right, var(--config-card-bg) 0%, transparent 100%);
+        }
+
+        .config-sidebar-wrapper::after {
+            right: 0;
+            background: linear-gradient(to left, var(--config-card-bg) 0%, transparent 100%);
+        }
+
+        /* Mostrar gradientes según posición de scroll */
+        .config-sidebar-wrapper.can-scroll-left::before {
+            opacity: 1;
+        }
+
+        .config-sidebar-wrapper.can-scroll-right::after {
+            opacity: 1;
+        }
+
+        /* Indicador de deslizar - flecha animada */
+        .scroll-hint {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 15;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 10px;
+            background: var(--config-primary);
+            color: white;
+            border-radius: 20px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(70, 130, 180, 0.4);
+            animation: pulseHint 2s ease-in-out infinite;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .scroll-hint.visible {
+            opacity: 1;
+        }
+
+        .scroll-hint svg {
+            width: 12px;
+            height: 12px;
+            animation: bounceRight 1s ease-in-out infinite;
+        }
+
+        @@keyframes pulseHint {
+            0%, 100% { transform: translateY(-50%) scale(1); }
+            50% { transform: translateY(-50%) scale(1.05); }
+        }
+
+        @@keyframes bounceRight {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(3px); }
+        }
+
+        .config-sidebar {
+            position: relative;
             display: flex;
             overflow-x: auto;
-            gap: 6px;
+            overflow-y: hidden;
+            gap: 8px;
+            padding: 12px 16px;
+            background: transparent;
             -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
-            background: var(--config-card-bg);
-            z-index: 40;
+            scroll-snap-type: x proximity;
+            scroll-behavior: smooth;
         }
 
         .config-sidebar::-webkit-scrollbar {
             display: none;
         }
 
+        /* Nav items como PILLS modernas */
         .config-nav-item {
-            flex-shrink: 0;
-            padding: 10px 16px;
-            border-radius: 20px;
-            font-size: 0.85rem;
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
             gap: 8px;
+            padding: 10px 16px;
+            min-height: 44px;
+            border-radius: 22px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-align: center;
             white-space: nowrap;
-            background: var(--bg-tertiary, #f3f4f6);
+            background: var(--config-border);
+            color: var(--config-text-secondary);
+            border: none;
+            scroll-snap-align: start;
+            transition: all 0.25s ease;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
+        .config-nav-item .config-nav-icon {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+        }
+
+        /* Texto abreviado para móvil */
+        .config-nav-item .nav-text-full {
+            display: none;
+        }
+
+        .config-nav-item .nav-text-short {
+            display: block;
+            font-weight: 600;
+        }
+
+        /* Tab activo - diseño destacado */
         .config-nav-item.active {
             background: var(--config-primary);
             color: white;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(70, 130, 180, 0.35);
+            transform: scale(1.02);
         }
 
-        .config-nav-icon {
-            width: 18px;
-            height: 18px;
+        .config-nav-item.active .config-nav-icon {
+            opacity: 1;
         }
 
-        /* Cards sin bordes laterales */
+        .config-nav-item:active:not(.active) {
+            transform: scale(0.96);
+            background: var(--config-primary-light, rgba(70, 130, 180, 0.15));
+        }
+
+        /* === CARDS OPTIMIZADAS === */
         .config-card {
             border-radius: 0;
             border-left: none;
             border-right: none;
-            margin-bottom: 8px;
+            margin-bottom: 0;
+            border-bottom: 8px solid var(--config-border);
+            box-shadow: none;
+        }
+
+        .config-card:last-child {
+            border-bottom: none;
         }
 
         .config-card-header {
-            padding: 14px 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .config-card-header h5 {
             font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .config-card-body {
-            padding: 12px;
+            padding: 16px;
+            padding-top: 8px;
         }
 
-        /* Settings row */
+        /* === SETTINGS ROWS MEJORADAS === */
         .config-settings-row {
-            padding: 14px 0;
-            gap: 10px;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 0;
+            gap: 16px;
+            border-bottom: 1px solid var(--config-border);
+        }
+
+        .config-settings-row:last-child {
+            border-bottom: none;
+        }
+
+        .config-settings-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .config-settings-info h6 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            line-height: 1.3;
+        }
+
+        .config-settings-info p {
+            font-size: 0.8rem;
+            line-height: 1.4;
+            color: var(--config-text-secondary);
+        }
+
+        /* === SWITCHES GRANDES PARA TOUCH === */
+        .config-switch {
+            width: 56px;
+            height: 32px;
+            flex-shrink: 0;
+        }
+
+        .config-switch-slider {
+            border-radius: 32px;
+        }
+
+        .config-switch-slider:before {
+            height: 26px;
+            width: 26px;
+            left: 3px;
+            bottom: 3px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .config-switch input:checked + .config-switch-slider:before {
+            transform: translateX(24px);
+        }
+
+        /* === FORMULARIOS MÓVIL === */
+        .config-form-group {
+            margin-bottom: 20px;
+        }
+
+        .config-form-label {
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .config-form-control {
+            padding: 14px 16px;
+            font-size: 16px; /* 16px evita zoom en iOS */
+            border-radius: 12px;
+            min-height: 52px;
+            background: var(--config-input-bg);
+            -webkit-appearance: none;
+        }
+
+        .config-form-control:focus {
+            border-color: var(--config-primary);
+            box-shadow: 0 0 0 4px rgba(70, 130, 180, 0.15);
+        }
+
+        .config-form-text {
+            font-size: 0.75rem;
+            margin-top: 8px;
+        }
+
+        .config-input-group {
+            flex-direction: row;
+        }
+
+        .config-input-group-text {
+            padding: 14px 12px;
+            font-size: 0.9rem;
+            border-radius: 12px 0 0 12px;
+        }
+
+        .config-input-group .config-form-control {
+            border-radius: 0 12px 12px 0;
+        }
+
+        /* === BOTONES MÓVIL === */
+        .config-btn {
+            padding: 14px 20px;
+            font-size: 0.95rem;
+            border-radius: 12px;
+            min-height: 52px;
+            width: 100%;
+            justify-content: center;
+            font-weight: 600;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .config-btn:active {
+            transform: scale(0.98);
+        }
+
+        .config-btn .config-icon {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Botones inline más pequeños */
+        .config-btn-sm,
+        .config-settings-row .config-btn {
+            width: auto;
+            min-height: 44px;
+            padding: 10px 16px;
+            font-size: 0.85rem;
+        }
+
+        /* === MODAL BOTTOM SHEET === */
+        .config-modal.show {
+            align-items: flex-end;
+        }
+
+        .config-modal-dialog {
+            margin: 0;
+            max-width: 100%;
+            width: 100%;
+            max-height: 90vh;
+            border-radius: 20px 20px 0 0;
+            animation: slideUp 0.3s ease;
+        }
+
+        @@keyframes slideUp {
+            from {
+                transform: translateY(100%);
+                opacity: 0.5;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .config-modal-header {
+            padding: 20px;
+            padding-bottom: 16px;
+            position: relative;
+        }
+
+        /* Handle indicador para bottom sheet */
+        .config-modal-header::before {
+            content: '';
+            position: absolute;
+            top: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 4px;
+            background: #d1d5db;
+            border-radius: 2px;
+        }
+
+        .config-modal-header h5 {
+            font-size: 1.1rem;
+        }
+
+        .config-modal-body {
+            padding: 20px;
+            padding-top: 0;
+            max-height: 50vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .config-modal-body ul {
+            padding-left: 20px;
+        }
+
+        .config-modal-body li {
+            padding: 4px 0;
+        }
+
+        .config-modal-footer {
+            padding: 16px 20px;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom, 20px));
+            flex-direction: column-reverse;
+            gap: 12px;
+            background: var(--config-card-bg);
+        }
+
+        .config-modal-footer .config-btn {
+            margin: 0;
+        }
+
+        .config-modal-footer .config-btn-danger {
+            order: 1;
+        }
+
+        /* === ALERTS === */
+        .config-alert {
+            padding: 14px;
+            font-size: 0.85rem;
+            border-radius: 12px;
+            margin: 16px;
+        }
+
+        /* === OPTIONS CARDS (Idioma, Lado Preferido) === */
+        .language-option,
+        .lado-pref-option,
+        .promo-option,
+        .bloquear-option,
+        .ocultar-publico-option {
+            padding: 16px !important;
+            gap: 12px !important;
+            border-radius: 14px !important;
+        }
+
+        .language-option span:first-of-type,
+        .lado-pref-option > div:first-child {
+            width: 44px !important;
+            height: 44px !important;
+            font-size: 24px !important;
+        }
+
+        .lado-pref-option > div:first-child svg {
+            width: 22px !important;
+            height: 22px !important;
+        }
+
+        .language-option > div,
+        .lado-pref-option > div:not(:first-child):not(:last-child) {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .language-option > div > div:first-child,
+        .lado-pref-option > div > div:first-child {
+            font-size: 0.95rem !important;
+        }
+
+        .language-option > div > div:last-child,
+        .lado-pref-option > div > div:last-child {
+            font-size: 0.8rem !important;
+        }
+
+        /* === ZONA HORARIA MÓVIL === */
+        .config-tab-content#notificaciones [style*="display: flex"][style*="gap: 16px"] {
+            flex-direction: column !important;
+        }
+
+        .config-tab-content#notificaciones [style*="flex: 1"][style*="min-width: 120px"] {
+            width: 100% !important;
+            min-width: 100% !important;
+        }
+
+        /* === AGENCIA GRID === */
+        .config-tab-content#agencia [style*="grid-template-columns: repeat(3"] {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+        }
+
+        .config-tab-content#agencia [style*="display: flex"][style*="gap: 12px"] {
+            flex-direction: column !important;
+        }
+
+        .config-tab-content#agencia [style*="display: flex"][style*="gap: 12px"] a {
+            width: 100%;
+            text-align: center;
+        }
+    }
+
+    /* ===== MÓVIL PEQUEÑO (< 480px) ===== */
+    @@media (max-width: 479px) {
+        .config-header {
+            padding: 14px;
+        }
+
+        .config-header h2 {
+            font-size: 1.1rem;
+        }
+
+        /* Tabs aún más compactas */
+        .config-nav-item {
+            min-width: 64px;
+            padding: 10px 12px;
+            min-height: 58px;
+            font-size: 0.65rem;
+        }
+
+        .config-nav-item .config-nav-icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        .config-card-header {
+            padding: 14px;
+        }
+
+        .config-card-header h5 {
+            font-size: 0.95rem;
+        }
+
+        .config-card-body {
+            padding: 14px;
         }
 
         .config-settings-info h6 {
@@ -857,38 +1326,70 @@
         }
 
         .config-settings-info p {
-            font-size: 0.8rem;
-        }
-
-        /* Form elements */
-        .config-form-group {
-            margin-bottom: 16px;
-        }
-
-        .config-form-label {
-            font-size: 0.85rem;
-            margin-bottom: 6px;
-        }
-
-        .config-form-control {
-            padding: 10px 12px;
-            font-size: 16px; /* Evitar zoom en iOS */
-            border-radius: 10px;
-        }
-
-        .config-form-text {
             font-size: 0.75rem;
         }
 
-        .config-input-group-text {
-            padding: 10px 12px;
+        .config-form-control {
+            padding: 12px 14px;
+            min-height: 48px;
+        }
+
+        .config-btn {
+            padding: 12px 16px;
+            min-height: 48px;
             font-size: 0.9rem;
         }
 
-        /* Switch más grande para touch */
+        /* Opciones de idioma/lado más compactas */
+        .language-option,
+        .lado-pref-option {
+            padding: 14px !important;
+        }
+
+        .lado-pref-option > div:first-child {
+            width: 40px !important;
+            height: 40px !important;
+        }
+    }
+
+    /* ===== PANTALLAS MUY PEQUEÑAS (< 360px) ===== */
+    @@media (max-width: 359px) {
+        .config-header h2 {
+            font-size: 1rem;
+        }
+
+        /* Solo iconos en tabs, sin texto */
+        .config-nav-item {
+            min-width: 52px;
+            padding: 10px 8px;
+            min-height: 52px;
+        }
+
+        .config-nav-item .nav-text-short {
+            display: none;
+        }
+
+        .config-nav-item .config-nav-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        .config-card-header h5 {
+            font-size: 0.9rem;
+        }
+
+        .config-settings-row {
+            gap: 12px;
+        }
+
+        .config-settings-info h6 {
+            font-size: 0.85rem;
+        }
+
+        /* Switch ligeramente más pequeño pero aún touch-friendly */
         .config-switch {
-            width: 52px;
-            height: 30px;
+            width: 50px;
+            height: 28px;
         }
 
         .config-switch-slider:before {
@@ -899,213 +1400,77 @@
         .config-switch input:checked + .config-switch-slider:before {
             transform: translateX(22px);
         }
+    }
 
-        /* Botones */
-        .config-btn {
-            padding: 10px 16px;
-            font-size: 0.9rem;
-            border-radius: 10px;
-            min-height: 44px;
-        }
-
-        .config-btn-sm {
-            padding: 8px 14px;
-            font-size: 0.85rem;
-        }
-
-        /* Modal */
-        .config-modal-backdrop {
-            padding: 0;
-        }
-
-        .config-modal-dialog {
-            margin: 0;
-            max-width: 100%;
-            max-height: 100vh;
-            border-radius: 16px 16px 0 0;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-        }
-
-        .config-modal-header {
-            padding: 14px 16px;
-        }
-
-        .config-modal-body {
-            padding: 16px;
-            max-height: 50vh;
-            overflow-y: auto;
+    /* ===== iOS SAFE AREAS Y OPTIMIZACIONES ===== */
+    @@supports (padding-bottom: env(safe-area-inset-bottom)) {
+        .config-page-wrapper {
+            padding-bottom: calc(80px + env(safe-area-inset-bottom));
         }
 
         .config-modal-footer {
-            padding: 12px 16px;
-            padding-bottom: calc(12px + env(safe-area-inset-bottom, 0));
-        }
-
-        /* Alerts */
-        .config-alert {
-            padding: 12px;
-            font-size: 0.85rem;
-            border-radius: 10px;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom));
         }
     }
 
-    /* Móvil Pequeño (< 480px) */
-    @@media (max-width: 479px) {
-        .config-header {
-            padding: 12px 10px;
-        }
-
-        .config-header h2 {
-            font-size: 1.1rem;
-        }
-
-        .config-header p {
-            font-size: 0.8rem;
-        }
-
+    /* Prefijos webkit para iOS */
+    @@media (max-width: 767px) {
         .config-sidebar {
-            padding: 6px 10px;
-            gap: 5px;
-        }
-
-        .config-nav-item {
-            padding: 8px 12px;
-            font-size: 0.8rem;
-        }
-
-        .config-nav-icon {
-            width: 16px;
-            height: 16px;
-        }
-
-        .config-card-header {
-            padding: 12px 10px;
-        }
-
-        .config-card-header h5 {
-            font-size: 0.95rem;
-        }
-
-        .config-card-body {
-            padding: 10px;
-        }
-
-        .config-settings-row {
-            padding: 12px 0;
-        }
-
-        .config-settings-info h6 {
-            font-size: 0.85rem;
-        }
-
-        .config-settings-info p {
-            font-size: 0.75rem;
+            -webkit-overflow-scrolling: touch;
         }
 
         .config-form-control {
-            padding: 8px 10px;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
         }
 
-        .config-btn {
-            padding: 8px 14px;
-            font-size: 0.85rem;
+        select.config-form-control {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 36px;
         }
 
-        /* Language/Lado options más compactos */
-        .language-option,
-        .lado-pref-option {
-            padding: 10px !important;
-        }
-
-        .language-option span,
-        .lado-pref-option span {
-            font-size: 0.85rem;
-        }
-    }
-
-    /* Pantallas muy pequeñas (< 360px) */
-    @@media (max-width: 359px) {
-        .config-header h2 {
-            font-size: 1rem;
-        }
-
-        .config-nav-item {
-            padding: 6px 10px;
-            font-size: 0.75rem;
-        }
-
-        .config-nav-item .config-nav-icon {
-            display: none;
-        }
-
-        .config-card-header h5 {
-            font-size: 0.9rem;
-        }
-
-        .config-settings-info h6 {
-            font-size: 0.8rem;
-        }
-
-        .config-switch {
-            width: 46px;
-            height: 26px;
-        }
-
-        .config-switch-slider:before {
-            height: 18px;
-            width: 18px;
-        }
-
-        .config-switch input:checked + .config-switch-slider:before {
-            transform: translateX(20px);
-        }
-    }
-
-    /* Safe area para iPhone X+ */
-    @@supports (padding-bottom: env(safe-area-inset-bottom)) {
-        @@media (max-width: 767px) {
-            .config-page-wrapper {
-                padding-bottom: calc(70px + env(safe-area-inset-bottom));
-            }
-
-            .config-modal-footer {
-                padding-bottom: calc(16px + env(safe-area-inset-bottom));
-            }
-        }
-    }
-
-    /* Optimizaciones de rendimiento móvil */
-    @@media (max-width: 767px) {
+        /* Transiciones más rápidas en móvil */
         .config-card,
         .config-nav-item,
-        .config-switch-slider {
+        .config-switch-slider,
+        .config-btn {
             transition-duration: 0.15s;
         }
 
-        /* Desactivar hover en móvil */
+        /* Desactivar hover effects */
         .config-nav-item:hover {
             background: transparent;
         }
 
-        .config-nav-item:active {
-            background: rgba(70, 130, 180, 0.1);
+        .config-nav-item.active:hover {
+            background: rgba(70, 130, 180, 0.08);
         }
 
-        .config-nav-item.active:hover,
-        .config-nav-item.active:active {
-            background: var(--config-primary);
+        /* Active states para touch feedback */
+        .config-nav-item:active:not(.active) {
+            background: rgba(70, 130, 180, 0.06);
         }
 
-        /* Scroll suave en sidebar */
-        .config-sidebar {
-            scroll-snap-type: x proximity;
+        .language-option:active,
+        .lado-pref-option:active {
+            transform: scale(0.98);
+        }
+    }
+
+    /* ===== ANIMACIONES REDUCIDAS PARA ACCESIBILIDAD ===== */
+    @@media (prefers-reduced-motion: reduce) {
+        .config-modal-dialog {
+            animation: none;
         }
 
-        .config-nav-item {
-            scroll-snap-align: start;
+        .config-card,
+        .config-nav-item,
+        .config-switch-slider,
+        .config-btn {
+            transition: none;
         }
     }
 
@@ -1146,41 +1511,53 @@
     </div>
 
     <div class="config-layout">
-        <!-- Sidebar -->
-        <div class="config-sidebar">
-            <button class="config-nav-item active" onclick="cambiarTab('cuenta')">
+        <!-- Sidebar con wrapper para gradientes en móvil -->
+        <div class="config-sidebar-wrapper can-scroll-right" id="sidebarWrapper">
+            <div class="scroll-hint visible" id="scrollHint">
+                <span>Desliza</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </div>
+            <div class="config-sidebar" id="configSidebar">
+                <button class="config-nav-item active" onclick="cambiarTab('cuenta')">
                 <svg class="config-nav-icon" viewBox="0 0 24 24">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                     <circle cx="12" cy="7" r="4" />
                 </svg>
-                Cuenta
+                <span class="nav-text-full">Cuenta</span>
+                <span class="nav-text-short">Cuenta</span>
             </button>
             <button class="config-nav-item" onclick="cambiarTab('seguridad')">
                 <svg class="config-nav-icon" viewBox="0 0 24 24">
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
-                Seguridad
+                <span class="nav-text-full">Seguridad</span>
+                <span class="nav-text-short">Seguro</span>
             </button>
             <button class="config-nav-item" onclick="cambiarTab('notificaciones')">
                 <svg class="config-nav-icon" viewBox="0 0 24 24">
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                     <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
-                Notificaciones
+                <span class="nav-text-full">Notificaciones</span>
+                <span class="nav-text-short">Alertas</span>
             </button>
             <button class="config-nav-item" onclick="cambiarTab('privacidad')">
                 <svg class="config-nav-icon" viewBox="0 0 24 24">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
-                Privacidad
+                <span class="nav-text-full">Privacidad</span>
+                <span class="nav-text-short">Privado</span>
             </button>
             <button class="config-nav-item" onclick="cambiarTab('agencia')">
                 <svg class="config-nav-icon" viewBox="0 0 24 24">
                     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
                     <polyline points="9 22 9 12 15 12 15 22"/>
                 </svg>
-                Agencia Publicitaria
+                <span class="nav-text-full">Agencia Publicitaria</span>
+                <span class="nav-text-short">Agencia</span>
             </button>
             <button class="config-nav-item" onclick="cambiarTab('idioma')">
                 <svg class="config-nav-icon" viewBox="0 0 24 24">
@@ -1188,7 +1565,8 @@
                     <line x1="2" y1="12" x2="22" y2="12"/>
                     <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                 </svg>
-                Idioma
+                <span class="nav-text-full">Idioma</span>
+                <span class="nav-text-short">Idioma</span>
             </button>
             <button class="config-nav-item" onclick="cambiarTab('ladopreferido')">
                 <svg class="config-nav-icon" viewBox="0 0 24 24">
@@ -1196,8 +1574,10 @@
                     <path d="M2 17l10 5 10-5"/>
                     <path d="M2 12l10 5 10-5"/>
                 </svg>
-                Lado Preferido
+                <span class="nav-text-full">Lado Preferido</span>
+                <span class="nav-text-short">Lado</span>
             </button>
+            </div>
         </div>
 
         <!-- Content -->
@@ -1474,29 +1854,215 @@
                     </div>
                     <div class="config-card-body">
                         <form asp-action="ActualizarNotificaciones" method="post">
-                            <div class="config-settings-row">
-                                <div class="config-settings-info">
-                                    <h6>Nuevos Seguidores</h6>
-                                    <p>Recibe un email cuando alguien te siga</p>
+                            <!-- Seccion: Interacciones -->
+                            <div style="margin-bottom: 24px;">
+                                <h6 style="color: var(--config-text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;">
+                                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                                    </svg>
+                                    Interacciones
+                                </h6>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Nuevos Mensajes</h6>
+                                        <p>Cuando alguien te envia un mensaje directo</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="EmailNuevosMensajes" checked>
+                                        <span class="config-switch-slider"></span>
+                                    </label>
                                 </div>
-                                <label class="config-switch">
-                                    <input type="checkbox" name="EmailNuevosSeguidores" checked>
-                                    <span class="config-switch-slider"></span>
-                                </label>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Comentarios</h6>
+                                        <p>Cuando alguien comenta en tu contenido</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="EmailComentarios" checked>
+                                        <span class="config-switch-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Menciones</h6>
+                                        <p>Cuando alguien te menciona en una publicacion</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="EmailMenciones" checked>
+                                        <span class="config-switch-slider"></span>
+                                    </label>
+                                </div>
                             </div>
 
-                            <div class="config-settings-row">
-                                <div class="config-settings-info">
-                                    <h6>Nuevos Mensajes</h6>
-                                    <p>Notificación de mensajes directos</p>
+                            <!-- Seccion: Seguidores y Suscriptores -->
+                            <div style="margin-bottom: 24px; border-top: 1px solid var(--config-border); padding-top: 24px;">
+                                <h6 style="color: var(--config-text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="9" cy="7" r="4"></circle>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                    </svg>
+                                    Seguidores y Suscriptores
+                                </h6>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Nuevos Seguidores</h6>
+                                        <p>Cuando alguien te sigue</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="EmailNuevosSeguidores" checked>
+                                        <span class="config-switch-slider"></span>
+                                    </label>
                                 </div>
-                                <label class="config-switch">
-                                    <input type="checkbox" name="EmailNuevosMensajes" checked>
-                                    <span class="config-switch-slider"></span>
-                                </label>
+
+                                @if (Model.EsCreador)
+                                {
+                                    <div class="config-settings-row">
+                                        <div class="config-settings-info">
+                                            <h6>Nuevas Suscripciones</h6>
+                                            <p>Cuando alguien se suscribe a tu contenido</p>
+                                        </div>
+                                        <label class="config-switch">
+                                            <input type="checkbox" name="EmailNuevasSuscripciones" checked>
+                                            <span class="config-switch-slider"></span>
+                                        </label>
+                                    </div>
+
+                                    <div class="config-settings-row">
+                                        <div class="config-settings-info">
+                                            <h6>Propinas Recibidas</h6>
+                                            <p>Cuando recibes una propina</p>
+                                        </div>
+                                        <label class="config-switch">
+                                            <input type="checkbox" name="EmailPropinas" checked>
+                                            <span class="config-switch-slider"></span>
+                                        </label>
+                                    </div>
+                                }
                             </div>
 
-                            <button type="submit" class="config-btn config-btn-primary" style="margin-top: 24px;">
+                            <!-- Seccion: Contenido -->
+                            <div style="margin-bottom: 24px; border-top: 1px solid var(--config-border); padding-top: 24px;">
+                                <h6 style="color: var(--config-text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                        <polyline points="21 15 16 10 5 21"></polyline>
+                                    </svg>
+                                    Contenido
+                                </h6>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Nuevo contenido de creadores</h6>
+                                        <p>Cuando un creador al que sigues publica algo nuevo</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="EmailNuevoContenido">
+                                        <span class="config-switch-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Stories destacadas</h6>
+                                        <p>Cuando un creador al que sigues publica una story</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="EmailStories">
+                                        <span class="config-switch-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Seccion: Resumenes -->
+                            <div style="margin-bottom: 24px; border-top: 1px solid var(--config-border); padding-top: 24px;">
+                                <h6 style="color: var(--config-text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                                        <polyline points="10 9 9 9 8 9"></polyline>
+                                    </svg>
+                                    Resumenes
+                                </h6>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Resumen semanal</h6>
+                                        <p>Un resumen de tu actividad y estadisticas cada semana</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="EmailResumenSemanal" checked>
+                                        <span class="config-switch-slider"></span>
+                                    </label>
+                                </div>
+
+                                @if (Model.EsCreador)
+                                {
+                                    <div class="config-settings-row">
+                                        <div class="config-settings-info">
+                                            <h6>Reporte de ganancias</h6>
+                                            <p>Resumen mensual de tus ganancias y pagos</p>
+                                        </div>
+                                        <label class="config-switch">
+                                            <input type="checkbox" name="EmailReporteGanancias" checked>
+                                            <span class="config-switch-slider"></span>
+                                        </label>
+                                    </div>
+                                }
+                            </div>
+
+                            <!-- Seccion: Marketing -->
+                            <div style="margin-bottom: 24px; border-top: 1px solid var(--config-border); padding-top: 24px;">
+                                <h6 style="color: var(--config-text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                    Marketing y Comunicados
+                                </h6>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Promociones y ofertas</h6>
+                                        <p>Descuentos especiales y ofertas exclusivas</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="EmailPromociones" @(Model.RecibirEmailsMarketing ? "checked" : "")>
+                                        <span class="config-switch-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Novedades de la plataforma</h6>
+                                        <p>Nuevas funciones y mejoras en Lado</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="EmailNovedades" @(Model.RecibirEmailsComunicados ? "checked" : "")>
+                                        <span class="config-switch-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Consejos para creadores</h6>
+                                        <p>Tips para mejorar tu contenido y ganancias</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="EmailConsejos">
+                                        <span class="config-switch-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="config-btn config-btn-primary" style="margin-top: 8px;">
                                 <svg class="config-icon" viewBox="0 0 24 24">
                                     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
                                     <polyline points="17 21 17 13 7 13 7 21" />
@@ -1513,106 +2079,285 @@
             <div class="config-tab-content" id="privacidad">
                 <div class="config-card">
                     <div class="config-card-header">
-                        <h5>Configuración de Privacidad</h5>
+                        <h5>Configuracion de Privacidad</h5>
                     </div>
                     <div class="config-card-body">
                         <form asp-action="ActualizarPrivacidad" method="post">
-                            <div class="config-settings-row">
-                                <div class="config-settings-info">
-                                    <h6>Perfil Público</h6>
-                                    <p>Permite que cualquiera vea tu perfil</p>
+                            <!-- Seccion: Visibilidad del Perfil -->
+                            <div style="margin-bottom: 24px;">
+                                <h6 style="color: var(--config-text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                    Visibilidad del Perfil
+                                </h6>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Perfil Privado</h6>
+                                        <p>Solo tus seguidores aprobados pueden ver tu contenido. Las solicitudes de seguimiento requieren tu aprobacion.</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="PerfilPrivado" id="perfilPrivado"
+                                               @(Model.PerfilPrivado ? "checked" : "")>
+                                        <span class="config-switch-slider"></span>
+                                    </label>
                                 </div>
-                                <label class="config-switch">
-                                    <input type="checkbox" name="PerfilPublico" checked>
-                                    <span class="config-switch-slider"></span>
-                                </label>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Mostrar en Busquedas</h6>
+                                        <p>Permite que otros usuarios te encuentren al buscar por nombre o usuario</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="MostrarBusquedas" id="mostrarBusquedas"
+                                               @(Model.MostrarEnBusquedas ? "checked" : "")>
+                                        <span class="config-switch-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Mostrar Estado En Linea</h6>
+                                        <p>Permite que otros usuarios vean cuando estas conectado en la plataforma</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="MostrarEstadoEnLinea" id="mostrarEstadoEnLinea"
+                                               @(Model.MostrarEstadoEnLinea ? "checked" : "")>
+                                        <span class="config-switch-slider"></span>
+                                    </label>
+                                </div>
                             </div>
 
-                            <div class="config-settings-row">
-                                <div class="config-settings-info">
-                                    <h6>Mostrar en Búsquedas</h6>
-                                    <p>Aparecer en resultados de búsqueda</p>
+                            <!-- Seccion: Quien puede interactuar -->
+                            <div style="margin-bottom: 24px; border-top: 1px solid var(--config-border); padding-top: 24px;">
+                                <h6 style="color: var(--config-text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="9" cy="7" r="4"></circle>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                    </svg>
+                                    Quien puede interactuar
+                                </h6>
+
+                                <div class="config-settings-row" style="flex-direction: column; align-items: flex-start; gap: 12px;">
+                                    <div class="config-settings-info" style="width: 100%;">
+                                        <h6>Quien puede enviarte mensajes</h6>
+                                        <p>Controla quien puede iniciar conversaciones contigo</p>
+                                    </div>
+                                    <select name="QuienPuedeMensajear" class="config-select" style="width: 100%; max-width: 300px; padding: 10px 12px; border: 1px solid var(--config-border); border-radius: 8px; background: var(--config-bg-tertiary); color: var(--config-text-primary); font-size: 14px;">
+                                        @if (Model.QuienPuedeMensajear == Lado.Models.PermisoPrivacidad.Todos)
+                                        {
+                                            @:<option value="Todos" selected>Todos</option>
+                                        }
+                                        else
+                                        {
+                                            @:<option value="Todos">Todos</option>
+                                        }
+                                        @if (Model.QuienPuedeMensajear == Lado.Models.PermisoPrivacidad.Seguidores)
+                                        {
+                                            @:<option value="Seguidores" selected>Solo seguidores</option>
+                                        }
+                                        else
+                                        {
+                                            @:<option value="Seguidores">Solo seguidores</option>
+                                        }
+                                        @if (Model.EsCreador)
+                                        {
+                                            if (Model.QuienPuedeMensajear == Lado.Models.PermisoPrivacidad.Suscriptores)
+                                            {
+                                                @:<option value="Suscriptores" selected>Solo suscriptores</option>
+                                            }
+                                            else
+                                            {
+                                                @:<option value="Suscriptores">Solo suscriptores</option>
+                                            }
+                                        }
+                                        @if (Model.QuienPuedeMensajear == Lado.Models.PermisoPrivacidad.Nadie)
+                                        {
+                                            @:<option value="Nadie" selected>Nadie</option>
+                                        }
+                                        else
+                                        {
+                                            @:<option value="Nadie">Nadie</option>
+                                        }
+                                    </select>
                                 </div>
-                                <label class="config-switch">
-                                    <input type="checkbox" name="MostrarBusquedas" checked>
-                                    <span class="config-switch-slider"></span>
-                                </label>
+
+                                <div class="config-settings-row" style="flex-direction: column; align-items: flex-start; gap: 12px; margin-top: 16px;">
+                                    <div class="config-settings-info" style="width: 100%;">
+                                        <h6>Quien puede comentar tu contenido</h6>
+                                        <p>Controla quien puede dejar comentarios en tus publicaciones</p>
+                                    </div>
+                                    <select name="QuienPuedeComentar" class="config-select" style="width: 100%; max-width: 300px; padding: 10px 12px; border: 1px solid var(--config-border); border-radius: 8px; background: var(--config-bg-tertiary); color: var(--config-text-primary); font-size: 14px;">
+                                        @if (Model.QuienPuedeComentar == Lado.Models.PermisoPrivacidad.Todos)
+                                        {
+                                            @:<option value="Todos" selected>Todos</option>
+                                        }
+                                        else
+                                        {
+                                            @:<option value="Todos">Todos</option>
+                                        }
+                                        @if (Model.QuienPuedeComentar == Lado.Models.PermisoPrivacidad.Seguidores)
+                                        {
+                                            @:<option value="Seguidores" selected>Solo seguidores</option>
+                                        }
+                                        else
+                                        {
+                                            @:<option value="Seguidores">Solo seguidores</option>
+                                        }
+                                        @if (Model.EsCreador)
+                                        {
+                                            if (Model.QuienPuedeComentar == Lado.Models.PermisoPrivacidad.Suscriptores)
+                                            {
+                                                @:<option value="Suscriptores" selected>Solo suscriptores</option>
+                                            }
+                                            else
+                                            {
+                                                @:<option value="Suscriptores">Solo suscriptores</option>
+                                            }
+                                        }
+                                        @if (Model.QuienPuedeComentar == Lado.Models.PermisoPrivacidad.Nadie)
+                                        {
+                                            @:<option value="Nadie" selected>Nadie (comentarios desactivados)</option>
+                                        }
+                                        else
+                                        {
+                                            @:<option value="Nadie">Nadie (comentarios desactivados)</option>
+                                        }
+                                    </select>
+                                </div>
                             </div>
 
-                            <div class="config-settings-row">
-                                <div class="config-settings-info">
-                                    <h6>Mensajes de Desconocidos</h6>
-                                    <p>Permite mensajes de personas que no sigues</p>
+                            <!-- Seccion: Informacion visible -->
+                            <div style="margin-bottom: 24px; border-top: 1px solid var(--config-border); padding-top: 24px;">
+                                <h6 style="color: var(--config-text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                    </svg>
+                                    Informacion visible a otros
+                                </h6>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Mostrar lista de seguidores</h6>
+                                        <p>Permite que otros vean quienes te siguen</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="MostrarSeguidores" id="mostrarSeguidores"
+                                               @(Model.MostrarSeguidores ? "checked" : "")>
+                                        <span class="config-switch-slider"></span>
+                                    </label>
                                 </div>
-                                <label class="config-switch">
-                                    <input type="checkbox" name="MensajesDesconocidos">
-                                    <span class="config-switch-slider"></span>
-                                </label>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Mostrar lista de siguiendo</h6>
+                                        <p>Permite que otros vean a quien sigues</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="MostrarSiguiendo" id="mostrarSiguiendo"
+                                               @(Model.MostrarSiguiendo ? "checked" : "")>
+                                        <span class="config-switch-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Permitir etiquetas</h6>
+                                        <p>Permite que otros usuarios te etiqueten en sus publicaciones</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="PermitirEtiquetas" id="permitirEtiquetas"
+                                               @(Model.PermitirEtiquetas ? "checked" : "")>
+                                        <span class="config-switch-slider"></span>
+                                    </label>
+                                </div>
                             </div>
 
-                            <div class="config-settings-row">
-                                <div class="config-settings-info">
-                                    <h6>Detectar Ubicacion en Fotos</h6>
-                                    <p>Extrae automaticamente la ubicacion de tus fotos y la muestra en el feed</p>
-                                </div>
-                                <label class="config-switch">
-                                    <input type="checkbox" name="DetectarUbicacionAutomaticamente" id="detectarUbicacion"
-                                           @(Model.DetectarUbicacionAutomaticamente ? "checked" : "")
-                                           onchange="actualizarDetectarUbicacion(this.checked)">
-                                    <span class="config-switch-slider"></span>
-                                </label>
-                            </div>
+                            <!-- Seccion: Ubicacion -->
+                            <div style="margin-bottom: 24px; border-top: 1px solid var(--config-border); padding-top: 24px;">
+                                <h6 style="color: var(--config-text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                        <circle cx="12" cy="10" r="3"></circle>
+                                    </svg>
+                                    Ubicacion
+                                </h6>
 
-                            <div class="config-settings-row">
-                                <div class="config-settings-info">
-                                    <h6>Mostrar Estado En Linea</h6>
-                                    <p>Permite que otros usuarios vean cuando estas conectado en la plataforma</p>
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Detectar ubicacion en fotos</h6>
+                                        <p>Extrae automaticamente la ubicacion de tus fotos y la muestra en el feed</p>
+                                    </div>
+                                    <label class="config-switch">
+                                        <input type="checkbox" name="DetectarUbicacionAutomaticamente" id="detectarUbicacion"
+                                               @(Model.DetectarUbicacionAutomaticamente ? "checked" : "")>
+                                        <span class="config-switch-slider"></span>
+                                    </label>
                                 </div>
-                                <label class="config-switch">
-                                    <input type="checkbox" name="MostrarEstadoEnLinea" id="mostrarEstadoEnLinea"
-                                           @(Model.MostrarEstadoEnLinea ? "checked" : "")
-                                           onchange="actualizarEstadoEnLinea(this.checked)">
-                                    <span class="config-switch-slider"></span>
-                                </label>
                             </div>
 
                             @if (Model.EsCreador && !string.IsNullOrEmpty(Model.Seudonimo))
                             {
-                                <div class="config-settings-row">
-                                    <div class="config-settings-info">
-                                        <h6>Ocultar Identidad LadoA</h6>
-                                        <p>Si activas esta opción, solo quienes te sigan en LadoA podrán ver tu perfil público. Los demás serán redirigidos a tu perfil LadoB (@Model.Seudonimo).</p>
+                                <!-- Seccion: LadoB (solo para creadores) -->
+                                <div style="margin-bottom: 24px; border-top: 1px solid var(--config-border); padding-top: 24px;">
+                                    <h6 style="color: var(--config-text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;">
+                                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                        </svg>
+                                        Privacidad LadoB
+                                    </h6>
+
+                                    <div class="config-settings-row">
+                                        <div class="config-settings-info">
+                                            <h6>Ocultar identidad LadoA</h6>
+                                            <p>Solo quienes te sigan en LadoA podran ver tu perfil publico. Los demas seran redirigidos a tu perfil LadoB (@@Model.Seudonimo).</p>
+                                        </div>
+                                        <label class="config-switch">
+                                            <input type="checkbox" name="OcultarIdentidadLadoA" id="ocultarIdentidadLadoA"
+                                                   @(Model.OcultarIdentidadLadoA ? "checked" : "")>
+                                            <span class="config-switch-slider"></span>
+                                        </label>
                                     </div>
-                                    <label class="config-switch">
-                                        <input type="checkbox" name="OcultarIdentidadLadoA" id="ocultarIdentidadLadoA"
-                                               @(Model.OcultarIdentidadLadoA ? "checked" : "")
-                                               onchange="actualizarOcultarIdentidad(this.checked)">
-                                        <span class="config-switch-slider"></span>
-                                    </label>
                                 </div>
                             }
 
-                            <div class="config-settings-row" style="border-top: 1px solid var(--config-border); padding-top: 20px; margin-top: 20px;">
-                                <div class="config-settings-info">
-                                    <h6>Usuarios Bloqueados</h6>
-                                    <p>Gestiona la lista de usuarios que has bloqueado</p>
-                                </div>
-                                <a href="/Usuario/UsuariosBloqueados" class="config-btn config-btn-secondary" style="padding: 8px 16px; font-size: 14px;">
-                                    <svg class="config-icon" viewBox="0 0 24 24" style="width: 16px; height: 16px;">
+                            <!-- Seccion: Usuarios bloqueados -->
+                            <div style="border-top: 1px solid var(--config-border); padding-top: 24px; margin-bottom: 24px;">
+                                <h6 style="color: var(--config-text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;">
                                         <circle cx="12" cy="12" r="10"></circle>
                                         <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
                                     </svg>
-                                    Ver bloqueados
-                                </a>
+                                    Usuarios bloqueados
+                                </h6>
+
+                                <div class="config-settings-row">
+                                    <div class="config-settings-info">
+                                        <h6>Gestionar bloqueados</h6>
+                                        <p>Ver y administrar la lista de usuarios que has bloqueado</p>
+                                    </div>
+                                    <a href="/Usuario/UsuariosBloqueados" class="config-btn config-btn-secondary" style="padding: 8px 16px; font-size: 14px;">
+                                        <svg class="config-icon" viewBox="0 0 24 24" style="width: 16px; height: 16px;">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                                        </svg>
+                                        Ver bloqueados
+                                    </a>
+                                </div>
                             </div>
 
-                            <button type="submit" class="config-btn config-btn-primary" style="margin-top: 24px;">
+                            <button type="submit" class="config-btn config-btn-primary" style="margin-top: 8px;">
                                 <svg class="config-icon" viewBox="0 0 24 24">
                                     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
                                     <polyline points="17 21 17 13 7 13 7 21" />
                                     <polyline points="7 3 7 8 15 8" />
                                 </svg>
-                                Guardar Configuración
+                                Guardar Configuracion
                             </button>
                         </form>
                     </div>
@@ -2180,6 +2925,68 @@
 </div>
 
 <script>
+    // === SCROLL DETECTION PARA NAVEGACIÓN MÓVIL ===
+    (function() {
+        var sidebar = document.getElementById('configSidebar');
+        var wrapper = document.getElementById('sidebarWrapper');
+        var scrollHint = document.getElementById('scrollHint');
+        var hasScrolled = false;
+
+        if (!sidebar || !wrapper) return;
+
+        function updateScrollIndicators() {
+            var scrollLeft = sidebar.scrollLeft;
+            var scrollWidth = sidebar.scrollWidth;
+            var clientWidth = sidebar.clientWidth;
+            var maxScroll = scrollWidth - clientWidth;
+
+            // Mostrar/ocultar gradientes según posición
+            if (scrollLeft > 10) {
+                wrapper.classList.add('can-scroll-left');
+            } else {
+                wrapper.classList.remove('can-scroll-left');
+            }
+
+            if (scrollLeft < maxScroll - 10) {
+                wrapper.classList.add('can-scroll-right');
+            } else {
+                wrapper.classList.remove('can-scroll-right');
+            }
+
+            // Ocultar hint después del primer scroll
+            if (!hasScrolled && scrollLeft > 20) {
+                hasScrolled = true;
+                if (scrollHint) {
+                    scrollHint.classList.remove('visible');
+                }
+            }
+        }
+
+        // Escuchar evento de scroll
+        sidebar.addEventListener('scroll', updateScrollIndicators, { passive: true });
+
+        // Verificar estado inicial después de que el layout se estabilice
+        setTimeout(function() {
+            updateScrollIndicators();
+            // Mostrar hint solo si hay scroll disponible
+            var maxScroll = sidebar.scrollWidth - sidebar.clientWidth;
+            if (maxScroll > 20 && scrollHint) {
+                scrollHint.classList.add('visible');
+                // Auto-ocultar hint después de 5 segundos
+                setTimeout(function() {
+                    if (!hasScrolled && scrollHint) {
+                        scrollHint.classList.remove('visible');
+                    }
+                }, 5000);
+            }
+        }, 100);
+
+        // Actualizar en resize
+        window.addEventListener('resize', function() {
+            setTimeout(updateScrollIndicators, 100);
+        });
+    })();
+
     // Cambiar entre tabs
     function cambiarTab(tabId) {
         // Ocultar todos los tabs

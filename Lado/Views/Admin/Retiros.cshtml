@@ -19,20 +19,21 @@
                 <div class="stat-content">
                     <p class="stat-label">Pendientes</p>
                     <h3 class="stat-value">@ViewBag.TotalPendientes</h3>
+                    <small class="text-muted">$@(((decimal)ViewBag.MontoPendiente).ToString("N2"))</small>
                 </div>
             </div>
         </div>
         <div class="col-12 col-md-6 col-xl-3">
             <div class="stat-card">
-                <div class="stat-icon bg-danger">
+                <div class="stat-icon bg-primary">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                        <line x1="12" y1="1" x2="12" y2="23"></line>
-                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
                     </svg>
                 </div>
                 <div class="stat-content">
-                    <p class="stat-label">Monto Pendiente</p>
-                    <h3 class="stat-value">$@(((decimal)ViewBag.MontoPendiente).ToString("N2"))</h3>
+                    <p class="stat-label">Por Pagar</p>
+                    <h3 class="stat-value">@ViewBag.TotalPorPagar</h3>
+                    <small class="text-muted">$@(((decimal)ViewBag.MontoPorPagar).ToString("N2"))</small>
                 </div>
             </div>
         </div>
@@ -45,22 +46,24 @@
                     </svg>
                 </div>
                 <div class="stat-content">
-                    <p class="stat-label">Aprobados</p>
-                    <h3 class="stat-value">@ViewBag.TotalAprobados</h3>
+                    <p class="stat-label">Pagados</p>
+                    <h3 class="stat-value">@ViewBag.TotalPagados</h3>
+                    <small class="text-muted">$@(((decimal)ViewBag.MontoPagado).ToString("N2"))</small>
                 </div>
             </div>
         </div>
         <div class="col-12 col-md-6 col-xl-3">
             <div class="stat-card">
-                <div class="stat-icon bg-info">
+                <div class="stat-icon bg-danger">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                        <line x1="12" y1="1" x2="12" y2="23"></line>
-                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
                     </svg>
                 </div>
                 <div class="stat-content">
-                    <p class="stat-label">Total Pagado</p>
-                    <h3 class="stat-value">$@(((decimal)ViewBag.MontoAprobado).ToString("N2"))</h3>
+                    <p class="stat-label">Rechazados</p>
+                    <h3 class="stat-value">@ViewBag.TotalRechazados</h3>
                 </div>
             </div>
         </div>
@@ -73,8 +76,11 @@
                 <a href="?filtro=pendientes" class="btn @(filtroActual == "pendientes" ? "btn-warning" : "btn-outline-warning")">
                     <i class="fas fa-clock me-1"></i> Pendientes (@ViewBag.TotalPendientes)
                 </a>
-                <a href="?filtro=aprobados" class="btn @(filtroActual == "aprobados" ? "btn-success" : "btn-outline-success")">
-                    <i class="fas fa-check me-1"></i> Aprobados (@ViewBag.TotalAprobados)
+                <a href="?filtro=porpagar" class="btn @(filtroActual == "porpagar" ? "btn-primary" : "btn-outline-primary")">
+                    <i class="fas fa-money-bill-wave me-1"></i> Por Pagar (@ViewBag.TotalPorPagar)
+                </a>
+                <a href="?filtro=pagados" class="btn @(filtroActual == "pagados" ? "btn-success" : "btn-outline-success")">
+                    <i class="fas fa-check-double me-1"></i> Pagados (@ViewBag.TotalPagados)
                 </a>
                 <a href="?filtro=rechazados" class="btn @(filtroActual == "rechazados" ? "btn-danger" : "btn-outline-danger")">
                     <i class="fas fa-times me-1"></i> Rechazados (@ViewBag.TotalRechazados)
@@ -95,8 +101,11 @@
                     case "pendientes":
                         <text>Retiros Pendientes de Aprobacion</text>
                         break;
-                    case "aprobados":
-                        <text>Retiros Aprobados</text>
+                    case "porpagar":
+                        <text>Retiros Aprobados - Pendientes de Pago en PayPal</text>
+                        break;
+                    case "pagados":
+                        <text>Retiros Pagados</text>
                         break;
                     case "rechazados":
                         <text>Retiros Rechazados</text>
@@ -176,9 +185,12 @@
                                             case "Pendiente":
                                                 <span class="badge bg-warning text-dark">Pendiente</span>
                                                 break;
-                                            case "Completado":
                                             case "Aprobado":
-                                                <span class="badge bg-success">Aprobado</span>
+                                                <span class="badge bg-primary">Por Pagar</span>
+                                                break;
+                                            case "Pagado":
+                                            case "Completado":
+                                                <span class="badge bg-success">Pagado</span>
                                                 break;
                                             case "Rechazado":
                                                 <span class="badge bg-danger">Rechazado</span>
@@ -200,6 +212,12 @@
                                                 </button>
                                                 <button class="btn btn-danger" onclick="rechazarRetiro(@retiro.Id)" title="Rechazar">
                                                     <i class="fas fa-times"></i>
+                                                </button>
+                                            }
+                                            @if (retiro.EstadoPago == "Aprobado")
+                                            {
+                                                <button class="btn btn-primary" onclick="marcarPagado(@retiro.Id)" title="Marcar como Pagado">
+                                                    <i class="fas fa-money-bill-wave"></i>
                                                 </button>
                                             }
                                         </div>
@@ -340,6 +358,53 @@
     </div>
 </div>
 
+<!-- Modal Marcar como Pagado -->
+<div class="modal fade" id="modalPagado" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-action="MarcarComoPagado">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="pagadoId">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-money-bill-wave me-2"></i>Confirmar Pago Realizado</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Confirma que <strong>YA enviaste</strong> el dinero por PayPal al usuario.
+                    </div>
+                    <div class="mb-3 p-3 bg-light rounded">
+                        <div class="row">
+                            <div class="col-6">
+                                <small class="text-muted">Usuario</small>
+                                <div class="fw-bold" id="pagadoUsuario"></div>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Monto Enviado</small>
+                                <div class="fw-bold text-success">$<span id="pagadoMonto"></span></div>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">Cuenta PayPal</small>
+                            <div class="fw-bold" id="pagadoCuenta"></div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Numero de referencia/transaccion PayPal (opcional)</label>
+                        <input type="text" name="referencia" class="form-control" placeholder="Ej: 5YK72847AB123456X">
+                        <small class="text-muted">Puedes encontrarlo en el historial de PayPal</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Confirmar Pago Realizado</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         var retiroActual = null;
@@ -370,13 +435,20 @@
                     document.getElementById('divNotas').style.display = 'none';
                 }
 
-                // Footer con acciones si esta pendiente
+                // Footer con acciones segun estado
                 var footer = document.getElementById('footerAcciones');
                 if (retiroActual.estado === 'Pendiente') {
                     footer.innerHTML = `
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
                         <button type="button" class="btn btn-success" onclick="aprobarRetiro(${retiroActual.id})">Aprobar</button>
                         <button type="button" class="btn btn-danger" onclick="rechazarRetiro(${retiroActual.id})">Rechazar</button>
+                    `;
+                } else if (retiroActual.estado === 'Aprobado') {
+                    footer.innerHTML = `
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                        <button type="button" class="btn btn-primary" onclick="marcarPagado(${retiroActual.id})">
+                            <i class="fas fa-money-bill-wave me-1"></i> Marcar como Pagado
+                        </button>
                     `;
                 } else {
                     footer.innerHTML = `<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>`;
@@ -393,9 +465,11 @@
             switch (estado) {
                 case 'Pendiente':
                     return '<span class="badge bg-warning text-dark">Pendiente</span>';
-                case 'Completado':
                 case 'Aprobado':
-                    return '<span class="badge bg-success">Aprobado</span>';
+                    return '<span class="badge bg-primary">Por Pagar</span>';
+                case 'Pagado':
+                case 'Completado':
+                    return '<span class="badge bg-success">Pagado</span>';
                 case 'Rechazado':
                     return '<span class="badge bg-danger">Rechazado</span>';
                 default:
@@ -437,6 +511,26 @@
             document.getElementById('rechazarMontoBruto').textContent = retiroActual.monto.toFixed(2);
 
             const modal = new bootstrap.Modal(document.getElementById('modalRechazar'));
+            modal.show();
+        }
+
+        async function marcarPagado(id) {
+            // Cerrar modal de detalle si esta abierto
+            var modalDetalle = bootstrap.Modal.getInstance(document.getElementById('modalDetalle'));
+            if (modalDetalle) modalDetalle.hide();
+
+            // Cargar datos si no los tenemos
+            if (!retiroActual || retiroActual.id !== id) {
+                const response = await fetch(`/Admin/ObtenerRetiro/${id}`);
+                retiroActual = await response.json();
+            }
+
+            document.getElementById('pagadoId').value = id;
+            document.getElementById('pagadoUsuario').textContent = retiroActual.usuario;
+            document.getElementById('pagadoMonto').textContent = (retiroActual.montoNeto || 0).toFixed(2);
+            document.getElementById('pagadoCuenta').textContent = retiroActual.cuentaRetiro || 'No especificada';
+
+            const modal = new bootstrap.Modal(document.getElementById('modalPagado'));
             modal.show();
         }
     </script>

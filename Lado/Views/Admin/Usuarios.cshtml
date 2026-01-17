@@ -1,11 +1,11 @@
-@model List<(Lado.Models.ApplicationUser, string)>
+@model List<(Lado.Models.ApplicationUser Usuario, string Rol, int TotalFotos, int TotalVideos, int TotalArchivos)>
 @{
     ViewData["Title"] = "Gestión de Usuarios";
     var verificacionesPendientes = (List<Lado.Models.CreatorVerificationRequest>)ViewBag.VerificacionesPendientes ?? new List<Lado.Models.CreatorVerificationRequest>();
     var totalUsuarios = Model.Count;
-    var totalCreadores = Model.Count(u => u.Item1.EsCreador);
-    var totalBloqueados = Model.Count(u => !u.Item1.EstaActivo);
-    var totalVerificados = Model.Count(u => u.Item1.CreadorVerificado);
+    var totalCreadores = Model.Count(u => u.Usuario.EsCreador);
+    var totalBloqueados = Model.Count(u => !u.Usuario.EstaActivo);
+    var totalVerificados = Model.Count(u => u.Usuario.CreadorVerificado);
 }
 
 <style>
@@ -863,7 +863,7 @@
         }
 
         .users-table {
-            min-width: 800px;
+            min-width: 950px;
         }
     }
 
@@ -1038,13 +1038,19 @@
                             <th>Rol</th>
                             <th>Estado</th>
                             <th>Registro</th>
-                            <th>Actividad</th>
+                            <th>Ingresos</th>
+                            <th>Contenido</th>
                             <th style="width: 100px; text-align: right;">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="usersTableBody">
-                        @foreach (var (usuario, rol) in Model)
+                        @foreach (var item in Model)
                         {
+                            var usuario = item.Usuario;
+                            var rol = item.Rol;
+                            var totalFotos = item.TotalFotos;
+                            var totalVideos = item.TotalVideos;
+                            var totalArchivos = item.TotalArchivos;
                             var paisKey = usuario.Pais ?? "";
                             var tienePais = Lado.Models.RetencionesPredeterminadas.Paises.ContainsKey(paisKey);
                             var paisNombre = tienePais ? Lado.Models.RetencionesPredeterminadas.Paises[paisKey].Nombre : "No definido";
@@ -1118,9 +1124,28 @@
                                 </td>
                                 <td>
                                     <div class="activity-cell">
-                                        <span class="date">@(usuario.UltimaActividad.HasValue ? usuario.UltimaActividad.Value.ToString("dd/MM/yy HH:mm") : "Sin actividad")</span>
-                                        <span class="logins">@usuario.ContadorIngresos ingresos</span>
+                                        <span class="date" style="font-weight:600;font-size:1rem;color:var(--gray-800);">@usuario.ContadorIngresos</span>
+                                        <span class="logins">@(usuario.UltimaActividad.HasValue ? usuario.UltimaActividad.Value.ToString("dd/MM HH:mm") : "Sin actividad")</span>
                                     </div>
+                                </td>
+                                <td>
+                                    @{
+                                        var contenidoTotal = totalFotos + totalVideos + totalArchivos;
+                                    }
+                                    @if (contenidoTotal > 0)
+                                    {
+                                        <div class="activity-cell">
+                                            <span class="date" style="font-weight:600;font-size:0.875rem;color:var(--gray-800);">@contenidoTotal total</span>
+                                            <span class="logins">
+                                                @if (totalFotos > 0) { <span title="Fotos">@totalFotos <svg style="width:12px;height:12px;vertical-align:-1px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></span> }
+                                                @if (totalVideos > 0) { <span title="Videos" style="margin-left:6px">@totalVideos <svg style="width:12px;height:12px;vertical-align:-1px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></span> }
+                                            </span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span style="color:var(--gray-400);font-size:0.8125rem">-</span>
+                                    }
                                 </td>
                                 <td style="text-align: right;">
                                     <div class="actions-dropdown">
@@ -1142,7 +1167,7 @@
                                             @if (rol != "Admin")
                                             {
                                                 <button type="button" data-bs-toggle="modal" data-bs-target="#cambiarContrasenaModal"
-                                                        data-userid="@usuario.Id" data-username="@usuario.NombreCompleto">
+                                                        data-userid="@usuario.Id">
                                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                                                         <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
@@ -1153,7 +1178,6 @@
                                                 {
                                                     <button type="button" data-bs-toggle="modal" data-bs-target="#comisionModal"
                                                             data-userid="@usuario.Id"
-                                                            data-username="@usuario.NombreCompleto"
                                                             data-comision="@usuario.ComisionRetiro"
                                                             data-minimo="@usuario.MontoMinimoRetiro"
                                                             data-pais="@paisKey"
@@ -1171,7 +1195,7 @@
                                                 <div class="divider"></div>
                                                 @if (usuario.EstaActivo)
                                                 {
-                                                    <form method="post" asp-action="BloquearUsuario" asp-route-id="@usuario.Id" onsubmit="return confirm('¿Bloquear a @usuario.NombreCompleto?')">
+                                                    <form method="post" asp-action="BloquearUsuario" asp-route-id="@usuario.Id" class="form-bloquear" data-userid="@usuario.Id">
                                                         @Html.AntiForgeryToken()
                                                         <button type="submit" class="danger">
                                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1184,7 +1208,7 @@
                                                 }
                                                 else
                                                 {
-                                                    <form method="post" asp-action="DesbloquearUsuario" asp-route-id="@usuario.Id" onsubmit="return confirm('¿Desbloquear a @usuario.NombreCompleto?')">
+                                                    <form method="post" asp-action="DesbloquearUsuario" asp-route-id="@usuario.Id" class="form-desbloquear" data-userid="@usuario.Id">
                                                         @Html.AntiForgeryToken()
                                                         <button type="submit" class="success">
                                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1195,7 +1219,7 @@
                                                     </form>
                                                 }
                                                 <button type="button" class="danger" data-bs-toggle="modal" data-bs-target="#eliminarModal"
-                                                        data-userid="@usuario.Id" data-username="@usuario.NombreCompleto">
+                                                        data-userid="@usuario.Id">
                                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                         <polyline points="3 6 5 6 21 6"/>
                                                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -1309,8 +1333,9 @@
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form method="post" id="formEliminar">
+            <form method="post" asp-action="EliminarUsuario" id="formEliminar">
                 @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="eliminarUserId" />
                 <div class="modal-body">
                     <div class="alert alert-danger border-0 d-flex align-items-center gap-2 mb-3">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1579,35 +1604,72 @@
     </div>
 </div>
 
+@* Mapa de usuarios con nombres seguros codificados en JSON *@
+<script type="application/json" id="usuariosData">
+@{
+    var usuariosMap = Model.ToDictionary(
+        u => u.Usuario.Id,
+        u => u.Usuario.NombreCompleto ?? "Usuario"
+    );
+}
+@Html.Raw(System.Text.Json.JsonSerializer.Serialize(usuariosMap))
+</script>
+
 <script>
+(function() {
+    'use strict';
+
+    // ========================================
+    // DATOS DE USUARIOS (cargados desde JSON)
+    // ========================================
+    var usuariosData = {};
+    try {
+        var dataElement = document.getElementById('usuariosData');
+        if (dataElement) {
+            usuariosData = JSON.parse(dataElement.textContent);
+        }
+    } catch (e) {
+        console.error('Error parsing usuarios data:', e);
+    }
+
+    function getUsername(userId) {
+        return usuariosData[userId] || 'este usuario';
+    }
+
     // ========================================
     // TABS
     // ========================================
-    function switchTab(tabId) {
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-        document.querySelector(`[onclick="switchTab('${tabId}')"]`).classList.add('active');
-        document.getElementById(`tab-${tabId}`).classList.add('active');
-    }
+    window.switchTab = function(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(function(btn) { btn.classList.remove('active'); });
+        document.querySelectorAll('.tab-content').forEach(function(content) { content.classList.remove('active'); });
+        var tabBtn = document.querySelector('[onclick="switchTab(\'' + tabId + '\')"]');
+        if (tabBtn) tabBtn.classList.add('active');
+        var tabContent = document.getElementById('tab-' + tabId);
+        if (tabContent) tabContent.classList.add('active');
+    };
 
     // ========================================
     // SEARCH & FILTERS
     // ========================================
-    function filterUsers() {
-        const search = document.getElementById('searchInput').value.toLowerCase();
-        const tipo = document.getElementById('filterTipo').value;
-        const estado = document.getElementById('filterEstado').value;
-        const rows = document.querySelectorAll('.user-row');
-        let visible = 0;
+    window.filterUsers = function() {
+        var searchInput = document.getElementById('searchInput');
+        var filterTipo = document.getElementById('filterTipo');
+        var filterEstado = document.getElementById('filterEstado');
 
-        rows.forEach(row => {
-            const name = row.getAttribute('data-name') || '';
-            const rowTipo = row.getAttribute('data-tipo');
-            const rowEstado = row.getAttribute('data-estado');
+        var search = searchInput ? searchInput.value.toLowerCase() : '';
+        var tipo = filterTipo ? filterTipo.value : '';
+        var estado = filterEstado ? filterEstado.value : '';
+        var rows = document.querySelectorAll('.user-row');
+        var visible = 0;
 
-            const matchSearch = !search || name.includes(search);
-            const matchTipo = !tipo || rowTipo === tipo;
-            const matchEstado = !estado || rowEstado === estado;
+        rows.forEach(function(row) {
+            var name = row.getAttribute('data-name') || '';
+            var rowTipo = row.getAttribute('data-tipo');
+            var rowEstado = row.getAttribute('data-estado');
+
+            var matchSearch = !search || name.indexOf(search) !== -1;
+            var matchTipo = !tipo || rowTipo === tipo;
+            var matchEstado = !estado || rowEstado === estado;
 
             if (matchSearch && matchTipo && matchEstado) {
                 row.style.display = '';
@@ -1617,104 +1679,75 @@
             }
         });
 
-        document.getElementById('visibleCount').textContent = visible;
-    }
+        var visibleCount = document.getElementById('visibleCount');
+        if (visibleCount) visibleCount.textContent = visible;
+    };
 
     // ========================================
     // ACTIONS DROPDOWN
     // ========================================
-    function toggleActionsMenu(btn) {
-        const menu = btn.nextElementSibling;
-        const wasOpen = menu.classList.contains('show');
+    window.toggleActionsMenu = function(btn) {
+        var menu = btn.nextElementSibling;
+        var wasOpen = menu && menu.classList.contains('show');
 
-        // Close all menus
-        document.querySelectorAll('.actions-menu.show').forEach(m => m.classList.remove('show'));
+        document.querySelectorAll('.actions-menu.show').forEach(function(m) { m.classList.remove('show'); });
 
-        if (!wasOpen) {
+        if (!wasOpen && menu) {
             menu.classList.add('show');
         }
-    }
-
-    // Close menus on click outside
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('.actions-dropdown')) {
-            document.querySelectorAll('.actions-menu.show').forEach(m => m.classList.remove('show'));
-        }
-    });
+    };
 
     // ========================================
-    // MODALES
+    // PASSWORD FUNCTIONS
     // ========================================
-    document.getElementById('eliminarModal').addEventListener('show.bs.modal', function (event) {
-        var button = event.relatedTarget;
-        var userId = button.getAttribute('data-userid');
-        var username = button.getAttribute('data-username');
-        document.getElementById('formEliminar').action = '/Admin/EliminarUsuario/' + userId;
-        document.getElementById('modalUsername').textContent = username;
-    });
-
-    document.getElementById('cambiarContrasenaModal').addEventListener('show.bs.modal', function (event) {
-        var button = event.relatedTarget;
-        var userId = button.getAttribute('data-userid');
-        var username = button.getAttribute('data-username');
-        document.getElementById('formCambiarContrasena').action = '/Admin/CambiarContrasena/' + userId;
-        document.getElementById('modalPasswordUsername').textContent = username;
-        document.getElementById('nuevaContrasenaInput').value = '';
-    });
-
-    function togglePasswordVisibility() {
+    window.togglePasswordVisibility = function() {
         var input = document.getElementById('nuevaContrasenaInput');
-        input.type = input.type === 'password' ? 'text' : 'password';
-    }
+        if (input) input.type = input.type === 'password' ? 'text' : 'password';
+    };
 
-    // Modal Comisión
-    document.getElementById('comisionModal').addEventListener('show.bs.modal', function (event) {
-        var button = event.relatedTarget;
-        var userId = button.getAttribute('data-userid');
-        var username = button.getAttribute('data-username');
-        var comision = parseFloat(button.getAttribute('data-comision')) || 20;
-        var minimo = parseFloat(button.getAttribute('data-minimo')) || 50;
-        var pais = button.getAttribute('data-pais') || '';
-        var paisNombre = button.getAttribute('data-paisnombre') || 'No definido';
-        var paisRetencion = parseFloat(button.getAttribute('data-paisretencion')) || 0;
-        var usarRetencionPais = button.getAttribute('data-usarretencionpais') === 'true';
-        var retencionPersonalizada = parseFloat(button.getAttribute('data-retencion')) || 0;
+    window.toggleCrearPasswordVisibility = function() {
+        var input = document.getElementById('crearPasswordInput');
+        if (input) input.type = input.type === 'password' ? 'text' : 'password';
+    };
 
-        document.getElementById('comisionUserId').value = userId;
-        document.getElementById('comisionUsername').textContent = username;
-        document.getElementById('comisionRetiroInput').value = comision;
-        document.getElementById('montoMinimoInput').value = minimo;
-        document.getElementById('paisUsuario').textContent = pais || 'Sin país';
-        document.getElementById('paisRetencionNombre').textContent = paisNombre;
-        document.getElementById('paisRetencionValor').textContent = paisRetencion.toFixed(1);
-        document.getElementById('usarRetencionPaisCheck').checked = usarRetencionPais;
-        document.getElementById('retencionImpuestosInput').value = retencionPersonalizada;
+    window.generarPassword = function() {
+        var chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!#$%';
+        var password = '';
+        password += 'abcdefghijklmnopqrstuvwxyz'.charAt(Math.floor(Math.random() * 26));
+        password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.charAt(Math.floor(Math.random() * 26));
+        password += '0123456789'.charAt(Math.floor(Math.random() * 10));
+        for (var i = 0; i < 9; i++) {
+            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        password = password.split('').sort(function() { return Math.random() - 0.5; }).join('');
+        var input = document.getElementById('crearPasswordInput');
+        if (input) {
+            input.value = password;
+            input.type = 'text';
+        }
+    };
 
-        toggleRetencionPersonalizada(usarRetencionPais);
-        var retencionActual = usarRetencionPais ? paisRetencion : retencionPersonalizada;
-        actualizarEjemploCompleto(comision, retencionActual);
-    });
+    // ========================================
+    // COMISION FUNCTIONS
+    // ========================================
+    window.toggleRetencionPersonalizada = function(usarPais) {
+        var div = document.getElementById('retencionPersonalizadaDiv');
+        if (div) div.style.display = usarPais ? 'none' : 'block';
+    };
 
-    document.getElementById('usarRetencionPaisCheck').addEventListener('change', function() {
-        toggleRetencionPersonalizada(this.checked);
-        recalcularEjemplo();
-    });
+    window.recalcularEjemplo = function() {
+        var comisionInput = document.getElementById('comisionRetiroInput');
+        var usarPaisCheck = document.getElementById('usarRetencionPaisCheck');
+        var paisRetencionValor = document.getElementById('paisRetencionValor');
+        var retencionInput = document.getElementById('retencionImpuestosInput');
 
-    function toggleRetencionPersonalizada(usarPais) {
-        document.getElementById('retencionPersonalizadaDiv').style.display = usarPais ? 'none' : 'block';
-    }
-
-    document.getElementById('comisionRetiroInput').addEventListener('input', recalcularEjemplo);
-    document.getElementById('retencionImpuestosInput').addEventListener('input', recalcularEjemplo);
-
-    function recalcularEjemplo() {
-        var comision = parseFloat(document.getElementById('comisionRetiroInput').value) || 0;
-        var usarPais = document.getElementById('usarRetencionPaisCheck').checked;
+        var comision = comisionInput ? parseFloat(comisionInput.value) || 0 : 0;
+        var usarPais = usarPaisCheck ? usarPaisCheck.checked : false;
         var retencion = usarPais
-            ? parseFloat(document.getElementById('paisRetencionValor').textContent) || 0
-            : parseFloat(document.getElementById('retencionImpuestosInput').value) || 0;
+            ? (paisRetencionValor ? parseFloat(paisRetencionValor.textContent) || 0 : 0)
+            : (retencionInput ? parseFloat(retencionInput.value) || 0 : 0);
         actualizarEjemploCompleto(comision, retencion);
-    }
+    };
 
     function actualizarEjemploCompleto(comision, retencion) {
         var montoBruto = 100;
@@ -1723,46 +1756,253 @@
         var totalDescuento = descuentoComision + descuentoImpuesto;
         var neto = montoBruto - totalDescuento;
 
-        document.getElementById('ejemploComision').textContent = comision.toFixed(1);
-        document.getElementById('ejemploDescuento').textContent = descuentoComision.toFixed(2);
-        document.getElementById('ejemploImpuesto').textContent = retencion.toFixed(1);
-        document.getElementById('ejemploImpuestoMonto').textContent = descuentoImpuesto.toFixed(2);
-        document.getElementById('ejemploTotalDescuento').textContent = totalDescuento.toFixed(2);
-        document.getElementById('ejemploNeto').textContent = neto.toFixed(2);
+        var el;
+        el = document.getElementById('ejemploComision'); if (el) el.textContent = comision.toFixed(1);
+        el = document.getElementById('ejemploDescuento'); if (el) el.textContent = descuentoComision.toFixed(2);
+        el = document.getElementById('ejemploImpuesto'); if (el) el.textContent = retencion.toFixed(1);
+        el = document.getElementById('ejemploImpuestoMonto'); if (el) el.textContent = descuentoImpuesto.toFixed(2);
+        el = document.getElementById('ejemploTotalDescuento'); if (el) el.textContent = totalDescuento.toFixed(2);
+        el = document.getElementById('ejemploNeto'); if (el) el.textContent = neto.toFixed(2);
     }
 
-    // Modal Crear Usuario
-    function toggleCrearPasswordVisibility() {
-        var input = document.getElementById('crearPasswordInput');
-        input.type = input.type === 'password' ? 'text' : 'password';
-    }
+    // ========================================
+    // INIT ON DOM READY
+    // ========================================
+    function initPage() {
+        // Close menus on click outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.actions-dropdown')) {
+                document.querySelectorAll('.actions-menu.show').forEach(function(m) { m.classList.remove('show'); });
+            }
+        });
 
-    function generarPassword() {
-        var chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@@#$%';
-        var password = '';
-        password += 'abcdefghijklmnopqrstuvwxyz'.charAt(Math.floor(Math.random() * 26));
-        password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.charAt(Math.floor(Math.random() * 26));
-        password += '0123456789'.charAt(Math.floor(Math.random() * 10));
-        for (var i = 0; i < 9; i++) {
-            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        // Confirmaciones de bloquear/desbloquear
+        document.querySelectorAll('.form-bloquear').forEach(function(form) {
+            form.addEventListener('submit', function(e) {
+                var userId = this.getAttribute('data-userid');
+                var username = getUsername(userId);
+                if (!confirm('¿Bloquear a ' + username + '?')) {
+                    e.preventDefault();
+                }
+            });
+        });
+
+        document.querySelectorAll('.form-desbloquear').forEach(function(form) {
+            form.addEventListener('submit', function(e) {
+                var userId = this.getAttribute('data-userid');
+                var username = getUsername(userId);
+                if (!confirm('¿Desbloquear a ' + username + '?')) {
+                    e.preventDefault();
+                }
+            });
+        });
+
+        // Modal Eliminar - Con AJAX y logging
+        var eliminarModal = document.getElementById('eliminarModal');
+        var eliminarUserId = null;
+        var eliminarUsername = null;
+
+        if (eliminarModal) {
+            eliminarModal.addEventListener('show.bs.modal', function(event) {
+                var button = event.relatedTarget;
+                console.log('[ELIMINAR] Modal abierto, button:', button);
+
+                if (!button) {
+                    console.error('[ELIMINAR] ERROR: No se encontró el botón que abrió el modal');
+                    return;
+                }
+
+                eliminarUserId = button.getAttribute('data-userid');
+                eliminarUsername = getUsername(eliminarUserId);
+
+                console.log('[ELIMINAR] UserId:', eliminarUserId);
+                console.log('[ELIMINAR] Username:', eliminarUsername);
+
+                var userIdInput = document.getElementById('eliminarUserId');
+                var modalUsername = document.getElementById('modalUsername');
+
+                if (userIdInput) {
+                    userIdInput.value = eliminarUserId || '';
+                    console.log('[ELIMINAR] Input hidden actualizado:', userIdInput.value);
+                }
+                if (modalUsername) {
+                    modalUsername.textContent = eliminarUsername;
+                }
+            });
         }
-        password = password.split('').sort(() => Math.random() - 0.5).join('');
-        document.getElementById('crearPasswordInput').value = password;
-        document.getElementById('crearPasswordInput').type = 'text';
+
+        // Handler del formulario de eliminar - usa AJAX
+        var formEliminar = document.getElementById('formEliminar');
+        if (formEliminar) {
+            formEliminar.addEventListener('submit', function(e) {
+                e.preventDefault();
+                console.log('[ELIMINAR-SUBMIT] Formulario enviado');
+
+                var userIdInput = document.getElementById('eliminarUserId');
+                var userId = userIdInput ? userIdInput.value : eliminarUserId;
+
+                console.log('[ELIMINAR-SUBMIT] UserId a eliminar:', userId);
+
+                if (!userId) {
+                    alert('Error: No se pudo obtener el ID del usuario');
+                    console.error('[ELIMINAR-SUBMIT] ERROR: userId vacío');
+                    return;
+                }
+
+                // Mostrar loading
+                var submitBtn = formEliminar.querySelector('button[type="submit"]');
+                var originalText = submitBtn ? submitBtn.innerHTML : '';
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Eliminando...';
+                }
+
+                console.log('[ELIMINAR-SUBMIT] Enviando request AJAX...');
+
+                fetch('/Admin/EliminarUsuarioAjax', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ UserId: userId })
+                })
+                .then(function(response) {
+                    console.log('[ELIMINAR-RESPONSE] Status:', response.status);
+                    console.log('[ELIMINAR-RESPONSE] Content-Type:', response.headers.get('content-type'));
+
+                    if (!response.ok) {
+                        return response.text().then(function(text) {
+                            console.error('[ELIMINAR-RESPONSE] Error body:', text);
+                            throw new Error('HTTP ' + response.status + ': ' + (text || 'Sin respuesta del servidor'));
+                        });
+                    }
+                    return response.json();
+                })
+                .then(function(data) {
+                    console.log('[ELIMINAR-RESPONSE] Data:', data);
+
+                    if (data.success) {
+                        alert('Usuario eliminado correctamente');
+                        window.location.reload();
+                    } else {
+                        alert('Error: ' + data.message + '\nPaso: ' + data.step + (data.details ? '\nDetalles: ' + data.details : ''));
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalText;
+                        }
+                    }
+                })
+                .catch(function(error) {
+                    console.error('[ELIMINAR-ERROR]', error);
+                    alert('Error: ' + error.message);
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalText;
+                    }
+                });
+            });
+        }
+
+        // Modal Cambiar Contraseña
+        var cambiarContrasenaModal = document.getElementById('cambiarContrasenaModal');
+        if (cambiarContrasenaModal) {
+            cambiarContrasenaModal.addEventListener('show.bs.modal', function(event) {
+                var button = event.relatedTarget;
+                if (!button) return;
+                var userId = button.getAttribute('data-userid');
+                var username = getUsername(userId);
+                var form = document.getElementById('formCambiarContrasena');
+                var modalUsername = document.getElementById('modalPasswordUsername');
+                var passwordInput = document.getElementById('nuevaContrasenaInput');
+                if (form) form.action = '/Admin/CambiarContrasena/' + userId;
+                if (modalUsername) modalUsername.textContent = username;
+                if (passwordInput) passwordInput.value = '';
+            });
+        }
+
+        // Modal Comisión
+        var comisionModal = document.getElementById('comisionModal');
+        if (comisionModal) {
+            comisionModal.addEventListener('show.bs.modal', function(event) {
+                var button = event.relatedTarget;
+                if (!button) return;
+                var userId = button.getAttribute('data-userid');
+                var username = getUsername(userId);
+                var comision = parseFloat(button.getAttribute('data-comision')) || 20;
+                var minimo = parseFloat(button.getAttribute('data-minimo')) || 50;
+                var pais = button.getAttribute('data-pais') || '';
+                var paisNombre = button.getAttribute('data-paisnombre') || 'No definido';
+                var paisRetencion = parseFloat(button.getAttribute('data-paisretencion')) || 0;
+                var usarRetencionPais = button.getAttribute('data-usarretencionpais') === 'true';
+                var retencionPersonalizada = parseFloat(button.getAttribute('data-retencion')) || 0;
+
+                var el;
+                el = document.getElementById('comisionUserId'); if (el) el.value = userId;
+                el = document.getElementById('comisionUsername'); if (el) el.textContent = username;
+                el = document.getElementById('comisionRetiroInput'); if (el) el.value = comision;
+                el = document.getElementById('montoMinimoInput'); if (el) el.value = minimo;
+                el = document.getElementById('paisUsuario'); if (el) el.textContent = pais || 'Sin país';
+                el = document.getElementById('paisRetencionNombre'); if (el) el.textContent = paisNombre;
+                el = document.getElementById('paisRetencionValor'); if (el) el.textContent = paisRetencion.toFixed(1);
+                el = document.getElementById('usarRetencionPaisCheck'); if (el) el.checked = usarRetencionPais;
+                el = document.getElementById('retencionImpuestosInput'); if (el) el.value = retencionPersonalizada;
+
+                toggleRetencionPersonalizada(usarRetencionPais);
+                var retencionActual = usarRetencionPais ? paisRetencion : retencionPersonalizada;
+                actualizarEjemploCompleto(comision, retencionActual);
+            });
+        }
+
+        // Checkbox retención
+        var usarRetencionCheck = document.getElementById('usarRetencionPaisCheck');
+        if (usarRetencionCheck) {
+            usarRetencionCheck.addEventListener('change', function() {
+                toggleRetencionPersonalizada(this.checked);
+                recalcularEjemplo();
+            });
+        }
+
+        // Inputs comisión
+        var comisionRetiroInput = document.getElementById('comisionRetiroInput');
+        if (comisionRetiroInput) comisionRetiroInput.addEventListener('input', recalcularEjemplo);
+
+        var retencionImpuestosInput = document.getElementById('retencionImpuestosInput');
+        if (retencionImpuestosInput) retencionImpuestosInput.addEventListener('input', recalcularEjemplo);
+
+        // Select rol
+        var selectRol = document.querySelector('select[name="rol"]');
+        if (selectRol) {
+            selectRol.addEventListener('change', function() {
+                var tipoCreadorDiv = document.getElementById('tipoCreadorDiv');
+                var creadorVerificadoCheck = document.getElementById('creadorVerificadoCheck');
+
+                if (tipoCreadorDiv) tipoCreadorDiv.style.display = this.value === 'Creador' ? 'block' : 'none';
+                if (creadorVerificadoCheck) {
+                    creadorVerificadoCheck.disabled = this.value === 'Usuario';
+                    if (this.value === 'Usuario') creadorVerificadoCheck.checked = false;
+                }
+            });
+        }
+
+        // Modal crear usuario reset
+        var crearUsuarioModal = document.getElementById('crearUsuarioModal');
+        if (crearUsuarioModal) {
+            crearUsuarioModal.addEventListener('hidden.bs.modal', function() {
+                var form = document.getElementById('formCrearUsuario');
+                var tipoCreadorDiv = document.getElementById('tipoCreadorDiv');
+                var passwordInput = document.getElementById('crearPasswordInput');
+                if (form) form.reset();
+                if (tipoCreadorDiv) tipoCreadorDiv.style.display = 'none';
+                if (passwordInput) passwordInput.type = 'password';
+            });
+        }
     }
 
-    document.querySelector('select[name="rol"]').addEventListener('change', function() {
-        var tipoCreadorDiv = document.getElementById('tipoCreadorDiv');
-        var creadorVerificadoCheck = document.getElementById('creadorVerificadoCheck');
-
-        tipoCreadorDiv.style.display = this.value === 'Creador' ? 'block' : 'none';
-        creadorVerificadoCheck.disabled = this.value === 'Usuario';
-        if (this.value === 'Usuario') creadorVerificadoCheck.checked = false;
-    });
-
-    document.getElementById('crearUsuarioModal').addEventListener('hidden.bs.modal', function () {
-        document.getElementById('formCrearUsuario').reset();
-        document.getElementById('tipoCreadorDiv').style.display = 'none';
-        document.getElementById('crearPasswordInput').type = 'password';
-    });
+    // Run init when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPage);
+    } else {
+        initPage();
+    }
+})();
 </script>

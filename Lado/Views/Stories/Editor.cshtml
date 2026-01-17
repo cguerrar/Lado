@@ -23,6 +23,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
     <!-- HEIC to JPEG converter para imágenes de iPhone -->
     <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+    <!-- MediaPipe Face Landmarker se carga dinámicamente cuando se necesita -->
 
     <style>
         /* ========================================
@@ -1170,6 +1171,92 @@
             font-size: 11px;
         }
 
+        /* ========================================
+           FILTROS DE BELLEZA
+           ======================================== */
+        .beauty-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: var(--bg);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .beauty-status.ready {
+            background: rgba(40, 167, 69, 0.1);
+            color: var(--success);
+        }
+
+        .beauty-status.detecting {
+            background: rgba(70, 130, 180, 0.1);
+            color: var(--primary);
+        }
+
+        .beauty-status.no-face {
+            background: rgba(220, 53, 69, 0.1);
+            color: var(--danger);
+        }
+
+        .beauty-status-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .beauty-status.detecting .beauty-status-icon svg {
+            animation: spin 1s linear infinite;
+        }
+
+        .beauty-slider {
+            width: 100%;
+            accent-color: var(--primary);
+        }
+
+        .beauty-presets {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .beauty-preset-btn {
+            padding: 10px 8px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--surface);
+            color: var(--fg);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .beauty-preset-btn:hover {
+            background: var(--surface-hover);
+            border-color: var(--primary);
+        }
+
+        .beauty-preset-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .beauty-info {
+            margin-top: 16px;
+            padding: 12px;
+            background: var(--bg);
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .beauty-info small {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
         @@keyframes glitch-preview {
             0%, 100% { transform: translate(0); }
             20% { transform: translate(-2px, 1px); }
@@ -1505,113 +1592,182 @@
         }
 
         /* ========================================
-           MÚSICA - Estilo TikTok
+           MÚSICA - Diseño Moderno Simplificado
            ======================================== */
         .music-selector {
             background: var(--bg);
             border-radius: 12px;
             overflow: hidden;
+            padding: 16px;
         }
 
-        /* Tabs de música */
-        .music-tabs {
+        /* Upload box */
+        .music-upload-box {
             display: flex;
             align-items: center;
-            border-bottom: 1px solid var(--line);
-            padding: 0 12px;
-            gap: 4px;
-        }
-
-        .music-tab {
-            padding: 12px 14px;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--muted);
-            background: none;
-            border: none;
+            gap: 14px;
+            padding: 16px;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1));
+            border: 2px dashed rgba(139, 92, 246, 0.3);
+            border-radius: 12px;
             cursor: pointer;
-            position: relative;
-            transition: color 0.2s;
+            transition: all 0.2s ease;
         }
 
-        .music-tab:hover {
-            color: var(--fg);
+        .music-upload-box:hover {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.15));
+            border-color: rgba(139, 92, 246, 0.5);
+            transform: translateY(-1px);
         }
 
-        .music-tab.active {
-            color: var(--fg);
+        .music-upload-box input[type="file"] {
+            display: none;
+        }
+
+        .music-upload-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .music-upload-icon svg {
+            width: 22px;
+            height: 22px;
+            color: white;
+        }
+
+        .music-upload-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .music-upload-title {
             font-weight: 600;
+            font-size: 14px;
+            color: var(--fg);
         }
 
-        .music-tab.active::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 24px;
-            height: 2px;
-            background: var(--fg);
-            border-radius: 2px;
-        }
-
-        .music-search-btn {
-            margin-left: auto;
-            padding: 8px;
-            background: none;
-            border: none;
+        .music-upload-hint {
+            font-size: 12px;
             color: var(--muted);
-            cursor: pointer;
-            border-radius: 50%;
+        }
+
+        /* Divisor */
+        .music-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 16px 0;
+        }
+
+        .music-divider::before,
+        .music-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--line);
+        }
+
+        .music-divider span {
+            font-size: 12px;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        /* Search box */
+        .music-search-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--line);
+            border-radius: 10px;
             transition: all 0.2s;
         }
 
-        .music-search-btn:hover {
+        .music-search-box:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+        }
+
+        .music-search-box svg {
+            width: 18px;
+            height: 18px;
+            color: var(--muted);
+            flex-shrink: 0;
+        }
+
+        .music-search-box input {
+            flex: 1;
+            background: none;
+            border: none;
+            outline: none;
+            font-size: 14px;
+            color: var(--fg);
+        }
+
+        .music-search-box input::placeholder {
+            color: var(--muted);
+        }
+
+        /* Quick filters */
+        .music-quick-filters {
+            display: flex;
+            gap: 8px;
+            margin: 14px 0;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .music-quick-filters::-webkit-scrollbar {
+            display: none;
+        }
+
+        .music-filter {
+            display: flex;
+            align-items: center;
+            padding: 8px 14px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--muted);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .music-filter:hover {
             background: var(--surface-hover);
             color: var(--fg);
         }
 
-        .music-search-btn svg {
-            width: 20px;
-            height: 20px;
+        .music-filter.active {
+            background: var(--fg);
+            color: var(--bg);
+            border-color: var(--fg);
         }
 
-        /* Búsqueda expandida */
-        .music-search-container {
-            padding: 10px 12px;
-            border-bottom: 1px solid var(--line);
-            display: none;
-        }
-
-        .music-search-container.active {
-            display: block;
-        }
-
-        .music-search-input {
-            width: 100%;
-            padding: 10px 14px;
-            border: 1px solid var(--line);
-            border-radius: 20px;
-            background: var(--bg-secondary);
-            font-size: 14px;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        .music-search-input:focus {
-            border-color: var(--primary);
-        }
-
-        .music-search-input::placeholder {
-            color: var(--muted);
+        .music-filter.active svg {
+            fill: var(--bg);
         }
 
         /* Lista de música */
         .music-list-container {
-            max-height: calc(100vh - 380px);
-            min-height: 300px;
+            max-height: calc(100vh - 450px);
+            min-height: 250px;
             overflow-y: auto;
-            padding: 8px 0;
+            margin: 0 -16px;
+            padding: 0 16px;
         }
 
         .music-item {
@@ -1741,17 +1897,436 @@
             padding: 40px 20px;
             text-align: center;
             color: var(--muted);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
         }
 
-        .music-empty svg {
+        .music-empty-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+        }
+
+        .music-empty-icon svg {
+            width: 28px;
+            height: 28px;
+            opacity: 0.6;
+        }
+
+        .music-empty p {
+            font-size: 14px;
+            font-weight: 500;
+            margin: 0;
+        }
+
+        .music-empty-hint {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        /* =============================================
+           SELECTOR DE MÚSICA MEJORADO (Estilo Beat Sync)
+           ============================================= */
+
+        .music-selector-enhanced {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Tabs de música (Subir / Biblioteca) */
+        .music-tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-secondary);
+            padding: 4px;
+            border-radius: 10px;
+        }
+
+        .music-tab {
+            flex: 1;
+            padding: 10px 12px;
+            border: none;
+            background: transparent;
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .music-tab:hover {
+            color: var(--fg);
+            background: var(--surface-hover);
+        }
+
+        .music-tab.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .music-tab svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Panel de contenido de tabs */
+        .music-tab-content {
+            display: none;
+        }
+
+        .music-tab-content.active {
+            display: block;
+        }
+
+        /* Área de subir música */
+        .music-upload-area {
+            border: 2px dashed var(--line);
+            border-radius: 10px;
+            padding: 30px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .music-upload-area:hover {
+            border-color: var(--primary);
+            background: var(--primary-alpha);
+        }
+
+        .music-upload-area.has-music {
+            border-style: solid;
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .music-upload-icon-lg {
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 8px;
+            color: var(--muted);
+        }
+
+        .music-upload-area.has-music .music-upload-icon-lg {
+            color: var(--success);
+        }
+
+        .music-upload-text-lg {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--fg);
+            margin-bottom: 4px;
+        }
+
+        .music-upload-hint-lg {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .music-upload-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--success);
+            margin-top: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Búsqueda mejorada */
+        .music-search-enhanced {
+            margin-bottom: 10px;
+        }
+
+        .music-search-enhanced input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            color: var(--fg);
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .music-search-enhanced input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+        }
+
+        .music-search-enhanced input::placeholder {
+            color: var(--muted);
+        }
+
+        /* Categorías de música */
+        .music-categories {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .music-category {
+            padding: 6px 12px;
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            background: transparent;
+            color: var(--fg-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        .music-category:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .music-category.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .music-category svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        /* Lista de biblioteca de música */
+        .music-library {
+            max-height: 320px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .music-library-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 40px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .music-library-empty {
+            text-align: center;
+            padding: 30px 20px;
+            color: var(--muted);
+        }
+
+        .music-library-empty svg {
             width: 48px;
             height: 48px;
             margin-bottom: 12px;
             opacity: 0.5;
         }
 
-        .music-empty p {
-            font-size: 14px;
+        /* Track individual - Estilo Beat Sync */
+        .music-track {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .music-track:hover {
+            background: var(--surface-hover);
+        }
+
+        .music-track.selected {
+            border-color: var(--primary);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .music-track.playing {
+            border-color: var(--success);
+        }
+
+        .music-track.loading {
+            border-color: var(--warning);
+            opacity: 0.8;
+        }
+
+        .music-track.loading .play-overlay {
+            opacity: 1 !important;
+        }
+
+        .music-track.loading .play-overlay::after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .music-track.loading .play-overlay svg {
+            display: none;
+        }
+
+        .music-track-cover {
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .music-track-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .music-track-cover svg {
+            width: 20px;
+            height: 20px;
+            color: white;
+        }
+
+        .music-track-cover .play-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .music-track:hover .play-overlay,
+        .music-track.playing .play-overlay {
+            opacity: 1;
+        }
+
+        /* Botón de play/pause para mejor soporte táctil */
+        .music-track-play-btn {
+            background: none;
+            border: none;
+            padding: 0;
+            margin: 0;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        /* Por defecto mostrar play, ocultar pause */
+        .music-track .play-icon { display: flex; align-items: center; justify-content: center; }
+        .music-track .pause-icon { display: none; align-items: center; justify-content: center; }
+
+        /* Cuando está reproduciendo, mostrar pause, ocultar play */
+        .music-track.playing .play-icon { display: none !important; }
+        .music-track.playing .pause-icon { display: flex !important; }
+
+        /* Indicador visual más claro para estado playing */
+        .music-track.playing .music-track-cover {
+            box-shadow: 0 0 0 2px var(--success);
+        }
+
+        .music-track-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .music-track-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--fg);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .music-track-artist {
+            font-size: 11px;
+            color: var(--muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .music-track-duration {
+            font-size: 12px;
+            color: var(--muted);
+            flex-shrink: 0;
+            margin-right: 8px;
+        }
+
+        .music-track-use-btn {
+            padding: 6px 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s;
+        }
+
+        .music-track:hover .music-track-use-btn {
+            opacity: 1;
+        }
+
+        .music-track-use-btn:hover {
+            background: var(--primary-hover);
+        }
+
+        /* Responsive para móvil */
+        @@media (max-width: 768px) {
+            .music-library {
+                max-height: none;
+            }
+
+            .music-track-use-btn {
+                opacity: 1;
+                padding: 6px 10px;
+            }
+
+            .music-categories {
+                overflow-x: auto;
+                flex-wrap: nowrap;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+                padding-bottom: 4px;
+            }
+
+            .music-categories::-webkit-scrollbar {
+                display: none;
+            }
         }
 
         /* =============================================
@@ -2953,6 +3528,64 @@
             border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
+        }
+
+        /* Barra de progreso de subida */
+        .upload-progress-container {
+            width: 300px;
+            max-width: 90%;
+            text-align: center;
+            margin-top: 16px;
+        }
+
+        /* Ocultar spinner cuando la barra de progreso está visible */
+        .loading-overlay .upload-progress-container[style*="block"] ~ .loading-spinner,
+        .loading-overlay:has(.upload-progress-container[style*="block"]) .loading-spinner {
+            display: none !important;
+        }
+
+        .upload-progress-bar {
+            width: 100%;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 8px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        .upload-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), #5a9fd4);
+            border-radius: 6px;
+            width: 0%;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px rgba(74, 144, 226, 0.5);
+        }
+
+        .upload-progress-fill.indeterminate {
+            width: 100%;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                var(--primary) 25%,
+                #5a9fd4 50%,
+                var(--primary) 75%,
+                transparent 100%);
+            background-size: 200% 100%;
+            animation: indeterminateProgress 1.5s linear infinite;
+        }
+
+        @@keyframes indeterminateProgress {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .upload-progress-text {
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 12px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
         }
 
         @@keyframes spin {
@@ -5078,6 +5711,13 @@
                     <circle cx="12" cy="12" r="4"/>
                 </svg>
             </button>
+            <button class="tool-btn" data-tool="beauty" title="Belleza" onclick="seleccionarHerramienta('beauty')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="8" r="4"/>
+                    <path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>
+                    <path d="M9 9c.5.5 1.5 1 3 1s2.5-.5 3-1"/>
+                </svg>
+            </button>
             <button class="tool-btn" data-tool="adjust" title="Ajustes" onclick="seleccionarHerramienta('adjust')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="3"/>
@@ -5088,6 +5728,18 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M6 2v14a2 2 0 0 0 2 2h14"/>
                     <path d="M18 22V8a2 2 0 0 0-2-2H2"/>
+                </svg>
+            </button>
+            <button class="tool-btn" data-tool="move" title="Mover fondo" onclick="seleccionarHerramienta('move')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2l3 3-3 3"/>
+                    <path d="M12 8V2"/>
+                    <path d="M22 12l-3 3 3 3"/>
+                    <path d="M16 12h6"/>
+                    <path d="M12 22l-3-3 3-3"/>
+                    <path d="M12 16v6"/>
+                    <path d="M2 12l3-3-3-3"/>
+                    <path d="M8 12H2"/>
                 </svg>
             </button>
             <button class="tool-btn" data-tool="background" title="Fondos" onclick="seleccionarHerramienta('background')">
@@ -5516,55 +6168,73 @@
                         </div>
                     </div>
 
-                    <!-- Selector de música estilo TikTok -->
-                    <div class="music-selector">
-                        <!-- Header -->
-                        <div class="music-selector-header">
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-                            </svg>
-                            <span>Agregar música</span>
-                        </div>
-
-                        <!-- Subir música propia -->
-                        <div class="music-upload-section">
-                            <label class="music-upload-btn" for="musicFileInput">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                    <polyline points="17 8 12 3 7 8"></polyline>
-                                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                                </svg>
-                                <span>Subir tu propia música</span>
-                                <input type="file" id="musicFileInput" accept="audio/*" onchange="handleMusicUpload(this)">
-                            </label>
-                        </div>
-
-                        <!-- Tabs -->
+                    <!-- Selector de música - Estilo Beat Sync -->
+                    <div class="music-selector music-selector-enhanced">
+                        <!-- Tabs: Subir / Biblioteca -->
                         <div class="music-tabs">
-                            <button type="button" class="music-tab active" data-tab="popular" onclick="cambiarTabMusica('popular', this)">Popular</button>
-                            <button type="button" class="music-tab" data-tab="parati" onclick="cambiarTabMusica('parati', this)">Para ti</button>
-                            <button type="button" class="music-tab" data-tab="favoritos" onclick="cambiarTabMusica('favoritos', this)">Favoritos</button>
-                            <button type="button" class="music-tab" data-tab="recientes" onclick="cambiarTabMusica('recientes', this)">Recientes</button>
-                            <button type="button" class="music-search-btn" onclick="toggleMusicSearch()" title="Buscar">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="11" cy="11" r="8"></circle>
-                                    <path d="m21 21-4.35-4.35"></path>
+                            <button class="music-tab" data-tab="upload" onclick="cambiarTabMusica('upload', this)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="17 8 12 3 7 8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
                                 </svg>
+                                Subir
+                            </button>
+                            <button class="music-tab active" data-tab="library" onclick="cambiarTabMusica('library', this)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path d="M9 18V5l12-2v13"/>
+                                    <circle cx="6" cy="18" r="3"/>
+                                    <circle cx="18" cy="16" r="3"/>
+                                </svg>
+                                Biblioteca
                             </button>
                         </div>
 
-                        <!-- Búsqueda -->
-                        <div class="music-search-container" id="musicSearchContainer">
-                            <input type="text" class="music-search-input" id="musicSearch" placeholder="Buscar canciones..." oninput="buscarMusica(this.value)">
+                        <!-- Tab: Subir música -->
+                        <div class="music-tab-content" id="musicTabUpload">
+                            <div class="music-upload-area" onclick="document.getElementById('musicFileInput').click()">
+                                <svg class="music-upload-icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="17 8 12 3 7 8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                                <div class="music-upload-text-lg">Toca para subir una canción</div>
+                                <div class="music-upload-hint-lg">MP3, WAV, AAC (máx 20MB)</div>
+                                <div class="music-upload-name" id="musicUploadName" style="display: none;"></div>
+                                <input type="file" id="musicFileInput" accept="audio/*" onchange="handleMusicUpload(this)" style="display:none;">
+                            </div>
                         </div>
 
-                        <!-- Lista de canciones -->
-                        <div id="musicList" class="music-list-container">
-                            <div class="music-empty">
-                                <svg viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-                                </svg>
-                                <p>Cargando musica...</p>
+                        <!-- Tab: Biblioteca -->
+                        <div class="music-tab-content active" id="musicTabLibrary">
+                            <!-- Búsqueda -->
+                            <div class="music-search-enhanced">
+                                <input type="text" id="musicSearch" placeholder="Buscar canciones..." oninput="buscarMusicaDebounced(this.value)">
+                            </div>
+
+                            <!-- Categorías por género -->
+                            <div class="music-categories" id="musicCategories">
+                                <button class="music-category active" data-category="all" onclick="filtrarMusicaCategoria2('all', this)">Todas</button>
+                                <button class="music-category" data-category="recientes" onclick="filtrarMusicaCategoria2('recientes', this)">Recientes</button>
+                                <button class="music-category" data-category="favoritos" onclick="filtrarMusicaCategoria2('favoritos', this)">
+                                    <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12" style="margin-right:4px;">
+                                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                    </svg>
+                                    Favoritos
+                                </button>
+                                <button class="music-category" data-category="trending" onclick="filtrarMusicaCategoria2('trending', this)">Trending</button>
+                                <button class="music-category" data-category="pop" onclick="filtrarMusicaCategoria2('pop', this)">Pop</button>
+                                <button class="music-category" data-category="electronic" onclick="filtrarMusicaCategoria2('electronic', this)">Electro</button>
+                                <button class="music-category" data-category="hiphop" onclick="filtrarMusicaCategoria2('hiphop', this)">Hip Hop</button>
+                                <button class="music-category" data-category="latin" onclick="filtrarMusicaCategoria2('latin', this)">Latino</button>
+                            </div>
+
+                            <!-- Lista de canciones -->
+                            <div id="musicList" class="music-library">
+                                <div class="music-library-loading" id="musicLibraryLoading">
+                                    <div class="loading-spinner"></div>
+                                    <span>Cargando biblioteca...</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -5778,6 +6448,53 @@
                     </div>
                 </div>
 
+                <!-- FILTROS DE BELLEZA -->
+                <div class="option-section" id="beautyOptions">
+                    <div class="beauty-status" id="beautyStatus">
+                        <div class="beauty-status-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 6v6l4 2"/>
+                            </svg>
+                        </div>
+                        <span>Cargando detección facial...</span>
+                    </div>
+
+                    <div class="option-group">
+                        <label class="option-label">Suavizado de piel: <span id="smoothnessValue">0%</span></label>
+                        <input type="range" class="size-slider beauty-slider" id="beautySmoothness" min="0" max="100" value="0" oninput="ajustarBelleza('smoothness', this.value)">
+                    </div>
+
+                    <div class="option-group">
+                        <label class="option-label">Brillo facial: <span id="glowValue">0%</span></label>
+                        <input type="range" class="size-slider beauty-slider" id="beautyGlow" min="0" max="100" value="0" oninput="ajustarBelleza('glow', this.value)">
+                    </div>
+
+                    <div class="option-group">
+                        <label class="option-label">Ojos: <span id="eyesValue">0%</span></label>
+                        <input type="range" class="size-slider beauty-slider" id="beautyEyes" min="0" max="50" value="0" oninput="ajustarBelleza('eyes', this.value)">
+                    </div>
+
+                    <div class="option-group">
+                        <label class="option-label">Rostro delgado: <span id="slimValue">0%</span></label>
+                        <input type="range" class="size-slider beauty-slider" id="beautySlim" min="0" max="50" value="0" oninput="ajustarBelleza('slim', this.value)">
+                    </div>
+
+                    <div class="option-group">
+                        <label class="option-label">Presets</label>
+                        <div class="beauty-presets">
+                            <button class="beauty-preset-btn" onclick="aplicarPresetBelleza('none')">Ninguno</button>
+                            <button class="beauty-preset-btn" onclick="aplicarPresetBelleza('subtle')">Sutil</button>
+                            <button class="beauty-preset-btn" onclick="aplicarPresetBelleza('natural')">Natural</button>
+                            <button class="beauty-preset-btn" onclick="aplicarPresetBelleza('glamour')">Glamour</button>
+                        </div>
+                    </div>
+
+                    <div class="beauty-info">
+                        <small>Los filtros de belleza requieren un rostro visible en la imagen/video.</small>
+                    </div>
+                </div>
+
                 <!-- AJUSTES DE IMAGEN/VIDEO -->
                 <div class="option-section" id="adjustOptions">
                     <!-- Voltear -->
@@ -5928,8 +6645,54 @@
                     </p>
                 </div>
 
+                <!-- MOVER FONDO -->
+                <div class="option-section" id="moveOptions">
+                    <div class="move-hint" style="display: flex; align-items: center; gap: 8px; padding: 12px; background: rgba(var(--primary-rgb), 0.1); border-radius: 8px; margin-bottom: 16px; font-size: 13px; color: var(--primary);">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" style="flex-shrink: 0;">
+                            <path d="M12 2l3 3-3 3-3-3 3-3zm0 16l-3 3 3 3 3-3-3-3zm8-8l3 3-3 3-3-3 3-3zM4 10l-3 3 3 3 3-3-3-3z"/>
+                        </svg>
+                        <span>Arrastra la imagen para centrarla como desees</span>
+                    </div>
+
+                    <div id="moveStatus" class="move-status" style="text-align: center; padding: 16px; background: var(--surface); border-radius: 8px; margin-bottom: 12px;">
+                        <div id="moveStatusIcon" style="font-size: 32px; margin-bottom: 8px;">🖐️</div>
+                        <p id="moveStatusText" style="margin: 0; color: var(--fg); font-size: 14px;">
+                            Arrastra sobre la imagen para moverla
+                        </p>
+                    </div>
+
+                    <div class="option-group" style="margin-top: 16px;">
+                        <label class="option-label">Posición</label>
+                        <div class="move-position-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                            <button class="adjust-btn" onclick="posicionarFondo('top-left')" title="Arriba izquierda">↖</button>
+                            <button class="adjust-btn" onclick="posicionarFondo('top')" title="Arriba">↑</button>
+                            <button class="adjust-btn" onclick="posicionarFondo('top-right')" title="Arriba derecha">↗</button>
+                            <button class="adjust-btn" onclick="posicionarFondo('left')" title="Izquierda">←</button>
+                            <button class="adjust-btn active" onclick="posicionarFondo('center')" title="Centro">⊙</button>
+                            <button class="adjust-btn" onclick="posicionarFondo('right')" title="Derecha">→</button>
+                            <button class="adjust-btn" onclick="posicionarFondo('bottom-left')" title="Abajo izquierda">↙</button>
+                            <button class="adjust-btn" onclick="posicionarFondo('bottom')" title="Abajo">↓</button>
+                            <button class="adjust-btn" onclick="posicionarFondo('bottom-right')" title="Abajo derecha">↘</button>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-secondary" style="width: 100%; margin-top: 16px;" onclick="resetearPosicionFondo()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                            <path d="M3 3v5h5"/>
+                        </svg>
+                        Restablecer posición
+                    </button>
+                </div>
+
                 <!-- FONDOS / BACKGROUNDS -->
                 <div class="option-section" id="backgroundOptions">
+                    <div class="background-hint" style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: rgba(var(--primary-rgb), 0.1); border-radius: 8px; margin-bottom: 12px; font-size: 13px; color: var(--primary);">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" style="flex-shrink: 0;">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                        </svg>
+                        <span>Elige un fondo y agrega texto para publicar sin foto</span>
+                    </div>
                     <div class="option-group">
                         <label class="option-label">Colores solidos</label>
                         <div class="bg-colors-grid">
@@ -5972,6 +6735,12 @@
 
                 <!-- PLANTILLAS / TEMPLATES -->
                 <div class="option-section" id="templateOptions">
+                    <div class="template-hint" style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: rgba(var(--primary-rgb), 0.1); border-radius: 8px; margin-bottom: 12px; font-size: 13px; color: var(--primary);">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" style="flex-shrink: 0;">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                        </svg>
+                        <span>Puedes publicar directamente con una plantilla, sin necesidad de subir foto</span>
+                    </div>
                     <div class="templates-tabs" id="templatesTabs">
                         <button class="template-tab active" data-category="all" onclick="filtrarPlantillas('all', this)">Todas</button>
                         <button class="template-tab" data-category="promo" onclick="filtrarPlantillas('promo', this)">Promo</button>
@@ -6021,7 +6790,7 @@
 
                             <!-- Tabs: Subir / Biblioteca -->
                             <div class="beatsync-music-tabs">
-                                <button class="beatsync-music-tab active" data-tab="upload" onclick="cambiarTabMusica('upload', this)">
+                                <button class="beatsync-music-tab active" data-tab="upload" onclick="cambiarTabMusicaBeatSync('upload', this)">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                                         <polyline points="17 8 12 3 7 8"/>
@@ -6029,7 +6798,7 @@
                                     </svg>
                                     Subir
                                 </button>
-                                <button class="beatsync-music-tab" data-tab="library" onclick="cambiarTabMusica('library', this)">
+                                <button class="beatsync-music-tab" data-tab="library" onclick="cambiarTabMusicaBeatSync('library', this)">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M9 18V5l12-2v13"/>
                                         <circle cx="6" cy="18" r="3"/>
@@ -6522,10 +7291,16 @@
         </div>
     </div>
 
-    <!-- Loading overlay -->
+    <!-- Loading overlay con barra de progreso -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
         <p id="loadingText">Publicando @(modo == "reel" ? "reel" : "historia")...</p>
+        <div class="upload-progress-container" id="uploadProgressContainer" style="display: none;">
+            <div class="upload-progress-bar">
+                <div class="upload-progress-fill" id="uploadProgressFill"></div>
+            </div>
+            <p class="upload-progress-text" id="uploadProgressText">0%</p>
+        </div>
     </div>
 
     <!-- Crop overlay -->
@@ -6574,6 +7349,7 @@
         let listPreviewAudio = null;
         let mediaFile = null;
         let mediaUrl = null;
+        let canvasHasGeneratedContent = false; // True cuando hay plantilla/fondo sin imagen original
         let canvasHistory = [];
         let historyIndex = -1;
 
@@ -6814,6 +7590,9 @@
             if (isIOS()) {
                 document.body.addEventListener('click', unlockAudioForIOS, { once: true });
             }
+
+            // Verificar si viene del popup con un archivo pendiente
+            cargarArchivoPendiente();
         });
 
         function initCanvas() {
@@ -6876,6 +7655,70 @@
                 item.onclick = () => agregarSticker(emoji);
                 grid.appendChild(item);
             });
+        }
+
+        // ========================================
+        // CARGAR ARCHIVO PENDIENTE DEL POPUP
+        // ========================================
+        async function cargarArchivoPendiente() {
+            // Verificar si viene del popup de crear historia
+            const urlParams = new URLSearchParams(window.location.search);
+            if (!urlParams.has('fromPopup')) return;
+
+            // Buscar archivo en sessionStorage
+            const pendingFileData = sessionStorage.getItem('editorPendingFile');
+            if (!pendingFileData) {
+                console.log('[Editor] No hay archivo pendiente en sessionStorage');
+                return;
+            }
+
+            try {
+                const fileData = JSON.parse(pendingFileData);
+                console.log('[Editor] Cargando archivo pendiente:', fileData.name, fileData.type);
+
+                // Convertir base64 a Blob (sin usar fetch para evitar CSP)
+                const blob = base64ToBlob(fileData.data, fileData.type);
+
+                // Crear File desde Blob
+                const file = new File([blob], fileData.name, { type: fileData.type });
+
+                // Simular input con el archivo
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+
+                const fakeInput = { files: dataTransfer.files };
+
+                // Cargar el medio
+                await cargarMedia(fakeInput);
+
+                // Limpiar sessionStorage
+                sessionStorage.removeItem('editorPendingFile');
+
+                // Limpiar URL (quitar parámetro fromPopup)
+                window.history.replaceState({}, document.title, '/Stories/Editor');
+
+                console.log('[Editor] Archivo pendiente cargado exitosamente');
+            } catch (error) {
+                console.error('[Editor] Error cargando archivo pendiente:', error);
+                sessionStorage.removeItem('editorPendingFile');
+            }
+        }
+
+        // Convertir data URL base64 a Blob (sin usar fetch)
+        function base64ToBlob(dataUrl, mimeType) {
+            // Extraer solo la parte base64 (después de la coma)
+            const base64 = dataUrl.split(',')[1];
+
+            // Decodificar base64
+            const byteString = atob(base64);
+
+            // Crear array de bytes
+            const byteArray = new Uint8Array(byteString.length);
+            for (let i = 0; i < byteString.length; i++) {
+                byteArray[i] = byteString.charCodeAt(i);
+            }
+
+            return new Blob([byteArray], { type: mimeType });
         }
 
         // ========================================
@@ -7562,6 +8405,7 @@
                 }
 
                 mediaFile = file;
+                canvasHasGeneratedContent = false; // El contenido ahora viene del usuario
 
                 // Usar URL.createObjectURL para carga más rápida (sin base64)
                 const objectUrl = URL.createObjectURL(file);
@@ -7688,13 +8532,14 @@
         // HERRAMIENTAS
         // ========================================
         function seleccionarHerramienta(tool) {
-            // Limpiar recursos de Beat Sync al cambiar de herramienta
-            if (currentTool === 'beatsync' && tool !== 'beatsync') {
-                stopBeatSyncPreview();
-                stopCutterPlayback();
-            }
+            try {
+                // Limpiar recursos de Beat Sync al cambiar de herramienta
+                if (currentTool === 'beatsync' && tool !== 'beatsync') {
+                    if (typeof stopBeatSyncPreview === 'function') stopBeatSyncPreview();
+                    if (typeof stopCutterPlayback === 'function') stopCutterPlayback();
+                }
 
-            currentTool = tool;
+                currentTool = tool;
 
             // Actualizar botones
             document.querySelectorAll('.tool-btn').forEach(btn => {
@@ -7705,7 +8550,10 @@
             document.querySelectorAll('.option-section').forEach(section => {
                 section.classList.remove('active');
             });
-            document.getElementById(tool + 'Options').classList.add('active');
+            const optionsSection = document.getElementById(tool + 'Options');
+            if (optionsSection) {
+                optionsSection.classList.add('active');
+            }
 
             // Actualizar título
             const titles = {
@@ -7719,11 +8567,16 @@
                 'effects': 'Efectos',
                 'adjust': 'Ajustes',
                 'crop': 'Recortar',
+                'move': 'Mover fondo',
                 'background': 'Fondos',
                 'template': 'Plantillas',
-                'beatsync': 'Beat Sync'
+                'beatsync': 'Beat Sync',
+                'beauty': 'Belleza'
             };
-            document.getElementById('optionsTitle').textContent = titles[tool] || 'Opciones';
+            const optionsTitle = document.getElementById('optionsTitle');
+            if (optionsTitle) {
+                optionsTitle.textContent = titles[tool] || 'Opciones';
+            }
 
             // Cargar GIFs trending al seleccionar la herramienta
             if (tool === 'gif' && !gifsYaCargados) {
@@ -7731,13 +8584,15 @@
                 gifsYaCargados = true;
             }
 
-            // Modo dibujo
-            canvas.isDrawingMode = (tool === 'draw');
-            if (tool === 'draw') {
-                canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-                canvas.freeDrawingBrush.color = drawConfig.color;
-                canvas.freeDrawingBrush.width = drawConfig.width;
-                canvas.freeDrawingBrush.decimate = 5;
+            // Modo dibujo (solo si canvas está inicializado)
+            if (canvas) {
+                canvas.isDrawingMode = (tool === 'draw');
+                if (tool === 'draw') {
+                    canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+                    canvas.freeDrawingBrush.color = drawConfig.color;
+                    canvas.freeDrawingBrush.width = drawConfig.width;
+                    canvas.freeDrawingBrush.decimate = 5;
+                }
             }
 
             // Cargar música cuando se selecciona esa herramienta
@@ -7750,29 +8605,58 @@
                 renderizarPlantillas('all');
             }
 
+            // Inicializar MediaPipe cuando se selecciona belleza
+            if (tool === 'beauty') {
+                inicializarMediaPipe().then(loaded => {
+                    if (loaded) {
+                        console.log('[Beauty] MediaPipe inicializado, herramienta lista');
+                        // Sincronizar canvas overlay con las dimensiones actuales
+                        sincronizarCanvasBeauty();
+                    }
+                });
+            } else if (currentTool !== 'beauty' && beautyState.enabled) {
+                // Detener detección al cambiar de herramienta
+                detenerDeteccionFacial();
+            }
+
+            // Modo mover fondo
+            if (tool === 'move') {
+                activarModoMoverFondo(true);
+            } else if (moveBackgroundState.active) {
+                activarModoMoverFondo(false);
+            }
+
             // Abrir panel en móvil
             if (window.innerWidth <= 768) {
                 abrirPanelOpciones();
             }
+            } catch (error) {
+                console.error('Error en seleccionarHerramienta:', error);
+            }
         }
 
         function abrirPanelOpciones() {
-            document.getElementById('optionsPanel').classList.add('open');
-            document.getElementById('optionsBackdrop').classList.add('active');
+            const panel = document.getElementById('optionsPanel');
+            const backdrop = document.getElementById('optionsBackdrop');
+            if (panel) panel.classList.add('open');
+            if (backdrop) backdrop.classList.add('active');
             document.body.style.overflow = 'hidden';
         }
 
         function cerrarPanelOpciones() {
             const panel = document.getElementById('optionsPanel');
-            panel.classList.remove('open');
-            panel.classList.remove('expanded');
-            document.getElementById('optionsBackdrop').classList.remove('active');
+            const backdrop = document.getElementById('optionsBackdrop');
+            if (panel) {
+                panel.classList.remove('open');
+                panel.classList.remove('expanded');
+            }
+            if (backdrop) backdrop.classList.remove('active');
             document.body.style.overflow = '';
         }
 
         function toggleExpandPanel() {
             const panel = document.getElementById('optionsPanel');
-            panel.classList.toggle('expanded');
+            if (panel) panel.classList.toggle('expanded');
         }
 
         // ========================================
@@ -8043,34 +8927,95 @@
         }
 
         // ========================================
-        // MÚSICA - Estilo TikTok
+        // MÚSICA - Diseño Simplificado
         // ========================================
-        let currentMusicTab = 'popular';
+        let currentMusicFilter = 'all';
         let musicaFavoritos = JSON.parse(localStorage.getItem('musicaFavoritos') || '[]');
         let musicaRecientes = JSON.parse(localStorage.getItem('musicaRecientes') || '[]');
+        let searchDebounceTimer = null;
 
-        function toggleMusicSearch() {
-            const container = document.getElementById('musicSearchContainer');
-            const input = document.getElementById('musicSearch');
-            container.classList.toggle('active');
-            if (container.classList.contains('active')) {
-                input.focus();
-            } else {
-                input.value = '';
-                cargarMusicaTab(currentMusicTab);
+        // Filtrar música por categoría
+        function filtrarMusica(filter, el) {
+            currentMusicFilter = filter;
+            document.querySelectorAll('.music-filter').forEach(f => f.classList.remove('active'));
+            el.classList.add('active');
+
+            // Limpiar búsqueda
+            const searchInput = document.getElementById('musicSearch');
+            if (searchInput) searchInput.value = '';
+
+            cargarMusicaTab(filter);
+        }
+
+        // Búsqueda con debounce
+        function buscarMusicaDebounced(query) {
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(() => {
+                buscarMusica(query);
+            }, 300);
+        }
+
+        // Cambiar tab de música (Subir / Biblioteca)
+        function cambiarTabMusica(tab, btn) {
+            // Actualizar tabs activos
+            document.querySelectorAll('.music-tab').forEach(t => t.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+
+            // Mostrar contenido de tab
+            document.querySelectorAll('.music-tab-content').forEach(content => content.classList.remove('active'));
+            const tabContent = document.getElementById(`musicTab${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
+            if (tabContent) tabContent.classList.add('active');
+
+            // Si es la tab de biblioteca, cargar música
+            if (tab === 'library') {
+                cargarMusicaTab('all');
             }
         }
 
-        function cambiarTabMusica(tab, el) {
-            currentMusicTab = tab;
-            document.querySelectorAll('.music-tab').forEach(t => t.classList.remove('active'));
-            el.classList.add('active');
+        // Filtrar por categoría en el nuevo selector
+        let currentMusicCategory = 'all';
 
-            // Cerrar búsqueda si está abierta
-            document.getElementById('musicSearchContainer').classList.remove('active');
-            document.getElementById('musicSearch').value = '';
+        function filtrarMusicaCategoria2(categoria, btn) {
+            currentMusicCategory = categoria;
 
-            cargarMusicaTab(tab);
+            // Actualizar categorías activas
+            document.querySelectorAll('.music-category').forEach(c => c.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+
+            // Limpiar búsqueda
+            const searchInput = document.getElementById('musicSearch');
+            if (searchInput) searchInput.value = '';
+
+            // Cargar según la categoría
+            if (categoria === 'recientes' || categoria === 'favoritos') {
+                cargarMusicaTab(categoria);
+            } else {
+                cargarMusicaPorCategoria(categoria);
+            }
+        }
+
+        async function cargarMusicaPorCategoria(categoria) {
+            const listDiv = document.getElementById('musicList');
+            listDiv.innerHTML = '<div class="music-library-loading"><div class="loading-spinner"></div><span>Cargando...</span></div>';
+
+            try {
+                let url = '/Stories/BuscarMusica?query=';
+                if (categoria && categoria !== 'all') {
+                    url += `&genero=${encodeURIComponent(categoria)}`;
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success && data.pistas && data.pistas.length > 0) {
+                    mostrarListaMusica(data.pistas);
+                } else {
+                    listDiv.innerHTML = '<div class="music-library-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><p>No hay canciones en esta categoría</p></div>';
+                }
+            } catch (error) {
+                EditorLog.audio('error', 'Error cargando categoría', { categoria, error: error.message });
+                listDiv.innerHTML = '<div class="music-library-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><p>Error al cargar</p></div>';
+            }
         }
 
         // Construir URL de audio usando el proxy para evitar CORS en iOS/móviles
@@ -8094,16 +9039,16 @@
 
         async function cargarMusicaTab(tab) {
             try {
-                EditorLog.audio('info', 'Cargando tab de música', { tab });
+                EditorLog.audio('info', 'Cargando música', { filter: tab });
                 const listDiv = document.getElementById('musicList');
-                listDiv.innerHTML = '<div class="music-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><p>Cargando...</p></div>';
+                listDiv.innerHTML = '<div class="music-library-loading"><div class="loading-spinner"></div><span>Cargando...</span></div>';
 
                 if (tab === 'favoritos') {
                     if (musicaFavoritos.length > 0) {
                         mostrarListaMusica(musicaFavoritos);
                         EditorLog.audio('info', 'Favoritos cargados', { count: musicaFavoritos.length });
                     } else {
-                        listDiv.innerHTML = '<div class="music-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg><p>No tienes favoritos</p></div>';
+                        listDiv.innerHTML = '<div class="music-library-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg><p>No tienes favoritos</p><span style="font-size:12px;opacity:0.7;">Guarda canciones tocando el corazón</span></div>';
                     }
                     return;
                 }
@@ -8113,11 +9058,12 @@
                         mostrarListaMusica(musicaRecientes);
                         EditorLog.audio('info', 'Recientes cargados', { count: musicaRecientes.length });
                     } else {
-                        listDiv.innerHTML = '<div class="music-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg><p>No hay recientes</p></div>';
+                        listDiv.innerHTML = '<div class="music-library-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg><p>No hay recientes</p><span style="font-size:12px;opacity:0.7;">Las canciones que uses aparecerán aquí</span></div>';
                     }
                     return;
                 }
 
+                // Para 'all' o cualquier otro filtro, cargar desde la API
                 const response = await fetch('/Stories/BuscarMusica?query=');
                 const data = await response.json();
 
@@ -8125,12 +9071,12 @@
                     mostrarListaMusica(data.pistas);
                     EditorLog.audio('info', 'Música popular cargada', { count: data.pistas.length });
                 } else {
-                    listDiv.innerHTML = '<div class="music-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><p>No hay canciones disponibles</p></div>';
+                    listDiv.innerHTML = '<div class="music-library-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><p>No hay canciones disponibles</p></div>';
                 }
             } catch (error) {
                 EditorLog.audio('error', 'Error cargando tab de música', { tab, error: error.message });
                 const listDiv = document.getElementById('musicList');
-                listDiv.innerHTML = '<div class="music-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><p>Error al cargar</p></div>';
+                listDiv.innerHTML = '<div class="music-library-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><p>Error al cargar</p></div>';
             }
         }
 
@@ -8138,12 +9084,12 @@
             const listDiv = document.getElementById('musicList');
 
             if (query.length < 2) {
-                cargarMusicaTab(currentMusicTab);
+                cargarMusicaTab(currentMusicCategory || 'all');
                 return;
             }
 
             EditorLog.audio('info', 'Buscando música', { query });
-            listDiv.innerHTML = '<div class="music-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><p>Buscando...</p></div>';
+            listDiv.innerHTML = '<div class="music-library-loading"><div class="loading-spinner"></div><span>Buscando...</span></div>';
 
             try {
                 const response = await fetch(`/Stories/BuscarMusica?query=${encodeURIComponent(query)}`);
@@ -8154,11 +9100,11 @@
                     EditorLog.audio('info', 'Búsqueda de música exitosa', { query, count: data.pistas.length });
                 } else {
                     EditorLog.audio('info', 'Búsqueda sin resultados', { query });
-                    listDiv.innerHTML = '<div class="music-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><p>No se encontraron canciones</p></div>';
+                    listDiv.innerHTML = '<div class="music-library-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><p>No se encontraron canciones</p></div>';
                 }
             } catch (error) {
                 EditorLog.audio('error', 'Error buscando música', { query, error: error.message });
-                listDiv.innerHTML = '<div class="music-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><p>Error al buscar</p></div>';
+                listDiv.innerHTML = '<div class="music-library-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><p>Error al buscar</p></div>';
             }
         }
 
@@ -8191,53 +9137,123 @@
             localStorage.setItem('musicaRecientes', JSON.stringify(musicaRecientes));
         }
 
+        // Preview de música
+        let musicPreviewAudio = null;
+        let currentPreviewTrackId = null;
+
         function mostrarListaMusica(pistas) {
             const listDiv = document.getElementById('musicList');
 
             if (!pistas || pistas.length === 0) {
-                listDiv.innerHTML = '<div class="music-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><p>No hay canciones</p></div>';
+                listDiv.innerHTML = '<div class="music-library-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><p>No hay canciones</p></div>';
                 return;
             }
 
             listDiv.innerHTML = pistas.map(p => {
                 // Transformar la pista para usar URL del proxy (evita CORS en iOS)
                 const pistaProxy = transformPistaForProxy(p);
-                const isFavorito = musicaFavoritos.some(f => f.id === p.id);
                 const isSelected = selectedMusic?.id === p.id;
                 const pistaJson = JSON.stringify(pistaProxy).replace(/"/g, '&quot;');
+                const trackUrl = encodeURIComponent(pistaProxy.audioUrl || '');
 
                 return `
-                <div class="music-item ${isSelected ? 'selected' : ''}" data-music-id="${p.id}" onclick="seleccionarMusica(${pistaJson})">
-                    <img src="${escapeHtml(p.portada) || '/images/music-placeholder.svg'}" class="music-cover" onerror="this.src='/images/music-placeholder.svg'" />
-                    <div class="music-info">
-                        <div class="music-title-row">
-                            <span class="music-playing-icon">
-                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
-                            </span>
-                            <span class="music-title">${escapeHtml(p.titulo)}</span>
+                <div class="music-track ${isSelected ? 'selected' : ''}"
+                     data-music-id="${p.id}"
+                     data-track-url="${trackUrl}">
+                    <button class="music-track-play-btn"
+                            onclick="event.stopPropagation(); toggleMusicPreview(this.closest('.music-track'), decodeURIComponent('${trackUrl}'))">
+                        <div class="music-track-cover">
+                            ${p.portada ?
+                                `<img src="${escapeHtml(p.portada)}" onerror="this.style.display='none'" />` :
+                                `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>`
+                            }
+                            <div class="play-overlay">
+                                <svg class="play-icon" viewBox="0 0 24 24" fill="white" width="20" height="20"><path d="M8 5v14l11-7z"/></svg>
+                                <svg class="pause-icon" viewBox="0 0 24 24" fill="white" width="20" height="20"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                            </div>
                         </div>
-                        <div class="music-meta">
-                            <span>${escapeHtml(p.artista)}</span>
-                            <span>${formatDuration(p.duracion || 0)}</span>
-                        </div>
+                    </button>
+                    <div class="music-track-info" onclick="toggleMusicPreview(this.closest('.music-track'), decodeURIComponent('${trackUrl}'))">
+                        <div class="music-track-title">${escapeHtml(p.titulo)}</div>
+                        <div class="music-track-artist">${escapeHtml(p.artista) || 'Artista desconocido'}${p.genero ? ` • ${escapeHtml(p.genero)}` : ''}</div>
                     </div>
-                    <div class="music-actions">
-                        <button type="button" class="music-action-btn" onclick="event.stopPropagation(); seleccionarMusica(${pistaJson})" title="Usar">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-                                <polyline points="14 2 14 8 20 8"/>
-                                <line x1="12" y1="18" x2="12" y2="12"/>
-                                <line x1="9" y1="15" x2="15" y2="15"/>
-                            </svg>
-                        </button>
-                        <button type="button" class="music-action-btn ${isFavorito ? 'favorited' : ''}" onclick="toggleFavorito(${pistaJson}, this, event)" title="${isFavorito ? 'Quitar de favoritos' : 'Agregar a favoritos'}">
-                            <svg viewBox="0 0 24 24" fill="${isFavorito ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
-                                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
-                            </svg>
-                        </button>
-                    </div>
+                    <span class="music-track-duration">${formatDuration(p.duracion || 0)}</span>
+                    <button class="music-track-use-btn" onclick="event.stopPropagation(); seleccionarMusica(${pistaJson})">
+                        Usar
+                    </button>
                 </div>
             `}).join('');
+        }
+
+        // Toggle preview de música (play/pause)
+        function toggleMusicPreview(trackElement, url) {
+            const trackId = trackElement.dataset.musicId;
+
+            // Si es el mismo track que estaba sonando, toggle play/pause
+            if (currentPreviewTrackId === trackId && musicPreviewAudio) {
+                if (!musicPreviewAudio.paused) {
+                    musicPreviewAudio.pause();
+                    trackElement.classList.remove('playing');
+                    return;
+                }
+            }
+
+            // Detener cualquier preview anterior
+            stopMusicPreview();
+
+            // Marcar como loading
+            trackElement.classList.add('loading');
+            currentPreviewTrackId = trackId;
+
+            // Crear nuevo audio
+            musicPreviewAudio = new Audio();
+            musicPreviewAudio.preload = 'auto';
+            musicPreviewAudio.volume = 0.5;
+
+            musicPreviewAudio.oncanplaythrough = () => {
+                trackElement.classList.remove('loading');
+                if (musicPreviewAudio && currentPreviewTrackId === trackId) {
+                    musicPreviewAudio.play().catch(() => {});
+                }
+            };
+
+            musicPreviewAudio.onplay = () => {
+                trackElement.classList.remove('loading');
+                trackElement.classList.add('playing');
+            };
+
+            musicPreviewAudio.onended = () => {
+                trackElement.classList.remove('playing');
+                currentPreviewTrackId = null;
+            };
+
+            musicPreviewAudio.onerror = () => {
+                trackElement.classList.remove('loading');
+                trackElement.classList.remove('playing');
+                currentPreviewTrackId = null;
+            };
+
+            musicPreviewAudio.onpause = () => {
+                trackElement.classList.remove('playing');
+            };
+
+            musicPreviewAudio.src = url;
+            musicPreviewAudio.load();
+        }
+
+        function stopMusicPreview() {
+            if (musicPreviewAudio) {
+                try {
+                    musicPreviewAudio.pause();
+                    musicPreviewAudio.src = '';
+                    musicPreviewAudio.load();
+                } catch (e) {}
+                musicPreviewAudio = null;
+            }
+            // Quitar clase playing de todos los tracks
+            document.querySelectorAll('.music-track.playing').forEach(t => t.classList.remove('playing'));
+            document.querySelectorAll('.music-track.loading').forEach(t => t.classList.remove('loading'));
+            currentPreviewTrackId = null;
         }
 
         function formatDuration(seconds) {
@@ -8304,9 +9320,12 @@
                 }
 
                 // Marcar como seleccionada en la lista
-                document.querySelectorAll('.music-item').forEach(item => item.classList.remove('selected'));
-                const musicItem = document.querySelector(`.music-item[data-music-id="${pista.id}"]`);
-                if (musicItem) musicItem.classList.add('selected');
+                document.querySelectorAll('.music-track').forEach(item => item.classList.remove('selected'));
+                const musicTrack = document.querySelector(`.music-track[data-music-id="${pista.id}"]`);
+                if (musicTrack) musicTrack.classList.add('selected');
+
+                // Detener preview si está sonando
+                stopMusicPreview();
 
                 // Mostrar el panel de música seleccionada
                 const container = document.getElementById('selectedMusicContainer');
@@ -8355,6 +9374,9 @@
             if (!waveformCanvas || !url) return;
 
             audioCutter.classList.add('loading');
+
+            // Mostrar waveform simplificado inmediatamente mientras carga el real
+            drawSimplifiedWaveform();
 
             try {
                 // Crear AudioContext con manejo robusto
@@ -8941,6 +9963,10 @@
             }
             // También detener preview de biblioteca
             detenerPreviewTrack();
+            // Detener preview del nuevo selector de música
+            if (typeof stopMusicPreview === 'function') {
+                stopMusicPreview();
+            }
             // Resetear iconos de play en la lista
             document.querySelectorAll('.music-play-btn').forEach(btn => {
                 const playIcon = btn.querySelector('.play-icon');
@@ -8948,12 +9974,14 @@
                 if (playIcon) playIcon.style.display = 'block';
                 if (pauseIcon) pauseIcon.style.display = 'none';
             });
-            document.querySelectorAll('.music-item').forEach(item => item.classList.remove('playing'));
+            document.querySelectorAll('.music-track').forEach(item => item.classList.remove('playing'));
+            document.querySelectorAll('.music-track').forEach(item => item.classList.remove('loading'));
         }
 
         function quitarMusica() {
             stopAllPreviews();
             stopPlayback();
+            stopMusicPreview();
 
             // Limpiar HTMLAudioElement
             if (cutterAudioElement) {
@@ -8973,7 +10001,7 @@
             audioBuffer = null;
 
             document.getElementById('selectedMusicContainer').style.display = 'none';
-            document.querySelectorAll('.music-item').forEach(item => item.classList.remove('selected'));
+            document.querySelectorAll('.music-track').forEach(item => item.classList.remove('selected'));
 
             // Resetear botón de confirmar
             const btnConfirm = document.getElementById('btnConfirmMusic');
@@ -9058,7 +10086,8 @@
             input.value = '';
         }
 
-        function toggleMusicPreview(url, btn) {
+        // Función legacy para compatibilidad - ya no se usa
+        function toggleMusicPreviewLegacy(url, btn) {
             if (!url) return;
 
             // Desbloquear audio en iOS primero
@@ -9066,12 +10095,12 @@
                 unlockAudioForIOS();
             }
 
-            const musicItem = btn.closest('.music-item');
+            const musicItem = btn.closest('.music-track') || btn.closest('.music-item');
             const playIcon = btn.querySelector('.play-icon');
             const pauseIcon = btn.querySelector('.pause-icon');
 
             // Si ya está reproduciendo, detener
-            if (musicItem.classList.contains('playing')) {
+            if (musicItem && musicItem.classList.contains('playing')) {
                 stopAllPreviews();
                 return;
             }
@@ -9093,25 +10122,25 @@
             listPreviewAudio.onplay = () => {
                 if (playIcon) playIcon.style.display = 'none';
                 if (pauseIcon) pauseIcon.style.display = 'block';
-                musicItem.classList.add('playing');
+                if (musicItem) musicItem.classList.add('playing');
             };
 
             listPreviewAudio.onended = () => {
                 if (playIcon) playIcon.style.display = 'block';
                 if (pauseIcon) pauseIcon.style.display = 'none';
-                musicItem.classList.remove('playing');
+                if (musicItem) musicItem.classList.remove('playing');
             };
 
             listPreviewAudio.onerror = () => {
                 if (playIcon) playIcon.style.display = 'block';
                 if (pauseIcon) pauseIcon.style.display = 'none';
-                musicItem.classList.remove('playing');
+                if (musicItem) musicItem.classList.remove('playing');
             };
 
             listPreviewAudio.onpause = () => {
                 if (playIcon) playIcon.style.display = 'block';
                 if (pauseIcon) pauseIcon.style.display = 'none';
-                musicItem.classList.remove('playing');
+                if (musicItem) musicItem.classList.remove('playing');
             };
 
             // Iniciar streaming
@@ -9377,6 +10406,487 @@
             contrast: 0,
             saturation: 0
         };
+
+        // ========================================
+        // MOVER FONDO - Estado y funciones
+        // ========================================
+        let moveBackgroundState = {
+            active: false,
+            isDragging: false,
+            startX: 0,
+            startY: 0,
+            originalLeft: 0,
+            originalTop: 0
+        };
+
+        // Activar/desactivar modo mover fondo
+        function activarModoMoverFondo(activar) {
+            moveBackgroundState.active = activar;
+            const bgImage = canvas.backgroundImage;
+
+            if (!bgImage) {
+                if (activar) {
+                    actualizarEstadoMover('no-image', 'No hay imagen de fondo para mover');
+                }
+                return;
+            }
+
+            if (activar) {
+                // Mostrar cursor de mover en el canvas
+                const canvasEl = document.querySelector('.canvas-container');
+                if (canvasEl) canvasEl.style.cursor = 'grab';
+
+                // Agregar eventos de arrastre
+                canvas.on('mouse:down', iniciarArrastreFondo);
+                canvas.on('mouse:move', arrastrarFondo);
+                canvas.on('mouse:up', terminarArrastreFondo);
+
+                actualizarEstadoMover('ready', 'Arrastra sobre la imagen para moverla');
+                console.log('[Move] Modo mover fondo activado');
+            } else {
+                // Restaurar cursor
+                const canvasEl = document.querySelector('.canvas-container');
+                if (canvasEl) canvasEl.style.cursor = 'default';
+
+                // Remover eventos de arrastre
+                canvas.off('mouse:down', iniciarArrastreFondo);
+                canvas.off('mouse:move', arrastrarFondo);
+                canvas.off('mouse:up', terminarArrastreFondo);
+
+                console.log('[Move] Modo mover fondo desactivado');
+            }
+        }
+
+        // Actualizar estado visual del panel de mover
+        function actualizarEstadoMover(estado, mensaje) {
+            const iconEl = document.getElementById('moveStatusIcon');
+            const textEl = document.getElementById('moveStatusText');
+            if (!iconEl || !textEl) return;
+
+            const icons = {
+                'ready': '🖐️',
+                'dragging': '✊',
+                'no-image': '🖼️'
+            };
+
+            iconEl.textContent = icons[estado] || '🖐️';
+            textEl.textContent = mensaje;
+        }
+
+        // Iniciar arrastre del fondo
+        function iniciarArrastreFondo(opt) {
+            if (!moveBackgroundState.active) return;
+
+            const bgImage = canvas.backgroundImage;
+            if (!bgImage) return;
+
+            moveBackgroundState.isDragging = true;
+            moveBackgroundState.startX = opt.e.clientX || opt.e.touches?.[0]?.clientX;
+            moveBackgroundState.startY = opt.e.clientY || opt.e.touches?.[0]?.clientY;
+            moveBackgroundState.originalLeft = bgImage.left;
+            moveBackgroundState.originalTop = bgImage.top;
+
+            const canvasEl = document.querySelector('.canvas-container');
+            if (canvasEl) canvasEl.style.cursor = 'grabbing';
+
+            actualizarEstadoMover('dragging', 'Moviendo...');
+        }
+
+        // Arrastrar el fondo
+        function arrastrarFondo(opt) {
+            if (!moveBackgroundState.active || !moveBackgroundState.isDragging) return;
+
+            const bgImage = canvas.backgroundImage;
+            if (!bgImage) return;
+
+            const clientX = opt.e.clientX || opt.e.touches?.[0]?.clientX;
+            const clientY = opt.e.clientY || opt.e.touches?.[0]?.clientY;
+
+            const deltaX = clientX - moveBackgroundState.startX;
+            const deltaY = clientY - moveBackgroundState.startY;
+
+            // Calcular nueva posición
+            let newLeft = moveBackgroundState.originalLeft + deltaX;
+            let newTop = moveBackgroundState.originalTop + deltaY;
+
+            // Calcular límites para que la imagen siempre cubra el canvas
+            const imgWidth = bgImage.width * bgImage.scaleX;
+            const imgHeight = bgImage.height * bgImage.scaleY;
+
+            // Límites (la imagen es más grande que el canvas, así que limitamos el movimiento)
+            const minLeft = canvas.width - (imgWidth / 2);
+            const maxLeft = imgWidth / 2;
+            const minTop = canvas.height - (imgHeight / 2);
+            const maxTop = imgHeight / 2;
+
+            // Aplicar límites solo si la imagen es más grande que el canvas
+            if (imgWidth > canvas.width) {
+                newLeft = Math.max(minLeft, Math.min(maxLeft, newLeft));
+            } else {
+                newLeft = canvas.width / 2; // Centrar si es más pequeña
+            }
+
+            if (imgHeight > canvas.height) {
+                newTop = Math.max(minTop, Math.min(maxTop, newTop));
+            } else {
+                newTop = canvas.height / 2; // Centrar si es más pequeña
+            }
+
+            bgImage.set({ left: newLeft, top: newTop });
+            canvas.renderAll();
+        }
+
+        // Terminar arrastre del fondo
+        function terminarArrastreFondo(opt) {
+            if (!moveBackgroundState.active) return;
+
+            if (moveBackgroundState.isDragging) {
+                moveBackgroundState.isDragging = false;
+                saveHistory();
+
+                const canvasEl = document.querySelector('.canvas-container');
+                if (canvasEl) canvasEl.style.cursor = 'grab';
+
+                actualizarEstadoMover('ready', 'Arrastra sobre la imagen para moverla');
+
+                // Re-aplicar filtros de belleza si están activos
+                if (beautyState.enabled) {
+                    aplicarFiltrosGlobales();
+                }
+            }
+        }
+
+        // Posicionar fondo en una posición predefinida
+        function posicionarFondo(posicion) {
+            const bgImage = canvas.backgroundImage;
+            if (!bgImage) return;
+
+            const imgWidth = bgImage.width * bgImage.scaleX;
+            const imgHeight = bgImage.height * bgImage.scaleY;
+
+            let newLeft = canvas.width / 2;
+            let newTop = canvas.height / 2;
+
+            // Calcular posiciones según el tamaño de la imagen
+            switch (posicion) {
+                case 'top-left':
+                    newLeft = imgWidth / 2;
+                    newTop = imgHeight / 2;
+                    break;
+                case 'top':
+                    newTop = imgHeight / 2;
+                    break;
+                case 'top-right':
+                    newLeft = canvas.width - (imgWidth / 2);
+                    newTop = imgHeight / 2;
+                    break;
+                case 'left':
+                    newLeft = imgWidth / 2;
+                    break;
+                case 'center':
+                    // Ya está centrado por defecto
+                    break;
+                case 'right':
+                    newLeft = canvas.width - (imgWidth / 2);
+                    break;
+                case 'bottom-left':
+                    newLeft = imgWidth / 2;
+                    newTop = canvas.height - (imgHeight / 2);
+                    break;
+                case 'bottom':
+                    newTop = canvas.height - (imgHeight / 2);
+                    break;
+                case 'bottom-right':
+                    newLeft = canvas.width - (imgWidth / 2);
+                    newTop = canvas.height - (imgHeight / 2);
+                    break;
+            }
+
+            // Aplicar límites
+            if (imgWidth > canvas.width) {
+                const minLeft = canvas.width - (imgWidth / 2);
+                const maxLeft = imgWidth / 2;
+                newLeft = Math.max(minLeft, Math.min(maxLeft, newLeft));
+            }
+            if (imgHeight > canvas.height) {
+                const minTop = canvas.height - (imgHeight / 2);
+                const maxTop = imgHeight / 2;
+                newTop = Math.max(minTop, Math.min(maxTop, newTop));
+            }
+
+            bgImage.set({ left: newLeft, top: newTop });
+            canvas.renderAll();
+            saveHistory();
+
+            // Actualizar botón activo
+            document.querySelectorAll('.move-position-grid .adjust-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const activeBtn = document.querySelector(`.move-position-grid .adjust-btn[onclick*="${posicion}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            // Re-aplicar filtros de belleza si están activos
+            if (beautyState.enabled) {
+                aplicarFiltrosGlobales();
+            }
+        }
+
+        // Resetear posición del fondo al centro
+        function resetearPosicionFondo() {
+            posicionarFondo('center');
+        }
+
+        // ========================================
+        // FILTROS DE BELLEZA - Filtros Globales de Imagen
+        // ========================================
+        let beautyState = {
+            enabled: false,
+            smoothness: 0,  // Suavizado (blur suave)
+            glow: 0,        // Brillo
+            eyes: 0,        // Contraste
+            slim: 0,        // Calidez (warmth)
+            currentPreset: 'none'
+        };
+
+        // Aplicar filtros globales de imagen usando CSS filters
+        function aplicarFiltrosGlobales() {
+            const bgImage = canvas.backgroundImage;
+            if (!bgImage) return;
+
+            // Calcular valores de filtros CSS
+            const blur = beautyState.smoothness * 0.015;  // Max ~1.5px blur
+            const brightness = 1 + (beautyState.glow * 0.003);  // 1.0 - 1.3
+            const contrast = 1 + (beautyState.eyes * 0.005);  // 1.0 - 1.25
+            const saturate = 1 + (beautyState.slim * 0.004);  // 1.0 - 1.2
+            const sepia = beautyState.slim * 0.001;  // 0 - 0.05 (ligero tono cálido)
+
+            // Construir string de filtros CSS
+            let filters = [];
+            if (blur > 0) filters.push(`blur(${blur}px)`);
+            if (brightness !== 1) filters.push(`brightness(${brightness})`);
+            if (contrast !== 1) filters.push(`contrast(${contrast})`);
+            if (saturate !== 1) filters.push(`saturate(${saturate})`);
+            if (sepia > 0) filters.push(`sepia(${sepia})`);
+
+            const filterString = filters.length > 0 ? filters.join(' ') : 'none';
+
+            // Aplicar a Fabric.js usando filtros de imagen
+            // Usamos el elemento canvas directamente con CSS
+            const canvasEl = document.querySelector('.canvas-container canvas.lower-canvas');
+            if (canvasEl) {
+                canvasEl.style.filter = filterString;
+            }
+
+            console.log('[Beauty] Filtros aplicados:', filterString);
+        }
+
+        // Actualizar estado visual del panel de belleza
+        function actualizarEstadoBelleza(estado, mensaje) {
+            const statusEl = document.getElementById('beautyStatus');
+            if (!statusEl) return;
+
+            statusEl.className = 'beauty-status ' + estado;
+            const spanEl = statusEl.querySelector('span');
+            if (spanEl) spanEl.textContent = mensaje;
+
+            // Cambiar icono según estado
+            const iconEl = statusEl.querySelector('.beauty-status-icon');
+            if (iconEl) {
+                const iconHtml = estado === 'ready'
+                    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+                    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>';
+                iconEl.innerHTML = iconHtml;
+            }
+        }
+
+        // Ajustar filtro de belleza individual
+        function ajustarBelleza(tipo, valor) {
+            valor = parseInt(valor);
+            beautyState[tipo] = valor;
+
+            // Actualizar label
+            const labelId = tipo + 'Value';
+            const labelEl = document.getElementById(labelId);
+            if (labelEl) {
+                labelEl.textContent = valor + '%';
+            }
+
+            // Verificar si hay filtros activos
+            const hayFiltrosActivos = beautyState.smoothness > 0 ||
+                                      beautyState.glow > 0 ||
+                                      beautyState.eyes > 0 ||
+                                      beautyState.slim > 0;
+
+            if (hayFiltrosActivos) {
+                beautyState.enabled = true;
+                aplicarFiltrosGlobales();
+                actualizarEstadoBelleza('ready', 'Filtros activos');
+            } else {
+                beautyState.enabled = false;
+                limpiarFiltrosGlobales();
+                actualizarEstadoBelleza('', 'Sin filtros');
+            }
+
+            // Limpiar preset activo si se cambia manualmente
+            beautyState.currentPreset = 'none';
+            actualizarBotonesPreset();
+        }
+
+        // Limpiar filtros globales
+        function limpiarFiltrosGlobales() {
+            const canvasEl = document.querySelector('.canvas-container canvas.lower-canvas');
+            if (canvasEl) {
+                canvasEl.style.filter = 'none';
+            }
+        }
+
+        // Obtener string de filtros CSS actuales
+        function obtenerFiltrosCSSString() {
+            if (!beautyState.enabled) return 'none';
+
+            const blur = beautyState.smoothness * 0.015;
+            const brightness = 1 + (beautyState.glow * 0.003);
+            const contrast = 1 + (beautyState.eyes * 0.005);
+            const saturate = 1 + (beautyState.slim * 0.004);
+            const sepia = beautyState.slim * 0.001;
+
+            let filters = [];
+            if (blur > 0) filters.push(`blur(${blur}px)`);
+            if (brightness !== 1) filters.push(`brightness(${brightness})`);
+            if (contrast !== 1) filters.push(`contrast(${contrast})`);
+            if (saturate !== 1) filters.push(`saturate(${saturate})`);
+            if (sepia > 0) filters.push(`sepia(${sepia})`);
+
+            return filters.length > 0 ? filters.join(' ') : 'none';
+        }
+
+        // Aplicar filtros de belleza a un dataURL y retornar nuevo dataURL
+        function aplicarFiltrosAImagen(dataUrl, callback) {
+            const filterString = obtenerFiltrosCSSString();
+            if (filterString === 'none') {
+                callback(dataUrl);
+                return;
+            }
+
+            const img = new Image();
+            img.onload = function() {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = img.width;
+                tempCanvas.height = img.height;
+                const ctx = tempCanvas.getContext('2d');
+
+                // Aplicar filtros CSS al contexto
+                ctx.filter = filterString;
+                ctx.drawImage(img, 0, 0);
+
+                // Convertir a dataURL
+                const filteredDataUrl = tempCanvas.toDataURL('image/jpeg', 0.95);
+                callback(filteredDataUrl);
+            };
+            img.src = dataUrl;
+        }
+
+        // Versión async para usar con await
+        function aplicarFiltrosAImagenAsync(dataUrl) {
+            return new Promise((resolve) => {
+                aplicarFiltrosAImagen(dataUrl, resolve);
+            });
+        }
+
+        // Aplicar preset de belleza
+        function aplicarPresetBelleza(preset) {
+            const presets = {
+                'none': { smoothness: 0, glow: 0, eyes: 0, slim: 0 },
+                'subtle': { smoothness: 15, glow: 10, eyes: 8, slim: 5 },
+                'natural': { smoothness: 25, glow: 20, eyes: 15, slim: 10 },
+                'glamour': { smoothness: 40, glow: 35, eyes: 25, slim: 20 }
+            };
+
+            const config = presets[preset];
+            if (!config) return;
+
+            beautyState.currentPreset = preset;
+
+            // Aplicar valores
+            Object.keys(config).forEach(key => {
+                beautyState[key] = config[key];
+
+                const sliderId = 'beauty' + key.charAt(0).toUpperCase() + key.slice(1);
+                const slider = document.getElementById(sliderId);
+                if (slider) slider.value = config[key];
+
+                const labelId = key + 'Value';
+                const label = document.getElementById(labelId);
+                if (label) label.textContent = config[key] + '%';
+            });
+
+            actualizarBotonesPreset();
+
+            // Aplicar o limpiar filtros según preset
+            if (preset === 'none') {
+                beautyState.enabled = false;
+                limpiarFiltrosGlobales();
+                actualizarEstadoBelleza('', 'Sin filtros');
+            } else {
+                beautyState.enabled = true;
+                aplicarFiltrosGlobales();
+                actualizarEstadoBelleza('ready', 'Filtros activos');
+            }
+        }
+
+        // Actualizar botones de preset
+        function actualizarBotonesPreset() {
+            document.querySelectorAll('.beauty-preset-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            const activeBtn = document.querySelector(`.beauty-preset-btn[onclick*="${beautyState.currentPreset}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+        }
+
+        // Resetear estado de belleza
+        function resetearBelleza() {
+            beautyState.smoothness = 0;
+            beautyState.glow = 0;
+            beautyState.eyes = 0;
+            beautyState.slim = 0;
+            beautyState.currentPreset = 'none';
+            beautyState.enabled = false;
+
+            // Resetear sliders
+            ['Smoothness', 'Glow', 'Eyes', 'Slim'].forEach(tipo => {
+                const slider = document.getElementById('beauty' + tipo);
+                if (slider) slider.value = 0;
+
+                const label = document.getElementById(tipo.toLowerCase() + 'Value');
+                if (label) label.textContent = '0%';
+            });
+
+            limpiarFiltrosGlobales();
+            actualizarBotonesPreset();
+            actualizarEstadoBelleza('', 'Sin filtros');
+        }
+
+        // Funciones legacy que ya no se necesitan pero se mantienen por compatibilidad
+        function iniciarDeteccionFacial() {
+            beautyState.enabled = true;
+            aplicarFiltrosGlobales();
+            actualizarEstadoBelleza('ready', 'Filtros activos');
+        }
+
+        function detenerDeteccionFacial() {
+            beautyState.enabled = false;
+            limpiarFiltrosGlobales();
+            actualizarEstadoBelleza('', 'Sin filtros');
+        }
+
+        function sincronizarCanvasBeauty() {
+            // Ya no se necesita con filtros globales
+        }
+
+        function aplicarFiltrosBelleza() {
+            aplicarFiltrosGlobales();
+        }
 
         function voltearHorizontal() {
             adjustState.flipX = !adjustState.flipX;
@@ -9668,6 +11178,65 @@
 
         // Descargar el media actual (para verificar antes de publicar)
         async function descargarMedia() {
+            // Si no hay mediaFile pero hay contenido generado, descargar el canvas
+            if (!mediaFile && canvasHasGeneratedContent) {
+                try {
+                    const fecha = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                    const nombreArchivo = `lado_${MODO_EDITOR}_${fecha}.jpg`;
+
+                    // Ocultar objetos interactivos (menciones/links) temporalmente
+                    const objetosInteractivos = [];
+                    canvas.getObjects().forEach(obj => {
+                        if (obj.userId || obj.isStoryLink) {
+                            objetosInteractivos.push(obj);
+                            obj.set('opacity', 0);
+                        }
+                    });
+
+                    // Agregar marca de agua
+                    const watermark = new fabric.Text('Creado con Ladoapp.com', {
+                        left: canvas.width / 2,
+                        top: canvas.height * 0.97,
+                        originX: 'center',
+                        originY: 'center',
+                        fontSize: 10,
+                        fontFamily: 'Poppins',
+                        fill: 'rgba(255, 255, 255, 0.6)',
+                        selectable: false,
+                        evented: false
+                    });
+                    canvas.add(watermark);
+                    canvas.renderAll();
+
+                    // Exportar canvas a imagen
+                    const dataUrl = canvas.toDataURL({
+                        format: 'jpeg',
+                        quality: 0.95,
+                        multiplier: 2
+                    });
+
+                    // Restaurar objetos interactivos y remover marca de agua
+                    objetosInteractivos.forEach(obj => obj.set('opacity', 1));
+                    canvas.remove(watermark);
+                    canvas.renderAll();
+
+                    // Aplicar filtros de belleza si están activos
+                    aplicarFiltrosAImagen(dataUrl, function(finalDataUrl) {
+                        const link = document.createElement('a');
+                        link.href = finalDataUrl;
+                        link.download = nombreArchivo;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    });
+                    return;
+                } catch (error) {
+                    console.error('Error al descargar canvas:', error);
+                    alert('Error al descargar el contenido');
+                    return;
+                }
+            }
+
             if (!mediaFile) {
                 alert('No hay contenido para descargar');
                 return;
@@ -9955,13 +11524,14 @@
 
         // Capturar cuando la página va a cerrar (puede indicar crash en iOS)
         window.addEventListener('pagehide', function(e) {
-            if (beatSyncPhotos && beatSyncPhotos.length > 0) {
+            // Usar optional chaining para evitar errores si beatSyncConfig no existe
+            if (typeof beatSyncConfig !== 'undefined' && beatSyncConfig?.photos?.length > 0) {
                 // Intentar log síncrono antes de cerrar usando Blob para content-type correcto
                 const logData = new Blob([JSON.stringify({
                     tipo: 'warning',
                     mensaje: '[Stories/Editor] Página cerrada durante BeatSync',
                     detalle: JSON.stringify({
-                        photosCount: beatSyncPhotos.length,
+                        photosCount: beatSyncConfig.photos.length,
                         hasVideo: !!mediaFile,
                         persisted: e.persisted
                     }),
@@ -10012,15 +11582,375 @@
         }
 
         // ========================================
+        // UPLOAD CON BARRA DE PROGRESO (iOS/Safari compatible)
+        // ========================================
+        let uploadStartTime = null;
+        let simulatedProgressInterval = null;
+        let hasReceivedRealProgress = false;
+        let currentFileSize = 0;
+
+        // Detectar iOS/Safari (usar función isIOS() ya definida o detectar aquí)
+        const isIOSUpload = typeof isIOS === 'function' ? isIOS() :
+                            (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+        function uploadWithProgress(url, formData, onProgress) {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                uploadStartTime = Date.now();
+                hasReceivedRealProgress = false;
+
+                // Obtener tamaño del archivo para simulación
+                currentFileSize = 0;
+                for (let [key, value] of formData.entries()) {
+                    if (value instanceof File) {
+                        currentFileSize = value.size;
+                        break;
+                    }
+                }
+
+                console.log('[Upload] iOS:', isIOSUpload, 'Safari:', isSafari, 'FileSize:', Math.round(currentFileSize/1024/1024) + 'MB');
+
+                // En iOS/Safari, iniciar simulación inmediatamente y NO detenerla
+                // hasta que tengamos progreso REAL (no solo loadstart)
+                if (isIOSUpload || isSafari) {
+                    startSimulatedProgress(onProgress, currentFileSize);
+                }
+
+                // Evento cuando inicia la subida
+                xhr.upload.addEventListener('loadstart', (e) => {
+                    console.log('[XHR] Upload started, total:', e.total);
+                    // NO detener simulación aquí - Safari dispara loadstart pero no progress
+                    if (!isIOSUpload && !isSafari) {
+                        if (onProgress) onProgress(0, 0, e.total || currentFileSize);
+                    }
+                });
+
+                // Evento de progreso de subida
+                xhr.upload.addEventListener('progress', (e) => {
+                    console.log('[XHR] Progress:', e.loaded, '/', e.total, 'computable:', e.lengthComputable);
+
+                    if (e.lengthComputable && e.loaded > 0) {
+                        // Tenemos progreso REAL - detener simulación
+                        if (!hasReceivedRealProgress) {
+                            hasReceivedRealProgress = true;
+                            stopSimulatedProgress();
+                        }
+
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        if (onProgress) onProgress(percent, e.loaded, e.total);
+
+                        if (percent >= 100) {
+                            showProcessingPhase();
+                        }
+                    }
+                });
+
+                // Cuando termina la subida del archivo
+                xhr.upload.addEventListener('load', () => {
+                    console.log('[XHR] Upload complete, waiting for server...');
+                    stopSimulatedProgress();
+                    showProcessingPhase();
+                });
+
+                // Cuando termina todo (respuesta del servidor)
+                xhr.addEventListener('load', () => {
+                    stopSimulatedProgress();
+                    console.log('[XHR] Response received, status:', xhr.status);
+
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            resolve({ ok: true, status: xhr.status, data: response });
+                        } catch (e) {
+                            resolve({ ok: true, status: xhr.status, data: xhr.responseText });
+                        }
+                    } else {
+                        let errorData = null;
+                        try {
+                            errorData = JSON.parse(xhr.responseText);
+                        } catch (e) {
+                            errorData = { message: xhr.responseText?.substring(0, 200) || 'Error desconocido' };
+                        }
+                        resolve({ ok: false, status: xhr.status, data: errorData });
+                    }
+                });
+
+                // Error de red - común en iOS cuando la app va a background
+                xhr.addEventListener('error', (e) => {
+                    stopSimulatedProgress();
+                    console.error('[XHR] Network error', e);
+
+                    // Mensaje específico para iOS
+                    let errorMsg = 'Error de conexión.';
+                    if (isIOSUpload) {
+                        errorMsg = 'Error de conexión. En iPhone, mantén la app abierta durante la subida y asegúrate de tener buena señal.';
+                    }
+                    reject(new Error(errorMsg));
+                });
+
+                // Timeout
+                xhr.addEventListener('timeout', () => {
+                    stopSimulatedProgress();
+                    console.error('[XHR] Timeout');
+                    reject(new Error('La subida tardó demasiado. Intenta con un video más corto o mejor conexión.'));
+                });
+
+                // Abort
+                xhr.addEventListener('abort', () => {
+                    stopSimulatedProgress();
+                    reject(new Error('Subida cancelada'));
+                });
+
+                // Timeout largo para archivos grandes (20 minutos para iOS)
+                xhr.timeout = isIOS ? 1200000 : 900000;
+
+                // Abrir y enviar
+                xhr.open('POST', url, true);
+                xhr.send(formData);
+            });
+        }
+
+        // Simulador de progreso mejorado para iOS/Safari
+        function startSimulatedProgress(onProgress, fileSize) {
+            stopSimulatedProgress();
+            if (fileSize === 0) return;
+
+            // Velocidad estimada más conservadora para móviles (300KB/s)
+            const estimatedSpeed = 300 * 1024;
+            const estimatedTime = (fileSize / estimatedSpeed) * 1000;
+            const startTime = Date.now();
+
+            console.log('[Simulated] Starting, estimated:', Math.round(estimatedTime/1000) + 's for', Math.round(fileSize/1024/1024) + 'MB');
+
+            // Actualizar inmediatamente
+            if (onProgress) onProgress(1, 0, fileSize);
+
+            simulatedProgressInterval = setInterval(() => {
+                // Si ya recibimos progreso real, no continuar
+                if (hasReceivedRealProgress) {
+                    stopSimulatedProgress();
+                    return;
+                }
+
+                const elapsed = Date.now() - startTime;
+                // Progreso con curva logarítmica - rápido al inicio, lento al final
+                // Nunca llegar a 100% simulado
+                const linearProgress = elapsed / estimatedTime;
+                const curvedProgress = Math.log10(1 + linearProgress * 9) / Math.log10(10);
+                const percent = Math.min(90, Math.round(curvedProgress * 100));
+
+                const simulatedLoaded = Math.round((percent / 100) * fileSize);
+
+                if (onProgress) onProgress(percent, simulatedLoaded, fileSize);
+            }, 500); // Actualizar cada 500ms para UI más fluida
+        }
+
+        function stopSimulatedProgress() {
+            if (simulatedProgressInterval) {
+                clearInterval(simulatedProgressInterval);
+                simulatedProgressInterval = null;
+            }
+        }
+
+        // Mostrar fase de procesamiento
+        function showProcessingPhase() {
+            const progressText = document.getElementById('uploadProgressText');
+            const progressFill = document.getElementById('uploadProgressFill');
+            const loadingText = document.getElementById('loadingText');
+
+            if (loadingText) {
+                loadingText.textContent = 'Procesando video...';
+            }
+            if (progressText) {
+                progressText.textContent = 'Convirtiendo para compatibilidad...';
+            }
+            if (progressFill) {
+                progressFill.style.width = '100%';
+                progressFill.classList.add('indeterminate');
+            }
+        }
+
+        // Función para actualizar UI de progreso
+        function updateUploadProgress(percent, loaded, total) {
+            console.log('[Upload Progress]', percent + '%', loaded, '/', total);
+
+            const progressContainer = document.getElementById('uploadProgressContainer');
+            const progressFill = document.getElementById('uploadProgressFill');
+            const progressText = document.getElementById('uploadProgressText');
+            const loadingText = document.getElementById('loadingText');
+            const loadingSpinner = document.querySelector('.loading-spinner');
+
+            // Mostrar contenedor de progreso y ocultar spinner
+            if (progressContainer) {
+                progressContainer.style.display = 'block';
+                progressContainer.style.visibility = 'visible';
+            }
+            if (loadingSpinner) {
+                loadingSpinner.style.display = 'none';
+            }
+
+            // Formatear tamaño
+            const loadedMB = (loaded / (1024 * 1024)).toFixed(1);
+            const totalMB = total > 0 ? (total / (1024 * 1024)).toFixed(1) : '?';
+
+            // Manejar progreso indeterminado (-1) o determinado
+            if (percent === -1) {
+                // Progreso indeterminado - mostrar animación
+                if (progressFill) {
+                    progressFill.style.width = '100%';
+                    progressFill.classList.add('indeterminate');
+                }
+                if (progressText) {
+                    progressText.textContent = `Subiendo... (${loadedMB}MB)`;
+                }
+            } else {
+                // Progreso determinado
+                if (progressFill) {
+                    progressFill.classList.remove('indeterminate');
+                    progressFill.style.width = percent + '%';
+                }
+                if (progressText) {
+                    progressText.textContent = `${percent}% (${loadedMB}MB / ${totalMB}MB)`;
+                }
+            }
+
+            // Actualizar texto principal según fase
+            if (loadingText) {
+                if (percent < 100) {
+                    loadingText.textContent = 'Subiendo archivo...';
+                } else {
+                    loadingText.textContent = 'Procesando...';
+                }
+            }
+        }
+
+        // Resetear UI de progreso
+        function resetUploadProgress() {
+            const progressContainer = document.getElementById('uploadProgressContainer');
+            const progressFill = document.getElementById('uploadProgressFill');
+            const progressText = document.getElementById('uploadProgressText');
+            const loadingSpinner = document.querySelector('.loading-spinner');
+
+            if (progressContainer) progressContainer.style.display = 'none';
+            if (progressFill) {
+                progressFill.style.width = '0%';
+                progressFill.classList.remove('indeterminate');
+            }
+            if (progressText) progressText.textContent = '0%';
+            if (loadingSpinner) loadingSpinner.style.display = '';
+
+            // Detener simulación si está activa
+            stopSimulatedProgress();
+        }
+
+        // ========================================
         // PUBLICAR
         // ========================================
         async function publicarStory() {
-            if (!mediaFile) {
-                alert(MODO_EDITOR === 'reel' ? 'Debes subir una imagen o video para el reel' : 'Debes subir una imagen o video');
+            // Si no hay mediaFile pero el canvas tiene contenido generado (plantilla/fondo),
+            // generar una imagen del canvas para usar como media
+            let archivoAEnviar = mediaFile;
+
+            // Variable para indicar si los elementos ya están renderizados en la imagen
+            let elementosYaRenderizados = false;
+
+            if (!mediaFile && canvasHasGeneratedContent) {
+                try {
+                    document.getElementById('loadingText').textContent = 'Generando imagen...';
+                    document.getElementById('loadingOverlay').classList.add('active');
+
+                    // Guardar referencias a objetos que NO deben estar en la imagen
+                    // (menciones y links se renderizan dinámicamente desde el JSON)
+                    const objetosInteractivos = [];
+                    canvas.getObjects().forEach(obj => {
+                        if (obj.userId || obj.isStoryLink) {
+                            objetosInteractivos.push(obj);
+                        }
+                    });
+
+                    // Ocultar temporalmente objetos interactivos
+                    objetosInteractivos.forEach(obj => {
+                        obj.set('opacity', 0);
+                    });
+
+                    // Agregar marca de agua al canvas antes de exportar
+                    const watermark = new fabric.Text('Creado con Ladoapp.com', {
+                        left: canvas.width / 2,
+                        top: canvas.height * 0.97,
+                        originX: 'center',
+                        originY: 'center',
+                        fontSize: 10,
+                        fontFamily: 'Poppins',
+                        fill: 'rgba(255, 255, 255, 0.6)',
+                        selectable: false,
+                        evented: false,
+                        isWatermark: true
+                    });
+                    canvas.add(watermark);
+                    canvas.renderAll();
+
+                    // Exportar el canvas completo a imagen JPEG de alta calidad
+                    let dataUrl = canvas.toDataURL({
+                        format: 'jpeg',
+                        quality: 0.95,
+                        multiplier: 2 // Exportar a 2x para mejor calidad
+                    });
+
+                    // Restaurar objetos interactivos
+                    objetosInteractivos.forEach(obj => {
+                        obj.set('opacity', 1);
+                    });
+
+                    // Remover la marca de agua del canvas (para que no interfiera con edición)
+                    canvas.remove(watermark);
+                    canvas.renderAll();
+
+                    // Aplicar filtros de belleza si están activos
+                    dataUrl = await aplicarFiltrosAImagenAsync(dataUrl);
+
+                    // Convertir data URL a Blob (método directo sin fetch, más confiable)
+                    function dataURLtoBlob(dataURL) {
+                        const parts = dataURL.split(',');
+                        const mimeMatch = parts[0].match(/:(.*?);/);
+                        const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+                        const bstr = atob(parts[1]);
+                        let n = bstr.length;
+                        const u8arr = new Uint8Array(n);
+                        while (n--) {
+                            u8arr[n] = bstr.charCodeAt(n);
+                        }
+                        return new Blob([u8arr], { type: mime });
+                    }
+
+                    const blob = dataURLtoBlob(dataUrl);
+
+                    // Crear File a partir del Blob
+                    const timestamp = new Date().getTime();
+                    archivoAEnviar = new File([blob], `canvas_${timestamp}.jpg`, { type: 'image/jpeg' });
+
+                    // Marcar que los elementos ya están renderizados en la imagen
+                    elementosYaRenderizados = true;
+
+                    EditorLog.publish('info', 'Imagen generada desde canvas', {
+                        size: Math.round(archivoAEnviar.size / 1024) + 'KB'
+                    });
+                } catch (genError) {
+                    EditorLog.publish('error', 'Error generando imagen del canvas', {
+                        error: genError.message
+                    });
+                    alert('Error al generar la imagen. Intenta de nuevo.');
+                    document.getElementById('loadingOverlay').classList.remove('active');
+                    return;
+                }
+            } else if (!mediaFile) {
+                alert(MODO_EDITOR === 'reel' ? 'Debes subir una imagen o video para el reel' : 'Debes subir una imagen o video, o usar una plantilla');
                 return;
             }
 
             document.getElementById('loadingOverlay').classList.add('active');
+            document.getElementById('loadingText').textContent = MODO_EDITOR === 'reel' ? 'Publicando reel...' : 'Publicando historia...';
 
             try {
                 // Recopilar elementos del canvas
@@ -10051,20 +11981,23 @@
                     }).join(' ');
                 }
 
-                // Agregar marca de agua automáticamente
-                const watermarkText = {
-                    id: 9999,
-                    texto: 'Creado con Ladoapp.com',
-                    x: 50, // Centrado horizontalmente
-                    y: 97, // Muy abajo (97% desde arriba)
-                    fontSize: 10,
-                    fontFamily: 'Poppins',
-                    color: 'rgba(255, 255, 255, 0.6)',
-                    backgroundColor: null,
-                    rotation: 0,
-                    isWatermark: true
-                };
-                elementos.textos.push(watermarkText);
+                // Si los elementos NO están ya renderizados en la imagen, agregar marca de agua
+                // Si están renderizados, la marca de agua ya se agregó al canvas antes de exportar
+                if (!elementosYaRenderizados) {
+                    const watermarkText = {
+                        id: 9999,
+                        texto: 'Creado con Ladoapp.com',
+                        x: 50, // Centrado horizontalmente
+                        y: 97, // Muy abajo (97% desde arriba)
+                        fontSize: 10,
+                        fontFamily: 'Poppins',
+                        color: 'rgba(255, 255, 255, 0.6)',
+                        backgroundColor: null,
+                        rotation: 0,
+                        isWatermark: true
+                    };
+                    elementos.textos.push(watermarkText);
+                }
 
                 canvas.getObjects().forEach((obj, index) => {
                     // Convertir coordenadas a porcentajes
@@ -10073,7 +12006,7 @@
 
                     if (obj.type === 'i-text') {
                         if (obj.userId) {
-                            // Es una mención
+                            // Es una mención - SIEMPRE incluir (necesita ser interactiva)
                             elementos.menciones.push({
                                 id: index,
                                 usuarioId: obj.userId,
@@ -10084,8 +12017,8 @@
                                 color: obj.fill
                             });
                             mencionesIds.push(obj.userId);
-                        } else {
-                            // Es texto normal
+                        } else if (!elementosYaRenderizados) {
+                            // Es texto normal - solo incluir si NO está ya renderizado
                             elementos.textos.push({
                                 id: index,
                                 texto: obj.text,
@@ -10099,23 +12032,27 @@
                             });
                         }
                     } else if (obj.type === 'text' && obj.text.length <= 4) {
-                        // Es un sticker/emoji
-                        elementos.stickers.push({
-                            id: index,
-                            valor: obj.text,
-                            x: xPercent,
-                            y: yPercent,
-                            scale: obj.scaleX,
-                            rotation: obj.angle
-                        });
+                        // Es un sticker/emoji - solo incluir si NO está ya renderizado
+                        if (!elementosYaRenderizados) {
+                            elementos.stickers.push({
+                                id: index,
+                                valor: obj.text,
+                                x: xPercent,
+                                y: yPercent,
+                                scale: obj.scaleX,
+                                rotation: obj.angle
+                            });
+                        }
                     } else if (obj.type === 'path') {
-                        // Es un dibujo - convertir path a SVG string
-                        elementos.dibujos.push({
-                            id: index,
-                            pathData: fabricPathToSvg(obj.path),
-                            color: obj.stroke,
-                            strokeWidth: obj.strokeWidth
-                        });
+                        // Es un dibujo - solo incluir si NO está ya renderizado
+                        if (!elementosYaRenderizados) {
+                            elementos.dibujos.push({
+                                id: index,
+                                pathData: fabricPathToSvg(obj.path),
+                                color: obj.stroke,
+                                strokeWidth: obj.strokeWidth
+                            });
+                        }
                     } else if (obj.isStoryLink) {
                         // Es un link
                         elementos.link = {
@@ -10134,7 +12071,7 @@
 
                 // Crear FormData
                 const formData = new FormData();
-                formData.append('archivo', mediaFile);
+                formData.append('archivo', archivoAEnviar);
                 formData.append('tipoLado', selectedLado);
                 formData.append('elementosJson', JSON.stringify(elementos));
                 formData.append('mencionesIds', mencionesIds.join(','));
@@ -10157,46 +12094,91 @@
                     formData.append('__RequestVerificationToken', tokenInput.value);
                 }
 
-                const response = await fetch(URL_CREAR, {
-                    method: 'POST',
-                    body: formData
-                });
+                // Mostrar barra de progreso inmediatamente para cualquier archivo
+                const fileSize = archivoAEnviar?.size || 0;
+                const fileSizeMB = Math.round(fileSize / (1024 * 1024));
+                console.log('[Upload] Iniciando subida, tamaño:', fileSizeMB + 'MB, iOS:', isIOSUpload);
 
-                // Verificar respuesta antes de parsear JSON
-                const contentType = response.headers.get('content-type') || '';
+                // Advertencia para archivos muy grandes en iOS
+                if (isIOSUpload && fileSizeMB > 100) {
+                    const continuar = confirm(
+                        `⚠️ Video de ${fileSizeMB}MB detectado.\n\n` +
+                        `En iPhone, videos muy grandes pueden fallar.\n\n` +
+                        `Recomendaciones:\n` +
+                        `• Usa WiFi (no datos móviles)\n` +
+                        `• Mantén la pantalla encendida\n` +
+                        `• No cambies de app durante la subida\n\n` +
+                        `¿Continuar con la subida?`
+                    );
+                    if (!continuar) {
+                        document.getElementById('loadingOverlay').classList.remove('active');
+                        return;
+                    }
+                }
+
+                // Siempre mostrar barra de progreso
+                const progressContainer = document.getElementById('uploadProgressContainer');
+                if (progressContainer) {
+                    progressContainer.style.display = 'block';
+                    progressContainer.style.visibility = 'visible';
+                }
+
+                // Mensaje según tamaño y dispositivo
+                const loadingTextEl = document.getElementById('loadingText');
+                if (loadingTextEl) {
+                    if (isIOSUpload) {
+                        loadingTextEl.textContent = `Subiendo ${fileSizeMB}MB... no cierres la app`;
+                    } else if (fileSizeMB > 50) {
+                        loadingTextEl.textContent = 'Subiendo video grande... esto puede tardar';
+                    } else {
+                        loadingTextEl.textContent = 'Subiendo archivo...';
+                    }
+                }
+
+                // Iniciar barra en 1% para que sea visible inmediatamente
+                updateUploadProgress(1, 0, fileSize);
+
+                // Usar upload con progreso para archivos grandes
+                const response = await uploadWithProgress(URL_CREAR, formData, updateUploadProgress);
 
                 if (!response.ok) {
-                    // Error HTTP - intentar obtener detalles
-                    let errorDetail = `HTTP ${response.status}`;
-                    try {
-                        if (contentType.includes('application/json')) {
-                            const errorData = await response.json();
-                            errorDetail = errorData.message || errorData.error || errorDetail;
-                        } else {
-                            const textBody = await response.text();
-                            errorDetail = textBody.substring(0, 200);
-                        }
-                    } catch (e) {}
-
+                    // Error HTTP - dar mensajes específicos según el código
+                    const errorDetail = response.data?.message || response.data?.error || `HTTP ${response.status}`;
                     logErrorToBackend('error', `Publicar: HTTP ${response.status}`, errorDetail);
-                    mostrarToastExito(`Error al publicar (${response.status})`);
+
+                    let errorMsg = 'Error al publicar';
+                    switch (response.status) {
+                        case 413:
+                            errorMsg = 'El archivo es demasiado grande. Intenta con un video más corto.';
+                            break;
+                        case 502:
+                        case 504:
+                            errorMsg = 'El servidor tardó demasiado procesando. Intenta con un video más pequeño o espera unos minutos.';
+                            break;
+                        case 503:
+                            errorMsg = 'Servidor temporalmente no disponible. Intenta en unos minutos.';
+                            break;
+                        case 400:
+                            errorMsg = response.data?.message || 'Archivo no válido. Verifica el formato.';
+                            break;
+                        case 401:
+                            errorMsg = 'Sesión expirada. Recarga la página e intenta de nuevo.';
+                            break;
+                        case 500:
+                            errorMsg = 'Error del servidor. Si persiste, contacta soporte.';
+                            break;
+                        default:
+                            errorMsg = `Error al publicar (${response.status})`;
+                    }
+
+                    mostrarToastExito(errorMsg);
+                    resetUploadProgress();
                     document.getElementById('loadingOverlay').classList.remove('active');
                     return;
                 }
 
-                // Parsear JSON de forma segura
-                let data;
-                try {
-                    if (!contentType.includes('application/json')) {
-                        throw new Error(`Respuesta inesperada: ${contentType}`);
-                    }
-                    data = await response.json();
-                } catch (parseError) {
-                    logErrorToBackend('error', `Publicar: Error parseando respuesta - ${parseError.message}`, `ContentType: ${contentType}`);
-                    mostrarToastExito('Error en la respuesta del servidor');
-                    document.getElementById('loadingOverlay').classList.remove('active');
-                    return;
-                }
+                // Procesar respuesta
+                const data = response.data;
 
                 if (data.success) {
                     window.location.href = URL_REDIRECT;
@@ -10204,6 +12186,7 @@
                     const errorMsg = data.message || 'Error al publicar';
                     logErrorToBackend('error', `Publicar: Server respondió error - ${errorMsg}`, JSON.stringify(data));
                     mostrarToastExito(errorMsg);
+                    resetUploadProgress();
                     document.getElementById('loadingOverlay').classList.remove('active');
                 }
             } catch (error) {
@@ -10211,10 +12194,23 @@
                 logErrorToBackend('error', `Publicar: ${error.message}`, JSON.stringify({
                     stack: error.stack,
                     mediaType: mediaType,
-                    mediaSize: mediaFile?.size,
-                    mediaName: mediaFile?.name
+                    mediaSize: archivoAEnviar?.size,
+                    mediaName: archivoAEnviar?.name,
+                    esGenerado: canvasHasGeneratedContent,
+                    isIOS: isIOS,
+                    isSafari: isSafari
                 }));
-                mostrarToastExito(MODO_EDITOR === 'reel' ? 'Error al publicar el reel' : 'Error al publicar');
+
+                // Mostrar mensaje de error más específico
+                let errorMsg = error.message || 'Error al publicar';
+
+                // Si el error es genérico y es iOS, dar más contexto
+                if (isIOSUpload && (errorMsg.includes('Failed to fetch') || errorMsg.includes('Load failed') || errorMsg.includes('conexión'))) {
+                    errorMsg = 'La subida falló. Mantén la pantalla activa y con buena conexión WiFi. Para videos grandes, intenta desde un computador.';
+                }
+
+                mostrarToastExito(errorMsg);
+                resetUploadProgress();
                 document.getElementById('loadingOverlay').classList.remove('active');
             }
         }
@@ -10573,6 +12569,9 @@
                 canvas.renderAll();
                 saveHistory();
 
+                // Marcar que el canvas tiene contenido generado
+                canvasHasGeneratedContent = true;
+
                 // Habilitar botón publicar si no hay media
                 document.getElementById('uploadOverlay').classList.add('hidden');
                 habilitarBotonPublicar();
@@ -10648,6 +12647,9 @@
                         });
                     }
                 });
+
+                // Marcar que el canvas tiene contenido generado
+                canvasHasGeneratedContent = true;
 
                 // Habilitar botón publicar
                 document.getElementById('uploadOverlay').classList.add('hidden');
@@ -10810,6 +12812,9 @@
                         agregarTextosPlantilla(template);
                     }
                 }
+
+                // Marcar que el canvas tiene contenido generado (sin imagen original)
+                canvasHasGeneratedContent = true;
 
                 // Ocultar overlay y habilitar publicar
                 document.getElementById('uploadOverlay').classList.add('hidden');
@@ -12105,8 +14110,8 @@
             return div.innerHTML;
         }
 
-        // Cambiar entre tabs de música
-        function cambiarTabMusica(tab, element) {
+        // Cambiar entre tabs de música en BeatSync
+        function cambiarTabMusicaBeatSync(tab, element) {
             // Actualizar tabs
             document.querySelectorAll('.beatsync-music-tab').forEach(t => t.classList.remove('active'));
             element.classList.add('active');

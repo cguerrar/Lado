@@ -1,0 +1,406 @@
+@model Lado.Models.TicketInterno
+@{
+    ViewData["Title"] = $"Ticket #{Model.Id}";
+    Layout = "_AdminLayout";
+    var admins = ViewBag.Admins;
+}
+
+<div class="container-fluid">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Admin/Tickets">Tickets</a></li>
+            <li class="breadcrumb-item active">Ticket #@Model.Id</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- Columna principal -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="badge @GetPrioridadBadge(Model.Prioridad) me-2">@Model.Prioridad</span>
+                        <span class="badge @GetEstadoBadge(Model.Estado)">@Model.Estado</span>
+                    </div>
+                    <small class="text-muted">Creado @Model.FechaCreacion.ToString("dd/MM/yyyy HH:mm")</small>
+                </div>
+                <div class="card-body">
+                    <h4 class="mb-3">@Model.Titulo</h4>
+                    <div class="mb-3">
+                        <span class="badge @GetCategoriaBadge(Model.Categoria) me-1">@Model.Categoria</span>
+                        @if (!string.IsNullOrEmpty(Model.Etiquetas))
+                        {
+                            @foreach (var etiqueta in Model.Etiquetas.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                <span class="badge bg-light text-dark me-1">@etiqueta.Trim()</span>
+                            }
+                        }
+                    </div>
+                    <div class="bg-light rounded p-3">
+                        <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">@Model.Descripcion</pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Respuestas/Comentarios -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-chat-dots me-2"></i>Conversacion (@Model.Respuestas.Count)</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush" id="listaRespuestas">
+                        @if (Model.Respuestas.Any())
+                        {
+                            @foreach (var respuesta in Model.Respuestas)
+                            {
+                                <div class="list-group-item @(respuesta.EsNotaInterna ? "bg-warning bg-opacity-10" : "")">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <strong>@(respuesta.Autor?.UserName ?? "Sistema")</strong>
+                                            @if (respuesta.EsNotaInterna)
+                                            {
+                                                <span class="badge bg-warning text-dark ms-1">Nota interna</span>
+                                            }
+                                        </div>
+                                        <small class="text-muted">@respuesta.FechaCreacion.ToString("dd/MM/yyyy HH:mm")</small>
+                                    </div>
+                                    <p class="mb-0" style="white-space: pre-wrap;">@respuesta.Contenido</p>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="list-group-item text-center text-muted py-4" id="sinRespuestas">
+                                <i class="bi bi-chat-dots d-block mb-2 fs-4"></i>
+                                Sin respuestas aun
+                            </div>
+                        }
+                    </div>
+                </div>
+                @if (Model.Estado != Lado.Models.EstadoTicket.Cerrado)
+                {
+                    <div class="card-footer bg-white">
+                        <form id="formRespuesta">
+                            <div class="mb-3">
+                                <textarea id="respuestaContenido" class="form-control" rows="3" placeholder="Escribe una respuesta..."></textarea>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="esNotaInterna">
+                                    <label class="form-check-label text-muted" for="esNotaInterna">
+                                        <i class="bi bi-lock me-1"></i>Nota interna (no visible para otros)
+                                    </label>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-send me-1"></i>Enviar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Info del ticket -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Informacion</h6>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-5 text-muted">Creado por</dt>
+                        <dd class="col-7">@(Model.CreadoPor?.UserName ?? "Sistema")</dd>
+
+                        <dt class="col-5 text-muted">Asignado a</dt>
+                        <dd class="col-7">@(Model.AsignadoA?.UserName ?? "<em>Sin asignar</em>")</dd>
+
+                        <dt class="col-5 text-muted">Categoria</dt>
+                        <dd class="col-7"><span class="badge @GetCategoriaBadge(Model.Categoria)">@Model.Categoria</span></dd>
+
+                        <dt class="col-5 text-muted">Prioridad</dt>
+                        <dd class="col-7"><span class="badge @GetPrioridadBadge(Model.Prioridad)">@Model.Prioridad</span></dd>
+
+                        <dt class="col-5 text-muted">Estado</dt>
+                        <dd class="col-7"><span class="badge @GetEstadoBadge(Model.Estado)">@Model.Estado</span></dd>
+
+                        @if (Model.FechaActualizacion.HasValue)
+                        {
+                            <dt class="col-5 text-muted">Actualizado</dt>
+                            <dd class="col-7">@Model.FechaActualizacion.Value.ToString("dd/MM/yyyy HH:mm")</dd>
+                        }
+
+                        @if (Model.FechaCierre.HasValue)
+                        {
+                            <dt class="col-5 text-muted">Cerrado</dt>
+                            <dd class="col-7">@Model.FechaCierre.Value.ToString("dd/MM/yyyy HH:mm")</dd>
+                        }
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Acciones -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="bi bi-gear me-2"></i>Acciones</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Asignar a</label>
+                        <select id="asignarA" class="form-select form-select-sm" onchange="asignarTicket()">
+                            <option value="">Sin asignar</option>
+                            @foreach (var admin in (IEnumerable<dynamic>)admins)
+                            {
+                                if (Model.AsignadoAId == admin.Id)
+                                {
+                                    <option value="@admin.Id" selected>@admin.UserName</option>
+                                }
+                                else
+                                {
+                                    <option value="@admin.Id">@admin.UserName</option>
+                                }
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Cambiar estado</label>
+                        <select id="cambiarEstado" class="form-select form-select-sm" onchange="cambiarEstado()">
+                            <option value="0" selected="@(Model.Estado == Lado.Models.EstadoTicket.Abierto)">Abierto</option>
+                            <option value="1" selected="@(Model.Estado == Lado.Models.EstadoTicket.EnProgreso)">En Progreso</option>
+                            <option value="2" selected="@(Model.Estado == Lado.Models.EstadoTicket.EnEspera)">En Espera</option>
+                            <option value="3" selected="@(Model.Estado == Lado.Models.EstadoTicket.Resuelto)">Resuelto</option>
+                            <option value="4" selected="@(Model.Estado == Lado.Models.EstadoTicket.Cerrado)">Cerrado</option>
+                        </select>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-grid gap-2">
+                        @if (Model.Estado != Lado.Models.EstadoTicket.Resuelto && Model.Estado != Lado.Models.EstadoTicket.Cerrado)
+                        {
+                            <button class="btn btn-success btn-sm" onclick="resolverTicket()">
+                                <i class="bi bi-check-circle me-1"></i>Marcar como Resuelto
+                            </button>
+                        }
+                        @if (Model.Estado != Lado.Models.EstadoTicket.Cerrado)
+                        {
+                            <button class="btn btn-outline-danger btn-sm" onclick="cerrarTicket()">
+                                <i class="bi bi-x-circle me-1"></i>Cerrar Ticket
+                            </button>
+                        }
+                        @if (Model.Estado == Lado.Models.EstadoTicket.Cerrado)
+                        {
+                            <button class="btn btn-outline-primary btn-sm" onclick="reabrirTicket()">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i>Reabrir Ticket
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Item relacionado -->
+            @if (Model.ItemRelacionadoId.HasValue && Model.TipoItemRelacionado.HasValue)
+            {
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h6 class="mb-0"><i class="bi bi-link-45deg me-2"></i>Item Relacionado</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-2">
+                            <span class="badge bg-info">@Model.TipoItemRelacionado</span>
+                            <strong>#@Model.ItemRelacionadoId</strong>
+                        </p>
+                        @{
+                            var url = Model.TipoItemRelacionado switch
+                            {
+                                Lado.Models.TipoItemTicket.Usuario => $"/Admin/DetalleUsuario?id={Model.ItemRelacionadoId}",
+                                Lado.Models.TipoItemTicket.Contenido => $"/Admin/DetalleContenido?id={Model.ItemRelacionadoId}",
+                                Lado.Models.TipoItemTicket.Reporte => $"/Admin/DetalleReporte?id={Model.ItemRelacionadoId}",
+                                Lado.Models.TipoItemTicket.Apelacion => $"/Admin/DetalleApelacion?id={Model.ItemRelacionadoId}",
+                                _ => "#"
+                            };
+                        }
+                        <a href="@url" class="btn btn-sm btn-outline-primary w-100">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>Ver Item
+                        </a>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const ticketId = @Model.Id;
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ||
+                      document.querySelector('meta[name="csrf-token"]')?.content;
+
+        // Enviar respuesta
+        document.getElementById('formRespuesta')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const contenido = document.getElementById('respuestaContenido').value;
+            const esNotaInterna = document.getElementById('esNotaInterna').checked;
+
+            if (!contenido.trim()) {
+                showToast('Escribe una respuesta', 'warning');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('ticketId', ticketId);
+                formData.append('contenido', contenido);
+                formData.append('esNotaInterna', esNotaInterna);
+                formData.append('__RequestVerificationToken', token);
+
+                const response = await fetch('/Admin/ResponderTicket', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    // Agregar respuesta al DOM
+                    const lista = document.getElementById('listaRespuestas');
+                    const sinRespuestas = document.getElementById('sinRespuestas');
+                    if (sinRespuestas) sinRespuestas.remove();
+
+                    const html = `
+                        <div class="list-group-item ${result.respuesta.esNotaInterna ? 'bg-warning bg-opacity-10' : ''}">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <strong>${result.respuesta.autor}</strong>
+                                    ${result.respuesta.esNotaInterna ? '<span class="badge bg-warning text-dark ms-1">Nota interna</span>' : ''}
+                                </div>
+                                <small class="text-muted">${result.respuesta.fecha}</small>
+                            </div>
+                            <p class="mb-0" style="white-space: pre-wrap;">${result.respuesta.contenido}</p>
+                        </div>
+                    `;
+                    lista.insertAdjacentHTML('beforeend', html);
+
+                    document.getElementById('respuestaContenido').value = '';
+                    document.getElementById('esNotaInterna').checked = false;
+
+                    showToast('Respuesta enviada', 'success');
+                } else {
+                    showToast(result.error, 'error');
+                }
+            } catch (error) {
+                showToast('Error al enviar', 'error');
+            }
+        });
+
+        async function asignarTicket() {
+            const asignadoAId = document.getElementById('asignarA').value;
+
+            try {
+                const formData = new FormData();
+                formData.append('id', ticketId);
+                formData.append('asignadoAId', asignadoAId);
+
+                const response = await fetch('/Admin/AsignarTicket', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showToast('Ticket asignado', 'success');
+                } else {
+                    showToast(result.error, 'error');
+                }
+            } catch (error) {
+                showToast('Error al asignar', 'error');
+            }
+        }
+
+        async function cambiarEstado() {
+            const estado = document.getElementById('cambiarEstado').value;
+
+            try {
+                const formData = new FormData();
+                formData.append('id', ticketId);
+                formData.append('estado', estado);
+
+                const response = await fetch('/Admin/CambiarEstadoTicket', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showToast('Estado actualizado', 'success');
+                    location.reload();
+                } else {
+                    showToast(result.error, 'error');
+                }
+            } catch (error) {
+                showToast('Error al cambiar estado', 'error');
+            }
+        }
+
+        function resolverTicket() {
+            document.getElementById('cambiarEstado').value = '3';
+            cambiarEstado();
+        }
+
+        function cerrarTicket() {
+            if (confirm('¿Cerrar este ticket?')) {
+                document.getElementById('cambiarEstado').value = '4';
+                cambiarEstado();
+            }
+        }
+
+        function reabrirTicket() {
+            document.getElementById('cambiarEstado').value = '0';
+            cambiarEstado();
+        }
+    </script>
+}
+
+@functions {
+    string GetCategoriaBadge(Lado.Models.CategoriaTicket categoria)
+    {
+        return categoria switch
+        {
+            Lado.Models.CategoriaTicket.Tecnico => "bg-info",
+            Lado.Models.CategoriaTicket.Moderacion => "bg-primary",
+            Lado.Models.CategoriaTicket.Finanzas => "bg-success",
+            Lado.Models.CategoriaTicket.Legal => "bg-dark",
+            Lado.Models.CategoriaTicket.Bug => "bg-danger",
+            Lado.Models.CategoriaTicket.Urgente => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    string GetPrioridadBadge(Lado.Models.PrioridadTicket prioridad)
+    {
+        return prioridad switch
+        {
+            Lado.Models.PrioridadTicket.Baja => "bg-secondary",
+            Lado.Models.PrioridadTicket.Normal => "bg-info",
+            Lado.Models.PrioridadTicket.Alta => "bg-warning text-dark",
+            Lado.Models.PrioridadTicket.Critica => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    string GetEstadoBadge(Lado.Models.EstadoTicket estado)
+    {
+        return estado switch
+        {
+            Lado.Models.EstadoTicket.Abierto => "bg-warning text-dark",
+            Lado.Models.EstadoTicket.EnProgreso => "bg-info",
+            Lado.Models.EstadoTicket.EnEspera => "bg-secondary",
+            Lado.Models.EstadoTicket.Resuelto => "bg-success",
+            Lado.Models.EstadoTicket.Cerrado => "bg-dark",
+            _ => "bg-secondary"
+        };
+    }
+}

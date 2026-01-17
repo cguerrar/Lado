@@ -62,6 +62,17 @@ namespace Lado.Models
 
         public DateTime FechaCreacion { get; set; } = DateTime.Now;
 
+        /// <summary>
+        /// Shadow hide: Este archivo está oculto para todos excepto el creador.
+        /// Útil para ocultar una foto específica de un carrusel sin afectar las demás.
+        /// </summary>
+        public bool OcultoSilenciosamente { get; set; } = false;
+
+        /// <summary>
+        /// Fecha en que se ocultó silenciosamente
+        /// </summary>
+        public DateTime? FechaOcultoSilenciosamente { get; set; }
+
         // ========================================
         // RELACIONES
         // ========================================

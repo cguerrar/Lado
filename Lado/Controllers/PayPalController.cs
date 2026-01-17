@@ -21,6 +21,7 @@ namespace Lado.Controllers
         private readonly IConfiguration _configuration;
         private readonly ILogger<PayPalController> _logger;
         private readonly ILogEventoService _logEventoService;
+        private readonly IRateLimitService _rateLimitService;
 
         public PayPalController(
             IPayPalService payPalService,
@@ -28,7 +29,8 @@ namespace Lado.Controllers
             UserManager<ApplicationUser> userManager,
             IConfiguration configuration,
             ILogger<PayPalController> logger,
-            ILogEventoService logEventoService)
+            ILogEventoService logEventoService,
+            IRateLimitService rateLimitService)
         {
             _payPalService = payPalService;
             _context = context;
@@ -36,6 +38,7 @@ namespace Lado.Controllers
             _configuration = configuration;
             _logger = logger;
             _logEventoService = logEventoService;
+            _rateLimitService = rateLimitService;
         }
 
         /// <summary>
@@ -67,6 +70,23 @@ namespace Lado.Controllers
                 var user = await _userManager.GetUserAsync(User);
                 if (user == null)
                     return Json(new { success = false, error = "Usuario no autenticado" });
+
+                // Rate limiting: máximo 5 órdenes por hora por usuario
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var userAgent = Request.Headers.UserAgent.ToString();
+                if (!await _rateLimitService.IsAllowedAsync(
+                    clientIp,
+                    $"paypal_crear_orden_{user.Id}",
+                    5,
+                    TimeSpan.FromHours(1),
+                    TipoAtaque.Fraude,
+                    "/PayPal/CrearOrden",
+                    user.Id,
+                    userAgent))
+                {
+                    _logger.LogWarning("Rate limit excedido para crear orden PayPal: Usuario {UserId}, IP {Ip}", user.Id, clientIp);
+                    return Json(new { success = false, error = "Demasiadas solicitudes. Por favor espera unos minutos." });
+                }
 
                 // Validar monto
                 if (request.Monto < 5)
@@ -145,6 +165,23 @@ namespace Lado.Controllers
                 var user = await _userManager.GetUserAsync(User);
                 if (user == null)
                     return Json(new { success = false, error = "Usuario no autenticado" });
+
+                // Rate limiting: máximo 10 capturas por hora por usuario
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var userAgent = Request.Headers.UserAgent.ToString();
+                if (!await _rateLimitService.IsAllowedAsync(
+                    clientIp,
+                    $"paypal_capturar_orden_{user.Id}",
+                    10,
+                    TimeSpan.FromHours(1),
+                    TipoAtaque.Fraude,
+                    "/PayPal/CapturarOrden",
+                    user.Id,
+                    userAgent))
+                {
+                    _logger.LogWarning("Rate limit excedido para capturar orden PayPal: Usuario {UserId}, IP {Ip}", user.Id, clientIp);
+                    return Json(new { success = false, error = "Demasiadas solicitudes. Por favor espera unos minutos." });
+                }
 
                 // Verificar que la orden existe y pertenece al usuario
                 var ordenPendiente = await _context.OrdenesPayPalPendientes
@@ -261,6 +298,40 @@ namespace Lado.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Webhook()
         {
+            // Obtener IP del cliente
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+            // Rate limiting por IP (máximo 100/min)
+            var ipAllowed = await _rateLimitService.IsAllowedAsync(
+                clientIp,
+                $"paypal_webhook_ip:{clientIp}",
+                RateLimits.PayPalWebhook_MaxRequests,
+                RateLimits.PayPalWebhook_Window,
+                TipoAtaque.WebhookAbuse,
+                "/PayPal/Webhook",
+                null,
+                Request.Headers.UserAgent.ToString()
+            );
+
+            if (!ipAllowed)
+            {
+                _logger.LogWarning("Rate limit excedido para webhook PayPal desde IP: {Ip}", clientIp);
+                return StatusCode(429, "Too Many Requests");
+            }
+
+            // Rate limiting global (máximo 500/hora)
+            var globalAllowed = _rateLimitService.IsAllowed(
+                "paypal_webhook_global",
+                RateLimits.PayPalWebhook_Global_MaxRequests,
+                RateLimits.PayPalWebhook_Global_Window
+            );
+
+            if (!globalAllowed)
+            {
+                _logger.LogError("Rate limit GLOBAL excedido para webhooks PayPal");
+                return StatusCode(429, "Too Many Requests");
+            }
+
             try
             {
                 using var reader = new StreamReader(Request.Body);

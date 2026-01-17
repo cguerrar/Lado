@@ -193,13 +193,18 @@ namespace Lado.Controllers
 
             _context.InteresesUsuarios.RemoveRange(interesesAnteriores);
 
-            // Agregar nuevos intereses
-            foreach (var categoriaId in categoriaIds.Distinct())
-            {
-                var categoriaExiste = await _context.CategoriasIntereses
-                    .AnyAsync(c => c.Id == categoriaId && c.EstaActiva);
+            // OPTIMIZACIÓN: Pre-cargar todas las categorías válidas en una sola query
+            var categoriasDistintas = categoriaIds.Distinct().ToList();
+            var categoriasActivasList = await _context.CategoriasIntereses
+                .Where(c => categoriasDistintas.Contains(c.Id) && c.EstaActiva)
+                .Select(c => c.Id)
+                .ToListAsync();
+            var categoriasActivas = new HashSet<int>(categoriasActivasList);
 
-                if (categoriaExiste)
+            // Agregar nuevos intereses (sin N+1)
+            foreach (var categoriaId in categoriasDistintas)
+            {
+                if (categoriasActivas.Contains(categoriaId))
                 {
                     await _interesesService.AgregarInteresExplicitoAsync(usuario.Id, categoriaId);
                 }

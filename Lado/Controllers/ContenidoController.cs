@@ -63,6 +63,24 @@ namespace Lado.Controllers
         }
 
         // ========================================
+        // RENOVAR TOKEN CSRF (para páginas que llevan tiempo abiertas)
+        // ========================================
+
+        /// <summary>
+        /// Obtiene un nuevo token CSRF para renovar formularios que llevan tiempo abiertos
+        /// </summary>
+        [HttpGet]
+        public IActionResult RenovarToken([FromServices] Microsoft.AspNetCore.Antiforgery.IAntiforgery antiforgery)
+        {
+            var tokens = antiforgery.GetAndStoreTokens(HttpContext);
+            return Json(new {
+                success = true,
+                token = tokens.RequestToken,
+                timestamp = DateTime.UtcNow
+            });
+        }
+
+        // ========================================
         // DIAGNÓSTICO DE UPLOAD (temporal)
         // ========================================
 
@@ -134,6 +152,11 @@ namespace Lado.Controllers
 
         public async Task<IActionResult> Index(string? filtro = null)
         {
+            // Evitar cache del navegador para mostrar siempre el contenido más reciente
+            Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+            Response.Headers["Pragma"] = "no-cache";
+            Response.Headers["Expires"] = "0";
+
             var usuario = await _userManager.GetUserAsync(User);
 
             if (usuario == null)
@@ -236,6 +259,8 @@ namespace Lado.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RequestSizeLimit(500_000_000)] // 500MB para videos grandes
+        [RequestFormLimits(MultipartBodyLengthLimit = 500_000_000)]
         public async Task<IActionResult> Crear(
             IFormFile archivo,
             string Descripcion,
@@ -246,7 +271,8 @@ namespace Lado.Controllers
             bool EsPublicoGeneral = false,
             bool CrearPreviewBlur = false,
             int TipoCensuraPreview = 0,
-            bool SoloSuscriptores = false)
+            bool SoloSuscriptores = false,
+            bool PublicarEnLadoB = false)
         {
             try
             {
@@ -322,11 +348,12 @@ namespace Lado.Controllers
                 _logger.LogInformation("Usuario: {Username} (Real: {NombreCompleto}, Seudónimo: {Seudonimo})",
                     usuario.UserName, usuario.NombreCompleto, usuario.Seudonimo);
                 _logger.LogInformation("Verificado: {Verificado}", usuario.CreadorVerificado);
-                _logger.LogInformation("Parámetros - EsGratis: {EsGratis}, Precio: {Precio}",
-                    EsGratis, PrecioDesbloqueo);
+                _logger.LogInformation("Parámetros - EsGratis: {EsGratis}, Precio: {Precio}, PublicarEnLadoB: {LadoB}",
+                    EsGratis, PrecioDesbloqueo, PublicarEnLadoB);
 
                 // ✅ GUARDAR LA INTENCIÓN ORIGINAL DEL USUARIO
-                var intentaPublicarEnLadoB = !EsGratis;
+                // NUEVO: Usar PublicarEnLadoB para determinar el lado, NO EsGratis
+                var intentaPublicarEnLadoB = PublicarEnLadoB;
 
                 // ✅ REGLA PRINCIPAL: Solo verificados pueden crear contenido en LadoB
                 if (intentaPublicarEnLadoB && !usuario.CreadorVerificado)
@@ -458,99 +485,51 @@ namespace Lado.Controllers
                         Directory.CreateDirectory(uploadsFolder);
                     }
 
-                    var uniqueFileName = $"{Guid.NewGuid()}{extension}";
-                    var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-                    string rutaFinal;
+                    // ====================================================================
+                    // 🔄 PROCESAMIENTO UNIFICADO - Usar ProcesarArchivoAsync
+                    // Todos los archivos pasan por el mismo pipeline de conversión.
+                    // NO hay fallback - si falla, se rechaza el archivo.
+                    // ====================================================================
+                    _logger.LogInformation("[Crear] 🔄 Procesando {FileName} ({Size}MB) con pipeline unificado...",
+                        archivo.FileName, (archivo.Length / 1024.0 / 1024.0).ToString("F1"));
 
-                    // Verificar si necesita conversión
-                    var esImagen = _imageService.EsImagenValida(extension) ||
-                                   new[] { ".heic", ".heif", ".dng", ".raw", ".cr2", ".nef", ".arw", ".orf", ".rw2", ".avif" }
-                                       .Contains(extension, StringComparer.OrdinalIgnoreCase);
-                    var esVideo = new[] { ".mp4", ".mov", ".avi", ".mkv", ".webm", ".wmv", ".flv", ".m4v", ".3gp", ".3gpp", ".mpeg", ".mpg", ".mxf" }
-                                      .Contains(extension, StringComparer.OrdinalIgnoreCase);
-
-                    if (esImagen && _mediaConversionService.ImagenRequiereConversion(extension))
+                    Services.MediaProcessingResult resultado;
+                    using (var stream = archivo.OpenReadStream())
                     {
-                        // Convertir imagen a JPEG estándar
-                        _logger.LogInformation("Convirtiendo imagen {Extension} a JPEG", extension);
-
-                        using (var stream = archivo.OpenReadStream())
-                        {
-                            var nombreBase = Guid.NewGuid().ToString();
-                            var rutaConvertida = await _mediaConversionService.ConvertirImagenAsync(
-                                stream, uploadsFolder, extension, nombreBase, 2048, 90);
-
-                            if (!string.IsNullOrEmpty(rutaConvertida))
-                            {
-                                rutaFinal = rutaConvertida;
-                                var nombreConvertido = Path.GetFileName(rutaConvertida);
-                                contenido.RutaArchivo = $"/uploads/{carpetaUsuario}/{nombreConvertido}";
-                                _logger.LogInformation("Imagen convertida: {RutaArchivo}", contenido.RutaArchivo);
-                            }
-                            else
-                            {
-                                // Fallback: guardar sin conversión
-                                _logger.LogWarning("Conversión de imagen falló, guardando original");
-                                using (var fallbackStream = archivo.OpenReadStream())
-                                using (var fileStream = new FileStream(filePath, FileMode.Create))
-                                {
-                                    await fallbackStream.CopyToAsync(fileStream);
-                                }
-                                rutaFinal = filePath;
-                                contenido.RutaArchivo = $"/uploads/{carpetaUsuario}/{uniqueFileName}";
-                            }
-                        }
-                    }
-                    else if (esVideo && _mediaConversionService.VideoRequiereConversion(extension))
-                    {
-                        // Convertir video a MP4 H.264 estándar
-                        _logger.LogInformation("Convirtiendo video {Extension} a MP4 H.264", extension);
-
-                        using (var stream = archivo.OpenReadStream())
-                        {
-                            var nombreBase = Guid.NewGuid().ToString();
-                            var rutaConvertida = await _mediaConversionService.ConvertirVideoAsync(
-                                stream, uploadsFolder, extension, nombreBase, 20, 1920);
-
-                            if (!string.IsNullOrEmpty(rutaConvertida))
-                            {
-                                rutaFinal = rutaConvertida;
-                                var nombreConvertido = Path.GetFileName(rutaConvertida);
-                                contenido.RutaArchivo = $"/uploads/{carpetaUsuario}/{nombreConvertido}";
-                                _logger.LogInformation("Video convertido: {RutaArchivo}", contenido.RutaArchivo);
-                            }
-                            else
-                            {
-                                // Fallback: guardar sin conversión
-                                _logger.LogWarning("Conversión de video falló, guardando original");
-                                using (var fallbackStream = archivo.OpenReadStream())
-                                using (var fileStream = new FileStream(filePath, FileMode.Create))
-                                {
-                                    await fallbackStream.CopyToAsync(fileStream);
-                                }
-                                rutaFinal = filePath;
-                                contenido.RutaArchivo = $"/uploads/{carpetaUsuario}/{uniqueFileName}";
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Guardar sin conversión (JPEG o MP4 ya estándar)
-                        using (var fileStream = new FileStream(filePath, FileMode.Create))
-                        {
-                            await archivo.CopyToAsync(fileStream);
-                        }
-                        rutaFinal = filePath;
-                        contenido.RutaArchivo = $"/uploads/{carpetaUsuario}/{uniqueFileName}";
+                        resultado = await _mediaConversionService.ProcesarArchivoAsync(stream, extension, uploadsFolder);
                     }
 
-                    _logger.LogInformation("Archivo guardado: {RutaArchivo}", contenido.RutaArchivo);
+                    if (!resultado.Exitoso)
+                    {
+                        _logger.LogError("[Crear] ❌ Error procesando {FileName}: {Error}",
+                            archivo.FileName, resultado.Error);
 
-                    // Actualizar filePath para el resto del procesamiento (thumbnail, EXIF, etc.)
-                    filePath = rutaFinal;
+                        // Registrar en Admin/Logs
+                        await _logEventoService.RegistrarEventoAsync(
+                            $"❌ Error procesando archivo: {archivo.FileName}",
+                            CategoriaEvento.Contenido,
+                            TipoLogEvento.Error,
+                            usuario.Id,
+                            usuario.UserName,
+                            $"Error: {resultado.Error}\nDetalle: {resultado.ErrorDetallado}\nExtensión: {extension}\nTamaño: {archivo.Length / 1024.0:F1} KB"
+                        );
 
-                    // Generar thumbnail para imágenes
-                    if (_imageService.EsImagenValida(extension))
+                        // NO hay fallback - rechazar el archivo
+                        TempData["Error"] = resultado.Error ?? "Error al procesar el archivo. Intenta con otro formato.";
+                        ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
+                        return View();
+                    }
+
+                    var filePath = resultado.RutaArchivo!;
+                    var nombreConvertido = resultado.NombreArchivo!;
+                    contenido.RutaArchivo = $"/uploads/{carpetaUsuario}/{nombreConvertido}";
+
+                    _logger.LogInformation("[Crear] ✅ Archivo procesado: {Original} ({OriginalSize}MB) -> {Convertido} ({FinalSize}MB)",
+                        archivo.FileName, (resultado.TamanoOriginal / 1024.0 / 1024.0).ToString("F1"),
+                        nombreConvertido, (resultado.TamanoFinal / 1024.0 / 1024.0).ToString("F1"));
+
+                    // Generar thumbnail para imágenes (usar TipoMedia del resultado, no la extensión original)
+                    if (resultado.TipoMedia == Services.TipoMediaProcesado.Imagen)
                     {
                         var thumbnail = await _imageService.GenerarThumbnailAsync(filePath, 400, 400, 75);
                         if (!string.IsNullOrEmpty(thumbnail))
@@ -737,6 +716,7 @@ namespace Lado.Controllers
                     catch (Exception ex)
                     {
                         _logger.LogWarning(ex, "Error al crear preview blur, el contenido original se guardó correctamente");
+                        _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, usuario?.Id, usuario?.UserName);
                     }
                 }
 
@@ -799,6 +779,8 @@ namespace Lado.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RequestSizeLimit(500_000_000)] // 500MB para videos grandes
+        [RequestFormLimits(MultipartBodyLengthLimit = 500_000_000)]
         public async Task<IActionResult> CrearRapido(IFormFile archivo, string descripcion, bool esPublico = true)
         {
             try
@@ -856,49 +838,44 @@ namespace Lado.Controllers
                     Directory.CreateDirectory(uploadsFolder);
                 }
 
-                var uniqueFileName = $"promo_{Guid.NewGuid()}{extension}";
-                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-                string rutaArchivo;
+                // ====================================================================
+                // 🔄 PROCESAMIENTO UNIFICADO - Usar ProcesarArchivoAsync
+                // NO hay fallback - si falla, se rechaza el archivo.
+                // ====================================================================
+                _logger.LogInformation("[CrearRapido] 🔄 Procesando {FileName} ({Size}KB) con pipeline unificado...",
+                    archivo.FileName, archivo.Length / 1024);
 
-                // Convertir a JPEG si no es formato estándar
-                if (_mediaConversionService.ImagenRequiereConversion(extension))
+                Services.MediaProcessingResult resultado;
+                using (var stream = archivo.OpenReadStream())
                 {
-                    _logger.LogInformation("CrearRapido: Convirtiendo imagen {Extension} a JPEG", extension);
-
-                    using (var stream = archivo.OpenReadStream())
-                    {
-                        var nombreBase = $"promo_{Guid.NewGuid()}";
-                        var rutaConvertida = await _mediaConversionService.ConvertirImagenAsync(
-                            stream, uploadsFolder, extension, nombreBase, 2048, 90);
-
-                        if (!string.IsNullOrEmpty(rutaConvertida))
-                        {
-                            filePath = rutaConvertida;
-                            var nombreConvertido = Path.GetFileName(rutaConvertida);
-                            rutaArchivo = $"/uploads/{carpetaUsuario}/{nombreConvertido}";
-                            _logger.LogInformation("CrearRapido: Imagen convertida a {RutaArchivo}", rutaArchivo);
-                        }
-                        else
-                        {
-                            // Fallback: guardar sin conversión
-                            _logger.LogWarning("CrearRapido: Conversión falló, guardando original");
-                            using (var fileStream = new FileStream(filePath, FileMode.Create))
-                            {
-                                await archivo.CopyToAsync(fileStream);
-                            }
-                            rutaArchivo = $"/uploads/{carpetaUsuario}/{uniqueFileName}";
-                        }
-                    }
+                    resultado = await _mediaConversionService.ProcesarArchivoAsync(stream, extension, uploadsFolder);
                 }
-                else
+
+                if (!resultado.Exitoso)
                 {
-                    // JPEG ya es formato estándar
-                    using (var fileStream = new FileStream(filePath, FileMode.Create))
-                    {
-                        await archivo.CopyToAsync(fileStream);
-                    }
-                    rutaArchivo = $"/uploads/{carpetaUsuario}/{uniqueFileName}";
+                    _logger.LogError("[CrearRapido] ❌ Error procesando {FileName}: {Error}",
+                        archivo.FileName, resultado.Error);
+
+                    // Registrar en Admin/Logs
+                    await _logEventoService.RegistrarEventoAsync(
+                        $"❌ CrearRapido: Error procesando imagen: {archivo.FileName}",
+                        CategoriaEvento.Contenido,
+                        TipoLogEvento.Error,
+                        usuario.Id,
+                        usuario.UserName,
+                        $"Error: {resultado.Error}\nDetalle: {resultado.ErrorDetallado}\nExtensión: {extension}\nTamaño: {archivo.Length / 1024.0:F1} KB"
+                    );
+
+                    // NO hay fallback - rechazar el archivo
+                    return Json(new { success = false, error = resultado.Error ?? "Error al procesar la imagen" });
                 }
+
+                var filePath = resultado.RutaArchivo!;
+                var rutaArchivo = $"/uploads/{carpetaUsuario}/{resultado.NombreArchivo}";
+
+                _logger.LogInformation("[CrearRapido] ✅ Imagen procesada: {Original} ({OriginalSize}KB) -> {Convertido} ({FinalSize}KB)",
+                    archivo.FileName, resultado.TamanoOriginal / 1024,
+                    resultado.NombreArchivo, resultado.TamanoFinal / 1024);
 
                 // Crear contenido
                 var contenido = new Contenido
@@ -949,15 +926,15 @@ namespace Lado.Controllers
                             _ => "image/jpeg"
                         };
 
-                        var resultado = await _classificationService.ClasificarYDetectarObjetosAsync(
+                        var clasificacionResult = await _classificationService.ClasificarYDetectarObjetosAsync(
                             imagenBytes, descripcion, mimeType);
 
-                        if (resultado.Clasificacion.Exito && resultado.Clasificacion.CategoriaId.HasValue)
+                        if (clasificacionResult.Clasificacion.Exito && clasificacionResult.Clasificacion.CategoriaId.HasValue)
                         {
-                            contenido.CategoriaInteresId = resultado.Clasificacion.CategoriaId.Value;
+                            contenido.CategoriaInteresId = clasificacionResult.Clasificacion.CategoriaId.Value;
                         }
 
-                        objetosEditor = resultado.ObjetosDetectados;
+                        objetosEditor = clasificacionResult.ObjetosDetectados;
                     }
                 }
                 catch (Exception ex)
@@ -1013,13 +990,19 @@ namespace Lado.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RequestSizeLimit(500_000_000)] // 500MB total para carrusel con videos grandes
+        [RequestFormLimits(MultipartBodyLengthLimit = 500_000_000)]
         public async Task<IActionResult> CrearCarrusel(
             List<IFormFile> archivos,
             string Descripcion,
             bool EsGratis,
             decimal? PrecioDesbloqueo = null,
             bool EsBorrador = false,
-            bool EsPublicoGeneral = false)
+            bool EsPublicoGeneral = false,
+            bool SoloSuscriptores = false,
+            bool CrearPreviewBlur = false,
+            int TipoCensuraPreview = 0,
+            bool PublicarEnLadoB = false)
         {
             try
             {
@@ -1123,9 +1106,12 @@ namespace Lado.Controllers
 
                 _logger.LogInformation("=== CREAR CARRUSEL ===");
                 _logger.LogInformation("Usuario: {Username}, Archivos: {Count}", usuario.UserName, archivos.Count);
+                _logger.LogInformation("🔍 PARAMS RECIBIDOS - EsGratis: {EsGratis}, PrecioDesbloqueo: {Precio}, SoloSuscriptores: {SoloSusc}, PublicarEnLadoB: {LadoB}",
+                    EsGratis, PrecioDesbloqueo, SoloSuscriptores, PublicarEnLadoB);
 
                 // Validar verificación - solo verificados pueden crear contenido en LadoB
-                var intentaPublicarEnLadoB = !EsGratis;
+                // NUEVO: Usar PublicarEnLadoB para determinar el lado, NO EsGratis
+                var intentaPublicarEnLadoB = PublicarEnLadoB;
                 if (intentaPublicarEnLadoB && !usuario.CreadorVerificado)
                 {
                     _logger.LogWarning("⚠️ Usuario {Username} intentó crear carrusel LadoB sin verificación - Forzando LadoA",
@@ -1135,15 +1121,25 @@ namespace Lado.Controllers
                     PrecioDesbloqueo = 0;
                 }
 
-                // Validar precio
+                // Validar precio (solo si NO es gratis Y está verificado)
+                // Si SoloSuscriptores=true y PrecioDesbloqueo=0, significa que solo suscriptores pueden ver (sin compra individual)
                 if (!EsGratis && usuario.CreadorVerificado)
                 {
-                    if (!PrecioDesbloqueo.HasValue || PrecioDesbloqueo <= 0)
-                        PrecioDesbloqueo = 10m;
+                    // Solo validar precio si hay compra individual disponible
+                    var tieneCompraIndividual = !SoloSuscriptores || (PrecioDesbloqueo.HasValue && PrecioDesbloqueo > 0);
 
-                    if (PrecioDesbloqueo % 5 != 0)
+                    if (tieneCompraIndividual && PrecioDesbloqueo.HasValue && PrecioDesbloqueo > 0)
                     {
-                        return Json(new { success = false, message = "El precio debe ser un múltiplo de 5" });
+                        if (PrecioDesbloqueo % 5 != 0)
+                        {
+                            return Json(new { success = false, message = "El precio debe ser un múltiplo de 5" });
+                        }
+                    }
+
+                    // Si no tiene precio y no es solo suscriptores, establecer precio default
+                    if (!SoloSuscriptores && (!PrecioDesbloqueo.HasValue || PrecioDesbloqueo <= 0))
+                    {
+                        PrecioDesbloqueo = 10m;
                     }
                 }
 
@@ -1168,6 +1164,7 @@ namespace Lado.Controllers
                     NombreMostrado = nombreMostrado,
                     EsPremium = !EsGratis,
                     PrecioDesbloqueo = EsGratis ? 0m : (PrecioDesbloqueo ?? 0m),
+                    SoloSuscriptores = tipoLado == TipoLado.LadoB && SoloSuscriptores,
                     EsBorrador = EsBorrador,
                     FechaPublicacion = DateTime.Now,
                     EstaActivo = true,
@@ -1221,13 +1218,8 @@ namespace Lado.Controllers
                         ? await _fileValidationService.ValidarImagenAsync(archivo)
                         : await _fileValidationService.ValidarVideoAsync(archivo);
 
-                    // Verificar si necesita conversión (imágenes a JPEG, videos a MP4)
-                    var requiereConversionImg = esFoto && _mediaConversionService.ImagenRequiereConversion(extension);
-                    var requiereConversionVideo = esVideo && _mediaConversionService.VideoRequiereConversion(extension);
-                    var requiereConversion = requiereConversionImg || requiereConversionVideo;
-
-                    _logger.LogInformation("[Carrusel] CHECK: Extension={Extension}, EsFoto={EsFoto}, EsVideo={EsVideo}, RequiereConversion={RequiereConversion}",
-                        extension, esFoto, esVideo, requiereConversion);
+                    _logger.LogInformation("[Carrusel] Procesando archivo: Extension={Extension}, EsFoto={EsFoto}, EsVideo={EsVideo}",
+                        extension, esFoto, esVideo);
 
                     // Validar magic bytes para TODOS los archivos (seguridad)
                     if (!validacion.EsValido)
@@ -1248,96 +1240,46 @@ namespace Lado.Controllers
                         continue; // Saltar archivos inválidos
                     }
 
-                    string filePath;
-                    string uniqueFileName;
-                    long tamanoFinal;
+                    // ====================================================================
+                    // 🔄 PROCESAMIENTO UNIFICADO - Usar ProcesarArchivoAsync
+                    // Todos los archivos pasan por el mismo pipeline de conversión.
+                    // NO hay fallback - si falla, se omite el archivo.
+                    // ====================================================================
+                    _logger.LogInformation("[Carrusel] 🔄 Procesando {FileName} ({Size}MB) con pipeline unificado...",
+                        archivo.FileName, (archivo.Length / 1024.0 / 1024.0).ToString("F1"));
 
-                    if (requiereConversionImg)
+                    Services.MediaProcessingResult resultado;
+                    using (var stream = archivo.OpenReadStream())
                     {
-                        // Convertir imagen a JPEG estándar
-                        _logger.LogInformation("[Carrusel] CONVIRTIENDO imagen {FileName} ({Extension}) a JPEG...",
-                            archivo.FileName, extension);
-
-                        var nombreBase = Guid.NewGuid().ToString();
-                        using var stream = archivo.OpenReadStream();
-                        var rutaConvertida = await _mediaConversionService.ConvertirImagenAsync(stream, uploadsFolder, extension, nombreBase, 2048, 90);
-
-                        if (string.IsNullOrEmpty(rutaConvertida))
-                        {
-                            _logger.LogWarning("[Carrusel] Error convirtiendo imagen {FileName}, saltando archivo", archivo.FileName);
-                            continue;
-                        }
-
-                        filePath = rutaConvertida;
-                        uniqueFileName = Path.GetFileName(rutaConvertida);
-                        tamanoFinal = new FileInfo(rutaConvertida).Length;
-
-                        _logger.LogInformation("[Carrusel] Conversión imagen exitosa: {Original} ({OriginalSize}MB) -> {Convertido} ({ConvertedSize}MB)",
-                            archivo.FileName, (archivo.Length / 1024.0 / 1024.0).ToString("F1"),
-                            uniqueFileName, (tamanoFinal / 1024.0 / 1024.0).ToString("F1"));
+                        resultado = await _mediaConversionService.ProcesarArchivoAsync(stream, extension, uploadsFolder);
                     }
-                    else if (requiereConversionVideo)
-                    {
-                        // Convertir video a MP4 H.264 estándar
-                        _logger.LogInformation("[Carrusel] CONVIRTIENDO video {FileName} ({Extension}) a MP4 H.264...",
-                            archivo.FileName, extension);
 
+                    if (!resultado.Exitoso)
+                    {
+                        _logger.LogWarning("[Carrusel] ❌ Error procesando {FileName}: {Error}",
+                            archivo.FileName, resultado.Error);
+
+                        // Registrar en Admin/Logs
                         await _logEventoService.RegistrarEventoAsync(
-                            $"Iniciando conversión video: {archivo.FileName}",
+                            $"❌ Error procesando archivo: {archivo.FileName}",
                             CategoriaEvento.Contenido,
-                            TipoLogEvento.Info,
+                            TipoLogEvento.Error,
                             usuario.Id,
                             usuario.UserName,
-                            $"Tamaño: {archivo.Length / 1024.0 / 1024.0:F1} MB\nExtensión: {extension}"
+                            $"Error: {resultado.Error}\nDetalle: {resultado.ErrorDetallado}\nExtensión: {extension}\nTamaño: {archivo.Length / 1024.0:F1} KB"
                         );
 
-                        var nombreBase = Guid.NewGuid().ToString();
-                        using var stream = archivo.OpenReadStream();
-                        var rutaConvertida = await _mediaConversionService.ConvertirVideoAsync(stream, uploadsFolder, extension, nombreBase, 20, 1920);
-
-                        if (string.IsNullOrEmpty(rutaConvertida))
-                        {
-                            _logger.LogWarning("[Carrusel] Error convirtiendo video {FileName}, saltando archivo", archivo.FileName);
-                            await _logEventoService.RegistrarEventoAsync(
-                                $"ERROR conversión video: {archivo.FileName}",
-                                CategoriaEvento.Contenido,
-                                TipoLogEvento.Error,
-                                usuario.Id,
-                                usuario.UserName,
-                                $"La conversión falló. Archivo: {archivo.FileName}, Tamaño: {archivo.Length / 1024.0 / 1024.0:F1} MB"
-                            );
-                            continue;
-                        }
-
-                        filePath = rutaConvertida;
-                        uniqueFileName = Path.GetFileName(rutaConvertida);
-                        tamanoFinal = new FileInfo(rutaConvertida).Length;
-
-                        _logger.LogInformation("[Carrusel] Conversión video exitosa: {Original} ({OriginalSize}MB) -> {Convertido} ({ConvertedSize}MB)",
-                            archivo.FileName, (archivo.Length / 1024.0 / 1024.0).ToString("F1"),
-                            uniqueFileName, (tamanoFinal / 1024.0 / 1024.0).ToString("F1"));
-
-                        await _logEventoService.RegistrarEventoAsync(
-                            $"Conversión video exitosa: {archivo.FileName}",
-                            CategoriaEvento.Contenido,
-                            TipoLogEvento.Info,
-                            usuario.Id,
-                            usuario.UserName,
-                            $"Original: {archivo.Length / 1024.0 / 1024.0:F1} MB -> Convertido: {tamanoFinal / 1024.0 / 1024.0:F1} MB\nArchivo: {uniqueFileName}"
-                        );
+                        // NO hay fallback - simplemente omitir el archivo
+                        continue;
                     }
-                    else
-                    {
-                        // Guardar archivo sin conversión (ya es formato estándar: .jpg o .mp4)
-                        uniqueFileName = $"{Guid.NewGuid()}{extension}";
-                        filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
-                        using (var fileStream = new FileStream(filePath, FileMode.Create))
-                        {
-                            await archivo.CopyToAsync(fileStream);
-                        }
-                        tamanoFinal = archivo.Length;
-                    }
+                    var filePath = resultado.RutaArchivo!;
+                    var uniqueFileName = resultado.NombreArchivo!;
+                    var tamanoFinal = resultado.TamanoFinal;
+
+                    _logger.LogInformation("[Carrusel] ✅ Archivo procesado: {Original} ({OriginalSize}MB) -> {Convertido} ({FinalSize}MB)",
+                        archivo.FileName, (resultado.TamanoOriginal / 1024.0 / 1024.0).ToString("F1"),
+                        uniqueFileName, (tamanoFinal / 1024.0 / 1024.0).ToString("F1"));
 
                     var archivoContenido = new ArchivoContenido
                     {
@@ -1536,6 +1478,48 @@ namespace Lado.Controllers
                     {
                         _logger.LogError(ex, "Error al procesar LadoCoins para carrusel: {ContentId}", contenido.Id);
                         await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, usuario.Id, usuario.UserName);
+                    }
+                }
+
+                // ========================================
+                // CREAR PREVIEW BLUR PARA LADOA (si se solicitó)
+                // ========================================
+                if (CrearPreviewBlur && tipoLado == TipoLado.LadoB && !EsBorrador)
+                {
+                    try
+                    {
+                        var previewBlur = new Contenido
+                        {
+                            UsuarioId = usuario.Id,
+                            TipoContenido = contenido.TipoContenido,
+                            Descripcion = "✨ Contenido exclusivo disponible en mi LadoB",
+                            RutaArchivo = contenido.RutaArchivo,
+                            Thumbnail = contenido.Thumbnail,
+                            TipoLado = TipoLado.LadoA,
+                            EsGratis = true,
+                            EsPublicoGeneral = true,
+                            NombreMostrado = usuario.NombreCompleto,
+                            EsPreviewBlurDeLadoB = true,
+                            ContenidoOriginalLadoBId = contenido.Id,
+                            TipoCensuraPreview = (Models.TipoCensuraPreview)TipoCensuraPreview,
+                            CategoriaInteresId = contenido.CategoriaInteresId,
+                            FechaPublicacion = DateTime.Now,
+                            EstaActivo = true,
+                            Latitud = contenido.Latitud,
+                            Longitud = contenido.Longitud,
+                            NombreUbicacion = contenido.NombreUbicacion
+                        };
+
+                        _context.Contenidos.Add(previewBlur);
+                        await _context.SaveChangesAsync();
+
+                        _logger.LogInformation("Preview blur creado para carrusel - ID: {Id} para LadoB contenido ID: {OriginalId}",
+                            previewBlur.Id, contenido.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error al crear preview blur para carrusel, el contenido original se guardó correctamente");
+                        _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, usuario?.Id, usuario?.UserName);
                     }
                 }
 
@@ -2239,6 +2223,7 @@ namespace Lado.Controllers
                             catch (Exception ex)
                             {
                                 _logger.LogWarning(ex, "No se pudo eliminar archivo anterior: {Ruta}", rutaAnterior);
+                                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, usuario?.Id, usuario?.UserName);
                             }
                         }
                     }
@@ -2481,6 +2466,7 @@ namespace Lado.Controllers
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error al registrar like para LadoCoins");
+                        _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Pago, usuario?.Id, usuario?.UserName);
                     }
                 }
 
@@ -2545,6 +2531,7 @@ namespace Lado.Controllers
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error al registrar comentario para LadoCoins");
+                    _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Pago, usuarioId, null);
                 }
 
                 var usuario = await _userManager.FindByIdAsync(usuarioId);
@@ -2604,6 +2591,8 @@ namespace Lado.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al obtener comentarios");
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 return Json(new { success = false, message = "Error al cargar comentarios" });
             }
         }

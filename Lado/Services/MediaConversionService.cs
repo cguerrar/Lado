@@ -55,6 +55,77 @@ namespace Lado.Services
         /// Obtiene información de un archivo multimedia
         /// </summary>
         Task<MediaInfo?> ObtenerInfoAsync(string rutaArchivo);
+
+        /// <summary>
+        /// Procesa un archivo multimedia (imagen o video) y lo convierte al formato estándar.
+        /// Este es el método UNIFICADO que debe usarse para todo el procesamiento de contenido.
+        /// </summary>
+        /// <param name="inputStream">Stream del archivo</param>
+        /// <param name="extension">Extensión del archivo original</param>
+        /// <param name="carpetaDestino">Carpeta donde guardar el resultado</param>
+        /// <param name="nombreBase">Nombre base sin extensión (opcional)</param>
+        /// <returns>Resultado con la ruta del archivo procesado o error</returns>
+        Task<MediaProcessingResult> ProcesarArchivoAsync(Stream inputStream, string extension, string carpetaDestino, string? nombreBase = null);
+
+        /// <summary>
+        /// Verifica si una extensión corresponde a una imagen soportada
+        /// </summary>
+        bool EsImagenSoportada(string extension);
+
+        /// <summary>
+        /// Verifica si una extensión corresponde a un video soportado
+        /// </summary>
+        bool EsVideoSoportado(string extension);
+
+        /// <summary>
+        /// Obtiene el último error de FFmpeg para diagnóstico
+        /// </summary>
+        string? ObtenerUltimoError();
+    }
+
+    /// <summary>
+    /// Resultado del procesamiento de un archivo multimedia
+    /// </summary>
+    public class MediaProcessingResult
+    {
+        public bool Exitoso { get; set; }
+        public string? RutaArchivo { get; set; }
+        public string? NombreArchivo { get; set; }
+        public string? Error { get; set; }
+        public string? ErrorDetallado { get; set; }
+        public TipoMediaProcesado TipoMedia { get; set; }
+        public long TamanoOriginal { get; set; }
+        public long TamanoFinal { get; set; }
+
+        public static MediaProcessingResult Exito(string rutaArchivo, TipoMediaProcesado tipo, long tamanoOriginal, long tamanoFinal)
+        {
+            return new MediaProcessingResult
+            {
+                Exitoso = true,
+                RutaArchivo = rutaArchivo,
+                NombreArchivo = Path.GetFileName(rutaArchivo),
+                TipoMedia = tipo,
+                TamanoOriginal = tamanoOriginal,
+                TamanoFinal = tamanoFinal
+            };
+        }
+
+        public static MediaProcessingResult Fallo(string error, string? errorDetallado = null)
+        {
+            return new MediaProcessingResult
+            {
+                Exitoso = false,
+                Error = error,
+                ErrorDetallado = errorDetallado
+            };
+        }
+    }
+
+    public enum TipoMediaProcesado
+    {
+        Desconocido,
+        Imagen,
+        Video
     }
 
     public class MediaInfo
@@ -154,15 +225,24 @@ namespace Lado.Services
         {
             if (string.IsNullOrEmpty(extension)) return false;
             extension = extension.StartsWith(".") ? extension : "." + extension;
-            return ImagenesSoportadas.Contains(extension) && !ImagenesEstandar.Contains(extension);
+            // FORZAR conversión de TODAS las imágenes para:
+            // 1. Normalizar orientación EXIF
+            // 2. Redimensionar a max 2048px
+            // 3. Comprimir a JPEG calidad 90
+            // 4. Garantizar compatibilidad universal
+            return ImagenesSoportadas.Contains(extension);
         }
 
         public bool VideoRequiereConversion(string extension)
         {
             if (string.IsNullOrEmpty(extension)) return false;
             extension = extension.StartsWith(".") ? extension : "." + extension;
-            // MP4 podría necesitar re-encoding si no es H.264, pero por ahora asumimos que sí
-            return VideosSoportados.Contains(extension) && !VideosEstandar.Contains(extension);
+            // FORZAR conversión de TODOS los videos para:
+            // 1. Garantizar codec H.264 compatible con WhatsApp/iOS/Safari
+            // 2. Normalizar a 30fps
+            // 3. Agregar faststart para streaming
+            // 4. Los MP4 que ya son H.264 compatible se copiarán sin re-encoding
+            return VideosSoportados.Contains(extension);
         }
 
         #region Conversión de Imágenes
@@ -816,6 +896,117 @@ namespace Lado.Services
             {
                 _logger.LogError(ex, "[MediaConversion] Error obteniendo info de video");
                 return null;
+            }
+        }
+
+        #endregion
+
+        #region Métodos Unificados de Procesamiento
+
+        public bool EsImagenSoportada(string extension)
+        {
+            if (string.IsNullOrEmpty(extension)) return false;
+            extension = extension.StartsWith(".") ? extension : "." + extension;
+            return ImagenesSoportadas.Contains(extension);
+        }
+
+        public bool EsVideoSoportado(string extension)
+        {
+            if (string.IsNullOrEmpty(extension)) return false;
+            extension = extension.StartsWith(".") ? extension : "." + extension;
+            return VideosSoportados.Contains(extension);
+        }
+
+        /// <summary>
+        /// Método UNIFICADO para procesar cualquier archivo multimedia.
+        /// Este método DEBE usarse en lugar de llamar directamente a ConvertirImagenAsync/ConvertirVideoAsync.
+        /// NO tiene fallback - si falla la conversión, retorna error.
+        /// </summary>
+        public async Task<MediaProcessingResult> ProcesarArchivoAsync(
+            Stream inputStream,
+            string extension,
+            string carpetaDestino,
+            string? nombreBase = null)
+        {
+            try
+            {
+                if (inputStream == null || inputStream.Length == 0)
+                {
+                    return MediaProcessingResult.Fallo(
+                        "El archivo está vacío",
+                        "Stream es null o tiene longitud 0");
+                }
+
+                extension = extension.StartsWith(".") ? extension : "." + extension;
+                extension = extension.ToLowerInvariant();
+                nombreBase ??= Guid.NewGuid().ToString();
+                var tamanoOriginal = inputStream.Length;
+
+                _logger.LogInformation("[MediaConversion] 🔄 Procesando archivo: Extension={Extension}, Tamaño={Size}KB",
+                    extension, tamanoOriginal / 1024);
+
+                // Determinar tipo de archivo
+                var esImagen = EsImagenSoportada(extension);
+                var esVideo = EsVideoSoportado(extension);
+
+                if (!esImagen && !esVideo)
+                {
+                    return MediaProcessingResult.Fallo(
+                        $"Formato no soportado: {extension}",
+                        $"La extensión {extension} no es una imagen ni video soportado.\nImágenes: {string.Join(", ", ImagenesSoportadas)}\nVideos: {string.Join(", ", VideosSoportados)}");
+                }
+
+                Directory.CreateDirectory(carpetaDestino);
+
+                if (esImagen)
+                {
+                    // Procesar imagen
+                    var rutaConvertida = await ConvertirImagenAsync(
+                        inputStream, carpetaDestino, extension, nombreBase, 2048, 90);
+
+                    if (string.IsNullOrEmpty(rutaConvertida))
+                    {
+                        return MediaProcessingResult.Fallo(
+                            "Error al procesar la imagen. Por favor intenta con otro archivo.",
+                            $"ConvertirImagenAsync retornó null.\nExtensión: {extension}\nTamaño: {tamanoOriginal / 1024}KB");
+                    }
+
+                    var tamanoFinal = new FileInfo(rutaConvertida).Length;
+                    _logger.LogInformation("[MediaConversion] ✅ Imagen procesada: {Original}KB -> {Final}KB ({Ratio}%)",
+                        tamanoOriginal / 1024, tamanoFinal / 1024,
+                        Math.Round((double)tamanoFinal / tamanoOriginal * 100, 1));
+
+                    return MediaProcessingResult.Exito(rutaConvertida, TipoMediaProcesado.Imagen, tamanoOriginal, tamanoFinal);
+                }
+                else // esVideo
+                {
+                    // Procesar video
+                    var rutaConvertida = await ConvertirVideoAsync(
+                        inputStream, carpetaDestino, extension, nombreBase, 20, 1920);
+
+                    if (string.IsNullOrEmpty(rutaConvertida))
+                    {
+                        var errorFFmpeg = ObtenerUltimoError();
+                        return MediaProcessingResult.Fallo(
+                            "Error al procesar el video. Verifica que el archivo no esté corrupto.",
+                            $"ConvertirVideoAsync retornó null.\nExtensión: {extension}\nTamaño: {tamanoOriginal / 1024}KB\nError FFmpeg: {errorFFmpeg ?? "desconocido"}");
+                    }
+
+                    var tamanoFinal = new FileInfo(rutaConvertida).Length;
+                    _logger.LogInformation("[MediaConversion] ✅ Video procesado: {Original}MB -> {Final}MB ({Ratio}%)",
+                        (tamanoOriginal / 1024.0 / 1024.0).ToString("F1"),
+                        (tamanoFinal / 1024.0 / 1024.0).ToString("F1"),
+                        Math.Round((double)tamanoFinal / tamanoOriginal * 100, 1));
+
+                    return MediaProcessingResult.Exito(rutaConvertida, TipoMediaProcesado.Video, tamanoOriginal, tamanoFinal);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[MediaConversion] ❌ Error procesando archivo: {Extension}", extension);
+                return MediaProcessingResult.Fallo(
+                    "Error interno al procesar el archivo. Por favor intenta de nuevo.",
+                    $"Excepción: {ex.Message}\nStackTrace: {ex.StackTrace}");
             }
         }
 

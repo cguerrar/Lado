@@ -73,9 +73,12 @@ namespace Lado.Services
     public class DateTimeService : IDateTimeService
     {
         private readonly ApplicationDbContext _context;
-        private string? _cachedTimeZoneId;
-        private DateTime _cacheExpiry = DateTime.MinValue;
-        private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
+
+        // OPTIMIZACIÓN: Cache estático para evitar queries repetidas entre requests
+        private static string? _staticCachedTimeZoneId;
+        private static DateTime _staticCacheExpiry = DateTime.MinValue;
+        private static readonly object _cacheLock = new();
+        private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(30); // Aumentado a 30 min
 
         public DateTimeService(ApplicationDbContext context)
         {
@@ -84,19 +87,28 @@ namespace Lado.Services
 
         public string GetTimeZoneId()
         {
-            // Usar cache para evitar consultas repetidas a la BD
-            if (_cachedTimeZoneId != null && DateTime.UtcNow < _cacheExpiry)
+            // Usar cache estático para evitar consultas a BD en cada request
+            if (_staticCachedTimeZoneId != null && DateTime.UtcNow < _staticCacheExpiry)
             {
-                return _cachedTimeZoneId;
+                return _staticCachedTimeZoneId;
             }
 
-            var config = _context.ConfiguracionesPlataforma
-                .FirstOrDefault(c => c.Clave == ConfiguracionPlataforma.ZONA_HORARIA);
+            lock (_cacheLock)
+            {
+                // Double-check después del lock
+                if (_staticCachedTimeZoneId != null && DateTime.UtcNow < _staticCacheExpiry)
+                {
+                    return _staticCachedTimeZoneId;
+                }
 
-            _cachedTimeZoneId = config?.Valor ?? "America/Bogota";
-            _cacheExpiry = DateTime.UtcNow.Add(CacheDuration);
+                var config = _context.ConfiguracionesPlataforma
+                    .FirstOrDefault(c => c.Clave == ConfiguracionPlataforma.ZONA_HORARIA);
 
-            return _cachedTimeZoneId;
+                _staticCachedTimeZoneId = config?.Valor ?? "America/Bogota";
+                _staticCacheExpiry = DateTime.UtcNow.Add(CacheDuration);
+            }
+
+            return _staticCachedTimeZoneId;
         }
 
         public DateTime ConvertToLocal(DateTime dateTime)

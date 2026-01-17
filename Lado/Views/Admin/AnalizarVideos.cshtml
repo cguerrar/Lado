@@ -490,23 +490,25 @@
 
                 const row = btn.closest('tr');
                 row.className = 'video-row';
+                row.dataset.estado = 'ok';
+                // Actualizar peso si está disponible
+                const pesoCell = row.querySelector('td:nth-child(4)');
+                if (pesoCell && data.message) {
+                    const match = data.message.match(/→ ([\d.]+)MB/);
+                    if (match) pesoCell.textContent = match[1] + ' MB';
+                }
                 row.querySelector('td:nth-child(8)').innerHTML = '<span class="badge bg-success"><i class="fas fa-check"></i> OK</span>';
-
-                alert(data.message);
+                console.log('[Video] Convertido:', data.message);
             } else {
                 btn.innerHTML = '<i class="fas fa-times"></i>';
                 btn.className = 'btn btn-sm btn-danger';
-                setTimeout(() => {
-                    btn.innerHTML = originalHtml;
-                    btn.className = 'btn btn-sm btn-primary btn-convertir-video';
-                    btn.disabled = false;
-                }, 2000);
-                alert('Error: ' + data.message);
+                btn.title = data.message;
+                console.error('[Video] Error:', data.message);
             }
         } catch (err) {
-            btn.innerHTML = originalHtml;
-            btn.disabled = false;
-            alert('Error: ' + err.message);
+            btn.innerHTML = '<i class="fas fa-times"></i>';
+            btn.className = 'btn btn-sm btn-danger';
+            console.error('[Video] Exception:', err.message);
         }
     }
 
@@ -533,23 +535,25 @@
 
                 const row = btn.closest('tr');
                 row.className = 'imagen-row';
+                row.dataset.estado = 'ok';
+                // Actualizar peso si está disponible
+                const pesoCell = row.querySelector('td:nth-child(4)');
+                if (pesoCell && data.message) {
+                    const match = data.message.match(/→ ([\d.]+)KB/);
+                    if (match) pesoCell.textContent = match[1] + ' KB';
+                }
                 row.querySelector('td:nth-child(8)').innerHTML = '<span class="badge bg-success"><i class="fas fa-check"></i> OK</span>';
-
-                alert(data.message);
+                console.log('[Imagen] Convertida:', data.message);
             } else {
                 btn.innerHTML = '<i class="fas fa-times"></i>';
                 btn.className = 'btn btn-sm btn-danger';
-                setTimeout(() => {
-                    btn.innerHTML = originalHtml;
-                    btn.className = 'btn btn-sm btn-info btn-convertir-imagen';
-                    btn.disabled = false;
-                }, 2000);
-                alert('Error: ' + data.message);
+                btn.title = data.message;
+                console.error('[Imagen] Error:', data.message);
             }
         } catch (err) {
-            btn.innerHTML = originalHtml;
-            btn.disabled = false;
-            alert('Error: ' + err.message);
+            btn.innerHTML = '<i class="fas fa-times"></i>';
+            btn.className = 'btn btn-sm btn-danger';
+            console.error('[Imagen] Exception:', err.message);
         }
     }
 
@@ -558,13 +562,6 @@
     // ========================================
     async function convertirVideos(modo) {
         const esProblematicos = modo === 'problematicos';
-        const mensajeConfirm = esProblematicos
-            ? 'Esto convertirá los videos problemáticos. Puede tomar varios minutos. ¿Continuar?'
-            : 'Esto RECONVERTIRÁ TODOS los videos (incluso los que ya están OK). Puede tomar MUCHO tiempo. ¿Continuar?';
-
-        if (!confirm(mensajeConfirm)) {
-            return;
-        }
 
         const btnProb = document.getElementById('btnConvertirProblematicos');
         const btnTodos = document.getElementById('btnConvertirTodos');
@@ -637,13 +634,6 @@
 
     async function convertirImagenes(modo) {
         const esProblematicas = modo === 'problematicas';
-        const mensajeConfirm = esProblematicas
-            ? 'Esto convertirá las imágenes no estándar a JPEG. ¿Continuar?'
-            : 'Esto RECONVERTIRÁ TODAS las imágenes a JPEG. ¿Continuar?';
-
-        if (!confirm(mensajeConfirm)) {
-            return;
-        }
 
         const btnProb = document.getElementById('btnConvertirImagenesProblematicas');
         const btnTodas = document.getElementById('btnConvertirTodasImagenes');

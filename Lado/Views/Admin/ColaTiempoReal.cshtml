@@ -1,0 +1,521 @@
+@{
+    ViewData["Title"] = "Cola de Moderacion - Tiempo Real";
+    Layout = "_AdminLayout";
+    var stats = ViewBag.Stats;
+}
+
+<div class="container-fluid">
+    <!-- Header con stats en vivo -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1"><i class="bi bi-broadcast me-2 text-danger"></i>Cola en Tiempo Real</h2>
+            <p class="text-muted mb-0">
+                <span class="badge bg-success me-2" id="statusConexion">
+                    <i class="bi bi-circle-fill me-1" style="font-size: 0.5rem;"></i>Conectando...
+                </span>
+                <span id="moderadoresOnline">@stats.ModeradoresOnline moderadores online</span>
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" onclick="refrescarCola()">
+                <i class="bi bi-arrow-clockwise me-1"></i>Refrescar
+            </button>
+            <div class="btn-group">
+                <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="bi bi-funnel me-1"></i>Filtrar
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item active" href="#" onclick="filtrar('todos', this)">Todos</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="#" onclick="filtrar('reportes', this)">Reportes</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="filtrar('apelaciones', this)">Apelaciones</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="filtrar('contenidos', this)">Contenidos</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm bg-danger bg-opacity-10">
+                <div class="card-body d-flex align-items-center">
+                    <div class="rounded-circle bg-danger bg-opacity-25 p-3 me-3">
+                        <i class="bi bi-flag text-danger fs-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0" id="countReportes">@stats.ReportesPendientes</h3>
+                        <small class="text-muted">Reportes</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm bg-warning bg-opacity-10">
+                <div class="card-body d-flex align-items-center">
+                    <div class="rounded-circle bg-warning bg-opacity-25 p-3 me-3">
+                        <i class="bi bi-chat-left-text text-warning fs-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0" id="countApelaciones">@stats.ApelacionesPendientes</h3>
+                        <small class="text-muted">Apelaciones</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm bg-info bg-opacity-10">
+                <div class="card-body d-flex align-items-center">
+                    <div class="rounded-circle bg-info bg-opacity-25 p-3 me-3">
+                        <i class="bi bi-images text-info fs-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0" id="countContenidos">@stats.ContenidosPendientes</h3>
+                        <small class="text-muted">Contenidos</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm bg-success bg-opacity-10">
+                <div class="card-body d-flex align-items-center">
+                    <div class="rounded-circle bg-success bg-opacity-25 p-3 me-3">
+                        <i class="bi bi-people text-success fs-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0" id="countModeradores">@stats.ModeradoresOnline</h3>
+                        <small class="text-muted">Moderadores</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de items en tiempo real -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-list-task me-2"></i>Items Pendientes</h5>
+            <div>
+                <span class="badge bg-secondary" id="totalItems">0 items</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div id="colaItems" class="list-group list-group-flush">
+                <!-- Items se cargan dinámicamente -->
+                <div class="text-center py-5" id="loadingCola">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="text-muted mt-2">Cargando cola...</p>
+                </div>
+            </div>
+            <div class="text-center py-5 d-none" id="colaVacia">
+                <i class="bi bi-check-circle text-success fs-1"></i>
+                <p class="text-muted mt-2 mb-0">No hay items pendientes</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log de actividad -->
+    <div class="card shadow-sm mt-4">
+        <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="bi bi-activity me-2"></i>Actividad en Tiempo Real</h5>
+        </div>
+        <div class="card-body p-0" style="max-height: 250px; overflow-y: auto;">
+            <div id="logActividad" class="list-group list-group-flush">
+                <div class="list-group-item text-muted text-center py-3" id="sinActividad">
+                    <i class="bi bi-clock-history me-1"></i>Sin actividad reciente
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de detalle de item -->
+<div class="modal fade" id="modalDetalle" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalDetalleTitle">Detalle del Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalDetalleBody">
+                <!-- Contenido dinámico -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-warning" onclick="liberarItem()">
+                    <i class="bi bi-arrow-return-left me-1"></i>Liberar
+                </button>
+                <a href="#" id="btnVerDetalle" class="btn btn-primary">
+                    <i class="bi bi-eye me-1"></i>Ver Completo
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.0/signalr.min.js"></script>
+    <script>
+        let connection = null;
+        let filtroActual = 'todos';
+        let itemActual = null;
+
+        // Inicializar conexión SignalR
+        async function iniciarConexion() {
+            connection = new signalR.HubConnectionBuilder()
+                .withUrl("/moderacionHub")
+                .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
+                .configureLogging(signalR.LogLevel.Warning)
+                .build();
+
+            // Eventos de conexión
+            connection.onreconnecting(() => {
+                actualizarEstadoConexion('reconnecting');
+            });
+
+            connection.onreconnected(() => {
+                actualizarEstadoConexion('connected');
+                refrescarCola();
+            });
+
+            connection.onclose(() => {
+                actualizarEstadoConexion('disconnected');
+            });
+
+            // Eventos de moderación
+            connection.on("NuevoItem", (item) => {
+                agregarItemACola(item);
+                agregarLog(`Nuevo ${item.tipo}: ${item.titulo}`, 'nuevo');
+                reproducirSonido('nuevo');
+            });
+
+            connection.on("ItemTomado", (data) => {
+                marcarItemTomado(data.itemId, data.tipoItem, data.moderadorNombre);
+                agregarLog(`${data.moderadorNombre} tomó ${data.tipoItem} #${data.itemId}`, 'tomado');
+            });
+
+            connection.on("ItemLiberado", (data) => {
+                marcarItemLiberado(data.itemId, data.tipoItem);
+                agregarLog(`${data.moderadorNombre} liberó ${data.tipoItem} #${data.itemId}`, 'liberado');
+            });
+
+            connection.on("ItemResuelto", (data) => {
+                removerItemDeCola(data.itemId, data.tipoItem);
+                agregarLog(`${data.moderadorNombre} resolvió ${data.tipoItem} #${data.itemId} (${data.accion})`, 'resuelto');
+            });
+
+            connection.on("ModeradorConectado", (data) => {
+                actualizarConteoModeradores(1);
+                agregarLog(`${data.userName} se conectó`, 'conexion');
+            });
+
+            connection.on("ModeradorDesconectado", (data) => {
+                actualizarConteoModeradores(-1);
+                agregarLog(`${data.userName} se desconectó`, 'desconexion');
+            });
+
+            try {
+                await connection.start();
+                actualizarEstadoConexion('connected');
+                refrescarCola();
+            } catch (err) {
+                console.error("Error conectando:", err);
+                actualizarEstadoConexion('error');
+                // Fallback a polling
+                setInterval(refrescarCola, 10000);
+            }
+        }
+
+        function actualizarEstadoConexion(estado) {
+            const badge = document.getElementById('statusConexion');
+            switch (estado) {
+                case 'connected':
+                    badge.className = 'badge bg-success me-2';
+                    badge.innerHTML = '<i class="bi bi-circle-fill me-1" style="font-size: 0.5rem;"></i>Conectado';
+                    break;
+                case 'reconnecting':
+                    badge.className = 'badge bg-warning me-2';
+                    badge.innerHTML = '<i class="bi bi-circle-fill me-1" style="font-size: 0.5rem;"></i>Reconectando...';
+                    break;
+                case 'disconnected':
+                case 'error':
+                    badge.className = 'badge bg-danger me-2';
+                    badge.innerHTML = '<i class="bi bi-circle-fill me-1" style="font-size: 0.5rem;"></i>Desconectado';
+                    break;
+            }
+        }
+
+        async function refrescarCola() {
+            try {
+                const response = await fetch(`/Admin/ObtenerColaModeracion?tipo=${filtroActual}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    renderizarCola(data.items);
+                    document.getElementById('countModeradores').textContent = data.moderadoresOnline;
+                    document.getElementById('moderadoresOnline').textContent = `${data.moderadoresOnline} moderadores online`;
+                }
+            } catch (error) {
+                console.error("Error refrescando cola:", error);
+            }
+        }
+
+        function renderizarCola(items) {
+            const container = document.getElementById('colaItems');
+            const loading = document.getElementById('loadingCola');
+            const vacia = document.getElementById('colaVacia');
+
+            loading.classList.add('d-none');
+
+            if (items.length === 0) {
+                container.innerHTML = '';
+                vacia.classList.remove('d-none');
+                document.getElementById('totalItems').textContent = '0 items';
+                return;
+            }
+
+            vacia.classList.add('d-none');
+            document.getElementById('totalItems').textContent = `${items.length} items`;
+
+            // Actualizar conteos
+            const reportes = items.filter(i => i.tipo === 'reporte').length;
+            const apelaciones = items.filter(i => i.tipo === 'apelacion').length;
+            const contenidos = items.filter(i => i.tipo === 'contenido').length;
+
+            document.getElementById('countReportes').textContent = reportes;
+            document.getElementById('countApelaciones').textContent = apelaciones;
+            document.getElementById('countContenidos').textContent = contenidos;
+
+            container.innerHTML = items.map(item => `
+                <div class="list-group-item list-group-item-action item-cola" data-id="${item.id}" data-tipo="${item.tipo}">
+                    <div class="d-flex w-100 justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <div class="me-3">
+                                ${getIconoTipo(item.tipo)}
+                            </div>
+                            <div>
+                                <h6 class="mb-1">${item.titulo}</h6>
+                                <p class="mb-1 text-muted small">${item.descripcion.substring(0, 100)}${item.descripcion.length > 100 ? '...' : ''}</p>
+                                <small class="text-muted">
+                                    <i class="bi bi-person me-1"></i>${item.usuario}
+                                    <i class="bi bi-clock ms-2 me-1"></i>${formatearFecha(item.fecha)}
+                                </small>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge ${getBadgeClass(item.prioridad)}">${item.prioridad}</span>
+                            <button class="btn btn-sm btn-primary" onclick="tomarItem(${item.id}, '${item.tipo}')">
+                                <i class="bi bi-hand-index me-1"></i>Tomar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getIconoTipo(tipo) {
+            switch (tipo) {
+                case 'reporte': return '<i class="bi bi-flag-fill text-danger fs-4"></i>';
+                case 'apelacion': return '<i class="bi bi-chat-left-text-fill text-warning fs-4"></i>';
+                case 'contenido': return '<i class="bi bi-images text-info fs-4"></i>';
+                default: return '<i class="bi bi-file fs-4"></i>';
+            }
+        }
+
+        function getBadgeClass(prioridad) {
+            switch (prioridad) {
+                case 'alta': return 'bg-danger';
+                case 'normal': return 'bg-warning text-dark';
+                case 'baja': return 'bg-secondary';
+                default: return 'bg-secondary';
+            }
+        }
+
+        function formatearFecha(fecha) {
+            const date = new Date(fecha);
+            const ahora = new Date();
+            const diff = Math.floor((ahora - date) / 1000 / 60);
+
+            if (diff < 1) return 'Ahora';
+            if (diff < 60) return `hace ${diff}m`;
+            if (diff < 1440) return `hace ${Math.floor(diff / 60)}h`;
+            return date.toLocaleDateString('es-ES');
+        }
+
+        async function tomarItem(id, tipo) {
+            try {
+                const formData = new FormData();
+                formData.append('itemId', id);
+                formData.append('tipoItem', tipo);
+
+                const response = await fetch('/Admin/TomarItemModeracion', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    // Redirigir a la página de detalle según el tipo
+                    switch (tipo) {
+                        case 'reporte':
+                            window.location.href = `/Admin/DetalleReporte?id=${id}`;
+                            break;
+                        case 'apelacion':
+                            window.location.href = `/Admin/DetalleApelacion?id=${id}`;
+                            break;
+                        case 'contenido':
+                            window.location.href = `/Admin/DetalleContenido?id=${id}`;
+                            break;
+                    }
+                }
+            } catch (error) {
+                console.error("Error tomando item:", error);
+            }
+        }
+
+        function marcarItemTomado(id, tipo, moderador) {
+            const item = document.querySelector(`.item-cola[data-id="${id}"][data-tipo="${tipo}"]`);
+            if (item) {
+                item.classList.add('opacity-50');
+                item.querySelector('button')?.remove();
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-dark';
+                badge.innerHTML = `<i class="bi bi-lock me-1"></i>${moderador}`;
+                item.querySelector('.d-flex.align-items-center.gap-2').appendChild(badge);
+            }
+        }
+
+        function marcarItemLiberado(id, tipo) {
+            refrescarCola(); // Simplificado: refrescar toda la cola
+        }
+
+        function removerItemDeCola(id, tipo) {
+            const item = document.querySelector(`.item-cola[data-id="${id}"][data-tipo="${tipo}"]`);
+            if (item) {
+                item.style.transition = 'all 0.3s ease-out';
+                item.style.opacity = '0';
+                item.style.transform = 'translateX(100%)';
+                setTimeout(() => item.remove(), 300);
+            }
+        }
+
+        function agregarItemACola(item) {
+            const container = document.getElementById('colaItems');
+            const vacia = document.getElementById('colaVacia');
+            vacia.classList.add('d-none');
+
+            const html = `
+                <div class="list-group-item list-group-item-action item-cola nuevo-item" data-id="${item.id}" data-tipo="${item.tipo}">
+                    <div class="d-flex w-100 justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <div class="me-3">${getIconoTipo(item.tipo)}</div>
+                            <div>
+                                <h6 class="mb-1">${item.titulo} <span class="badge bg-success ms-1">Nuevo</span></h6>
+                                <p class="mb-1 text-muted small">${item.descripcion?.substring(0, 100) || ''}</p>
+                                <small class="text-muted">
+                                    <i class="bi bi-person me-1"></i>${item.usuario}
+                                    <i class="bi bi-clock ms-2 me-1"></i>Ahora
+                                </small>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge ${getBadgeClass(item.prioridad || 'normal')}">${item.prioridad || 'normal'}</span>
+                            <button class="btn btn-sm btn-primary" onclick="tomarItem(${item.id}, '${item.tipo}')">
+                                <i class="bi bi-hand-index me-1"></i>Tomar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            container.insertAdjacentHTML('afterbegin', html);
+        }
+
+        function agregarLog(mensaje, tipo) {
+            const container = document.getElementById('logActividad');
+            const sinActividad = document.getElementById('sinActividad');
+            sinActividad?.remove();
+
+            const iconos = {
+                'nuevo': '<i class="bi bi-plus-circle text-success me-2"></i>',
+                'tomado': '<i class="bi bi-hand-index text-primary me-2"></i>',
+                'liberado': '<i class="bi bi-arrow-return-left text-warning me-2"></i>',
+                'resuelto': '<i class="bi bi-check-circle text-success me-2"></i>',
+                'conexion': '<i class="bi bi-wifi text-success me-2"></i>',
+                'desconexion': '<i class="bi bi-wifi-off text-danger me-2"></i>'
+            };
+
+            const html = `
+                <div class="list-group-item py-2">
+                    ${iconos[tipo] || '<i class="bi bi-info-circle me-2"></i>'}
+                    <span>${mensaje}</span>
+                    <small class="text-muted float-end">${new Date().toLocaleTimeString('es-ES')}</small>
+                </div>
+            `;
+
+            container.insertAdjacentHTML('afterbegin', html);
+
+            // Mantener solo los últimos 50 logs
+            const items = container.querySelectorAll('.list-group-item');
+            if (items.length > 50) {
+                items[items.length - 1].remove();
+            }
+        }
+
+        function filtrar(tipo, btn) {
+            filtroActual = tipo;
+            document.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
+            btn.classList.add('active');
+            refrescarCola();
+        }
+
+        function actualizarConteoModeradores(delta) {
+            const el = document.getElementById('countModeradores');
+            const current = parseInt(el.textContent) || 0;
+            el.textContent = Math.max(0, current + delta);
+            document.getElementById('moderadoresOnline').textContent = `${Math.max(0, current + delta)} moderadores online`;
+        }
+
+        function reproducirSonido(tipo) {
+            // Opcional: reproducir sonido de notificación
+            if (Notification.permission === 'granted') {
+                new Notification('Nuevo item en cola', {
+                    body: 'Hay un nuevo item pendiente de moderación',
+                    icon: '/images/logo.png'
+                });
+            }
+        }
+
+        // Solicitar permisos de notificación
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+
+        // Iniciar al cargar
+        document.addEventListener('DOMContentLoaded', iniciarConexion);
+    </script>
+
+    <style>
+        .item-cola.nuevo-item {
+            animation: slideIn 0.3s ease-out;
+            background-color: rgba(25, 135, 84, 0.05);
+        }
+
+        @@keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .item-cola:hover {
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+    </style>
+}

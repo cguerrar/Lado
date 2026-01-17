@@ -1,0 +1,312 @@
+@model List<Lado.Models.TemplateRespuesta>
+@{
+    ViewData["Title"] = "Templates de Respuestas";
+    Layout = "_AdminLayout";
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Templates de Respuestas</h2>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalTemplate" onclick="abrirNuevoTemplate()">
+            <i class="bi bi-plus-lg me-1"></i>Nuevo Template
+        </button>
+    </div>
+
+    <!-- Info -->
+    <div class="alert alert-info mb-4">
+        <i class="bi bi-info-circle me-2"></i>
+        <strong>Variables disponibles:</strong> <code>{usuario}</code>, <code>{contenido}</code>, <code>{motivo}</code>, <code>{fecha}</code>, <code>{hora}</code>
+        <br><small>Usa el campo "Atajo" para activar un template rápidamente con el teclado.</small>
+    </div>
+
+    <!-- Filtros -->
+    <div class="mb-4">
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-outline-primary active" onclick="filtrarCategoria(null, this)">Todos</button>
+            <button type="button" class="btn btn-outline-primary" onclick="filtrarCategoria(0, this)">Reportes</button>
+            <button type="button" class="btn btn-outline-primary" onclick="filtrarCategoria(1, this)">Apelaciones</button>
+            <button type="button" class="btn btn-outline-primary" onclick="filtrarCategoria(2, this)">Verificaciones</button>
+            <button type="button" class="btn btn-outline-primary" onclick="filtrarCategoria(3, this)">Soporte</button>
+            <button type="button" class="btn btn-outline-primary" onclick="filtrarCategoria(4, this)">Suspensión</button>
+            <button type="button" class="btn btn-outline-primary" onclick="filtrarCategoria(5, this)">Rechazo</button>
+            <button type="button" class="btn btn-outline-primary" onclick="filtrarCategoria(6, this)">Aprobación</button>
+        </div>
+    </div>
+
+    <!-- Lista de templates -->
+    <div class="row g-4" id="listaTemplates">
+        @foreach (var grupo in Model.GroupBy(t => t.Categoria))
+        {
+            <div class="col-12">
+                <h5 class="text-muted mb-3"><i class="bi bi-folder me-2"></i>@grupo.Key</h5>
+            </div>
+            foreach (var template in grupo.OrderBy(t => t.Orden))
+            {
+                <div class="col-lg-4 col-md-6 template-card" data-categoria="@((int)template.Categoria)">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>@template.Nombre</strong>
+                                @if (!string.IsNullOrEmpty(template.Atajo))
+                                {
+                                    <span class="badge bg-dark ms-2">@template.Atajo</span>
+                                }
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="#" onclick="editarTemplate(@template.Id); return false;"><i class="bi bi-pencil me-2"></i>Editar</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="copiarTemplate(@template.Id); return false;"><i class="bi bi-clipboard me-2"></i>Copiar</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" href="#" onclick="eliminarTemplate(@template.Id); return false;"><i class="bi bi-trash me-2"></i>Eliminar</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text small text-muted" style="white-space: pre-wrap; max-height: 100px; overflow: hidden;">@template.Contenido</p>
+                        </div>
+                        <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="bi bi-bar-chart me-1"></i>Usado @template.VecesUsado veces
+                            </small>
+                            <button class="btn btn-sm btn-outline-primary" onclick="copiarContenido(@template.Id, '@template.Contenido.Replace("'", "\\'").Replace("\n", "\\n").Replace("\r", "")')">
+                                <i class="bi bi-clipboard me-1"></i>Copiar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+
+        @if (!Model.Any())
+        {
+            <div class="col-12 text-center py-5">
+                <i class="bi bi-file-earmark-text fs-1 text-muted d-block mb-2"></i>
+                <p class="text-muted">No hay templates creados</p>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalTemplate" onclick="abrirNuevoTemplate()">
+                    <i class="bi bi-plus-lg me-1"></i>Crear primer template
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Modal Template -->
+<div class="modal fade" id="modalTemplate" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTemplateTitle"><i class="bi bi-file-earmark-text me-2"></i>Nuevo Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="templateId">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label">Nombre <span class="text-danger">*</span></label>
+                        <input type="text" id="templateNombre" class="form-control" maxlength="100" placeholder="Ej: Reporte resuelto - Contenido removido">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Categoría</label>
+                        <select id="templateCategoria" class="form-select">
+                            <option value="0">Reporte</option>
+                            <option value="1">Apelación</option>
+                            <option value="2">Verificación</option>
+                            <option value="3">Soporte</option>
+                            <option value="4">Suspensión</option>
+                            <option value="5">Rechazo</option>
+                            <option value="6">Aprobación</option>
+                            <option value="99">Otro</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Contenido <span class="text-danger">*</span></label>
+                        <textarea id="templateContenido" class="form-control" rows="6" maxlength="2000" placeholder="Escribe el contenido del template aquí...&#10;&#10;Puedes usar variables como {usuario} o {motivo}"></textarea>
+                        <small class="text-muted">Variables: {usuario}, {contenido}, {motivo}, {fecha}, {hora}</small>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label">Descripción (opcional)</label>
+                        <input type="text" id="templateDescripcion" class="form-control" maxlength="500" placeholder="Instrucciones de uso o notas">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Atajo</label>
+                        <input type="text" id="templateAtajo" class="form-control" maxlength="10" placeholder="Ej: r1">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Orden</label>
+                        <input type="number" id="templateOrden" class="form-control" value="0" min="0">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="guardarTemplate()">
+                    <i class="bi bi-check-lg me-1"></i>Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ||
+                      document.querySelector('meta[name="csrf-token"]')?.content;
+
+        let templatesData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Select(t => new {
+            id = t.Id,
+            nombre = t.Nombre,
+            categoria = (int)t.Categoria,
+            contenido = t.Contenido,
+            descripcion = t.Descripcion,
+            atajo = t.Atajo,
+            orden = t.Orden
+        })));
+
+        function abrirNuevoTemplate() {
+            document.getElementById('modalTemplateTitle').innerHTML = '<i class="bi bi-file-earmark-text me-2"></i>Nuevo Template';
+            document.getElementById('templateId').value = '';
+            document.getElementById('templateNombre').value = '';
+            document.getElementById('templateCategoria').value = '0';
+            document.getElementById('templateContenido').value = '';
+            document.getElementById('templateDescripcion').value = '';
+            document.getElementById('templateAtajo').value = '';
+            document.getElementById('templateOrden').value = '0';
+        }
+
+        function editarTemplate(id) {
+            const template = templatesData.find(t => t.id === id);
+            if (!template) return;
+
+            document.getElementById('modalTemplateTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Editar Template';
+            document.getElementById('templateId').value = template.id;
+            document.getElementById('templateNombre').value = template.nombre;
+            document.getElementById('templateCategoria').value = template.categoria;
+            document.getElementById('templateContenido').value = template.contenido;
+            document.getElementById('templateDescripcion').value = template.descripcion || '';
+            document.getElementById('templateAtajo').value = template.atajo || '';
+            document.getElementById('templateOrden').value = template.orden;
+
+            const modal = new bootstrap.Modal(document.getElementById('modalTemplate'));
+            modal.show();
+        }
+
+        async function guardarTemplate() {
+            const id = document.getElementById('templateId').value;
+            const data = {
+                id: id ? parseInt(id) : 0,
+                nombre: document.getElementById('templateNombre').value,
+                categoria: parseInt(document.getElementById('templateCategoria').value),
+                contenido: document.getElementById('templateContenido').value,
+                descripcion: document.getElementById('templateDescripcion').value || null,
+                atajo: document.getElementById('templateAtajo').value || null,
+                orden: parseInt(document.getElementById('templateOrden').value) || 0
+            };
+
+            if (!data.nombre || !data.contenido) {
+                mostrarToast('warning', 'Nombre y contenido son requeridos');
+                return;
+            }
+
+            try {
+                const url = id ? '/Admin/ActualizarTemplate' : '/Admin/CrearTemplate';
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    mostrarToast('success', result.mensaje);
+                    bootstrap.Modal.getInstance(document.getElementById('modalTemplate')).hide();
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    mostrarToast('danger', result.error);
+                }
+            } catch (error) {
+                mostrarToast('danger', 'Error al guardar');
+            }
+        }
+
+        async function eliminarTemplate(id) {
+            if (!confirm('¿Eliminar este template?')) return;
+
+            try {
+                const formData = new FormData();
+                formData.append('__RequestVerificationToken', token);
+                formData.append('id', id);
+
+                const response = await fetch('/Admin/EliminarTemplate', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    mostrarToast('success', result.mensaje);
+                    location.reload();
+                } else {
+                    mostrarToast('danger', result.error);
+                }
+            } catch (error) {
+                mostrarToast('danger', 'Error al eliminar');
+            }
+        }
+
+        function copiarContenido(id, contenido) {
+            navigator.clipboard.writeText(contenido.replace(/\\n/g, '\n')).then(() => {
+                mostrarToast('success', 'Copiado al portapapeles');
+                // Registrar uso
+                fetch('/Admin/UsarTemplate?id=' + id, { method: 'POST' });
+            });
+        }
+
+        function filtrarCategoria(categoria, btn) {
+            document.querySelectorAll('.btn-group .btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            document.querySelectorAll('.template-card').forEach(card => {
+                if (categoria === null || card.dataset.categoria == categoria) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        function mostrarToast(type, message) {
+            let toastContainer = document.getElementById('toastContainer');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toastContainer';
+                toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+                toastContainer.style.zIndex = '1100';
+                document.body.appendChild(toastContainer);
+            }
+
+            const toastId = 'toast-' + Date.now();
+            const bgClass = type === 'success' ? 'bg-success' : type === 'danger' ? 'bg-danger' : 'bg-warning';
+
+            const toastHtml = `
+                <div id="${toastId}" class="toast align-items-center text-white ${bgClass}" role="alert">
+                    <div class="d-flex">
+                        <div class="toast-body">${message}</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+
+            toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
+            toast.show();
+            toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
+        }
+    </script>
+}

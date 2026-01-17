@@ -180,12 +180,23 @@ namespace Lado.Controllers
                     Rol = _context.UserRoles
                         .Where(ur => ur.UserId == u.Id)
                         .Join(_context.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Name)
-                        .FirstOrDefault() ?? "Sin Rol"
+                        .FirstOrDefault() ?? "Sin Rol",
+                    // Contar contenidos (fotos y videos)
+                    TotalFotos = _context.Contenidos
+                        .Where(c => c.UsuarioId == u.Id && c.EstaActivo && c.TipoContenido == TipoContenido.Imagen)
+                        .Count(),
+                    TotalVideos = _context.Contenidos
+                        .Where(c => c.UsuarioId == u.Id && c.EstaActivo && c.TipoContenido == TipoContenido.Video)
+                        .Count(),
+                    // También contar archivos en contenidos con múltiples archivos
+                    TotalArchivos = _context.ArchivosContenido
+                        .Where(a => a.Contenido.UsuarioId == u.Id && a.Contenido.EstaActivo)
+                        .Count()
                 })
                 .ToListAsync();
 
             var resultado = usuariosConRoles
-                .Select(x => (x.Usuario, x.Rol))
+                .Select(x => (x.Usuario, x.Rol, x.TotalFotos, x.TotalVideos, x.TotalArchivos))
                 .ToList();
 
             ViewBag.VerificacionesPendientes = await _context.CreatorVerificationRequests
@@ -1118,10 +1129,174 @@ namespace Lado.Controllers
             if (usuario != null)
             {
                 usuario.EstaActivo = true;
+                // También limpiar suspensión temporal si la tiene
+                usuario.FechaSuspensionFin = null;
+                usuario.RazonSuspension = null;
+                usuario.FechaSuspension = null;
+                usuario.SuspendidoPorId = null;
                 await _context.SaveChangesAsync();
                 return Json(new { success = true });
             }
             return Json(new { success = false });
+        }
+
+        /// <summary>
+        /// Suspende temporalmente a un usuario por una duración específica
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SuspenderTemporal(string userId, int duracionDias, string razon)
+        {
+            var adminActual = await _userManager.GetUserAsync(User);
+            if (adminActual == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            // Prevenir auto-suspensión
+            if (userId == adminActual.Id)
+            {
+                return Json(new { success = false, message = "No puedes suspenderte a ti mismo" });
+            }
+
+            // Validar duración (mínimo 1 día, máximo 365 días)
+            if (duracionDias < 1 || duracionDias > 365)
+            {
+                return Json(new { success = false, message = "La duración debe ser entre 1 y 365 días" });
+            }
+
+            var usuario = await _context.Users.FindAsync(userId);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "Usuario no encontrado" });
+            }
+
+            // Aplicar suspensión temporal
+            usuario.FechaSuspension = DateTime.Now;
+            usuario.FechaSuspensionFin = DateTime.Now.AddDays(duracionDias);
+            usuario.RazonSuspension = razon;
+            usuario.SuspendidoPorId = adminActual.Id;
+
+            await _context.SaveChangesAsync();
+
+            // Crear notificación para el usuario
+            var notificacion = new Notificacion
+            {
+                UsuarioId = usuario.Id,
+                Tipo = TipoNotificacion.SuspensionTemporal,
+                Titulo = "Cuenta Suspendida Temporalmente",
+                Mensaje = $"Tu cuenta ha sido suspendida por {duracionDias} día(s). Razón: {razon}",
+                UrlDestino = "/Ayuda/Suspensiones",
+                FechaCreacion = DateTime.Now,
+                Leida = false,
+                EstaActiva = true
+            };
+            _context.Notificaciones.Add(notificacion);
+
+            // Registrar en logs
+            await _logEventoService.RegistrarEventoAsync(
+                $"Usuario suspendido temporalmente por {duracionDias} días",
+                CategoriaEvento.Admin,
+                TipoLogEvento.Warning,
+                adminActual.Id,
+                adminActual.NombreCompleto ?? adminActual.UserName,
+                $"Usuario: {usuario.UserName} ({usuario.Id}). Razón: {razon}"
+            );
+
+            await _context.SaveChangesAsync();
+
+            return Json(new {
+                success = true,
+                message = $"Usuario suspendido hasta {usuario.FechaSuspensionFin:dd/MM/yyyy HH:mm}",
+                fechaFin = usuario.FechaSuspensionFin?.ToString("dd/MM/yyyy HH:mm")
+            });
+        }
+
+        /// <summary>
+        /// Levanta la suspensión temporal de un usuario
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> LevantarSuspensionTemporal(string userId)
+        {
+            var adminActual = await _userManager.GetUserAsync(User);
+            if (adminActual == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            var usuario = await _context.Users.FindAsync(userId);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "Usuario no encontrado" });
+            }
+
+            if (!usuario.FechaSuspensionFin.HasValue)
+            {
+                return Json(new { success = false, message = "El usuario no tiene suspensión temporal activa" });
+            }
+
+            var razonOriginal = usuario.RazonSuspension;
+
+            // Limpiar campos de suspensión
+            usuario.FechaSuspensionFin = null;
+            usuario.RazonSuspension = null;
+            usuario.FechaSuspension = null;
+            usuario.SuspendidoPorId = null;
+
+            // Notificar al usuario
+            var notificacion = new Notificacion
+            {
+                UsuarioId = usuario.Id,
+                Tipo = TipoNotificacion.SuspensionLevantada,
+                Titulo = "Suspensión Levantada",
+                Mensaje = "Tu suspensión temporal ha sido levantada anticipadamente por un administrador.",
+                UrlDestino = "/Feed",
+                FechaCreacion = DateTime.Now,
+                Leida = false,
+                EstaActiva = true
+            };
+            _context.Notificaciones.Add(notificacion);
+
+            // Registrar en logs
+            await _logEventoService.RegistrarEventoAsync(
+                $"Suspensión temporal levantada manualmente",
+                CategoriaEvento.Admin,
+                TipoLogEvento.Info,
+                adminActual.Id,
+                adminActual.NombreCompleto ?? adminActual.UserName,
+                $"Usuario: {usuario.UserName} ({usuario.Id}). Razón original: {razonOriginal ?? "No especificada"}"
+            );
+
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, message = "Suspensión temporal levantada correctamente" });
+        }
+
+        /// <summary>
+        /// Obtiene usuarios con suspensiones temporales activas
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ObtenerSuspensionesTemporales()
+        {
+            var ahora = DateTime.Now;
+            var suspendidos = await _context.Users
+                .Where(u => u.FechaSuspensionFin != null && u.FechaSuspensionFin > ahora)
+                .OrderBy(u => u.FechaSuspensionFin)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.UserName,
+                    u.NombreCompleto,
+                    u.FotoPerfil,
+                    u.FechaSuspension,
+                    u.FechaSuspensionFin,
+                    u.RazonSuspension,
+                    DiasRestantes = EF.Functions.DateDiffDay(ahora, u.FechaSuspensionFin)
+                })
+                .ToListAsync();
+
+            return Json(new { success = true, suspendidos });
         }
 
         [HttpPost]
@@ -2823,7 +2998,9 @@ namespace Lado.Controllers
                             usedGB = d.UsedGB,
                             freeGB = d.FreeGB,
                             usagePercent = d.UsagePercent,
-                            format = d.DriveFormat
+                            format = d.DriveFormat,
+                            type = d.DriveType,
+                            isSystem = d.IsSystemDrive
                         }),
                         server = new
                         {
@@ -2849,6 +3026,61 @@ namespace Lado.Controllers
         public IActionResult Servidor()
         {
             return View();
+        }
+
+        /// <summary>
+        /// Endpoint de diagnóstico para ver todas las unidades de disco detectadas
+        /// </summary>
+        [HttpGet]
+        public IActionResult DiagnosticoDrives()
+        {
+            var drives = new List<object>();
+
+            try
+            {
+                foreach (var drive in System.IO.DriveInfo.GetDrives())
+                {
+                    var driveInfo = new Dictionary<string, object>
+                    {
+                        ["Name"] = drive.Name,
+                        ["DriveType"] = drive.DriveType.ToString(),
+                        ["IsReady"] = drive.IsReady
+                    };
+
+                    if (drive.IsReady)
+                    {
+                        try
+                        {
+                            driveInfo["VolumeLabel"] = drive.VolumeLabel ?? "(sin etiqueta)";
+                            driveInfo["DriveFormat"] = drive.DriveFormat;
+                            driveInfo["TotalSizeGB"] = drive.TotalSize / 1024 / 1024 / 1024;
+                            driveInfo["FreeSpaceGB"] = drive.AvailableFreeSpace / 1024 / 1024 / 1024;
+                            driveInfo["RootDirectory"] = drive.RootDirectory.FullName;
+                        }
+                        catch (Exception ex)
+                        {
+                            driveInfo["Error"] = ex.Message;
+                        }
+                    }
+                    else
+                    {
+                        driveInfo["Status"] = "No está lista";
+                    }
+
+                    drives.Add(driveInfo);
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, error = ex.Message });
+            }
+
+            return Json(new {
+                success = true,
+                totalDrives = drives.Count,
+                systemDirectory = Environment.SystemDirectory,
+                drives
+            });
         }
 
         // ========================================
@@ -3850,7 +4082,37 @@ namespace Lado.Controllers
                 fechaFin = anuncio.FechaFin?.ToString("yyyy-MM-dd"),
                 impresiones = anuncio.Impresiones,
                 clics = anuncio.Clics,
-                mostrarEnStoriesGlobal = anuncio.MostrarEnStoriesGlobal
+                mostrarEnStoriesGlobal = anuncio.MostrarEnStoriesGlobal,
+                // Ubicaciones
+                mostrarEnFeed = anuncio.MostrarEnFeed,
+                frecuenciaEnFeed = anuncio.FrecuenciaEnFeed,
+                mostrarEnStories = anuncio.MostrarEnStories,
+                mostrarEnExplorar = anuncio.MostrarEnExplorar,
+                mostrarBannerSuperior = anuncio.MostrarBannerSuperior,
+                mostrarBannerInferior = anuncio.MostrarBannerInferior,
+                mostrarEnPerfiles = anuncio.MostrarEnPerfiles,
+                // Frecuencia por usuario
+                maxImpresionesUsuario = anuncio.MaxImpresionesUsuario,
+                maxImpresionesUsuarioDia = anuncio.MaxImpresionesUsuarioDia,
+                minutosEntreImpresiones = anuncio.MinutosEntreImpresiones,
+                // Segmentación por tipo de usuario
+                soloCreadores = anuncio.SoloCreadores,
+                soloFans = anuncio.SoloFans,
+                soloVerificados = anuncio.SoloVerificados,
+                soloConSuscripciones = anuncio.SoloConSuscripciones,
+                // Carrusel
+                esCarrusel = anuncio.EsCarrusel,
+                imagenesCarruselJson = anuncio.ImagenesCarruselJson,
+                // Admin
+                nombreInterno = anuncio.NombreInterno,
+                notasInternas = anuncio.NotasInternas,
+                // Métricas adicionales
+                impresionesHoy = anuncio.ImpresionesHoy,
+                clicsHoy = anuncio.ClicsHoy,
+                usuariosUnicos = anuncio.UsuariosUnicos,
+                gastoTotal = anuncio.GastoTotal,
+                gastoHoy = anuncio.GastoHoy,
+                ctr = anuncio.CTR
             });
         }
 
@@ -3871,7 +4133,32 @@ namespace Lado.Controllers
             string? FechaFin,
             string Estado,
             bool MostrarEnStoriesGlobal,
-            IFormFile? ImagenCreativo)
+            // Ubicaciones
+            bool MostrarEnFeed,
+            int FrecuenciaEnFeed,
+            bool MostrarEnStories,
+            bool MostrarEnExplorar,
+            bool MostrarBannerSuperior,
+            bool MostrarBannerInferior,
+            bool MostrarEnPerfiles,
+            // Frecuencia por usuario
+            int MaxImpresionesUsuario,
+            int MaxImpresionesUsuarioDia,
+            int MinutosEntreImpresiones,
+            // Segmentación por tipo de usuario
+            bool SoloCreadores,
+            bool SoloFans,
+            bool SoloVerificados,
+            bool SoloConSuscripciones,
+            // Carrusel
+            bool EsCarrusel,
+            string? ImagenesCarruselJson,
+            // Admin
+            string? NombreInterno,
+            string? NotasInternas,
+            // Archivo
+            IFormFile? ImagenCreativo,
+            List<IFormFile>? ImagenesCarrusel)
         {
             try
             {
@@ -3896,7 +4183,7 @@ namespace Lado.Controllers
                     }
                 }
 
-                // Actualizar propiedades
+                // Actualizar propiedades básicas
                 anuncio.Titulo = Titulo;
                 anuncio.Descripcion = Descripcion;
                 anuncio.UrlDestino = UrlDestino;
@@ -3915,9 +4202,17 @@ namespace Lado.Controllers
                 {
                     anuncio.FechaInicio = fechaInicioDate;
                 }
+                else
+                {
+                    anuncio.FechaInicio = null;
+                }
                 if (!string.IsNullOrEmpty(FechaFin) && DateTime.TryParse(FechaFin, out var fechaFinDate))
                 {
                     anuncio.FechaFin = fechaFinDate;
+                }
+                else
+                {
+                    anuncio.FechaFin = null;
                 }
 
                 // Estado
@@ -3940,7 +4235,34 @@ namespace Lado.Controllers
                 }
                 anuncio.MostrarEnStoriesGlobal = MostrarEnStoriesGlobal;
 
-                // Procesar imagen del creativo
+                // Ubicaciones
+                anuncio.MostrarEnFeed = MostrarEnFeed;
+                anuncio.FrecuenciaEnFeed = FrecuenciaEnFeed > 0 ? FrecuenciaEnFeed : 5;
+                anuncio.MostrarEnStories = MostrarEnStories;
+                anuncio.MostrarEnExplorar = MostrarEnExplorar;
+                anuncio.MostrarBannerSuperior = MostrarBannerSuperior;
+                anuncio.MostrarBannerInferior = MostrarBannerInferior;
+                anuncio.MostrarEnPerfiles = MostrarEnPerfiles;
+
+                // Frecuencia por usuario
+                anuncio.MaxImpresionesUsuario = MaxImpresionesUsuario >= 0 ? MaxImpresionesUsuario : 0;
+                anuncio.MaxImpresionesUsuarioDia = MaxImpresionesUsuarioDia >= 0 ? MaxImpresionesUsuarioDia : 3;
+                anuncio.MinutosEntreImpresiones = MinutosEntreImpresiones >= 0 ? MinutosEntreImpresiones : 30;
+
+                // Segmentación por tipo de usuario
+                anuncio.SoloCreadores = SoloCreadores;
+                anuncio.SoloFans = SoloFans;
+                anuncio.SoloVerificados = SoloVerificados;
+                anuncio.SoloConSuscripciones = SoloConSuscripciones;
+
+                // Carrusel
+                anuncio.EsCarrusel = EsCarrusel;
+
+                // Admin
+                anuncio.NombreInterno = NombreInterno;
+                anuncio.NotasInternas = NotasInternas;
+
+                // Procesar imagen del creativo principal
                 if (ImagenCreativo != null && ImagenCreativo.Length > 0)
                 {
                     var nombreArchivo = $"anuncio_lado_{Guid.NewGuid()}{Path.GetExtension(ImagenCreativo.FileName)}";
@@ -3984,6 +4306,55 @@ namespace Lado.Controllers
                     return RedirectToAction(nameof(Publicidad));
                 }
 
+                // Procesar imágenes del carrusel
+                if (EsCarrusel && ImagenesCarrusel != null && ImagenesCarrusel.Count > 0)
+                {
+                    var urlsCarrusel = new List<string>();
+
+                    // Mantener URLs existentes si se envían
+                    if (!string.IsNullOrEmpty(ImagenesCarruselJson))
+                    {
+                        try
+                        {
+                            urlsCarrusel = System.Text.Json.JsonSerializer.Deserialize<List<string>>(ImagenesCarruselJson) ?? new List<string>();
+                        }
+                        catch { }
+                    }
+
+                    foreach (var imagen in ImagenesCarrusel)
+                    {
+                        if (imagen.Length > 0)
+                        {
+                            var nombreArchivo = $"carrusel_{Guid.NewGuid()}{Path.GetExtension(imagen.FileName)}";
+                            var rutaArchivo = Path.Combine("wwwroot", "uploads", "anuncios", "carrusel", nombreArchivo);
+
+                            var directorio = Path.GetDirectoryName(rutaArchivo);
+                            if (!string.IsNullOrEmpty(directorio) && !Directory.Exists(directorio))
+                            {
+                                Directory.CreateDirectory(directorio);
+                            }
+
+                            using (var stream = new FileStream(rutaArchivo, FileMode.Create))
+                            {
+                                await imagen.CopyToAsync(stream);
+                            }
+
+                            urlsCarrusel.Add($"/uploads/anuncios/carrusel/{nombreArchivo}");
+                        }
+                    }
+
+                    anuncio.ImagenesCarruselJson = System.Text.Json.JsonSerializer.Serialize(urlsCarrusel);
+                }
+                else if (!EsCarrusel)
+                {
+                    anuncio.ImagenesCarruselJson = null;
+                }
+                else if (!string.IsNullOrEmpty(ImagenesCarruselJson))
+                {
+                    // Mantener las URLs existentes
+                    anuncio.ImagenesCarruselJson = ImagenesCarruselJson;
+                }
+
                 if (esNuevo)
                 {
                     _context.Anuncios.Add(anuncio);
@@ -3998,6 +4369,185 @@ namespace Lado.Controllers
             }
 
             return RedirectToAction(nameof(Publicidad));
+        }
+
+        /// <summary>
+        /// Duplica un anuncio de Lado existente
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> DuplicarAnuncioLado([FromBody] DuplicarAnuncioRequest request)
+        {
+            try
+            {
+                var original = await _context.Anuncios.FindAsync(request.Id);
+                if (original == null || !original.EsAnuncioLado)
+                {
+                    return Json(new { success = false, message = "Anuncio no encontrado" });
+                }
+
+                var copia = new Anuncio
+                {
+                    EsAnuncioLado = true,
+                    Titulo = $"{original.Titulo} (Copia)",
+                    Descripcion = original.Descripcion,
+                    UrlDestino = original.UrlDestino,
+                    UrlCreativo = original.UrlCreativo,
+                    TipoCreativo = original.TipoCreativo,
+                    TextoBoton = original.TextoBoton,
+                    TextoBotonPersonalizado = original.TextoBotonPersonalizado,
+                    Prioridad = original.Prioridad,
+                    // Ubicaciones
+                    MostrarEnFeed = original.MostrarEnFeed,
+                    FrecuenciaEnFeed = original.FrecuenciaEnFeed,
+                    MostrarEnStories = original.MostrarEnStories,
+                    MostrarEnExplorar = original.MostrarEnExplorar,
+                    MostrarBannerSuperior = original.MostrarBannerSuperior,
+                    MostrarBannerInferior = original.MostrarBannerInferior,
+                    MostrarEnPerfiles = original.MostrarEnPerfiles,
+                    MostrarEnStoriesGlobal = false, // No copiar esto
+                    // Frecuencia
+                    MaxImpresionesUsuario = original.MaxImpresionesUsuario,
+                    MaxImpresionesUsuarioDia = original.MaxImpresionesUsuarioDia,
+                    MinutosEntreImpresiones = original.MinutosEntreImpresiones,
+                    // Segmentación
+                    SoloCreadores = original.SoloCreadores,
+                    SoloFans = original.SoloFans,
+                    SoloVerificados = original.SoloVerificados,
+                    SoloConSuscripciones = original.SoloConSuscripciones,
+                    // Carrusel
+                    EsCarrusel = original.EsCarrusel,
+                    ImagenesCarruselJson = original.ImagenesCarruselJson,
+                    // Presupuesto (copiamos la configuración)
+                    PresupuestoDiario = original.PresupuestoDiario,
+                    PresupuestoTotal = original.PresupuestoTotal,
+                    CostoPorMilImpresiones = original.CostoPorMilImpresiones,
+                    CostoPorClic = original.CostoPorClic,
+                    // Estado
+                    Estado = EstadoAnuncio.Borrador, // Siempre inicia como borrador
+                    FechaCreacion = DateTime.Now,
+                    UltimaActualizacion = DateTime.Now,
+                    // Admin
+                    NombreInterno = !string.IsNullOrEmpty(original.NombreInterno) ? $"{original.NombreInterno} (Copia)" : null,
+                    NotasInternas = original.NotasInternas
+                    // Métricas empiezan en 0 por defecto
+                };
+
+                _context.Anuncios.Add(copia);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, id = copia.Id, message = "Anuncio duplicado exitosamente" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al duplicar: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Obtiene estadísticas de un anuncio para reportes
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ObtenerEstadisticasAnuncio(int id, int dias = 30)
+        {
+            var anuncio = await _context.Anuncios.FindAsync(id);
+            if (anuncio == null || !anuncio.EsAnuncioLado)
+            {
+                return NotFound();
+            }
+
+            var fechaInicio = DateTime.Now.AddDays(-dias);
+
+            // Obtener impresiones por día
+            var impresionesDetalle = await _context.Set<ImpresionAnuncio>()
+                .Where(i => i.AnuncioId == id && i.FechaImpresion >= fechaInicio)
+                .GroupBy(i => i.FechaImpresion.Date)
+                .Select(g => new { Fecha = g.Key, Total = g.Count() })
+                .OrderBy(x => x.Fecha)
+                .ToListAsync();
+
+            // Obtener clics por día
+            var clicsDetalle = await _context.Set<ClicAnuncio>()
+                .Where(c => c.AnuncioId == id && c.FechaClic >= fechaInicio)
+                .GroupBy(c => c.FechaClic.Date)
+                .Select(g => new { Fecha = g.Key, Total = g.Count() })
+                .OrderBy(x => x.Fecha)
+                .ToListAsync();
+
+            return Json(new
+            {
+                anuncioId = id,
+                titulo = anuncio.Titulo,
+                impresionesTotales = anuncio.Impresiones,
+                clicsTotales = anuncio.Clics,
+                ctr = anuncio.CTR,
+                usuariosUnicos = anuncio.UsuariosUnicos,
+                impresionesHoy = anuncio.ImpresionesHoy,
+                clicsHoy = anuncio.ClicsHoy,
+                impresionesDetalle = impresionesDetalle.Select(x => new { fecha = x.Fecha.ToString("yyyy-MM-dd"), total = x.Total }),
+                clicsDetalle = clicsDetalle.Select(x => new { fecha = x.Fecha.ToString("yyyy-MM-dd"), total = x.Total })
+            });
+        }
+
+        /// <summary>
+        /// Elimina una imagen del carrusel de un anuncio
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> EliminarImagenCarrusel([FromBody] EliminarImagenCarruselRequest request)
+        {
+            try
+            {
+                var anuncio = await _context.Anuncios.FindAsync(request.AnuncioId);
+                if (anuncio == null || !anuncio.EsAnuncioLado)
+                {
+                    return Json(new { success = false, message = "Anuncio no encontrado" });
+                }
+
+                if (string.IsNullOrEmpty(anuncio.ImagenesCarruselJson))
+                {
+                    return Json(new { success = false, message = "No hay imágenes en el carrusel" });
+                }
+
+                var imagenes = System.Text.Json.JsonSerializer.Deserialize<List<string>>(anuncio.ImagenesCarruselJson) ?? new List<string>();
+
+                if (request.Index >= 0 && request.Index < imagenes.Count)
+                {
+                    var urlImagen = imagenes[request.Index];
+                    imagenes.RemoveAt(request.Index);
+
+                    // Eliminar archivo físico
+                    var rutaArchivo = Path.Combine("wwwroot", urlImagen.TrimStart('/'));
+                    if (System.IO.File.Exists(rutaArchivo))
+                    {
+                        System.IO.File.Delete(rutaArchivo);
+                    }
+
+                    anuncio.ImagenesCarruselJson = imagenes.Count > 0
+                        ? System.Text.Json.JsonSerializer.Serialize(imagenes)
+                        : null;
+                    anuncio.EsCarrusel = imagenes.Count > 0;
+                    anuncio.UltimaActualizacion = DateTime.Now;
+
+                    await _context.SaveChangesAsync();
+                    return Json(new { success = true, message = "Imagen eliminada" });
+                }
+
+                return Json(new { success = false, message = "Índice inválido" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error: {ex.Message}" });
+            }
+        }
+
+        public class DuplicarAnuncioRequest
+        {
+            public int Id { get; set; }
+        }
+
+        public class EliminarImagenCarruselRequest
+        {
+            public int AnuncioId { get; set; }
+            public int Index { get; set; }
         }
 
         /// <summary>
@@ -7637,7 +8187,8 @@ Este email fue enviado a {{{{email}}}}
 
             // Validacion: fondo transparente requiere contenido o imagen
             var fondoTransparente = string.IsNullOrWhiteSpace(colorFondo) ||
-                                    colorFondo.Equals("transparent", StringComparison.OrdinalIgnoreCase);
+                                    colorFondo.Equals("transparent", StringComparison.OrdinalIgnoreCase) ||
+                                    colorFondo.Equals("#00000000", StringComparison.OrdinalIgnoreCase);
             var tieneContenido = !string.IsNullOrWhiteSpace(titulo) ||
                                  !string.IsNullOrWhiteSpace(contenido?.Replace("<br>", "").Replace("&nbsp;", "").Trim());
             var tieneImagen = !string.IsNullOrWhiteSpace(imagenUrl);
@@ -7680,7 +8231,10 @@ Este email fue enviado a {{{{email}}}}
                 popup.IconoClase = iconoClase;
                 popup.BotonesJson = botonesJson;
                 popup.Posicion = posicion;
-                popup.ColorFondo = colorFondo;
+                // Convertir 'transparent' a un valor hex seguro para evitar problemas de renderizado
+                popup.ColorFondo = colorFondo?.Equals("transparent", StringComparison.OrdinalIgnoreCase) == true
+                    ? "#00000000"
+                    : colorFondo;
                 popup.ColorTexto = colorTexto;
                 popup.ColorBotonPrimario = colorBotonPrimario;
                 popup.CssPersonalizado = cssPersonalizado;
@@ -9620,8 +10174,12 @@ Este email fue enviado a {{{{email}}}}
                 }
 
                 // Convertir con ffmpeg
-                // Parámetros optimizados estilo TikTok: H.264, 30fps, AAC 192kbps
-                var arguments = $"-y -i \"{rutaFisica}\" -c:v libx264 -preset medium -crf 23 -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -movflags +faststart -vf \"scale='min(1920,iw)':-2\" \"{rutaTemporal}\"";
+                // Parámetros agresivos para máxima compresión:
+                // -crf 28: Mayor compresión (23 era muy conservador)
+                // -preset slow: Mejor compresión (toma más tiempo)
+                // -maxrate 4M -bufsize 8M: Limitar bitrate máximo
+                // -profile:v main -level 4.0: Compatibilidad amplia
+                var arguments = $"-y -i \"{rutaFisica}\" -c:v libx264 -profile:v main -level 4.0 -preset slow -crf 28 -maxrate 4M -bufsize 8M -pix_fmt yuv420p -r 30 -c:a aac -b:a 128k -movflags +faststart -vf \"scale='min(1080,iw)':-2\" \"{rutaTemporal}\"";
 
                 var processInfo = new System.Diagnostics.ProcessStartInfo
                 {

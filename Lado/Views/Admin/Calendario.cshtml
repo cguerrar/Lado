@@ -1,0 +1,464 @@
+@using Lado.Models
+@{
+    ViewData["Title"] = "Calendario";
+    Layout = "_AdminLayout";
+    var proximosEventos = ViewBag.ProximosEventos as List<EventoAdmin>;
+    var admins = ViewBag.Admins;
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Columna principal - Calendario -->
+        <div class="col-lg-9">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-calendar3 me-2"></i>Calendario de Eventos</h5>
+                    <button class="btn btn-primary btn-sm" onclick="nuevoEvento()">
+                        <i class="bi bi-plus-lg me-1"></i>Nuevo Evento
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="calendario"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-3">
+            <!-- Próximos eventos -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="bi bi-clock me-2"></i>Proximos Eventos</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        @if (proximosEventos?.Any() == true)
+                        {
+                            @foreach (var evento in proximosEventos)
+                            {
+                                <a href="#" class="list-group-item list-group-item-action" onclick="verEvento(@evento.Id); return false;">
+                                    <div class="d-flex align-items-center">
+                                        <div class="rounded-circle me-2" style="width: 10px; height: 10px; background-color: @GetColorHex(evento.Color);"></div>
+                                        <div>
+                                            <div class="fw-semibold text-truncate" style="max-width: 180px;">@evento.Titulo</div>
+                                            <small class="text-muted">
+                                                <i class="bi bi-calendar me-1"></i>@evento.FechaInicio.ToString("dd/MM HH:mm")
+                                            </small>
+                                        </div>
+                                    </div>
+                                </a>
+                            }
+                        }
+                        else
+                        {
+                            <div class="list-group-item text-center text-muted py-4">
+                                <i class="bi bi-calendar-x d-block mb-2 fs-4"></i>
+                                Sin eventos proximos
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leyenda de colores -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="bi bi-palette me-2"></i>Tipos de Evento</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2">
+                        <span class="badge" style="background-color: #3b82f6;">General</span>
+                        <span class="badge" style="background-color: #10b981;">Reunion</span>
+                        <span class="badge" style="background-color: #ef4444;">Mantenimiento</span>
+                        <span class="badge" style="background-color: #f59e0b;">Lanzamiento</span>
+                        <span class="badge" style="background-color: #8b5cf6;">Revision</span>
+                        <span class="badge" style="background-color: #64748b;">Deadline</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones rápidas -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="bi bi-lightning me-2"></i>Acciones Rapidas</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-success btn-sm" onclick="crearEventoRapido('Reunion')">
+                            <i class="bi bi-people me-1"></i>Nueva Reunion
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="crearEventoRapido('Mantenimiento')">
+                            <i class="bi bi-tools me-1"></i>Programar Mantenimiento
+                        </button>
+                        <button class="btn btn-outline-warning btn-sm" onclick="crearEventoRapido('Deadline')">
+                            <i class="bi bi-flag me-1"></i>Agregar Deadline
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Evento -->
+<div class="modal fade" id="modalEvento" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalEventoTitle"><i class="bi bi-calendar-plus me-2"></i>Nuevo Evento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="eventoId">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Titulo <span class="text-danger">*</span></label>
+                        <input type="text" id="eventoTitulo" class="form-control" maxlength="200">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Tipo</label>
+                        <select id="eventoTipo" class="form-select">
+                            <option value="0">General</option>
+                            <option value="1">Reunion</option>
+                            <option value="2">Mantenimiento</option>
+                            <option value="3">Lanzamiento</option>
+                            <option value="4">Revision</option>
+                            <option value="5">Capacitacion</option>
+                            <option value="6">Deadline</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Color</label>
+                        <select id="eventoColor" class="form-select">
+                            <option value="0">Azul</option>
+                            <option value="1">Verde</option>
+                            <option value="2">Rojo</option>
+                            <option value="3">Amarillo</option>
+                            <option value="4">Morado</option>
+                            <option value="5">Rosa</option>
+                            <option value="6">Naranja</option>
+                            <option value="7">Gris</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Fecha/Hora Inicio</label>
+                        <input type="datetime-local" id="eventoInicio" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Fecha/Hora Fin</label>
+                        <input type="datetime-local" id="eventoFin" class="form-control">
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="eventoTodoElDia">
+                            <label class="form-check-label" for="eventoTodoElDia">Todo el dia</label>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Descripcion</label>
+                        <textarea id="eventoDescripcion" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Ubicacion / Enlace</label>
+                        <input type="text" id="eventoUbicacion" class="form-control" placeholder="Ej: Sala de reuniones, https://meet.google.com/...">
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="eventoRecordatorio">
+                            <label class="form-check-label" for="eventoRecordatorio">Enviar recordatorio</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <select id="eventoMinutosRecordatorio" class="form-select form-select-sm">
+                            <option value="15">15 min antes</option>
+                            <option value="30" selected>30 min antes</option>
+                            <option value="60">1 hora antes</option>
+                            <option value="1440">1 dia antes</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Notas privadas</label>
+                        <textarea id="eventoNotas" class="form-control" rows="2" placeholder="Solo visibles para ti"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger me-auto" id="btnEliminarEvento" onclick="eliminarEvento()" style="display: none;">
+                    <i class="bi bi-trash me-1"></i>Eliminar
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="guardarEvento()">
+                    <i class="bi bi-check-lg me-1"></i>Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/locales/es.global.min.js"></script>
+
+    <script>
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ||
+                      document.querySelector('meta[name="csrf-token"]')?.content;
+
+        let calendar;
+        const modalEvento = new bootstrap.Modal(document.getElementById('modalEvento'));
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const calendarEl = document.getElementById('calendario');
+
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'es',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+                },
+                buttonText: {
+                    today: 'Hoy',
+                    month: 'Mes',
+                    week: 'Semana',
+                    day: 'Dia',
+                    list: 'Lista'
+                },
+                events: '/Admin/ObtenerEventos',
+                editable: true,
+                selectable: true,
+                selectMirror: true,
+                dayMaxEvents: true,
+                weekNumbers: true,
+                navLinks: true,
+                nowIndicator: true,
+                height: 'auto',
+
+                select: function(info) {
+                    nuevoEvento(info.start, info.end, info.allDay);
+                },
+
+                eventClick: function(info) {
+                    verEvento(info.event.id);
+                },
+
+                eventDrop: function(info) {
+                    moverEvento(info.event.id, info.event.start, info.event.end);
+                },
+
+                eventResize: function(info) {
+                    moverEvento(info.event.id, info.event.start, info.event.end);
+                }
+            });
+
+            calendar.render();
+        });
+
+        function nuevoEvento(start, end, allDay) {
+            document.getElementById('modalEventoTitle').innerHTML = '<i class="bi bi-calendar-plus me-2"></i>Nuevo Evento';
+            document.getElementById('eventoId').value = '';
+            document.getElementById('eventoTitulo').value = '';
+            document.getElementById('eventoTipo').value = '0';
+            document.getElementById('eventoColor').value = '0';
+            document.getElementById('eventoDescripcion').value = '';
+            document.getElementById('eventoUbicacion').value = '';
+            document.getElementById('eventoRecordatorio').checked = false;
+            document.getElementById('eventoNotas').value = '';
+            document.getElementById('btnEliminarEvento').style.display = 'none';
+
+            if (start) {
+                document.getElementById('eventoInicio').value = formatDateForInput(start);
+                document.getElementById('eventoTodoElDia').checked = allDay || false;
+                if (end) {
+                    document.getElementById('eventoFin').value = formatDateForInput(end);
+                }
+            } else {
+                const now = new Date();
+                document.getElementById('eventoInicio').value = formatDateForInput(now);
+                document.getElementById('eventoTodoElDia').checked = false;
+            }
+
+            modalEvento.show();
+        }
+
+        async function verEvento(id) {
+            try {
+                const response = await fetch(`/Admin/ObtenerEvento?id=${id}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const e = data.evento;
+                    document.getElementById('modalEventoTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Editar Evento';
+                    document.getElementById('eventoId').value = e.id;
+                    document.getElementById('eventoTitulo').value = e.titulo;
+                    document.getElementById('eventoTipo').value = e.tipo;
+                    document.getElementById('eventoColor').value = e.color;
+                    document.getElementById('eventoInicio').value = e.fechaInicio;
+                    document.getElementById('eventoFin').value = e.fechaFin || '';
+                    document.getElementById('eventoTodoElDia').checked = e.todoElDia;
+                    document.getElementById('eventoDescripcion').value = e.descripcion || '';
+                    document.getElementById('eventoUbicacion').value = e.ubicacion || '';
+                    document.getElementById('eventoRecordatorio').checked = e.enviarRecordatorio;
+                    document.getElementById('eventoMinutosRecordatorio').value = e.minutosAnteRecordatorio;
+                    document.getElementById('eventoNotas').value = e.notas || '';
+                    document.getElementById('btnEliminarEvento').style.display = 'block';
+
+                    modalEvento.show();
+                } else {
+                    showToast(data.error, 'error');
+                }
+            } catch (error) {
+                showToast('Error al cargar evento', 'error');
+            }
+        }
+
+        async function guardarEvento() {
+            const id = document.getElementById('eventoId').value;
+            const data = {
+                id: id ? parseInt(id) : 0,
+                titulo: document.getElementById('eventoTitulo').value,
+                tipo: parseInt(document.getElementById('eventoTipo').value),
+                color: parseInt(document.getElementById('eventoColor').value),
+                fechaInicio: document.getElementById('eventoInicio').value,
+                fechaFin: document.getElementById('eventoFin').value || null,
+                todoElDia: document.getElementById('eventoTodoElDia').checked,
+                descripcion: document.getElementById('eventoDescripcion').value || null,
+                ubicacion: document.getElementById('eventoUbicacion').value || null,
+                enviarRecordatorio: document.getElementById('eventoRecordatorio').checked,
+                minutosAnteRecordatorio: parseInt(document.getElementById('eventoMinutosRecordatorio').value),
+                notas: document.getElementById('eventoNotas').value || null
+            };
+
+            if (!data.titulo || !data.fechaInicio) {
+                showToast('Titulo y fecha son requeridos', 'warning');
+                return;
+            }
+
+            try {
+                const url = id ? '/Admin/ActualizarEvento' : '/Admin/CrearEvento';
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showToast(result.mensaje, 'success');
+                    modalEvento.hide();
+                    calendar.refetchEvents();
+                } else {
+                    showToast(result.error, 'error');
+                }
+            } catch (error) {
+                showToast('Error al guardar', 'error');
+            }
+        }
+
+        async function moverEvento(id, start, end) {
+            try {
+                const formData = new FormData();
+                formData.append('id', id);
+                formData.append('start', start.toISOString());
+                if (end) formData.append('end', end.toISOString());
+
+                const response = await fetch('/Admin/MoverEvento', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (!result.success) {
+                    showToast(result.error, 'error');
+                    calendar.refetchEvents();
+                }
+            } catch (error) {
+                showToast('Error al mover evento', 'error');
+                calendar.refetchEvents();
+            }
+        }
+
+        async function eliminarEvento() {
+            const id = document.getElementById('eventoId').value;
+            if (!id || !confirm('¿Eliminar este evento?')) return;
+
+            try {
+                const formData = new FormData();
+                formData.append('id', id);
+
+                const response = await fetch('/Admin/EliminarEvento', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showToast(result.mensaje, 'success');
+                    modalEvento.hide();
+                    calendar.refetchEvents();
+                } else {
+                    showToast(result.error, 'error');
+                }
+            } catch (error) {
+                showToast('Error al eliminar', 'error');
+            }
+        }
+
+        function crearEventoRapido(tipo) {
+            const tipos = { 'Reunion': 1, 'Mantenimiento': 2, 'Deadline': 6 };
+            const colores = { 'Reunion': 1, 'Mantenimiento': 2, 'Deadline': 7 };
+
+            nuevoEvento();
+            document.getElementById('eventoTipo').value = tipos[tipo] || 0;
+            document.getElementById('eventoColor').value = colores[tipo] || 0;
+            document.getElementById('eventoTitulo').focus();
+        }
+
+        function formatDateForInput(date) {
+            return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        }
+    </script>
+
+    <style>
+        .fc {
+            font-family: inherit;
+        }
+        .fc-toolbar-title {
+            font-size: 1.25rem !important;
+            font-weight: 600;
+        }
+        .fc-button {
+            font-size: 0.875rem !important;
+        }
+        .fc-event {
+            cursor: pointer;
+            border: none;
+            padding: 2px 4px;
+        }
+        .fc-daygrid-event {
+            border-radius: 4px;
+        }
+    </style>
+}
+
+@functions {
+    string GetColorHex(ColorEvento color)
+    {
+        return color switch
+        {
+            ColorEvento.Azul => "#3b82f6",
+            ColorEvento.Verde => "#10b981",
+            ColorEvento.Rojo => "#ef4444",
+            ColorEvento.Amarillo => "#f59e0b",
+            ColorEvento.Morado => "#8b5cf6",
+            ColorEvento.Rosa => "#ec4899",
+            ColorEvento.Naranja => "#f97316",
+            ColorEvento.Gris => "#64748b",
+            _ => "#3b82f6"
+        };
+    }
+}

@@ -18,6 +18,7 @@ namespace Lado.Controllers
         private readonly IRateLimitService _rateLimitService;
         private readonly ILadoCoinsService _ladoCoinsService;
         private readonly IReferidosService _referidosService;
+        private readonly ISuscripcionCacheService _suscripcionCache;
 
         public PagosController(
             ApplicationDbContext context,
@@ -25,7 +26,8 @@ namespace Lado.Controllers
             ILogger<PagosController> logger,
             IRateLimitService rateLimitService,
             ILadoCoinsService ladoCoinsService,
-            IReferidosService referidosService)
+            IReferidosService referidosService,
+            ISuscripcionCacheService suscripcionCache)
         {
             _context = context;
             _userManager = userManager;
@@ -33,6 +35,7 @@ namespace Lado.Controllers
             _rateLimitService = rateLimitService;
             _ladoCoinsService = ladoCoinsService;
             _referidosService = referidosService;
+            _suscripcionCache = suscripcionCache;
         }
 
         // ============================================
@@ -242,6 +245,10 @@ namespace Lado.Controllers
                     }
 
                     await _context.SaveChangesAsync();
+
+                    // Invalidar caché de suscripciones
+                    _suscripcionCache.InvalidarCache(usuarioId, creadorId);
+
                     await transaction.CommitAsync();
 
                     var textoDuracionMsg = Suscripcion.ObtenerTextoDuracion(tipoDuracion);
@@ -308,6 +315,9 @@ namespace Lado.Controllers
 
                 await _context.SaveChangesAsync();
 
+                // Invalidar caché de suscripciones
+                _suscripcionCache.InvalidarCache(usuarioId!, creadorId);
+
                 _logger.LogInformation($"Suscripción cancelada: Fan {usuarioId} -> Creador {creadorId}");
 
                 TempData["Success"] = "Suscripción cancelada exitosamente";
@@ -337,6 +347,23 @@ namespace Lado.Controllers
                 if (usuario == null)
                 {
                     return Json(new { success = false, message = "Usuario no encontrado" });
+                }
+
+                // Rate limiting: máximo 20 desbloqueos por 5 minutos por usuario
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var userAgent = Request.Headers.UserAgent.ToString();
+                if (!await _rateLimitService.IsAllowedAsync(
+                    clientIp,
+                    $"desbloquear_contenido_{usuarioId}",
+                    20,
+                    TimeSpan.FromMinutes(5),
+                    TipoAtaque.Fraude,
+                    "/Pagos/DesbloquearContenido",
+                    usuarioId,
+                    userAgent))
+                {
+                    _logger.LogWarning("Rate limit excedido para desbloquear contenido: Usuario {UserId}, IP {Ip}", usuarioId, clientIp);
+                    return Json(new { success = false, message = "Demasiadas solicitudes. Por favor espera unos minutos." });
                 }
 
                 // Obtener el contenido
@@ -504,6 +531,23 @@ namespace Lado.Controllers
                 if (usuario == null)
                 {
                     return Json(new { success = false, message = "Usuario no encontrado. Inicia sesión de nuevo." });
+                }
+
+                // Rate limiting: máximo 10 tips por 5 minutos por usuario
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var userAgent = Request.Headers.UserAgent.ToString();
+                if (!await _rateLimitService.IsAllowedAsync(
+                    clientIp,
+                    $"enviar_tip_{usuarioId}",
+                    10,
+                    TimeSpan.FromMinutes(5),
+                    TipoAtaque.Fraude,
+                    "/Pagos/EnviarTip",
+                    usuarioId,
+                    userAgent))
+                {
+                    _logger.LogWarning("Rate limit excedido para enviar tip: Usuario {UserId}, IP {Ip}", usuarioId, clientIp);
+                    return Json(new { success = false, message = "Demasiadas propinas enviadas. Por favor espera unos minutos." });
                 }
 
                 if (string.IsNullOrEmpty(request?.CreadorId))

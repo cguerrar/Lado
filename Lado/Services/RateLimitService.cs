@@ -345,5 +345,13 @@ namespace Lado.Services
         // Una IP no debería crear más de 100 contenidos por hora
         public const int ContentCreation_IP_Hourly_MaxRequests = 100;
         public static readonly TimeSpan ContentCreation_IP_Hourly_Window = TimeSpan.FromHours(1);
+
+        // Webhooks de PayPal: máximo 100 por minuto por IP (protección anti-DDoS)
+        public const int PayPalWebhook_MaxRequests = 100;
+        public static readonly TimeSpan PayPalWebhook_Window = TimeSpan.FromMinutes(1);
+
+        // Webhooks de PayPal: máximo 500 por hora global (todas las IPs)
+        public const int PayPalWebhook_Global_MaxRequests = 500;
+        public static readonly TimeSpan PayPalWebhook_Global_Window = TimeSpan.FromHours(1);
     }
 }

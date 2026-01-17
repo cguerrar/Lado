@@ -2594,8 +2594,9 @@
 								<div class="user-info-pseudo">@usernameNavbar</div>
 							</li>
 						}
-						<li><a class="dropdown-item" href="/Usuario/Perfil/@usuario?.Id">@Localizer.Get("Profile_MyProfile")</a></li>
+						<li><a class="dropdown-item" href="/Feed/Perfil/@usuario?.Id">@Localizer.Get("Profile_MyProfile")</a></li>
 						<li><a class="dropdown-item" href="/Usuario/Configuracion">@Localizer.Get("Nav_Settings")</a></li>
+						<li><a class="dropdown-item" href="/Usuario/Perfil/@usuario?.Id">Editar Perfil</a></li>
 						<li><hr class="dropdown-divider"></li>
 						<li><a class="dropdown-item" href="/Account/Logout">@Localizer.Get("Nav_Logout")</a></li>
 					</ul>
@@ -4716,9 +4717,22 @@
 			if (popup.cerrarAlClickFuera && (popup.tipo === 1 || popup.tipo === 3 || popup.tipo === 4)) {
 				element.addEventListener('click', function(e) {
 					// Cerrar si el clic fue en el overlay (no en el popup interno)
-					if (e.target === element || e.target.classList.contains('lado-popup-overlay')) {
-						closePopup(popup.id);
+					const target = e.target;
+					const isOverlay = target === element ||
+					                  target.classList.contains('lado-popup-overlay') ||
+					                  target.classList.contains('imagen-only');
+					if (isOverlay) {
+						window.closePopup(popup.id);
 					}
+				});
+			}
+
+			// Configurar botón X (usando event delegation por si el onclick falla)
+			const closeBtn = element.querySelector('.lado-popup-close');
+			if (closeBtn) {
+				closeBtn.addEventListener('click', function(e) {
+					e.stopPropagation();
+					window.closePopup(popup.id);
 				});
 			}
 		}
@@ -4837,18 +4851,22 @@
 
 				default: // Modal (1)
 					// Detectar si es popup de solo imagen (fondo transparente + imagen + sin contenido real)
+					const colorBg = popup.colorFondo?.toLowerCase() || '';
+					const esTransparenteBg = !colorBg || colorBg === 'transparent' || colorBg === '#00000000';
 					const esImagenOnly = popup.imagenUrl &&
-						(!popup.colorFondo || popup.colorFondo.toLowerCase() === 'transparent') &&
+						esTransparenteBg &&
 						!popup.titulo &&
 						(!contenido || contenido.replace(/<[^>]*>/g, '').trim() === '');
 
 					if (esImagenOnly) {
 						// Popup de solo imagen: estructura especial con botón X en el borde de la imagen
+						// anchoMaximo contiene el porcentaje (20-90) para popups de imagen
+						const anchoPct = popup.anchoMaximo <= 100 ? popup.anchoMaximo : 50; // Si es <= 100, es porcentaje
 						return `
 						<div id="lado-popup-${popup.id}" class="lado-popup-overlay ${animClass}">
-							<div class="lado-popup imagen-only" style="max-width:${popup.anchoMaximo || 400}px;">
+							<div class="lado-popup imagen-only" style="width:${anchoPct}vw;max-width:${anchoPct}vw;">
 								<div class="lado-popup-image-wrapper">
-									<img src="${popup.imagenUrl}" class="lado-popup-image" alt="" style="max-width:${popup.anchoMaximo || 400}px;">
+									<img src="${popup.imagenUrl}" class="lado-popup-image" alt="">
 									${popup.mostrarBotonCerrar ? `<button class="lado-popup-close" onclick="window.closePopup(${popup.id})">&times;</button>` : ''}
 								</div>
 							</div>

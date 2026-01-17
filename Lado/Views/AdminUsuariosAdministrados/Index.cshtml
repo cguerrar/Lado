@@ -1,0 +1,303 @@
+@model IEnumerable<dynamic>
+@{
+    ViewData["Title"] = "Usuarios Administrados";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+<style>
+    .admin-page { padding: 20px; max-width: 1400px; margin: 0 auto; }
+
+    /* Header con info */
+    .page-header { margin-bottom: 24px; }
+    .page-header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .page-title { font-size: 24px; font-weight: 700; color: var(--fg); margin: 0; }
+    .btn-crear { background: var(--primary); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; text-decoration: none; transition: all 0.2s; }
+    .btn-crear:hover { background: var(--primary-hover); color: #fff; transform: translateY(-1px); }
+
+    /* Info box */
+    .info-box { background: linear-gradient(135deg, rgba(0,149,246,0.1), rgba(0,149,246,0.05)); border: 1px solid rgba(0,149,246,0.2); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; }
+    .info-box-content { display: flex; align-items: flex-start; gap: 12px; }
+    .info-box-icon { width: 40px; height: 40px; background: var(--primary); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .info-box-icon svg { color: #fff; }
+    .info-box-text h3 { font-size: 15px; font-weight: 600; color: var(--fg); margin: 0 0 4px 0; }
+    .info-box-text p { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5; }
+
+    /* Stats globales */
+    .global-stats { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .global-stat { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; min-width: 140px; }
+    .global-stat-value { font-size: 28px; font-weight: 700; color: var(--fg); }
+    .global-stat-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .global-stat.primary .global-stat-value { color: var(--primary); }
+    .global-stat.success .global-stat-value { color: #388e3c; }
+    .global-stat.warning .global-stat-value { color: #f57c00; }
+
+    /* Search */
+    .search-box { margin-bottom: 20px; }
+    .search-input { width: 100%; max-width: 400px; padding: 10px 16px; padding-left: 40px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); font-size: 14px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: 12px center; }
+    .search-input:focus { outline: none; border-color: var(--primary); }
+
+    /* Grid de usuarios */
+    .usuarios-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
+    .usuario-card { background: var(--surface); border-radius: 12px; border: 1px solid var(--line); overflow: hidden; transition: all 0.2s; }
+    .usuario-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-color: var(--primary); }
+
+    .usuario-card-header { display: flex; align-items: center; gap: 14px; padding: 20px; border-bottom: 1px solid var(--line); }
+    .usuario-avatar { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: var(--bg-tertiary); }
+    .usuario-avatar-placeholder { width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), #833ab4); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 600; color: #fff; }
+    .usuario-info { flex: 1; min-width: 0; }
+    .usuario-nombre { font-weight: 600; font-size: 16px; color: var(--fg); display: flex; align-items: center; gap: 8px; }
+    .usuario-username { color: var(--muted); font-size: 13px; margin-top: 2px; }
+    .usuario-badges { display: flex; gap: 6px; margin-top: 6px; }
+    .badge { font-size: 10px; padding: 3px 8px; border-radius: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+    .badge-creador { background: rgba(0,149,246,0.15); color: #0095f6; }
+    .badge-activo { background: rgba(56,142,60,0.15); color: #388e3c; }
+    .badge-inactivo { background: rgba(211,47,47,0.15); color: #d32f2f; }
+
+    .usuario-card-body { padding: 16px 20px; }
+    .usuario-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .stat-item { text-align: center; padding: 10px 8px; background: var(--bg); border-radius: 8px; }
+    .stat-value { font-size: 20px; font-weight: 700; }
+    .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; margin-top: 2px; }
+    .stat-pendiente .stat-value { color: #f57c00; }
+    .stat-programado .stat-value { color: #1976d2; }
+    .stat-publicado .stat-value { color: #388e3c; }
+
+    .usuario-card-footer { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: var(--bg); border-top: 1px solid var(--line); }
+    .auto-status { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; }
+    .auto-status.activa { color: #388e3c; }
+    .auto-status.inactiva { color: var(--muted); }
+    .auto-status-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .auto-status.activa .auto-status-dot { background: #388e3c; animation: pulse 2s infinite; }
+    .auto-status.inactiva .auto-status-dot { background: var(--muted); }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .btn-gestionar { background: var(--primary); color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; transition: all 0.2s; }
+    .btn-gestionar:hover { background: var(--primary-hover); color: #fff; }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 80px 20px; background: var(--surface); border-radius: 12px; border: 2px dashed var(--line); }
+    .empty-icon { width: 80px; height: 80px; background: linear-gradient(135deg, rgba(0,149,246,0.2), rgba(0,149,246,0.1)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+    .empty-icon svg { color: var(--primary); }
+    .empty-title { font-size: 20px; font-weight: 600; color: var(--fg); margin-bottom: 8px; }
+    .empty-text { color: var(--muted); margin-bottom: 24px; max-width: 400px; margin-left: auto; margin-right: auto; line-height: 1.5; }
+
+    /* Workflow steps */
+    .workflow-steps { display: flex; gap: 24px; justify-content: center; margin-top: 32px; flex-wrap: wrap; }
+    .workflow-step { text-align: center; max-width: 160px; }
+    .workflow-step-number { width: 36px; height: 36px; background: var(--primary); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; margin: 0 auto 8px; }
+    .workflow-step-title { font-size: 13px; font-weight: 600; color: var(--fg); margin-bottom: 4px; }
+    .workflow-step-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+
+    @@media (max-width: 768px) {
+        .usuarios-grid { grid-template-columns: 1fr; }
+        .global-stats { flex-direction: column; }
+        .global-stat { width: 100%; }
+    }
+</style>
+
+<div class="admin-page">
+    <div class="page-header">
+        <div class="page-header-top">
+            <h1 class="page-title">Usuarios Administrados</h1>
+            <a href="/Admin/UsuariosAdministrados/Crear" class="btn-crear">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Nuevo Usuario
+            </a>
+        </div>
+    </div>
+
+    <div class="info-box">
+        <div class="info-box-content">
+            <div class="info-box-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+            </div>
+            <div class="info-box-text">
+                <h3>Gestiona perfiles con contenido automatizado</h3>
+                <p>Crea usuarios, sube una biblioteca de medios y programa publicaciones automáticas para simular actividad real. El sistema publicará gradualmente el contenido según tu configuración.</p>
+            </div>
+        </div>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert" style="margin-bottom:20px">
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert" style="margin-bottom:20px">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (Model != null && Model.Any())
+    {
+        var totalPendientes = Model.Sum(u => (int)u.MediaPendiente);
+        var totalProgramados = Model.Sum(u => (int)u.MediaProgramada);
+        var totalPublicados = Model.Sum(u => (int)u.MediaPublicada);
+        var totalActivos = Model.Count(u => (bool?)u.ConfiguracionActiva == true);
+
+        <div class="global-stats">
+            <div class="global-stat primary">
+                <div class="global-stat-value">@Model.Count()</div>
+                <div class="global-stat-label">Usuarios</div>
+            </div>
+            <div class="global-stat warning">
+                <div class="global-stat-value">@totalPendientes</div>
+                <div class="global-stat-label">Medios Pendientes</div>
+            </div>
+            <div class="global-stat" style="--color: #1976d2">
+                <div class="global-stat-value" style="color:#1976d2">@totalProgramados</div>
+                <div class="global-stat-label">Programados</div>
+            </div>
+            <div class="global-stat success">
+                <div class="global-stat-value">@totalPublicados</div>
+                <div class="global-stat-label">Publicados</div>
+            </div>
+            <div class="global-stat">
+                <div class="global-stat-value">@totalActivos</div>
+                <div class="global-stat-label">Auto-activos</div>
+            </div>
+        </div>
+
+        <div class="search-box">
+            <input type="text" class="search-input" id="searchInput" placeholder="Buscar usuario...">
+        </div>
+
+        <div class="usuarios-grid" id="usuariosGrid">
+            @foreach (var usuario in Model)
+            {
+                <div class="usuario-card" data-search="@usuario.UserName @usuario.NombreCompleto">
+                    <div class="usuario-card-header">
+                        @if (!string.IsNullOrEmpty((string?)usuario.FotoPerfil))
+                        {
+                            <img src="@usuario.FotoPerfil" class="usuario-avatar" alt="@usuario.UserName">
+                        }
+                        else
+                        {
+                            <div class="usuario-avatar-placeholder">@(((string?)usuario.NombreCompleto ?? (string?)usuario.UserName ?? "?")[0].ToString().ToUpper())</div>
+                        }
+                        <div class="usuario-info">
+                            <div class="usuario-nombre">@usuario.NombreCompleto</div>
+                            <div class="usuario-username">@@@usuario.UserName</div>
+                            <div class="usuario-badges">
+                                @if ((bool)usuario.EsCreador)
+                                {
+                                    <span class="badge badge-creador">Creador</span>
+                                }
+                                @if ((bool)usuario.EstaActivo)
+                                {
+                                    <span class="badge badge-activo">Activo</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-inactivo">Inactivo</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="usuario-card-body">
+                        <div class="usuario-stats">
+                            <div class="stat-item stat-pendiente">
+                                <div class="stat-value">@usuario.MediaPendiente</div>
+                                <div class="stat-label">Pendientes</div>
+                            </div>
+                            <div class="stat-item stat-programado">
+                                <div class="stat-value">@usuario.MediaProgramada</div>
+                                <div class="stat-label">Programados</div>
+                            </div>
+                            <div class="stat-item stat-publicado">
+                                <div class="stat-value">@usuario.MediaPublicada</div>
+                                <div class="stat-label">Publicados</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="usuario-card-footer">
+                        <div class="auto-status @((bool?)usuario.ConfiguracionActiva == true ? "activa" : "inactiva")">
+                            <span class="auto-status-dot"></span>
+                            @if ((bool?)usuario.ConfiguracionActiva == true)
+                            {
+                                <span>Auto-publicación activa</span>
+                            }
+                            else
+                            {
+                                <span>Auto-publicación inactiva</span>
+                            }
+                        </div>
+                        <a href="/Admin/UsuariosAdministrados/Gestionar/@usuario.Id" class="btn-gestionar">Gestionar</a>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="empty-state">
+            <div class="empty-icon">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <line x1="19" y1="8" x2="19" y2="14"/>
+                    <line x1="22" y1="11" x2="16" y2="11"/>
+                </svg>
+            </div>
+            <div class="empty-title">No hay usuarios administrados</div>
+            <div class="empty-text">Crea tu primer usuario administrado para comenzar a gestionar contenido de forma automática.</div>
+            <a href="/Admin/UsuariosAdministrados/Crear" class="btn-crear" style="display:inline-flex">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Crear Usuario
+            </a>
+
+            <div class="workflow-steps">
+                <div class="workflow-step">
+                    <div class="workflow-step-number">1</div>
+                    <div class="workflow-step-title">Crear Usuario</div>
+                    <div class="workflow-step-desc">Crea un nuevo perfil o convierte uno existente</div>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">2</div>
+                    <div class="workflow-step-title">Subir Medios</div>
+                    <div class="workflow-step-desc">Sube fotos y videos a la biblioteca</div>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">3</div>
+                    <div class="workflow-step-title">Configurar</div>
+                    <div class="workflow-step-desc">Define horarios y frecuencia de publicación</div>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">4</div>
+                    <div class="workflow-step-title">Activar</div>
+                    <div class="workflow-step-desc">El sistema publica automáticamente</div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<script>
+document.getElementById('searchInput')?.addEventListener('input', function(e) {
+    const search = e.target.value.toLowerCase();
+    document.querySelectorAll('.usuario-card').forEach(card => {
+        const text = card.dataset.search.toLowerCase();
+        card.style.display = text.includes(search) ? '' : 'none';
+    });
+});
+</script>

@@ -231,73 +231,86 @@ namespace Lado.Controllers
             // Calcular monto neto (bruto - comisión - impuestos - billetera)
             var montoNeto = monto - comision - montoRetencion - comisionBilletera;
 
-            // Crear transacción de retiro
-            var transaccion = new Transaccion
-            {
-                UsuarioId = usuario.Id,
-                Monto = monto,
-                MontoNeto = montoNeto,
-                Comision = comision,
-                RetencionImpuestos = montoRetencion,
-                ComisionBilleteraElectronica = comisionBilletera,
-                TipoTransaccion = TipoTransaccion.Retiro,
-                Descripcion = $"Retiro vía {metodoPago} (Comisión: {usuario.ComisionRetiro}%, Impuestos: {retencionImpuestos}%, Billetera: {porcentajeBilletera}%)",
-                EstadoPago = "Pendiente",
-                MetodoPago = metodoPago,
-                FechaTransaccion = DateTime.Now,
-                Notas = detalles
-            };
+            // Usar transacción atómica para asegurar consistencia
+            using var transaction = await _context.Database.BeginTransactionAsync();
 
-            _context.Transacciones.Add(transaccion);
-
-            // Restar del saldo disponible (el monto bruto)
-            usuario.Saldo -= monto;
-            _context.Users.Update(usuario);
-
-            await _context.SaveChangesAsync();
-
-            // Generar PDF de liquidación
             try
             {
-                // Generar y guardar PDF
+                // Crear transacción de retiro
+                var transaccion = new Transaccion
+                {
+                    UsuarioId = usuario.Id,
+                    Monto = monto,
+                    MontoNeto = montoNeto,
+                    Comision = comision,
+                    RetencionImpuestos = montoRetencion,
+                    ComisionBilleteraElectronica = comisionBilletera,
+                    TipoTransaccion = TipoTransaccion.Retiro,
+                    Descripcion = $"Retiro vía {metodoPago} (Comisión: {usuario.ComisionRetiro}%, Impuestos: {retencionImpuestos}%, Billetera: {porcentajeBilletera}%)",
+                    EstadoPago = "Pendiente",
+                    MetodoPago = metodoPago,
+                    FechaTransaccion = DateTime.Now,
+                    Notas = $"{detalles} | Fuente retención: {(usuario.RetencionImpuestos.HasValue ? "Usuario" : "País/Default")}"
+                };
+
+                _context.Transacciones.Add(transaccion);
+                await _context.SaveChangesAsync(); // Guardar para obtener el ID
+
+                // Generar PDF de liquidación ANTES de descontar saldo
                 var rutaPdf = await _liquidacionService.GenerarLiquidacionPdfAsync(transaccion, usuario);
                 transaccion.RutaLiquidacion = rutaPdf;
-                await _context.SaveChangesAsync();
 
                 // Generar bytes del PDF para enviar por email
                 var pdfBytes = await _liquidacionService.GenerarLiquidacionBytesAsync(transaccion, usuario);
 
-                // Enviar email con PDF adjunto
-                var emailEnviado = await _emailService.SendLiquidacionRetiroAsync(
-                    usuario.Email!,
-                    usuario.NombreCompleto ?? usuario.UserName ?? "Creador",
-                    monto,
-                    comision,
-                    montoRetencion,
-                    comisionBilletera,
-                    montoNeto,
-                    metodoPago,
-                    transaccion.Id,
-                    pdfBytes
-                );
+                // Solo si el PDF se generó correctamente, descontar saldo
+                usuario.Saldo -= monto;
+                _context.Users.Update(usuario);
 
-                if (emailEnviado)
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                // Enviar email DESPUÉS del commit (no afecta la transacción)
+                try
                 {
-                    _logger.LogInformation("Liquidación enviada por email para transacción {TransaccionId}", transaccion.Id);
+                    var emailEnviado = await _emailService.SendLiquidacionRetiroAsync(
+                        usuario.Email!,
+                        usuario.NombreCompleto ?? usuario.UserName ?? "Creador",
+                        monto,
+                        comision,
+                        montoRetencion,
+                        comisionBilletera,
+                        montoNeto,
+                        metodoPago,
+                        transaccion.Id,
+                        pdfBytes
+                    );
+
+                    if (emailEnviado)
+                    {
+                        _logger.LogInformation("Liquidación enviada por email para transacción {TransaccionId}", transaccion.Id);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("No se pudo enviar email de liquidación para transacción {TransaccionId}", transaccion.Id);
+                    }
                 }
-                else
+                catch (Exception emailEx)
                 {
-                    _logger.LogWarning("No se pudo enviar email de liquidación para transacción {TransaccionId}", transaccion.Id);
+                    // El email no es crítico, la transacción ya está guardada
+                    _logger.LogWarning(emailEx, "Error al enviar email de liquidación (retiro ya procesado)");
                 }
+
+                TempData["Success"] = $"Retiro solicitado: ${monto:N2} bruto → Comisión ${comision:N2} + Impuestos ${montoRetencion:N2} + Billetera ${comisionBilletera:N2} = Neto ${montoNeto:N2}. Se procesará en 3-5 días hábiles. Recibirás la liquidación por email.";
+                return RedirectToAction(nameof(Index));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al generar/enviar liquidación para transacción {TransaccionId}", transaccion.Id);
-                // No fallar la solicitud de retiro si falla la generación del PDF
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Error al procesar retiro para usuario {UserId}", usuario.Id);
+                TempData["Error"] = "Error al procesar el retiro. Por favor, intenta de nuevo.";
+                return RedirectToAction(nameof(Index));
             }
-
-            TempData["Success"] = $"Retiro solicitado: ${monto:N2} bruto → Comisión ${comision:N2} + Impuestos ${montoRetencion:N2} + Billetera ${comisionBilletera:N2} = Neto ${montoNeto:N2}. Se procesará en 3-5 días hábiles. Recibirás la liquidación por email.";
-            return RedirectToAction(nameof(Index));
         }
 
         // POST: /Billetera/ActualizarMetodoPago

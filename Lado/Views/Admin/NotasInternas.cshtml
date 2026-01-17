@@ -1,0 +1,476 @@
+@model List<Lado.Models.NotaInterna>
+@{
+    ViewData["Title"] = "Notas Internas";
+    Layout = "_AdminLayout";
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0"><i class="bi bi-sticky me-2"></i>Notas Internas</h2>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevaNota">
+            <i class="bi bi-plus-lg me-1"></i>Nueva Nota
+        </button>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">Buscar</label>
+                    <input type="text" id="buscarTermino" class="form-control" placeholder="Buscar en notas...">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Tipo de Entidad</label>
+                    <select id="filtroTipo" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="0">Usuario</option>
+                        <option value="1">Contenido</option>
+                        <option value="2">Reporte</option>
+                        <option value="3">Apelación</option>
+                        <option value="4">Verificación</option>
+                        <option value="5">Transacción</option>
+                        <option value="6">General</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Prioridad</label>
+                    <select id="filtroPrioridad" class="form-select">
+                        <option value="">Todas</option>
+                        <option value="3">Urgente</option>
+                        <option value="2">Alta</option>
+                        <option value="1">Normal</option>
+                        <option value="0">Baja</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-primary w-100" onclick="buscarNotas()">
+                        <i class="bi bi-search me-1"></i>Buscar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de notas -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div id="listaNotas">
+                @if (Model.Any())
+                {
+                    foreach (var nota in Model)
+                    {
+                        var prioridadClass = nota.Prioridad switch
+                        {
+                            Lado.Models.PrioridadNota.Urgente => "border-danger bg-danger bg-opacity-10",
+                            Lado.Models.PrioridadNota.Alta => "border-warning",
+                            Lado.Models.PrioridadNota.Baja => "border-secondary",
+                            _ => ""
+                        };
+                        var prioridadBadge = nota.Prioridad switch
+                        {
+                            Lado.Models.PrioridadNota.Urgente => "bg-danger",
+                            Lado.Models.PrioridadNota.Alta => "bg-warning text-dark",
+                            Lado.Models.PrioridadNota.Baja => "bg-secondary",
+                            _ => "bg-info"
+                        };
+
+                        <div class="nota-item p-3 border-bottom @prioridadClass @(nota.EsFijada ? "bg-primary bg-opacity-10" : "")" data-id="@nota.Id">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="d-flex align-items-center gap-2">
+                                    @if (nota.EsFijada)
+                                    {
+                                        <i class="bi bi-pin-fill text-primary" title="Nota fijada"></i>
+                                    }
+                                    <span class="badge @prioridadBadge">@nota.Prioridad</span>
+                                    <span class="badge bg-dark">@nota.TipoEntidad</span>
+                                    @if (!string.IsNullOrEmpty(nota.Tags))
+                                    {
+                                        foreach (var tag in nota.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                                        {
+                                            <span class="badge bg-light text-dark">@tag.Trim()</span>
+                                        }
+                                    }
+                                </div>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="dropdown">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li><a class="dropdown-item" href="#" onclick="editarNota(@nota.Id); return false;"><i class="bi bi-pencil me-2"></i>Editar</a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="fijarNota(@nota.Id, @(!nota.EsFijada ? "true" : "false")); return false;"><i class="bi bi-pin me-2"></i>@(nota.EsFijada ? "Desfijar" : "Fijar")</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item text-danger" href="#" onclick="eliminarNota(@nota.Id); return false;"><i class="bi bi-trash me-2"></i>Eliminar</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <p class="mb-2" style="white-space: pre-wrap;">@nota.Contenido</p>
+                            <div class="d-flex justify-content-between text-muted small">
+                                <span>
+                                    <strong>@(nota.CreadoPor?.NombreCompleto ?? nota.CreadoPor?.UserName ?? "Admin")</strong>
+                                    • @nota.FechaCreacion.ToString("dd/MM/yyyy HH:mm")
+                                    @if (nota.FechaEdicion.HasValue)
+                                    {
+                                        <span class="text-info">(editado @nota.FechaEdicion.Value.ToString("dd/MM/yyyy HH:mm"))</span>
+                                    }
+                                </span>
+                                <span>
+                                    <a href="#" onclick="verEntidad(@((int)nota.TipoEntidad), '@nota.EntidadId'); return false;" class="text-decoration-none">
+                                        Ver @nota.TipoEntidad: @nota.EntidadId
+                                    </a>
+                                </span>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-sticky fs-1 d-block mb-2"></i>
+                        <p>No hay notas internas</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nueva Nota -->
+<div class="modal fade" id="modalNuevaNota" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-sticky me-2"></i>Nueva Nota Interna</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Tipo de Entidad</label>
+                    <select id="nuevaNotaTipo" class="form-select">
+                        <option value="6">General</option>
+                        <option value="0">Usuario</option>
+                        <option value="1">Contenido</option>
+                        <option value="2">Reporte</option>
+                        <option value="3">Apelación</option>
+                        <option value="4">Verificación</option>
+                        <option value="5">Transacción</option>
+                    </select>
+                </div>
+                <div class="mb-3" id="entidadIdContainer" style="display: none;">
+                    <label class="form-label">ID de la Entidad</label>
+                    <input type="text" id="nuevaNotaEntidadId" class="form-control" placeholder="ID del usuario, contenido, etc.">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Prioridad</label>
+                    <select id="nuevaNotaPrioridad" class="form-select">
+                        <option value="1">Normal</option>
+                        <option value="0">Baja</option>
+                        <option value="2">Alta</option>
+                        <option value="3">Urgente</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Contenido <span class="text-danger">*</span></label>
+                    <textarea id="nuevaNotaContenido" class="form-control" rows="4" maxlength="2000" placeholder="Escribe la nota aquí..."></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Tags (separados por coma)</label>
+                    <input type="text" id="nuevaNotaTags" class="form-control" placeholder="ej: urgente, revisar, seguimiento">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="crearNota()">
+                    <i class="bi bi-check-lg me-1"></i>Crear Nota
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar Nota -->
+<div class="modal fade" id="modalEditarNota" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Editar Nota</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editarNotaId">
+                <div class="mb-3">
+                    <label class="form-label">Prioridad</label>
+                    <select id="editarNotaPrioridad" class="form-select">
+                        <option value="1">Normal</option>
+                        <option value="0">Baja</option>
+                        <option value="2">Alta</option>
+                        <option value="3">Urgente</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Contenido</label>
+                    <textarea id="editarNotaContenido" class="form-control" rows="4" maxlength="2000"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Tags</label>
+                    <input type="text" id="editarNotaTags" class="form-control">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="guardarEdicion()">
+                    <i class="bi bi-check-lg me-1"></i>Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ||
+                      document.querySelector('meta[name="csrf-token"]')?.content;
+
+        // Mostrar/ocultar campo de entidad ID según el tipo
+        document.getElementById('nuevaNotaTipo').addEventListener('change', function() {
+            const container = document.getElementById('entidadIdContainer');
+            container.style.display = this.value !== '6' ? 'block' : 'none';
+        });
+
+        async function crearNota() {
+            const tipo = parseInt(document.getElementById('nuevaNotaTipo').value);
+            const entidadId = tipo === 6 ? 'general' : document.getElementById('nuevaNotaEntidadId').value;
+            const contenido = document.getElementById('nuevaNotaContenido').value;
+            const prioridad = parseInt(document.getElementById('nuevaNotaPrioridad').value);
+            const tags = document.getElementById('nuevaNotaTags').value;
+
+            if (!contenido.trim()) {
+                mostrarToast('warning', 'El contenido es requerido');
+                return;
+            }
+
+            if (tipo !== 6 && !entidadId.trim()) {
+                mostrarToast('warning', 'El ID de la entidad es requerido');
+                return;
+            }
+
+            try {
+                const response = await fetch('/Admin/CrearNotaInterna', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify({
+                        tipoEntidad: tipo,
+                        entidadId: entidadId,
+                        contenido: contenido,
+                        prioridad: prioridad,
+                        tags: tags || null
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    mostrarToast('success', 'Nota creada correctamente');
+                    bootstrap.Modal.getInstance(document.getElementById('modalNuevaNota')).hide();
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    mostrarToast('danger', data.error);
+                }
+            } catch (error) {
+                mostrarToast('danger', 'Error al crear la nota');
+            }
+        }
+
+        async function editarNota(id) {
+            // Cargar datos de la nota
+            try {
+                const response = await fetch(`/Admin/ObtenerNotasEntidad?tipo=6&entidadId=general`);
+                const data = await response.json();
+                // Por ahora, simplemente abrir el modal
+                document.getElementById('editarNotaId').value = id;
+                const modal = new bootstrap.Modal(document.getElementById('modalEditarNota'));
+                modal.show();
+            } catch (error) {
+                mostrarToast('danger', 'Error al cargar la nota');
+            }
+        }
+
+        async function guardarEdicion() {
+            const id = parseInt(document.getElementById('editarNotaId').value);
+            const contenido = document.getElementById('editarNotaContenido').value;
+            const prioridad = parseInt(document.getElementById('editarNotaPrioridad').value);
+            const tags = document.getElementById('editarNotaTags').value;
+
+            try {
+                const response = await fetch('/Admin/EditarNotaInterna', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify({ id, contenido, prioridad, tags })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    mostrarToast('success', data.mensaje);
+                    bootstrap.Modal.getInstance(document.getElementById('modalEditarNota')).hide();
+                    location.reload();
+                } else {
+                    mostrarToast('danger', data.error);
+                }
+            } catch (error) {
+                mostrarToast('danger', 'Error al guardar');
+            }
+        }
+
+        async function eliminarNota(id) {
+            if (!confirm('¿Eliminar esta nota?')) return;
+
+            try {
+                const formData = new FormData();
+                formData.append('__RequestVerificationToken', token);
+                formData.append('id', id);
+
+                const response = await fetch('/Admin/EliminarNotaInterna', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    mostrarToast('success', data.mensaje);
+                    document.querySelector(`.nota-item[data-id="${id}"]`)?.remove();
+                } else {
+                    mostrarToast('danger', data.error);
+                }
+            } catch (error) {
+                mostrarToast('danger', 'Error al eliminar');
+            }
+        }
+
+        async function fijarNota(id, fijar) {
+            try {
+                const formData = new FormData();
+                formData.append('__RequestVerificationToken', token);
+                formData.append('id', id);
+                formData.append('fijar', fijar);
+
+                const response = await fetch('/Admin/FijarNotaInterna', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    mostrarToast('success', data.mensaje);
+                    location.reload();
+                } else {
+                    mostrarToast('danger', data.error);
+                }
+            } catch (error) {
+                mostrarToast('danger', 'Error');
+            }
+        }
+
+        async function buscarNotas() {
+            const termino = document.getElementById('buscarTermino').value;
+            const tipo = document.getElementById('filtroTipo').value;
+
+            try {
+                const url = `/Admin/BuscarNotasInternas?termino=${encodeURIComponent(termino)}${tipo ? `&tipo=${tipo}` : ''}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success) {
+                    renderizarNotas(data.notas);
+                }
+            } catch (error) {
+                mostrarToast('danger', 'Error en la búsqueda');
+            }
+        }
+
+        function renderizarNotas(notas) {
+            const container = document.getElementById('listaNotas');
+            if (notas.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-search fs-1 d-block mb-2"></i>
+                        <p>No se encontraron notas</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = notas.map(nota => {
+                const prioridadBadge = {
+                    'Urgente': 'bg-danger',
+                    'Alta': 'bg-warning text-dark',
+                    'Normal': 'bg-info',
+                    'Baja': 'bg-secondary'
+                }[nota.prioridad] || 'bg-info';
+
+                return `
+                    <div class="nota-item p-3 border-bottom ${nota.esFijada ? 'bg-primary bg-opacity-10' : ''}" data-id="${nota.id}">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                ${nota.esFijada ? '<i class="bi bi-pin-fill text-primary"></i>' : ''}
+                                <span class="badge ${prioridadBadge}">${nota.prioridad}</span>
+                                <span class="badge bg-dark">${nota.tipoEntidad}</span>
+                            </div>
+                        </div>
+                        <p class="mb-2" style="white-space: pre-wrap;">${nota.contenido}</p>
+                        <div class="text-muted small">
+                            <strong>${nota.creadoPor}</strong> • ${nota.fechaCreacion}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function verEntidad(tipo, id) {
+            const urls = {
+                0: `/Admin/Usuarios?buscar=${id}`,
+                1: `/Admin/Contenido?id=${id}`,
+                2: `/Admin/Reportes?id=${id}`,
+                3: `/Admin/Apelaciones?id=${id}`,
+                4: `/Admin/Verificaciones?id=${id}`,
+                5: `/Admin/Transacciones?id=${id}`
+            };
+            if (urls[tipo]) {
+                window.open(urls[tipo], '_blank');
+            }
+        }
+
+        function mostrarToast(type, message) {
+            let toastContainer = document.getElementById('toastContainer');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toastContainer';
+                toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+                toastContainer.style.zIndex = '1100';
+                document.body.appendChild(toastContainer);
+            }
+
+            const toastId = 'toast-' + Date.now();
+            const bgClass = type === 'success' ? 'bg-success' : type === 'danger' ? 'bg-danger' : 'bg-warning';
+
+            const toastHtml = `
+                <div id="${toastId}" class="toast align-items-center text-white ${bgClass}" role="alert">
+                    <div class="d-flex">
+                        <div class="toast-body">${message}</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+
+            toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
+            toast.show();
+            toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
+        }
+    </script>
+}

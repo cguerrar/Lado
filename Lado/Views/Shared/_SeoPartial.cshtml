@@ -1,13 +1,27 @@
 @*
     Partial de SEO con Structured Data (JSON-LD)
     Incluye Schema.org para Organization, WebSite y datos dinamicos
+    Usa configuracion desde la base de datos
 *@
+@using Lado.Services
+@inject ISeoConfigService SeoConfigService
 
 @{
-    var baseUrl = "https://ladoapp.com";
-    var siteName = "Lado";
-    var siteDescription = ViewData["MetaDescription"]?.ToString() ?? "Lado - Plataforma de contenido exclusivo donde los creadores muestran su lado autentico.";
-    var logoUrl = $"{baseUrl}/images/logo-lado.png";
+    // Cargar configuracion SEO desde BD (con cache)
+    var seoConfig = await SeoConfigService.ObtenerConfiguracionAsync();
+
+    var baseUrl = seoConfig.UrlBase;
+    var siteName = seoConfig.OrganizacionNombre;
+    var siteDescription = ViewData["MetaDescription"]?.ToString() ?? seoConfig.DescripcionMeta;
+    var logoUrl = $"{baseUrl}{seoConfig.OrganizacionLogo}";
+
+    // Construir lista de redes sociales
+    var socialLinks = new List<string>();
+    if (!string.IsNullOrEmpty(seoConfig.TwitterUrl)) socialLinks.Add(seoConfig.TwitterUrl);
+    if (!string.IsNullOrEmpty(seoConfig.InstagramUrl)) socialLinks.Add(seoConfig.InstagramUrl);
+    if (!string.IsNullOrEmpty(seoConfig.FacebookUrl)) socialLinks.Add(seoConfig.FacebookUrl);
+    if (!string.IsNullOrEmpty(seoConfig.TikTokUrl)) socialLinks.Add(seoConfig.TikTokUrl);
+    if (!string.IsNullOrEmpty(seoConfig.YouTubeUrl)) socialLinks.Add(seoConfig.YouTubeUrl);
 
     // Datos dinamicos para schemas especificos
     var schemaType = ViewData["SchemaType"]?.ToString();
@@ -35,17 +49,14 @@
         "width": 512,
         "height": 512
     },
-    "description": "Lado es la plataforma donde los creadores de contenido muestran su lado autentico y exclusivo.",
-    "foundingDate": "2024",
-    "sameAs": [
-        "https://twitter.com/ladoapp",
-        "https://instagram.com/ladoapp"
-    ],
+    "description": "@seoConfig.OrganizacionDescripcion",
+    "foundingDate": "@seoConfig.OrganizacionFundacion",
+    "sameAs": [@Html.Raw(string.Join(", ", socialLinks.Select(s => $"\"{s}\"")))],
     "contactPoint": {
         "@@type": "ContactPoint",
         "contactType": "customer service",
-        "email": "soporte@ladoapp.com",
-        "availableLanguage": ["Spanish"]
+        "email": "@seoConfig.OrganizacionEmail",
+        "availableLanguage": ["Spanish", "English"]
     }
 }
 </script>
@@ -95,12 +106,12 @@ else if (schemaType == "Article" && !string.IsNullOrEmpty(articleTitle))
         "@@context": "https://schema.org",
         "@@type": "Article",
         "headline": "@articleTitle",
-        "image": ["@(schemaImage ?? $"{baseUrl}/images/og-default.jpg")"],
+        "image": ["@(schemaImage ?? $"{baseUrl}{seoConfig.OgImagenDefault}")"],
         "datePublished": "@(articleDatePublished ?? DateTime.UtcNow.ToString("yyyy-MM-dd"))",
         "dateModified": "@(articleDatePublished ?? DateTime.UtcNow.ToString("yyyy-MM-dd"))",
         "author": {
             "@@type": "Person",
-            "name": "@(articleAuthor ?? "Lado")"
+            "name": "@(articleAuthor ?? siteName)"
         },
         "publisher": {
             "@@type": "Organization",

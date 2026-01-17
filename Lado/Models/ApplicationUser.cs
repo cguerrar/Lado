@@ -54,6 +54,12 @@ namespace Lado.Models
         [Display(Name = "Es Creador")]
         public bool EsCreador { get; set; } = false;
 
+        /// <summary>
+        /// Indica si este usuario es administrado/virtual (controlado desde el panel de admin)
+        /// </summary>
+        [Display(Name = "Usuario Administrado")]
+        public bool EsUsuarioAdministrado { get; set; } = false;
+
         // === INFORMACIÓN DE CREADOR ===
         [Display(Name = "Precio de Suscripción")]
         [Range(0, 999999)]
@@ -79,6 +85,25 @@ namespace Lado.Models
 
         [Display(Name = "Total de Ganancias")]
         public decimal TotalGanancias { get; set; } = 0;
+
+        [Display(Name = "Crédito Publicitario")]
+        public decimal SaldoPublicitario { get; set; } = 0;
+
+        // ========================================
+        // BOOST DE ALGORITMO
+        // ========================================
+
+        [Display(Name = "Boost Activo")]
+        public bool BoostActivo { get; set; } = false;
+
+        [Display(Name = "Crédito de Boost Restante")]
+        public decimal BoostCredito { get; set; } = 0;
+
+        [Display(Name = "Fecha de Vencimiento del Boost")]
+        public DateTime? BoostFechaFin { get; set; }
+
+        [Display(Name = "Multiplicador de Visibilidad")]
+        public decimal BoostMultiplicador { get; set; } = 1.0m;
 
         // ========================================
         // CONFIGURACIÓN DE RETIROS (CREADORES)
@@ -114,6 +139,46 @@ namespace Lado.Models
         // === ESTADO DE CUENTA ===
         [Display(Name = "Cuenta Activa")]
         public bool EstaActivo { get; set; } = true;
+
+        // === SUSPENSIÓN TEMPORAL ===
+        [Display(Name = "Fecha Fin Suspensión")]
+        public DateTime? FechaSuspensionFin { get; set; }
+
+        [Display(Name = "Razón Suspensión")]
+        [StringLength(500)]
+        public string? RazonSuspension { get; set; }
+
+        [Display(Name = "Suspendido Por")]
+        public string? SuspendidoPorId { get; set; }
+
+        [Display(Name = "Fecha Suspensión")]
+        public DateTime? FechaSuspension { get; set; }
+
+        /// <summary>
+        /// Verifica si el usuario está actualmente suspendido (temporal o permanente)
+        /// </summary>
+        public bool EstaSuspendido()
+        {
+            // Si no está activo, está suspendido permanentemente
+            if (!EstaActivo) return true;
+
+            // Si tiene fecha de fin de suspensión y aún no ha pasado, está suspendido
+            if (FechaSuspensionFin.HasValue && FechaSuspensionFin.Value > DateTime.Now)
+                return true;
+
+            return false;
+        }
+
+        /// <summary>
+        /// Obtiene el tiempo restante de suspensión temporal
+        /// </summary>
+        public TimeSpan? TiempoRestanteSuspension()
+        {
+            if (!FechaSuspensionFin.HasValue || FechaSuspensionFin.Value <= DateTime.Now)
+                return null;
+
+            return FechaSuspensionFin.Value - DateTime.Now;
+        }
 
         [Display(Name = "Usuario Verificado")]
         public bool EsVerificado { get; set; } = false;
@@ -270,6 +335,43 @@ namespace Lado.Models
         public bool RecibirEmailsComunicados { get; set; } = true;
 
         // ========================================
+        // PREFERENCIAS DE NOTIFICACIONES EMAIL
+        // ========================================
+
+        [Display(Name = "Email: Nuevos Mensajes")]
+        public bool EmailNuevosMensajes { get; set; } = true;
+
+        [Display(Name = "Email: Comentarios")]
+        public bool EmailComentarios { get; set; } = true;
+
+        [Display(Name = "Email: Menciones")]
+        public bool EmailMenciones { get; set; } = true;
+
+        [Display(Name = "Email: Nuevos Seguidores")]
+        public bool EmailNuevosSeguidores { get; set; } = true;
+
+        [Display(Name = "Email: Nuevas Suscripciones")]
+        public bool EmailNuevasSuscripciones { get; set; } = true;
+
+        [Display(Name = "Email: Propinas")]
+        public bool EmailPropinas { get; set; } = true;
+
+        [Display(Name = "Email: Nuevo Contenido")]
+        public bool EmailNuevoContenido { get; set; } = false;
+
+        [Display(Name = "Email: Stories")]
+        public bool EmailStories { get; set; } = false;
+
+        [Display(Name = "Email: Resumen Semanal")]
+        public bool EmailResumenSemanal { get; set; } = true;
+
+        [Display(Name = "Email: Reporte Ganancias")]
+        public bool EmailReporteGanancias { get; set; } = true;
+
+        [Display(Name = "Email: Consejos")]
+        public bool EmailConsejos { get; set; } = false;
+
+        // ========================================
         // SISTEMA LADO COINS (Dólares Premio)
         // ========================================
 
@@ -385,6 +487,52 @@ namespace Lado.Models
         [Display(Name = "Mostrar Estado En Línea")]
         public bool MostrarEstadoEnLinea { get; set; } = true;
 
+        // ========================================
+        // CONTROLES DE PRIVACIDAD AVANZADOS
+        // ========================================
+
+        /// <summary>
+        /// Si es true, el perfil es privado y requiere aprobación para seguir
+        /// </summary>
+        [Display(Name = "Perfil Privado")]
+        public bool PerfilPrivado { get; set; } = false;
+
+        /// <summary>
+        /// Si es true, los usuarios pueden encontrar este perfil en búsquedas
+        /// </summary>
+        [Display(Name = "Mostrar en Búsquedas")]
+        public bool MostrarEnBusquedas { get; set; } = true;
+
+        /// <summary>
+        /// Define quién puede enviar mensajes directos a este usuario
+        /// </summary>
+        [Display(Name = "Quién puede enviar mensajes")]
+        public PermisoPrivacidad QuienPuedeMensajear { get; set; } = PermisoPrivacidad.Todos;
+
+        /// <summary>
+        /// Define quién puede comentar en las publicaciones de este usuario
+        /// </summary>
+        [Display(Name = "Quién puede comentar")]
+        public PermisoPrivacidad QuienPuedeComentar { get; set; } = PermisoPrivacidad.Todos;
+
+        /// <summary>
+        /// Si es true, otros usuarios pueden ver la lista de seguidores
+        /// </summary>
+        [Display(Name = "Mostrar Seguidores")]
+        public bool MostrarSeguidores { get; set; } = true;
+
+        /// <summary>
+        /// Si es true, otros usuarios pueden ver a quién sigue este usuario
+        /// </summary>
+        [Display(Name = "Mostrar Siguiendo")]
+        public bool MostrarSiguiendo { get; set; } = true;
+
+        /// <summary>
+        /// Si es true, se permite etiquetar a este usuario en publicaciones
+        /// </summary>
+        [Display(Name = "Permitir Etiquetas")]
+        public bool PermitirEtiquetas { get; set; } = true;
+
         /// <summary>
         /// Verifica si el usuario está en línea (actividad en los últimos 5 minutos)
         /// </summary>
@@ -418,6 +566,12 @@ namespace Lado.Models
 
         // Relacion con Intereses
         public virtual ICollection<InteresUsuario> Intereses { get; set; } = new List<InteresUsuario>();
+
+        // Relacion con Estadísticas de Desafíos
+        public virtual EstadisticasDesafiosUsuario? EstadisticasDesafios { get; set; }
+
+        // Relacion con Badges de Desafíos
+        public virtual ICollection<BadgeUsuario> BadgesDesafios { get; set; } = new List<BadgeUsuario>();
 
         // ========================================
         // MÉTODOS HELPER
