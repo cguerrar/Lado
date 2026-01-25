@@ -1,10 +1,12 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using System.Security.Claims;
 using Lado.Data;
+using Lado.Hubs;
 using Lado.Models;
 using Lado.Services;
 
@@ -420,13 +422,21 @@ namespace Lado.Controllers
                     return RedirectToAction("Index");
                 }
 
-                var usuario = await _userManager.FindByIdAsync(id);
+                // Buscar primero por username, luego por ID
+                var usuario = await _userManager.FindByNameAsync(id);
+                if (usuario == null)
+                {
+                    usuario = await _userManager.FindByIdAsync(id);
+                }
 
                 if (usuario == null || !usuario.EstaActivo)
                 {
                     TempData["Error"] = "Usuario no encontrado";
                     return RedirectToAction("Index");
                 }
+
+                // Usar el ID real del usuario encontrado para todas las consultas
+                var usuarioPerfilId = usuario.Id;
 
                 var usuarioActual = await _userManager.GetUserAsync(User);
                 if (usuarioActual == null)
@@ -436,7 +446,7 @@ namespace Lado.Controllers
 
                 // ⭐ PROTECCIÓN DE PRIVACIDAD LADOA/LADOB
                 var tieneSeudonimoActivo = !string.IsNullOrEmpty(usuario.Seudonimo);
-                var esPerfilPropio = usuarioActual.Id == id;
+                var esPerfilPropio = usuarioActual.Id == usuarioPerfilId;
 
                 // ⭐ REGLAS DE ACCESO:
                 // - LadoA es PÚBLICO: siempre visible para todos
@@ -463,7 +473,7 @@ namespace Lado.Controllers
                 // Verificar suscripción específica al TipoLado que se está viendo
                 var estaSuscrito = await _context.Suscripciones
                     .AnyAsync(s => s.FanId == usuarioActual.Id &&
-                             s.CreadorId == id &&
+                             s.CreadorId == usuarioPerfilId &&
                              s.TipoLado == tipoLadoActual &&
                              s.EstaActiva);
 
@@ -487,10 +497,10 @@ namespace Lado.Controllers
                         .ToListAsync();
 
                     // Cargar TODO el contenido LadoB (se mostrará con blur si no tiene acceso)
-                    var esPropio = id == usuarioActual.Id;
+                    var esPropio = usuarioPerfilId == usuarioActual.Id;
                     var contenidoLadoB = await _context.Contenidos
                         .Include(c => c.Archivos)
-                        .Where(c => c.UsuarioId == id
+                        .Where(c => c.UsuarioId == usuarioPerfilId
                                 && c.EstaActivo
                                 && !c.EsBorrador
                                 && !c.Censurado
@@ -522,7 +532,7 @@ namespace Lado.Controllers
 
                     var contenidoLadoA = await _context.Contenidos
                         .Include(c => c.Archivos)
-                        .Where(c => c.UsuarioId == id
+                        .Where(c => c.UsuarioId == usuarioPerfilId
                                 && c.EstaActivo
                                 && !c.EsBorrador
                                 && !c.Censurado
@@ -545,17 +555,17 @@ namespace Lado.Controllers
 
                 ViewBag.Colecciones = await _context.Colecciones
                     .Include(c => c.Contenidos)
-                    .Where(c => c.CreadorId == id && c.EstaActiva)
+                    .Where(c => c.CreadorId == usuarioPerfilId && c.EstaActiva)
                     .OrderByDescending(c => c.FechaCreacion)
                     .ToListAsync();
 
                 // Seguidores (personas que siguen a este usuario)
                 ViewBag.NumeroSuscriptores = await _context.Suscripciones
-                    .CountAsync(s => s.CreadorId == id && s.EstaActiva);
+                    .CountAsync(s => s.CreadorId == usuarioPerfilId && s.EstaActiva);
 
                 // Siguiendo (personas que este usuario sigue)
                 ViewBag.NumeroSiguiendo = await _context.Suscripciones
-                    .CountAsync(s => s.FanId == id && s.EstaActiva);
+                    .CountAsync(s => s.FanId == usuarioPerfilId && s.EstaActiva);
 
                 var contenidosTotales = ViewBag.Contenidos as List<Contenido>;
                 ViewBag.TotalLikes = contenidosTotales?.Sum(c => c.NumeroLikes) ?? 0;
@@ -565,7 +575,7 @@ namespace Lado.Controllers
 
                 // Verificar si el creador tiene contenido LadoB (puede recibir propinas)
                 var tieneContenidoLadoB = await _context.Contenidos
-                    .AnyAsync(c => c.UsuarioId == id
+                    .AnyAsync(c => c.UsuarioId == usuarioPerfilId
                                 && c.TipoLado == TipoLado.LadoB
                                 && c.EstaActivo
                                 && !c.EsBorrador);
@@ -575,12 +585,12 @@ namespace Lado.Controllers
                 // SEGUIDORES EN COMÚN
                 // ========================================
                 // Usuarios que YO sigo y que también siguen a este creador
-                if (usuarioActual.Id != id)
+                if (usuarioActual.Id != usuarioPerfilId)
                 {
                     var seguidoresEnComun = await _context.Suscripciones
                         .Where(s1 => s1.FanId == usuarioActual.Id && s1.EstaActiva) // Usuarios que yo sigo
                         .Join(
-                            _context.Suscripciones.Where(s2 => s2.CreadorId == id && s2.EstaActiva), // Que también siguen al creador
+                            _context.Suscripciones.Where(s2 => s2.CreadorId == usuarioPerfilId && s2.EstaActiva), // Que también siguen al creador
                             s1 => s1.CreadorId,  // El creador que yo sigo
                             s2 => s2.FanId,      // Es fan de este creador
                             (s1, s2) => s1.CreadorId
@@ -786,6 +796,7 @@ namespace Lado.Controllers
         // INDEX - FEED PRINCIPAL CON CREADORES FAVORITOS
         // ========================================
 
+        [AllowAnonymous]
         public async Task<IActionResult> Index(int? post = null)
         {
             try
@@ -804,8 +815,16 @@ namespace Lado.Controllers
 
                 if (string.IsNullOrEmpty(usuarioId))
                 {
-                    _logger.LogWarning("Usuario no autenticado en Index");
-                    return RedirectToAction("Login", "Account");
+                    // Si hay un post específico en la URL, redirigir a Detalle (que permite anónimos para contenido público)
+                    // Esto permite compartir links como /Feed?post=1340 con usuarios no registrados (estilo Instagram)
+                    if (post.HasValue)
+                    {
+                        _logger.LogInformation("Usuario no autenticado con post={PostId}, redirigiendo a Detalle", post.Value);
+                        return RedirectToAction("Detalle", new { id = post.Value });
+                    }
+
+                    _logger.LogInformation("Usuario no autenticado en Index, redirigiendo a FeedPublico");
+                    return RedirectToAction("Index", "FeedPublico");
                 }
 
                 // ========================================
@@ -1232,9 +1251,18 @@ namespace Lado.Controllers
                     .Include(c => c.Usuario)
                     .Include(c => c.Comentarios)
                         .ThenInclude(com => com.Usuario)
-                    .FirstOrDefaultAsync(c => c.Id == id && c.EstaActivo);
+                    .FirstOrDefaultAsync(c => c.Id == id
+                        && c.EstaActivo
+                        && !c.EsBorrador
+                        && !c.Censurado);
 
                 if (contenido == null)
+                {
+                    return Json(new { success = false, message = "Contenido no encontrado" });
+                }
+
+                // Verificar shadow hide - contenido oculto solo visible para su propietario
+                if (contenido.OcultoSilenciosamente && contenido.UsuarioId != usuarioId)
                 {
                     return Json(new { success = false, message = "Contenido no encontrado" });
                 }
@@ -1289,6 +1317,133 @@ namespace Lado.Controllers
             {
                 _logger.LogError(ex, "Error al obtener detalle de contenido {Id}", id);
                 return Json(new { success = false, message = "Error al cargar contenido" });
+            }
+        }
+
+        // ========================================
+        // OBTENER PUBLICACIONES DE UN USUARIO (para fullview de Detalle)
+        // ========================================
+
+        [HttpGet]
+        public async Task<IActionResult> ObtenerPublicacionesUsuario(string usuarioId, int? contenidoActualId = null, int limit = 50)
+        {
+            try
+            {
+                var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrWhiteSpace(usuarioId))
+                {
+                    return Json(new { success = false, message = "Usuario no especificado" });
+                }
+
+                // Verificar si el usuario actual está suscrito al creador
+                var estaSuscrito = false;
+                if (!string.IsNullOrEmpty(currentUserId))
+                {
+                    estaSuscrito = await _context.Suscripciones
+                        .AnyAsync(s => s.FanId == currentUserId &&
+                                       s.CreadorId == usuarioId &&
+                                       s.EstaActiva);
+                }
+
+                var esPropio = currentUserId == usuarioId;
+
+                // Obtener contenidos del usuario
+                var query = _context.Contenidos
+                    .Include(c => c.Usuario)
+                    .Include(c => c.Archivos)
+                    .Include(c => c.PistaMusical)
+                    .Where(c => c.UsuarioId == usuarioId
+                            && c.EstaActivo
+                            && !c.EsBorrador
+                            && !c.Censurado
+                            && (esPropio || !c.OcultoSilenciosamente));
+
+                // Si no está suscrito y no es propio, solo mostrar contenido gratuito
+                if (!estaSuscrito && !esPropio)
+                {
+                    query = query.Where(c => !c.EsPremium || c.EsPublicoGeneral);
+                }
+
+                var contenidos = await query
+                    .OrderByDescending(c => c.FechaPublicacion)
+                    .Take(limit)
+                    .ToListAsync();
+
+                // Obtener likes del usuario actual
+                var likesUsuario = new HashSet<int>();
+                if (!string.IsNullOrEmpty(currentUserId))
+                {
+                    likesUsuario = (await _context.Likes
+                        .Where(l => l.UsuarioId == currentUserId && contenidos.Select(c => c.Id).Contains(l.ContenidoId))
+                        .Select(l => l.ContenidoId)
+                        .ToListAsync()).ToHashSet();
+                }
+
+                // Encontrar el índice del contenido actual para posicionamiento
+                var indexActual = contenidoActualId.HasValue
+                    ? contenidos.FindIndex(c => c.Id == contenidoActualId.Value)
+                    : 0;
+                if (indexActual < 0) indexActual = 0;
+
+                var resultado = contenidos.Select(c => {
+                    // Determinar la fuente del media
+                    var archivos = c.TodosLosArchivos;
+                    var esCarrusel = archivos.Count > 1;
+
+                    return new
+                    {
+                        id = c.Id,
+                        tipo = esCarrusel ? "carousel" : (c.TipoContenido == TipoContenido.Video ? "video" : "image"),
+                        src = c.RutaArchivo,
+                        thumbnail = c.Thumbnail ?? c.RutaArchivo,
+                        descripcion = c.Descripcion,
+                        likes = c.NumeroLikes,
+                        comments = c.NumeroComentarios,
+                        isLiked = likesUsuario.Contains(c.Id),
+                        fecha = c.FechaPublicacion,
+                        usuario = new
+                        {
+                            id = c.Usuario.Id,
+                            username = c.Usuario.UserName,
+                            seudonimo = c.Usuario.Seudonimo,
+                            nombre = c.Usuario.NombreCompleto,
+                            fotoPerfil = c.TipoLado == TipoLado.LadoB
+                                ? (c.Usuario.FotoPerfilLadoB ?? c.Usuario.FotoPerfil)
+                                : c.Usuario.FotoPerfil
+                        },
+                        tipoLado = (int)c.TipoLado,
+                        esPremium = c.EsPremium,
+                        // Datos de música si existe
+                        musica = c.PistaMusical != null ? new
+                        {
+                            titulo = c.PistaMusical.Titulo,
+                            artista = c.PistaMusical.Artista,
+                            rutaArchivo = c.PistaMusical.RutaArchivo,
+                            inicio = c.AudioTrimInicio ?? 0,
+                            volumen = (double)(c.MusicaVolumen ?? 0.7m)
+                        } : null,
+                        // Datos del carrusel si existe
+                        carouselFiles = esCarrusel ? archivos.Select(a => new
+                        {
+                            src = a.RutaArchivo,
+                            tipo = a.TipoArchivo == TipoArchivo.Video ? "video" : "image"
+                        }).ToList() : null
+                    };
+                }).ToList();
+
+                return Json(new
+                {
+                    success = true,
+                    posts = resultado,
+                    indexActual = indexActual,
+                    total = contenidos.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener publicaciones del usuario {UsuarioId}", usuarioId);
+                return Json(new { success = false, message = "Error al cargar publicaciones" });
             }
         }
 
@@ -2027,6 +2182,52 @@ namespace Lado.Controllers
         }
 
         // ========================================
+        // GET POST PREVIEW (para mensajes compartidos)
+        // ========================================
+
+        [HttpGet]
+        public async Task<IActionResult> GetPostPreview(int id)
+        {
+            try
+            {
+                var contenido = await _context.Contenidos
+                    .Include(c => c.Usuario)
+                    .FirstOrDefaultAsync(c => c.Id == id);
+
+                if (contenido == null)
+                {
+                    return NotFound();
+                }
+
+                // Obtener thumbnail (primera imagen o frame del video)
+                var rutaArchivo = contenido.RutaArchivo;
+                if (contenido.TipoContenido == TipoContenido.Video && !string.IsNullOrEmpty(contenido.Thumbnail))
+                {
+                    rutaArchivo = contenido.Thumbnail;
+                }
+
+                return Json(new
+                {
+                    id = contenido.Id,
+                    tipoContenido = (int)contenido.TipoContenido,
+                    rutaArchivo = rutaArchivo,
+                    thumbnail = contenido.Thumbnail ?? rutaArchivo,
+                    autorUsername = contenido.Usuario?.UserName,
+                    autorNombre = contenido.Usuario?.NombreCompleto ?? contenido.Usuario?.UserName,
+                    autorFoto = contenido.Usuario?.FotoPerfil ?? "/images/default-avatar.svg",
+                    descripcion = contenido.Descripcion?.Length > 50
+                        ? contenido.Descripcion.Substring(0, 50) + "..."
+                        : contenido.Descripcion
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener preview del post {PostId}", id);
+                return NotFound();
+            }
+        }
+
+        // ========================================
         // ENVIAR CONTENIDO A AMIGOS
         // ========================================
 
@@ -2055,33 +2256,77 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "Contenido no encontrado" });
                 }
 
+                // Obtener HubContext para SignalR
+                var hubContext = _serviceProvider.GetService<IHubContext<ChatHub>>();
+
                 int enviados = 0;
                 foreach (var amigoId in request.AmigosIds.Distinct())
                 {
-                    // Verificar que el amigo exista y que lo sigo
-                    var suscripcion = await _context.Suscripciones
-                        .AnyAsync(s => s.FanId == usuarioActual.Id && s.CreadorId == amigoId && s.EstaActiva);
-
-                    if (!suscripcion) continue;
+                    // Verificar que el amigo exista
+                    var amigo = await _userManager.FindByIdAsync(amigoId);
+                    if (amigo == null) continue;
 
                     // Crear mensaje privado con el contenido compartido
                     var tipoContenido = contenido.TipoContenido == TipoContenido.Foto || contenido.TipoContenido == TipoContenido.Imagen
                         ? "📷" : contenido.TipoContenido == TipoContenido.Video ? "🎬" : "📝";
 
+                    var textoMensaje = $"{tipoContenido} Te compartí una publicación de @{contenido.Usuario?.UserName ?? "usuario"}\n{request.Url}";
+
                     var mensaje = new MensajePrivado
                     {
                         RemitenteId = usuarioActual.Id,
                         DestinatarioId = amigoId,
-                        Contenido = $"{tipoContenido} Te compartió una publicación de @{contenido.Usuario?.UserName ?? "usuario"}\n{request.Url}",
+                        Contenido = textoMensaje,
                         FechaEnvio = DateTime.Now,
-                        Leido = false
+                        Leido = false,
+                        TipoMensaje = TipoMensaje.Texto
                     };
 
                     _context.MensajesPrivados.Add(mensaje);
+                    await _context.SaveChangesAsync(); // Guardar para obtener el ID
+
+                    // Notificar via SignalR al destinatario (para chat en tiempo real)
+                    if (hubContext != null)
+                    {
+                        var mensajeDto = new
+                        {
+                            id = mensaje.Id,
+                            remitenteId = usuarioActual.Id,
+                            remitenteNombre = usuarioActual.NombreCompleto ?? usuarioActual.UserName,
+                            remitenteFoto = usuarioActual.FotoPerfil,
+                            contenido = textoMensaje,
+                            fechaEnvio = mensaje.FechaEnvio,
+                            tipoMensaje = (int)TipoMensaje.Texto,
+                            leido = false
+                        };
+
+                        await hubContext.Clients.Group($"user_{amigoId}").SendAsync("RecibirMensaje", mensajeDto);
+                    }
+
+                    // Enviar Push Notification
+                    var nombreRemitente = usuarioActual.NombreCompleto ?? usuarioActual.UserName ?? "Alguien";
+                    _ = _pushService.EnviarNotificacionAsync(
+                        amigoId,
+                        $"💬 {nombreRemitente}",
+                        $"{tipoContenido} Te compartió una publicación",
+                        $"/Mensajes/Chat/{usuarioActual.Id}",
+                        TipoNotificacionPush.NuevoMensaje,
+                        usuarioActual.FotoPerfil
+                    );
+
+                    // Crear notificación en la campana
+                    await _notificationService.CrearNotificacionSistemaAsync(
+                        amigoId,
+                        $"💬 {nombreRemitente}",
+                        "Te compartió una publicación",
+                        $"/Mensajes/Chat/{usuarioActual.Id}"
+                    );
+
                     enviados++;
                 }
 
-                await _context.SaveChangesAsync();
+                _logger.LogInformation("Usuario {Usuario} compartió contenido {ContenidoId} con {Enviados} amigos",
+                    usuarioActual.UserName, request.ContenidoId, enviados);
 
                 return Json(new { success = true, enviados });
             }
@@ -3167,7 +3412,8 @@ namespace Lado.Controllers
                             con.EstaActivo &&
                             !con.EsBorrador &&
                             !con.Censurado &&
-                            !con.EsPrivado)
+                            !con.EsPrivado &&
+                            !con.OcultoSilenciosamente)
                     })
                     .OrderBy(c => c.Orden)
                     .ThenByDescending(c => c.ContadorContenido)
@@ -3251,7 +3497,8 @@ namespace Lado.Controllers
                             con.EstaActivo &&
                             !con.EsBorrador &&
                             !con.Censurado &&
-                            !con.EsPrivado)
+                            !con.EsPrivado &&
+                            !con.OcultoSilenciosamente)
                     })
                     .ToListAsync();
 
@@ -3374,18 +3621,21 @@ namespace Lado.Controllers
                     return RedirectToAction("Index");
                 }
 
+                // Verificar shadow hide - el contenido oculto silenciosamente solo es visible para su propietario
+                var usuarioActualId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (contenido.OcultoSilenciosamente && contenido.UsuarioId != usuarioActualId)
+                {
+                    TempData["Error"] = "Contenido no encontrado";
+                    return RedirectToAction("Index");
+                }
+
                 // Si no está autenticado, solo puede ver contenido público general
                 if (usuarioActual == null)
                 {
-                    if (!contenido.EsPublicoGeneral)
-                    {
-                        // Redirigir al login con returnUrl
-                        return RedirectToAction("Login", "Account", new { returnUrl = $"/Feed/Detalle/{id}" });
-                    }
-
-                    // Usuario no autenticado viendo contenido público
-                    contenido.NumeroVistas++;
-                    await _context.SaveChangesAsync();
+                    // Verificar que el contenido sea público: LadoA, EsPublicoGeneral=true, no privado
+                    var esContenidoPublico = contenido.TipoLado == TipoLado.LadoA
+                                             && contenido.EsPublicoGeneral
+                                             && !contenido.EsPrivado;
 
                     ViewBag.Reacciones = new List<object>();
                     ViewBag.TotalReacciones = 0;
@@ -3395,6 +3645,27 @@ namespace Lado.Controllers
                     ViewBag.EsFavorito = false;
                     ViewBag.EstaAutenticado = false;
                     ViewBag.CurrentUserId = "";
+                    ViewBag.EstaSiguiendo = false;
+
+                    if (!esContenidoPublico)
+                    {
+                        // Mostrar contenido bloqueado con invitación a registrarse (estilo Instagram)
+                        // En lugar de redirigir al login, mostramos el contenido con overlay de bloqueo
+                        ViewBag.ContenidoBloqueado = true;
+                        ViewBag.MensajeBloqueo = contenido.TipoLado == TipoLado.LadoB
+                            ? "Este es contenido exclusivo. Regístrate para suscribirte a este creador."
+                            : "Regístrate para ver todo el contenido de este creador.";
+
+                        _logger.LogInformation("Detalle bloqueado mostrado: Contenido {Id} (LadoB={EsLadoB}) por usuario anónimo",
+                            id, contenido.TipoLado == TipoLado.LadoB);
+
+                        return View(contenido);
+                    }
+
+                    // Usuario no autenticado viendo contenido público
+                    ViewBag.ContenidoBloqueado = false;
+                    contenido.NumeroVistas++;
+                    await _context.SaveChangesAsync();
 
                     _logger.LogInformation("Detalle público visto: Contenido {Id} por usuario anónimo", id);
 
@@ -3446,6 +3717,11 @@ namespace Lado.Controllers
                 var esFavorito = await _context.Favoritos
                     .AnyAsync(f => f.ContenidoId == id && f.UsuarioId == usuarioActual.Id);
                 ViewBag.EsFavorito = esFavorito;
+
+                // Verificar si el usuario sigue al creador del post
+                var estaSiguiendo = !esPropio && await _context.Suscripciones
+                    .AnyAsync(s => s.FanId == usuarioActual.Id && s.CreadorId == contenido.UsuarioId && s.EstaActiva);
+                ViewBag.EstaSiguiendo = estaSiguiendo;
 
                 _logger.LogInformation("Detalle visto: Contenido {Id} ({TipoLado}) por Usuario {UserId}",
                     id, contenido.TipoLado, usuarioActual.Id);
@@ -3935,9 +4211,18 @@ namespace Lado.Controllers
 
                 var post = await _context.Contenidos
                     .Include(c => c.Usuario)
-                    .FirstOrDefaultAsync(c => c.Id == id && c.EstaActivo);
+                    .FirstOrDefaultAsync(c => c.Id == id
+                        && c.EstaActivo
+                        && !c.EsBorrador
+                        && !c.Censurado);
 
                 if (post == null)
+                {
+                    return Json(new { success = false, message = "Post no encontrado" });
+                }
+
+                // Verificar shadow hide - contenido oculto solo visible para su propietario
+                if (post.OcultoSilenciosamente && post.UsuarioId != usuarioActual.Id)
                 {
                     return Json(new { success = false, message = "Post no encontrado" });
                 }
@@ -4011,7 +4296,16 @@ namespace Lado.Controllers
         /// </summary>
         [AllowAnonymous]
         [HttpGet]
-        public async Task<IActionResult> ObtenerFotosMuro(int cantidad = 500)
+        public async Task<IActionResult> ObtenerFotosMuro(
+            int cantidad = 100,
+            int pagina = 0,
+            string? orden = "tendencias",
+            string? periodo = "all",
+            string? categoria = null,
+            int minLikes = 0,
+            int minNivel = 0,
+            bool soloDestacadas = false,
+            string? busqueda = null)
         {
             try
             {
@@ -4020,19 +4314,95 @@ namespace Lado.Controllers
                     ? new List<string>()
                     : await ObtenerUsuariosBloqueadosCacheadosAsync(usuarioId);
 
-                // Obtener fotos elegibles: LadoA, públicas, activas, solo fotos
-                var fotosElegibles = await _context.Contenidos
+                // Base query: fotos elegibles LadoA, públicas, activas
+                var query = _context.Contenidos
                     .Include(c => c.Usuario)
                     .Where(c => c.EstaActivo
                         && !c.EsBorrador
                         && !c.Censurado
-                        && !c.OcultoSilenciosamente // Shadow hide
+                        && !c.OcultoSilenciosamente
                         && !c.EsPrivado
                         && c.TipoLado == TipoLado.LadoA
                         && c.TipoContenido == TipoContenido.Foto
                         && !string.IsNullOrEmpty(c.RutaArchivo)
-                        && !bloqueados.Contains(c.UsuarioId))
-                    .OrderBy(c => Guid.NewGuid()) // Orden aleatorio
+                        && !bloqueados.Contains(c.UsuarioId));
+
+                // Filtro por período
+                if (!string.IsNullOrEmpty(periodo) && periodo != "all")
+                {
+                    var fechaLimite = periodo switch
+                    {
+                        "today" => DateTime.UtcNow.AddDays(-1),
+                        "week" => DateTime.UtcNow.AddDays(-7),
+                        "month" => DateTime.UtcNow.AddMonths(-1),
+                        _ => DateTime.MinValue
+                    };
+                    if (fechaLimite > DateTime.MinValue)
+                    {
+                        query = query.Where(c => c.FechaPublicacion >= fechaLimite);
+                    }
+                }
+
+                // Filtro por búsqueda
+                if (!string.IsNullOrEmpty(busqueda))
+                {
+                    var searchLower = busqueda.ToLower();
+                    query = query.Where(c =>
+                        (c.Descripcion != null && c.Descripcion.ToLower().Contains(searchLower)) ||
+                        (c.Usuario!.UserName != null && c.Usuario.UserName.ToLower().Contains(searchLower)) ||
+                        (c.Usuario.NombreCompleto != null && c.Usuario.NombreCompleto.ToLower().Contains(searchLower)));
+                }
+
+                // Filtro por categoría
+                if (!string.IsNullOrEmpty(categoria) && categoria != "all")
+                {
+                    // Buscar categoría por slug o nombre
+                    var categoriaEntity = await _context.CategoriasIntereses
+                        .FirstOrDefaultAsync(c => c.Slug == categoria || c.Nombre.ToLower() == categoria.ToLower());
+
+                    if (categoriaEntity != null)
+                    {
+                        query = query.Where(c => c.CategoriaInteresId == categoriaEntity.Id);
+                    }
+                }
+
+                // Filtro por likes mínimos
+                if (minLikes > 0)
+                {
+                    query = query.Where(c => c.NumeroLikes >= minLikes);
+                }
+
+                // Ordenamiento
+                IOrderedQueryable<Contenido> orderedQuery = orden switch
+                {
+                    "recientes" => query.OrderByDescending(c => c.FechaPublicacion),
+                    "tendencias" => query.OrderByDescending(c => c.NumeroLikes + c.NumeroComentarios * 2)
+                                        .ThenByDescending(c => c.FechaPublicacion),
+                    "destacadas" => query.OrderByDescending(c => c.FechaPublicacion), // Se filtrará después
+                    _ => query.OrderBy(c => Guid.NewGuid()) // Aleatorio
+                };
+
+                // Obtener destacados activos
+                var ahora = DateTime.UtcNow;
+                var destacadosDict = await _context.FotosDestacadas
+                    .Where(f => f.FechaInicio <= ahora && f.FechaExpiracion >= ahora)
+                    .ToDictionaryAsync(f => f.ContenidoId, f => (int)f.Nivel);
+
+                // Si solo destacadas o filtro por nivel mínimo
+                if (soloDestacadas || minNivel > 0)
+                {
+                    var idsDestacados = destacadosDict.Keys.ToList();
+                    if (minNivel > 0)
+                    {
+                        idsDestacados = destacadosDict.Where(d => d.Value >= minNivel).Select(d => d.Key).ToList();
+                    }
+                    orderedQuery = (IOrderedQueryable<Contenido>)orderedQuery.Where(c => idsDestacados.Contains(c.Id));
+                }
+
+                // Paginación
+                var skip = pagina * cantidad;
+                var fotosElegibles = await orderedQuery
+                    .Skip(skip)
                     .Take(cantidad)
                     .Select(c => new
                     {
@@ -4042,15 +4412,10 @@ namespace Lado.Controllers
                         CreadorId = c.UsuarioId,
                         CreadorNombre = c.Usuario!.NombreCompleto ?? c.Usuario.UserName,
                         CreadorFoto = c.Usuario.FotoPerfil,
-                        CreadorUsername = c.Usuario.UserName
+                        CreadorUsername = c.Usuario.UserName,
+                        c.NumeroLikes
                     })
                     .ToListAsync();
-
-                // Obtener destacados activos
-                var ahora = DateTime.UtcNow;
-                var destacados = await _context.FotosDestacadas
-                    .Where(f => f.FechaInicio <= ahora && f.FechaExpiracion >= ahora)
-                    .ToDictionaryAsync(f => f.ContenidoId, f => (int)f.Nivel);
 
                 // Combinar fotos con sus niveles
                 var resultado = fotosElegibles.Select(f => new
@@ -4061,19 +4426,15 @@ namespace Lado.Controllers
                     f.CreadorNombre,
                     f.CreadorFoto,
                     f.CreadorUsername,
-                    Nivel = destacados.GetValueOrDefault(f.Id, 0),
-                    Tamano = ObtenerTamanoNivel(destacados.GetValueOrDefault(f.Id, 0))
+                    f.NumeroLikes,
+                    Nivel = destacadosDict.GetValueOrDefault(f.Id, 0),
+                    Tamano = ObtenerTamanoNivel(destacadosDict.GetValueOrDefault(f.Id, 0))
                 }).ToList();
 
-                // Si no hay suficientes fotos, duplicar para llenar
-                if (resultado.Count < cantidad && resultado.Count > 0)
+                // Para orden destacadas, reordenar por nivel
+                if (orden == "destacadas")
                 {
-                    var original = resultado.ToList();
-                    while (resultado.Count < cantidad)
-                    {
-                        var toAdd = original.OrderBy(x => Guid.NewGuid()).Take(cantidad - resultado.Count);
-                        resultado.AddRange(toAdd);
-                    }
+                    resultado = resultado.OrderByDescending(r => r.Nivel).ThenByDescending(r => r.NumeroLikes).ToList();
                 }
 
                 return Json(new { success = true, fotos = resultado });
@@ -4435,6 +4796,190 @@ namespace Lado.Controllers
                 contenidos,
                 hashtags = tagsEncontrados.Take(5)
             });
+        }
+
+        /// <summary>
+        /// API para obtener categorías disponibles para filtros
+        /// </summary>
+        [AllowAnonymous]
+        [HttpGet]
+        public async Task<IActionResult> ObtenerCategoriasMuro()
+        {
+            try
+            {
+                var categorias = await _context.CategoriasIntereses
+                    .Where(c => c.EstaActiva && c.CategoriaPadreId == null)
+                    .OrderBy(c => c.Orden)
+                    .ThenBy(c => c.Nombre)
+                    .Select(c => new
+                    {
+                        c.Id,
+                        c.Nombre,
+                        c.Slug,
+                        c.Icono,
+                        c.Color
+                    })
+                    .ToListAsync();
+
+                return Json(new { success = true, categorias });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error obteniendo categorías del muro");
+                return Json(new { success = false, message = "Error al cargar categorías" });
+            }
+        }
+
+        /// <summary>
+        /// API para buscar creadores (autocompletado de búsqueda en Muro)
+        /// </summary>
+        [AllowAnonymous]
+        [HttpGet]
+        public async Task<IActionResult> BuscarCreadores(string q, int limit = 5)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(q) || q.Length < 2)
+                {
+                    return Json(new { success = true, creadores = new List<object>() });
+                }
+
+                var searchLower = q.ToLower();
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var bloqueados = string.IsNullOrEmpty(usuarioId)
+                    ? new List<string>()
+                    : await ObtenerUsuariosBloqueadosCacheadosAsync(usuarioId);
+
+                var ahora = DateTime.Now;
+                var creadores = await _context.Users
+                    .Where(u => u.EsCreador
+                        && u.EstaActivo
+                        && (!u.FechaSuspensionFin.HasValue || u.FechaSuspensionFin.Value <= ahora)
+                        && !bloqueados.Contains(u.Id)
+                        && ((u.UserName != null && u.UserName.ToLower().Contains(searchLower)) ||
+                            (u.NombreCompleto != null && u.NombreCompleto.ToLower().Contains(searchLower))))
+                    .OrderByDescending(u => u.NumeroSeguidores)
+                    .Take(limit)
+                    .Select(u => new
+                    {
+                        u.Id,
+                        Username = u.UserName,
+                        Nombre = u.NombreCompleto ?? u.UserName,
+                        Avatar = u.FotoPerfil,
+                        Seguidores = u.NumeroSeguidores
+                    })
+                    .ToListAsync();
+
+                return Json(new { success = true, creadores });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error buscando creadores: {Query}", q);
+                return Json(new { success = false, message = "Error en la búsqueda" });
+            }
+        }
+
+        /// <summary>
+        /// API para obtener creadores seguidos con sus fotos recientes (para sección Muro)
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ObtenerCreadoresSeguidos(int limit = 10)
+        {
+            try
+            {
+                var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(usuarioId))
+                {
+                    return Json(new { success = false, message = "Debes iniciar sesión" });
+                }
+
+                // Obtener IDs de creadores seguidos (Fan sigue a Creador)
+                var seguidosIds = await _context.Suscripciones
+                    .Where(s => s.FanId == usuarioId && s.EstaActiva)
+                    .Select(s => s.CreadorId)
+                    .ToListAsync();
+
+                if (!seguidosIds.Any())
+                {
+                    return Json(new { success = true, creadores = new List<object>() });
+                }
+
+                // Obtener creadores con sus fotos/contenido reciente
+                var ahora = DateTime.Now;
+                var creadores = await _context.Users
+                    .Where(u => seguidosIds.Contains(u.Id)
+                        && u.EstaActivo
+                        && (!u.FechaSuspensionFin.HasValue || u.FechaSuspensionFin.Value <= ahora))
+                    .OrderByDescending(u => u.UltimaActividad ?? u.FechaRegistro)
+                    .Take(limit)
+                    .Select(u => new
+                    {
+                        u.Id,
+                        Username = u.UserName,
+                        Nombre = u.NombreCompleto ?? u.UserName,
+                        Avatar = u.FotoPerfil ?? "/images/default-avatar.svg",
+                        // Contar todo el contenido visual (fotos, videos, reels)
+                        FotosCount = _context.Contenidos.Count(c =>
+                            c.UsuarioId == u.Id &&
+                            c.EstaActivo &&
+                            !c.EsBorrador &&
+                            c.TipoLado == TipoLado.LadoA)
+                    })
+                    .ToListAsync();
+
+                // Obtener contenido visual reciente de cada creador (fotos, videos, reels)
+                var creadoresConFotos = new List<object>();
+                foreach (var creador in creadores)
+                {
+                    // Obtener thumbnails de cualquier tipo de contenido (fotos y videos)
+                    var fotos = await _context.Contenidos
+                        .Where(c => c.UsuarioId == creador.Id
+                            && c.EstaActivo
+                            && !c.EsBorrador
+                            && c.TipoLado == TipoLado.LadoA
+                            && !string.IsNullOrEmpty(c.Thumbnail))
+                        .OrderByDescending(c => c.FechaPublicacion)
+                        .Take(4)
+                        .Select(c => c.Thumbnail)
+                        .ToListAsync();
+
+                    // Si faltan slots, completar con RutaArchivo de SOLO IMÁGENES (no videos)
+                    if (fotos.Count < 4)
+                    {
+                        var imagenesAdicionales = await _context.Contenidos
+                            .Where(c => c.UsuarioId == creador.Id
+                                && c.EstaActivo
+                                && !c.EsBorrador
+                                && c.TipoLado == TipoLado.LadoA
+                                && string.IsNullOrEmpty(c.Thumbnail) // Solo las que no tienen thumbnail
+                                && !string.IsNullOrEmpty(c.RutaArchivo)
+                                && (c.TipoContenido == TipoContenido.Foto || c.TipoContenido == TipoContenido.Imagen))
+                            .OrderByDescending(c => c.FechaPublicacion)
+                            .Take(4 - fotos.Count)
+                            .Select(c => c.RutaArchivo!)
+                            .ToListAsync();
+
+                        fotos.AddRange(imagenesAdicionales);
+                    }
+
+                    creadoresConFotos.Add(new
+                    {
+                        id = creador.Id,
+                        username = creador.Username,
+                        nombre = creador.Nombre,
+                        avatar = creador.Avatar,
+                        fotosCount = creador.FotosCount,
+                        fotos = fotos
+                    });
+                }
+
+                return Json(new { success = true, creadores = creadoresConFotos });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error obteniendo creadores seguidos");
+                return Json(new { success = false, message = "Error al cargar creadores" });
+            }
         }
 
         private static int ObtenerTamanoNivel(int nivel)

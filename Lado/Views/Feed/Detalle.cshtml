@@ -8,6 +8,10 @@
     var esFavorito = ViewBag.EsFavorito ?? false;
     var estaAutenticado = ViewBag.EstaAutenticado ?? User.Identity?.IsAuthenticated ?? false;
     var currentUserId = ViewBag.CurrentUserId as string ?? "";
+    var estaSiguiendo = ViewBag.EstaSiguiendo ?? false;
+    var esPropio = ViewBag.EsPropio ?? false;
+    var contenidoBloqueado = ViewBag.ContenidoBloqueado ?? false;
+    var mensajeBloqueo = ViewBag.MensajeBloqueo as string ?? "Regístrate para ver este contenido";
 
     // Soporte para carrusel (múltiples archivos)
     var archivosCarrusel = Model.TodosLosArchivos;
@@ -134,6 +138,40 @@
     .creator-details span {
         font-size: 14px;
         color: var(--muted);
+    }
+
+    /* Botón Seguir en header */
+    .header-follow-btn {
+        padding: 6px 16px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+        margin-left: 12px;
+    }
+
+    .header-follow-btn.follow {
+        background: var(--primary, #7c3aed);
+        color: white;
+    }
+
+    .header-follow-btn.follow:hover {
+        background: var(--primary-dark, #6d28d9);
+    }
+
+    .header-follow-btn.following {
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--border);
+    }
+
+    .header-follow-btn.following:hover {
+        border-color: #ef4444;
+        color: #ef4444;
+        background: rgba(239, 68, 68, 0.1);
     }
 
     /* Seguidores en común */
@@ -315,6 +353,46 @@
         display: block;
     }
 
+    /* Botón explorar contenido del creador */
+    .explore-creator-btn {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.6);
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        transition: all 0.2s ease;
+        z-index: 100; /* Alto para estar sobre video controls */
+    }
+
+    /* Asegurar que content-media tenga position relative para el botón absoluto */
+    .content-media {
+        position: relative;
+    }
+
+    /* Hacer que el video no bloquee el botón */
+    .content-media video {
+        position: relative;
+        z-index: 1;
+    }
+
+    .explore-creator-btn:hover {
+        background: rgba(0, 0, 0, 0.8);
+        transform: scale(1.1);
+    }
+
+    .explore-creator-btn svg {
+        width: 22px;
+        height: 22px;
+    }
+
     /* MUSIC BADGE */
     .image-with-music-container {
         position: relative;
@@ -458,6 +536,39 @@
     .unlock-btn:hover {
         background: var(--primary-dark);
         transform: translateY(-1px);
+    }
+
+    /* Estilos para contenido bloqueado (usuarios no autenticados) */
+    .blocked-overlay {
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    .blocked-cta-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 8px;
+        width: 100%;
+        max-width: 280px;
+    }
+
+    .blocked-cta-buttons .unlock-btn {
+        width: 100%;
+        justify-content: center;
+        text-decoration: none;
+    }
+
+    .blocked-cta-buttons .primary-btn {
+        background: var(--primary);
+    }
+
+    .blocked-cta-buttons .secondary-btn {
+        background: transparent;
+        border: 2px solid white;
+    }
+
+    .blocked-cta-buttons .secondary-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
     }
 
     /* ACCIONES */
@@ -2319,10 +2430,12 @@
         width: 100%;
         max-width: 500px;
         max-height: 70vh;
+        min-height: 50vh; /* Altura mínima */
         transform: translateY(100%);
         transition: transform 0.3s ease;
         display: flex;
         flex-direction: column;
+        padding-bottom: env(safe-area-inset-bottom, 20px); /* Safe area iOS */
     }
 
     .likes-modal-overlay.visible .likes-modal {
@@ -2333,8 +2446,22 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 16px 20px;
+        padding: 24px 20px 16px; /* Espacio para handle */
         border-bottom: 1px solid var(--line, #efefef);
+        position: relative;
+    }
+
+    /* Handle visual estilo iOS */
+    .likes-modal-header::before {
+        content: '';
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 36px;
+        height: 4px;
+        background: var(--line, #dbdbdb);
+        border-radius: 2px;
     }
 
     .likes-modal-title {
@@ -2357,12 +2484,26 @@
         flex: 1;
         overflow-y: auto;
         padding: 12px 20px 20px;
+        min-height: 200px; /* Altura mínima para el contenido */
     }
 
     .likes-modal-list {
         display: flex;
         flex-direction: column;
         gap: 12px;
+    }
+
+    /* Loading y empty states */
+    .likes-modal-loading,
+    .likes-modal-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        color: var(--muted, #8e8e8e);
+        text-align: center;
+        min-height: 150px;
     }
 
     .likes-modal-user {
@@ -2929,12 +3070,23 @@
         border: none;
         cursor: pointer;
         color: var(--fg);
-        width: 32px;
-        height: 32px;
+        width: 40px;
+        height: 40px;
         display: flex;
         align-items: center;
         justify-content: center;
         border-radius: 50%;
+        z-index: 10;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .share-modal-close:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .share-modal-close:active {
+        background: rgba(255, 255, 255, 0.2);
     }
 
     .share-search-box {
@@ -3156,6 +3308,18 @@
                     </span>
                 </div>
                 </a>
+
+                @* Botón Seguir (solo si no es propio y está autenticado) *@
+                @if (estaAutenticado && !esPropio)
+                {
+                    <button type="button"
+                            class="header-follow-btn @(estaSiguiendo ? "following" : "follow")"
+                            id="btnHeaderFollow"
+                            onclick="toggleHeaderFollow('@Model.UsuarioId', @((int)Model.TipoLado))">
+                        @(estaSiguiendo ? "Siguiendo" : "Seguir")
+                    </button>
+                }
+
                 @* Badge de seguidores en común (solo para usuarios autenticados) *@
                 @if (estaAutenticado)
                 {
@@ -3216,10 +3380,6 @@
             </div>
         </div>
 
-        @{
-            var esPropio = ViewBag.EsPropio ?? false;
-        }
-
         @if (esPropio)
         {
             <!-- Toggle de Visibilidad (solo para el propietario) -->
@@ -3263,7 +3423,43 @@
 
         <!-- MEDIA -->
         <div class="content-media">
-            @if (Model.EsPremium && !estaSuscrito)
+            @if (contenidoBloqueado)
+            {
+                <!-- Contenido bloqueado para usuarios no autenticados (estilo Instagram) -->
+                @if ((int)Model.TipoContenido == 2)
+                {
+                    <video src="@(Model.Thumbnail ?? "/images/placeholder.jpg")" style="filter: blur(30px); pointer-events: none;" playsinline muted></video>
+                }
+                else
+                {
+                    <img src="@(Model.Thumbnail ?? Model.RutaArchivo ?? "/images/placeholder.jpg")" alt="Contenido bloqueado" style="filter: blur(30px);">
+                }
+                <div class="premium-overlay blocked-overlay">
+                    <div class="premium-lock-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                    </div>
+                    <h4>Contenido Exclusivo</h4>
+                    <p>@mensajeBloqueo</p>
+                    <div class="blocked-cta-buttons">
+                        <a href="@Url.Action("Registro", "Account")" class="unlock-btn primary-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="8.5" cy="7" r="4"></circle>
+                                <line x1="20" y1="8" x2="20" y2="14"></line>
+                                <line x1="23" y1="11" x2="17" y2="11"></line>
+                            </svg>
+                            Crear cuenta gratis
+                        </a>
+                        <a href="@Url.Action("Login", "Account", new { returnUrl = Context.Request.Path })" class="unlock-btn secondary-btn">
+                            Iniciar sesion
+                        </a>
+                    </div>
+                </div>
+            }
+            else if (Model.EsPremium && !estaSuscrito)
             {
                 @if ((int)Model.TipoContenido == 2)
                 {
@@ -3339,7 +3535,7 @@
                 }
                 else
                 {
-                    <div class="image-with-music-container">
+                    <div class="image-with-music-container" onclick="openCreatorFullscreen()" style="cursor: pointer;">
                         <img src="@Model.RutaArchivo" alt="Contenido">
                         @if (Model.PistaMusical != null)
                         {
@@ -3366,6 +3562,19 @@
                         }
                     </div>
                 }
+            }
+
+            @* Botón para abrir fullscreen viewer del creador *@
+            @if (!Model.EsPremium || estaSuscrito)
+            {
+                <button class="explore-creator-btn" onclick="openCreatorFullscreen()" title="Ver más contenido de @creadorNombre">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                </button>
             }
         </div>
 
@@ -3753,11 +3962,11 @@
 </div>
 
 <!-- Share Modal - Estilo Instagram -->
-<div class="share-modal-overlay" id="shareModal" onclick="if(event.target === this) closeShareModal()">
+<div class="share-modal-overlay" id="shareModal" onclick="if(event.target===this)closeShareModal()">
     <div class="share-modal">
         <div class="share-modal-header">
-            <button class="share-modal-close" onclick="closeShareModal()">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button type="button" class="share-modal-close" id="btnCloseShareModal" onclick="event.stopPropagation();closeShareModal()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
                     <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
@@ -4259,8 +4468,39 @@
         }
 
         function closeShareModal() {
-            document.getElementById('shareModal').classList.remove('active');
+            const modal = document.getElementById('shareModal');
+            if (modal) {
+                modal.classList.remove('active');
+                console.log('Modal cerrado');
+            }
         }
+
+        // Delegación de eventos global (funciona siempre)
+        document.addEventListener('click', function(e) {
+            // Cerrar con botón X
+            if (e.target.closest('#btnCloseShareModal')) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeShareModal();
+                return;
+            }
+
+            // Cerrar con click en overlay
+            const overlay = document.getElementById('shareModal');
+            if (e.target === overlay) {
+                closeShareModal();
+            }
+        }, true);
+
+        // Tecla Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('shareModal');
+                if (modal && modal.classList.contains('active')) {
+                    closeShareModal();
+                }
+            }
+        });
 
         async function cargarContactosGrid() {
             const grid = document.getElementById('shareContactsGrid');
@@ -4313,8 +4553,9 @@
                         'RequestVerificationToken': token
                     },
                     body: JSON.stringify({
-                        contenidoId: contenidoId,
-                        amigoIds: [contactId]
+                        ContenidoId: contenidoId,
+                        AmigosIds: [contactId],
+                        Url: shareUrl
                     })
                 });
 
@@ -5087,6 +5328,45 @@
         cerrarMenus();
     }
 
+    // Toggle seguir/dejar de seguir desde header
+    async function toggleHeaderFollow(userId, tipoLado) {
+        const btn = document.getElementById('btnHeaderFollow');
+        if (!btn) return;
+
+        const isFollowing = btn.classList.contains('following');
+        btn.disabled = true;
+
+        try {
+            const endpoint = isFollowing ? '/Feed/DejarDeSeguir' : '/Feed/Seguir';
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `id=${userId}&tipoLado=${tipoLado}`
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                if (isFollowing) {
+                    btn.classList.remove('following');
+                    btn.classList.add('follow');
+                    btn.textContent = 'Seguir';
+                    showToast('Has dejado de seguir');
+                } else {
+                    btn.classList.remove('follow');
+                    btn.classList.add('following');
+                    btn.textContent = 'Siguiendo';
+                    showToast('Ahora sigues a este usuario');
+                }
+            } else {
+                showToast(data.message || 'Error al procesar');
+            }
+        } catch (err) {
+            showToast('Error al procesar');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
     // Reportar contenido
     function reportarContenido(postId) {
         const motivo = prompt('Por favor, indica el motivo del reporte:');
@@ -5389,4 +5669,536 @@
             }, 200);
         });
     });
+</script>
+
+@{
+    var schemaBaseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+    var schemaCreadorNombre = Model.Usuario?.Seudonimo ?? Model.Usuario?.UserName ?? "Creador";
+    var schemaDescripcion = !string.IsNullOrEmpty(Model.Descripcion)
+        ? Model.Descripcion.Replace("\"", "\\\"").Replace("\n", " ").Replace("\r", "")
+        : $"Contenido de {schemaCreadorNombre} en Lado";
+    var schemaThumbnail = !string.IsNullOrEmpty(Model.Thumbnail)
+        ? $"{schemaBaseUrl}{Model.Thumbnail}"
+        : $"{schemaBaseUrl}/images/og-default.jpg";
+    var schemaUrl = $"{schemaBaseUrl}/Feed/Detalle/{Model.Id}";
+    var schemaFechaPublicacion = Model.FechaPublicacion.ToString("yyyy-MM-ddTHH:mm:ssZ");
+}
+
+@if (Model.TipoContenido == Lado.Models.TipoContenido.Video)
+{
+    <!-- Schema.org VideoObject -->
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "VideoObject",
+        "name": "@(schemaDescripcion.Length > 100 ? schemaDescripcion.Substring(0, 100) : schemaDescripcion)",
+        "description": "@schemaDescripcion",
+        "thumbnailUrl": "@schemaThumbnail",
+        "uploadDate": "@schemaFechaPublicacion",
+        "contentUrl": "@schemaBaseUrl@Model.RutaArchivo",
+        "embedUrl": "@schemaUrl",
+        "interactionStatistic": {
+            "@@type": "InteractionCounter",
+            "interactionType": "https://schema.org/LikeAction",
+            "userInteractionCount": @Model.NumeroLikes
+        },
+        "author": {
+            "@@type": "Person",
+            "name": "@schemaCreadorNombre",
+            "url": "@schemaBaseUrl/@@@(Model.Usuario?.UserName ?? Model.Usuario?.Seudonimo)"
+        },
+        "publisher": {
+            "@@type": "Organization",
+            "name": "Lado",
+            "logo": {
+                "@@type": "ImageObject",
+                "url": "@schemaBaseUrl/images/logo-512.png"
+            }
+        }
+    }
+    </script>
+}
+else
+{
+    <!-- Schema.org Article/ImageObject -->
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "@(Model.TipoContenido == Lado.Models.TipoContenido.Foto ? "ImageObject" : "Article")",
+        @if (Model.TipoContenido == Lado.Models.TipoContenido.Foto) {
+            <text>"contentUrl": "@schemaBaseUrl@Model.RutaArchivo",</text>
+        }
+        "name": "@(schemaDescripcion.Length > 100 ? schemaDescripcion.Substring(0, 100) : schemaDescripcion)",
+        "description": "@schemaDescripcion",
+        "thumbnailUrl": "@schemaThumbnail",
+        "datePublished": "@schemaFechaPublicacion",
+        "url": "@schemaUrl",
+        "interactionStatistic": {
+            "@@type": "InteractionCounter",
+            "interactionType": "https://schema.org/LikeAction",
+            "userInteractionCount": @Model.NumeroLikes
+        },
+        "author": {
+            "@@type": "Person",
+            "name": "@schemaCreadorNombre",
+            "url": "@schemaBaseUrl/@@@(Model.Usuario?.UserName ?? Model.Usuario?.Seudonimo)"
+        },
+        "publisher": {
+            "@@type": "Organization",
+            "name": "Lado",
+            "logo": {
+                "@@type": "ImageObject",
+                "url": "@schemaBaseUrl/images/logo-512.png"
+            }
+        }
+    }
+    </script>
+}
+
+<!-- ========================================
+     FULLSCREEN VIEWER DEL CREADOR
+     Muestra solo publicaciones del mismo creador
+     ======================================== -->
+<div id="creatorFullscreenViewer" class="creator-fullscreen-viewer">
+    <div class="creator-fs-header">
+        <button class="creator-fs-close" onclick="closeCreatorFullscreen()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+        <div class="creator-fs-info">
+            <img id="creatorFsAvatar" src="" alt="" class="creator-fs-avatar">
+            <span id="creatorFsUsername"></span>
+        </div>
+        <div class="creator-fs-counter" id="creatorFsCounter">1 / 1</div>
+    </div>
+    <div class="creator-fs-container" id="creatorFsContainer"></div>
+</div>
+
+<style>
+    .creator-fullscreen-viewer {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #000;
+        z-index: 10000;
+        overflow: hidden;
+    }
+    .creator-fullscreen-viewer.active {
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Ocultar navegación cuando fullscreen está activo */
+    body.fullscreen-active .top-navbar,
+    body.fullscreen-active .bottom-nav,
+    body.fullscreen-active .sidebar,
+    body.fullscreen-active .navbar,
+    body.fullscreen-active nav:not(.creator-fs-header) {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    body.fullscreen-active {
+        overflow: hidden !important;
+    }
+
+    html.fullscreen-active,
+    body.fullscreen-active {
+        background: #000 !important;
+    }
+    .creator-fs-header {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
+        background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+        z-index: 10;
+    }
+    .creator-fs-close {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.5);
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+    .creator-fs-close svg { width: 24px; height: 24px; }
+    .creator-fs-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: white;
+        font-weight: 600;
+    }
+    .creator-fs-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid white;
+    }
+    .creator-fs-counter {
+        color: white;
+        font-size: 14px;
+        background: rgba(0,0,0,0.5);
+        padding: 6px 12px;
+        border-radius: 20px;
+    }
+    .creator-fs-container {
+        flex: 1;
+        overflow-y: scroll;
+        scroll-snap-type: y mandatory;
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: none;
+    }
+    .creator-fs-container::-webkit-scrollbar { display: none; }
+    .creator-fs-slide {
+        width: 100%;
+        height: 100vh;
+        height: 100dvh;
+        scroll-snap-align: start;
+        scroll-snap-stop: always;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #000;
+    }
+    .creator-fs-slide img, .creator-fs-slide video {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+    .creator-fs-slide video { width: 100%; height: 100%; }
+    .creator-fs-slide .loading-spinner {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255,255,255,0.2);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: creatorSpin 1s linear infinite;
+    }
+    .creator-fs-slide.media-loaded .loading-spinner { display: none; }
+    @@keyframes creatorSpin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+    .creator-fs-credits {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 80px 20px 100px;
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
+        background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+        color: white;
+    }
+    .creator-fs-description {
+        font-size: 15px;
+        line-height: 1.5;
+        margin-bottom: 12px;
+        max-height: 80px;
+        overflow: hidden;
+    }
+    .creator-fs-stats {
+        display: flex;
+        gap: 20px;
+        font-size: 14px;
+        color: rgba(255,255,255,0.8);
+    }
+    .creator-fs-stats span { display: flex; align-items: center; gap: 6px; }
+    .creator-fs-stats svg { width: 18px; height: 18px; }
+    .creator-fs-side-actions {
+        position: absolute;
+        right: 16px;
+        bottom: 150px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        z-index: 5;
+    }
+    .creator-fs-action-btn {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.5);
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        transition: transform 0.2s;
+    }
+    .creator-fs-action-btn:active { transform: scale(0.9); }
+    .creator-fs-action-btn svg { width: 24px; height: 24px; }
+    .creator-fs-action-btn.liked svg { fill: #ff3b5c; color: #ff3b5c; }
+    .creator-fs-action-count { font-size: 12px; text-align: center; color: white; margin-top: 4px; }
+    .creator-fs-heart-animation {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0);
+        pointer-events: none;
+        z-index: 100;
+        opacity: 0;
+    }
+    .creator-fs-heart-animation svg { width: 120px; height: 120px; fill: #ff3b5c; }
+    .creator-fs-heart-animation.animate { animation: creatorHeartPop 0.8s ease-out forwards; }
+    @@keyframes creatorHeartPop {
+        0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+        50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+        100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+    }
+    .creator-fs-carousel { width: 100%; height: 100%; position: relative; }
+    .creator-fs-carousel .swiper { width: 100%; height: 100%; }
+    .creator-fs-carousel .swiper-slide { display: flex; align-items: center; justify-content: center; }
+    .creator-fs-carousel .swiper-pagination-bullet { background: white; opacity: 0.5; }
+    .creator-fs-carousel .swiper-pagination-bullet-active { opacity: 1; }
+    .creator-fs-music-badge {
+        position: absolute;
+        bottom: 200px;
+        left: 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(0,0,0,0.6);
+        padding: 8px 12px;
+        border-radius: 20px;
+        color: white;
+        font-size: 13px;
+    }
+    .creator-fs-music-badge svg { width: 20px; height: 20px; animation: creatorMusicSpin 3s linear infinite; }
+    @@keyframes creatorMusicSpin { to { transform: rotate(360deg); } }
+    @@media (min-width: 768px) {
+        .creator-fs-slide { padding: 60px; }
+        .creator-fs-side-actions { right: 40px; bottom: 200px; }
+    }
+</style>
+
+<script>
+(function() {
+    const creatorId = '@Model.UsuarioId';
+    const currentPostId = @Model.Id;
+    const creatorUsername = '@Html.Raw((Model.Usuario?.Seudonimo ?? Model.Usuario?.UserName ?? "Creador").Replace("'", "\\'"))';
+    const creatorAvatar = '@Html.Raw((Model.TipoLado == Lado.Models.TipoLado.LadoB ? (Model.Usuario?.FotoPerfilLadoB ?? Model.Usuario?.FotoPerfil ?? "") : (Model.Usuario?.FotoPerfil ?? "")).Replace("'", "\\'"))';
+
+    let creatorPosts = [];
+    let currentCreatorIndex = 0;
+    let isCreatorFsActive = false;
+
+    window.openCreatorFullscreen = async function() {
+        const viewer = document.getElementById('creatorFullscreenViewer');
+        if (!viewer) return;
+        try {
+            const response = await fetch(`/Feed/ObtenerPublicacionesUsuario?usuarioId=${creatorId}&contenidoActualId=${currentPostId}`);
+            const data = await response.json();
+            if (!data.success || !data.posts || data.posts.length === 0) {
+                console.error('No se pudieron cargar las publicaciones');
+                return;
+            }
+            creatorPosts = data.posts;
+            currentCreatorIndex = data.indexActual;
+            document.getElementById('creatorFsAvatar').src = creatorAvatar || '/images/default-avatar.png';
+            document.getElementById('creatorFsUsername').textContent = creatorUsername;
+            renderCreatorSlides();
+            viewer.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            document.body.classList.add('fullscreen-active');
+            document.documentElement.classList.add('fullscreen-active');
+            isCreatorFsActive = true;
+            setTimeout(() => {
+                const container = document.getElementById('creatorFsContainer');
+                const slideHeight = window.innerHeight;
+                container.scrollTo({ top: slideHeight * currentCreatorIndex, behavior: 'instant' });
+                updateCreatorCounter();
+                playCurrentCreatorMedia();
+            }, 100);
+        } catch (error) {
+            console.error('Error cargando publicaciones:', error);
+        }
+    };
+
+    window.closeCreatorFullscreen = function() {
+        const viewer = document.getElementById('creatorFullscreenViewer');
+        if (!viewer) return;
+        pauseAllCreatorMedia();
+        viewer.classList.remove('active');
+        document.body.style.overflow = '';
+        document.body.classList.remove('fullscreen-active');
+        document.documentElement.classList.remove('fullscreen-active');
+        isCreatorFsActive = false;
+    };
+
+    function renderCreatorSlides() {
+        const container = document.getElementById('creatorFsContainer');
+        container.innerHTML = '';
+        creatorPosts.forEach((post, index) => {
+            const slide = document.createElement('div');
+            slide.className = 'creator-fs-slide';
+            slide.dataset.index = index;
+            slide.dataset.postId = post.id;
+            let html = '<div class="loading-spinner"></div>';
+            if (post.tipo === 'video') {
+                html += `<video src="${post.src}" playsinline webkit-playsinline loop preload="metadata"></video>`;
+            } else if (post.tipo === 'carousel' && post.carouselFiles) {
+                html += `<div class="creator-fs-carousel"><div class="swiper" data-post-id="${post.id}"><div class="swiper-wrapper">${post.carouselFiles.map(file => `<div class="swiper-slide">${file.tipo === 'video' ? `<video src="${file.src}" playsinline webkit-playsinline loop preload="metadata"></video>` : `<img src="${file.src}" alt="">`}</div>`).join('')}</div><div class="swiper-pagination"></div></div></div>`;
+            } else {
+                html += `<img src="${post.src}" alt="">`;
+            }
+            if (post.musica) {
+                html += `<div class="creator-fs-music-badge" data-start="${post.musica.inicio}" data-volume="${post.musica.volumen}"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><span>${escapeHtml(post.musica.titulo)} - ${escapeHtml(post.musica.artista)}</span><audio src="${post.musica.rutaArchivo}" preload="metadata" loop></audio></div>`;
+            }
+            html += `<div class="creator-fs-heart-animation"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>`;
+            html += `<div class="creator-fs-side-actions"><div><button class="creator-fs-action-btn ${post.isLiked ? 'liked' : ''}" onclick="toggleCreatorLike(${post.id}, this)"><svg viewBox="0 0 24 24" fill="${post.isLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button><div class="creator-fs-action-count">${formatCount(post.likes)}</div></div><div><button class="creator-fs-action-btn" onclick="window.location.href='/Feed/Detalle/${post.id}'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button><div class="creator-fs-action-count">${formatCount(post.comments)}</div></div><div><button class="creator-fs-action-btn" onclick="shareCreatorPost(${post.id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button></div></div>`;
+            html += `<div class="creator-fs-credits">${post.descripcion ? `<div class="creator-fs-description">${escapeHtml(post.descripcion)}</div>` : ''}<div class="creator-fs-stats"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>${formatCount(post.likes)}</span><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${formatCount(post.comments)}</span></div></div>`;
+            slide.innerHTML = html;
+            container.appendChild(slide);
+            const img = slide.querySelector('img');
+            const video = slide.querySelector('video');
+            if (img) { img.onload = () => slide.classList.add('media-loaded'); if (img.complete) slide.classList.add('media-loaded'); }
+            if (video) { video.onloadeddata = () => slide.classList.add('media-loaded'); }
+        });
+        initCreatorSwipers();
+        container.addEventListener('scroll', onCreatorScroll);
+        setupCreatorDoubleTap();
+    }
+
+    function initCreatorSwipers() {
+        if (typeof Swiper !== 'undefined') {
+            document.querySelectorAll('.creator-fs-carousel .swiper').forEach(swiperEl => {
+                new Swiper(swiperEl, { slidesPerView: 1, spaceBetween: 0, pagination: { el: swiperEl.querySelector('.swiper-pagination'), clickable: true } });
+            });
+        }
+    }
+
+    let scrollTimeout;
+    function onCreatorScroll() {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+            const container = document.getElementById('creatorFsContainer');
+            const slideHeight = window.innerHeight;
+            const newIndex = Math.round(container.scrollTop / slideHeight);
+            if (newIndex !== currentCreatorIndex && newIndex >= 0 && newIndex < creatorPosts.length) {
+                pauseAllCreatorMedia();
+                currentCreatorIndex = newIndex;
+                updateCreatorCounter();
+                playCurrentCreatorMedia();
+            }
+        }, 100);
+    }
+
+    function updateCreatorCounter() {
+        const counter = document.getElementById('creatorFsCounter');
+        if (counter) counter.textContent = `${currentCreatorIndex + 1} / ${creatorPosts.length}`;
+    }
+
+    function playCurrentCreatorMedia() {
+        const slides = document.querySelectorAll('.creator-fs-slide');
+        const currentSlide = slides[currentCreatorIndex];
+        if (!currentSlide) return;
+        const video = currentSlide.querySelector('video');
+        if (video) { video.currentTime = 0; video.play().catch(() => {}); }
+        const musicBadge = currentSlide.querySelector('.creator-fs-music-badge');
+        if (musicBadge) {
+            const audio = musicBadge.querySelector('audio');
+            if (audio) {
+                audio.currentTime = parseFloat(musicBadge.dataset.start) || 0;
+                audio.volume = parseFloat(musicBadge.dataset.volume) || 0.7;
+                audio.play().catch(() => {});
+            }
+        }
+    }
+
+    function pauseAllCreatorMedia() {
+        document.querySelectorAll('.creator-fs-slide video').forEach(v => v.pause());
+        document.querySelectorAll('.creator-fs-music-badge audio').forEach(a => a.pause());
+    }
+
+    window.toggleCreatorLike = async function(postId, btn) {
+        const svg = btn.querySelector('svg');
+        const countEl = btn.parentElement.querySelector('.creator-fs-action-count');
+        const isLiked = btn.classList.contains('liked');
+        btn.classList.toggle('liked');
+        svg.setAttribute('fill', isLiked ? 'none' : 'currentColor');
+        let currentCount = parseInt(countEl.textContent) || 0;
+        countEl.textContent = formatCount(isLiked ? currentCount - 1 : currentCount + 1);
+        try {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            await fetch('/Feed/Like/' + postId, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': token } });
+        } catch (error) {
+            btn.classList.toggle('liked');
+            svg.setAttribute('fill', isLiked ? 'currentColor' : 'none');
+            countEl.textContent = formatCount(currentCount);
+        }
+    };
+
+    window.shareCreatorPost = async function(postId) {
+        const url = `${window.location.origin}/Feed/Detalle/${postId}`;
+        if (navigator.share) { try { await navigator.share({ url }); } catch (e) {} }
+        else { navigator.clipboard.writeText(url); alert('Enlace copiado'); }
+    };
+
+    let doubleTapSetup = false;
+    function setupCreatorDoubleTap() {
+        if (doubleTapSetup) return;
+        doubleTapSetup = true;
+        let lastTap = 0, tapTimeout;
+        document.getElementById('creatorFsContainer').addEventListener('click', function(e) {
+            if (e.target.closest('button, .creator-fs-action-btn, .swiper-pagination')) return;
+            const now = Date.now();
+            if (now - lastTap < 300) {
+                clearTimeout(tapTimeout);
+                const slide = e.target.closest('.creator-fs-slide');
+                if (slide) {
+                    const postId = parseInt(slide.dataset.postId);
+                    const likeBtn = slide.querySelector('.creator-fs-action-btn');
+                    if (likeBtn && !likeBtn.classList.contains('liked')) {
+                        const heart = slide.querySelector('.creator-fs-heart-animation');
+                        if (heart) { heart.classList.remove('animate'); void heart.offsetWidth; heart.classList.add('animate'); setTimeout(() => heart.classList.remove('animate'), 800); }
+                        toggleCreatorLike(postId, likeBtn);
+                    }
+                }
+                lastTap = 0;
+            } else {
+                lastTap = now;
+                tapTimeout = setTimeout(() => {
+                    const slide = e.target.closest('.creator-fs-slide');
+                    if (slide) { const video = slide.querySelector('video'); if (video) { if (video.paused) video.play(); else video.pause(); } }
+                }, 300);
+            }
+        });
+    }
+
+    function formatCount(num) { if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'; if (num >= 1000) return (num / 1000).toFixed(1) + 'K'; return num.toString(); }
+    function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && isCreatorFsActive) closeCreatorFullscreen(); });
+
+    let touchStartX = 0, touchStartY = 0;
+    document.getElementById('creatorFsContainer')?.addEventListener('touchstart', function(e) { touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; }, { passive: true });
+    document.getElementById('creatorFsContainer')?.addEventListener('touchend', function(e) {
+        const deltaX = e.changedTouches[0].clientX - touchStartX;
+        const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartY);
+        if (Math.abs(deltaX) > 100 && deltaY < 50 && deltaX > 0) closeCreatorFullscreen();
+    }, { passive: true });
+})();
 </script>
