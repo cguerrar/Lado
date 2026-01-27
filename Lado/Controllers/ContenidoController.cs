@@ -63,21 +63,124 @@ namespace Lado.Controllers
         }
 
         // ========================================
-        // RENOVAR TOKEN CSRF (para páginas que llevan tiempo abiertas)
+        // VERIFICACIÓN DE SESIÓN Y TOKEN CSRF - REFACTORIZADO
         // ========================================
 
         /// <summary>
-        /// Obtiene un nuevo token CSRF para renovar formularios que llevan tiempo abiertos
+        /// Verifica si la sesión del usuario sigue activa (requiere autenticación)
+        /// Retorna 401 si la sesión expiró - usado para detectar hibernación
+        /// </summary>
+        [HttpGet]
+        [Authorize]
+        public IActionResult VerificarSesion()
+        {
+            try
+            {
+                var userId = _userManager.GetUserId(User);
+                var userName = User.Identity?.Name;
+
+                return Json(new {
+                    authenticated = true,
+                    userId = userId,
+                    userName = userName,
+                    timestamp = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[VerificarSesion] Error verificando sesión");
+                return Json(new { authenticated = false, error = "Error interno" });
+            }
+        }
+
+        /// <summary>
+        /// ENDPOINT PRINCIPAL: Verifica sesión + renueva token en una sola llamada
+        /// REQUIERE [Authorize] - Si la sesión expiró, retorna 401 automáticamente
+        /// Esto previene generar tokens para contextos no autenticados
+        /// </summary>
+        [HttpGet]
+        [Authorize]
+        public async Task<IActionResult> RenovarTokenSeguro([FromServices] Microsoft.AspNetCore.Antiforgery.IAntiforgery antiforgery)
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+                if (usuario == null)
+                {
+                    _logger.LogWarning("[RenovarTokenSeguro] Usuario no encontrado en sesión activa");
+                    await _logEventoService.RegistrarEventoAsync(
+                        "Sesión inválida en RenovarTokenSeguro",
+                        CategoriaEvento.Auth,
+                        TipoLogEvento.Warning,
+                        null, null,
+                        "Usuario no encontrado aunque sesión reporta autenticado"
+                    );
+                    return Unauthorized(new { success = false, message = "Sesión inválida" });
+                }
+
+                // Generar nuevo token CSRF vinculado a esta sesión autenticada
+                var tokens = antiforgery.GetAndStoreTokens(HttpContext);
+
+                return Json(new {
+                    success = true,
+                    token = tokens.RequestToken,
+                    authenticated = true,
+                    userId = usuario.Id,
+                    userName = usuario.UserName,
+                    timestamp = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[RenovarTokenSeguro] Error renovando token");
+                await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Auth, null, null);
+                return StatusCode(500, new { success = false, message = "Error interno" });
+            }
+        }
+
+        /// <summary>
+        /// DEPRECADO: Mantener por compatibilidad pero preferir RenovarTokenSeguro
+        /// Este endpoint NO tiene [Authorize] por diseño legacy
         /// </summary>
         [HttpGet]
         public IActionResult RenovarToken([FromServices] Microsoft.AspNetCore.Antiforgery.IAntiforgery antiforgery)
         {
-            var tokens = antiforgery.GetAndStoreTokens(HttpContext);
-            return Json(new {
-                success = true,
-                token = tokens.RequestToken,
-                timestamp = DateTime.UtcNow
-            });
+            try
+            {
+                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+
+                // Si no está autenticado, no generar token - indicar que debe reloguearse
+                if (!isAuthenticated)
+                {
+                    _logger.LogWarning("[RenovarToken] Intento de renovar token sin autenticación");
+                    return Json(new {
+                        success = false,
+                        authenticated = false,
+                        message = "Sesión expirada",
+                        requireLogin = true,
+                        timestamp = DateTime.UtcNow
+                    });
+                }
+
+                var tokens = antiforgery.GetAndStoreTokens(HttpContext);
+
+                return Json(new {
+                    success = true,
+                    token = tokens.RequestToken,
+                    authenticated = true,
+                    userId = _userManager.GetUserId(User),
+                    timestamp = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[RenovarToken] Error renovando token");
+                return Json(new {
+                    success = false,
+                    error = "Error interno",
+                    timestamp = DateTime.UtcNow
+                });
+            }
         }
 
         // ========================================
@@ -268,11 +371,12 @@ namespace Lado.Controllers
             bool EsGratis,
             decimal? PrecioDesbloqueo = null,
             bool EsBorrador = false,
-            bool EsPublicoGeneral = false,
+            bool EsPublicoGeneral = true, // Por defecto público para LadoA
             bool CrearPreviewBlur = false,
             int TipoCensuraPreview = 0,
             bool SoloSuscriptores = false,
-            bool PublicarEnLadoB = false)
+            bool PublicarEnLadoB = false,
+            int[]? galeriaMediaIds = null)
         {
             try
             {
@@ -369,8 +473,11 @@ namespace Lado.Controllers
                     TempData["Warning"] = "Para crear contenido en LadoB debes verificar tu identidad. Tu contenido se ha publicado en LadoA.";
                 }
 
-                // Validaciones básicas - archivo requerido para fotos/videos
-                if (!EsBorrador && TipoContenido != (int)Models.TipoContenido.Post && (archivo == null || archivo.Length == 0))
+                // Validaciones básicas - archivo requerido para fotos/videos (o archivos de galería)
+                var tieneArchivoSubido = archivo != null && archivo.Length > 0;
+                var tieneArchivosGaleria = galeriaMediaIds != null && galeriaMediaIds.Length > 0;
+
+                if (!EsBorrador && TipoContenido != (int)Models.TipoContenido.Post && !tieneArchivoSubido && !tieneArchivosGaleria)
                 {
                     TempData["Error"] = "Debes subir un archivo para este tipo de contenido";
                     ViewBag.UsuarioVerificado = usuario.CreadorVerificado;
@@ -426,7 +533,7 @@ namespace Lado.Controllers
                     NumeroLikes = 0,
                     NumeroComentarios = 0,
                     NumeroVistas = 0,
-                    // Solo contenido LadoA puede ser publico general
+                    // LadoA respeta selección del usuario (por defecto público)
                     EsPublicoGeneral = tipoLado == TipoLado.LadoA && EsPublicoGeneral
                 };
 
@@ -560,6 +667,54 @@ namespace Lado.Controllers
                 }
 
                 // ========================================
+                // PROCESAR ARCHIVOS DE GALERÍA PRIVADA
+                // ========================================
+                if (tieneArchivosGaleria && string.IsNullOrEmpty(contenido.RutaArchivo))
+                {
+                    try
+                    {
+                        // Obtener archivos de galería que pertenecen al usuario
+                        var mediasGaleria = await _context.MediasGaleria
+                            .Where(m => galeriaMediaIds.Contains(m.Id) && m.UsuarioId == usuario.Id)
+                            .ToListAsync();
+
+                        if (mediasGaleria.Any())
+                        {
+                            var primerMedia = mediasGaleria.First();
+
+                            // Usar el primer archivo como principal del contenido
+                            contenido.RutaArchivo = primerMedia.RutaArchivo;
+                            contenido.Thumbnail = primerMedia.Thumbnail;
+
+                            // Actualizar tipo de contenido según el tipo de media
+                            if (primerMedia.TipoMedia == TipoMediaGaleria.Video)
+                            {
+                                contenido.TipoContenido = Models.TipoContenido.Video;
+                            }
+                            else
+                            {
+                                contenido.TipoContenido = Models.TipoContenido.Foto;
+                            }
+
+                            // Marcar el media como usado en este contenido (después de guardar el contenido)
+                            // Lo hacemos después del SaveChanges para tener el ContenidoId
+
+                            _logger.LogInformation("[Crear] Usando archivo de galería: {MediaId} - {Ruta}",
+                                primerMedia.Id, primerMedia.RutaArchivo);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("[Crear] No se encontraron archivos de galería válidos para usuario {UserId}",
+                                usuario.Id);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "[Crear] Error al procesar archivos de galería");
+                    }
+                }
+
+                // ========================================
                 // CLASIFICAR + DETECTAR OBJETOS (UNA SOLA LLAMADA A CLAUDE)
                 // ========================================
                 List<Services.ObjetoDetectado> objetosParaGuardar = new();
@@ -621,6 +776,33 @@ namespace Lado.Controllers
 
                 _logger.LogInformation("Contenido guardado - ID: {Id}, TipoLado: {TipoLado}, CategoriaId: {CategoriaId}",
                     contenido.Id, contenido.TipoLado, contenido.CategoriaInteresId);
+
+                // ========================================
+                // ACTUALIZAR MediaGaleria.ContenidoAsociadoId
+                // ========================================
+                if (tieneArchivosGaleria)
+                {
+                    try
+                    {
+                        var mediasParaActualizar = await _context.MediasGaleria
+                            .Where(m => galeriaMediaIds.Contains(m.Id) && m.UsuarioId == usuario.Id)
+                            .ToListAsync();
+
+                        foreach (var media in mediasParaActualizar)
+                        {
+                            media.ContenidoAsociadoId = contenido.Id;
+                        }
+
+                        await _context.SaveChangesAsync();
+                        _logger.LogInformation("[Crear] {Count} archivos de galería asociados al contenido {ContentId}",
+                            mediasParaActualizar.Count, contenido.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "[Crear] Error al actualizar MediaGaleria.ContenidoAsociadoId");
+                        // No fallar la creación por este error
+                    }
+                }
 
                 // ⭐ LADOCOINS: Procesar bonos de contenido (síncrono para mejor manejo de errores)
                 if (!EsBorrador)
@@ -760,7 +942,9 @@ namespace Lado.Controllers
                     }
                 }
 
-                return RedirectToAction("Index");
+                // Redirect con filtro y timestamp para evitar caché del navegador
+                var filtro = tipoLado == TipoLado.LadoA ? "ladoa" : "ladob";
+                return RedirectToAction("Index", new { filtro, t = DateTime.Now.Ticks });
             }
             catch (Exception ex)
             {
@@ -886,7 +1070,7 @@ namespace Lado.Controllers
                     RutaArchivo = rutaArchivo,
                     TipoLado = TipoLado.LadoA,
                     EsGratis = true,
-                    EsPublicoGeneral = esPublico,
+                    EsPublicoGeneral = esPublico, // LadoA respeta selección del usuario (default true)
                     NombreMostrado = usuario.NombreCompleto,
                     EsPremium = false,
                     PrecioDesbloqueo = 0,
@@ -998,7 +1182,7 @@ namespace Lado.Controllers
             bool EsGratis,
             decimal? PrecioDesbloqueo = null,
             bool EsBorrador = false,
-            bool EsPublicoGeneral = false,
+            bool EsPublicoGeneral = true, // Por defecto público para LadoA
             bool SoloSuscriptores = false,
             bool CrearPreviewBlur = false,
             int TipoCensuraPreview = 0,
@@ -1171,6 +1355,7 @@ namespace Lado.Controllers
                     NumeroLikes = 0,
                     NumeroComentarios = 0,
                     NumeroVistas = 0,
+                    // LadoA respeta selección del usuario (por defecto público)
                     EsPublicoGeneral = tipoLado == TipoLado.LadoA && EsPublicoGeneral
                 };
 
@@ -1557,7 +1742,7 @@ namespace Lado.Controllers
             string tipo,
             bool esGratis = false,
             bool permitirComentarios = true,
-            bool esPublicoGeneral = false,
+            bool esPublicoGeneral = true, // Por defecto público para LadoA
             // Parámetros de música
             int? audioTrackId = null,
             string? audioTrackTitle = null,
@@ -1761,7 +1946,7 @@ namespace Lado.Controllers
                     NumeroVistas = 0,
                     RutaArchivo = rutaArchivo,
                     Thumbnail = thumbnailPath,
-                    EsPublicoGeneral = esPublicoGeneral,
+                    EsPublicoGeneral = tipoLado == TipoLado.LadoA && esPublicoGeneral, // LadoA respeta selección del usuario
                     // Ubicación EXIF
                     Latitud = latitud,
                     Longitud = longitud,
@@ -1993,7 +2178,9 @@ namespace Lado.Controllers
                                 contenido.EsGratis ? "gratis en LadoB" : "premium (LadoB)";
             TempData["Success"] = $"✅ Contenido {tipoContenido} publicado exitosamente";
 
-            return RedirectToAction("Index");
+            // Redirect con filtro y timestamp para evitar caché del navegador
+            var filtro = contenido.TipoLado == TipoLado.LadoA ? "ladoa" : "ladob";
+            return RedirectToAction("Index", new { filtro, t = DateTime.Now.Ticks });
         }
 
         // ========================================
@@ -2267,7 +2454,9 @@ namespace Lado.Controllers
                     TempData["Success"] = $"✅ Contenido actualizado como premium en LadoB (${contenido.PrecioDesbloqueo})";
                 }
 
-                return RedirectToAction("Index");
+                // Redirect con filtro y timestamp para evitar caché del navegador
+                var filtro = contenido.TipoLado == TipoLado.LadoA ? "ladoa" : "ladob";
+                return RedirectToAction("Index", new { filtro, t = DateTime.Now.Ticks });
             }
             catch (Exception ex)
             {
@@ -2391,6 +2580,7 @@ namespace Lado.Controllers
                     return RedirectToAction("Index");
                 }
 
+                var tipoLadoContenido = contenido.TipoLado;
                 contenido.EstaActivo = false;
                 await _context.SaveChangesAsync();
 
@@ -2398,7 +2588,10 @@ namespace Lado.Controllers
                     id, usuario.UserName);
 
                 TempData["Success"] = "Contenido eliminado exitosamente";
-                return RedirectToAction("Index");
+
+                // Redirect con filtro y timestamp para evitar caché del navegador
+                var filtro = tipoLadoContenido == TipoLado.LadoA ? "ladoa" : "ladob";
+                return RedirectToAction("Index", new { filtro, t = DateTime.Now.Ticks });
             }
             catch (Exception ex)
             {
@@ -2407,6 +2600,49 @@ namespace Lado.Controllers
                 _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
                 TempData["Error"] = "Error al eliminar el contenido. Por favor intenta de nuevo.";
                 return RedirectToAction("Index");
+            }
+        }
+
+        // Endpoint AJAX para eliminar contenido (devuelve JSON)
+        [HttpPost]
+        public async Task<IActionResult> EliminarAjax(int id)
+        {
+            try
+            {
+                var usuario = await _userManager.GetUserAsync(User);
+
+                if (usuario == null)
+                {
+                    return Json(new { success = false, message = "Debes iniciar sesión" });
+                }
+
+                var contenido = await _context.Contenidos
+                    .FirstOrDefaultAsync(c => c.Id == id && c.UsuarioId == usuario.Id);
+
+                if (contenido == null)
+                {
+                    return Json(new { success = false, message = "El contenido no existe o no tienes permiso" });
+                }
+
+                if (!contenido.EstaActivo)
+                {
+                    return Json(new { success = false, message = "Este contenido ya fue eliminado" });
+                }
+
+                contenido.EstaActivo = false;
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Contenido eliminado (AJAX) - ID: {Id}, Usuario: {Username}",
+                    id, usuario.UserName);
+
+                return Json(new { success = true, message = "Contenido eliminado" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al eliminar contenido (AJAX) {Id}", id);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _ = _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Contenido, userId, null);
+                return Json(new { success = false, message = "Error al eliminar. Intenta de nuevo." });
             }
         }
 
@@ -2536,6 +2772,8 @@ namespace Lado.Controllers
 
                 var usuario = await _userManager.FindByIdAsync(usuarioId);
 
+                // ⭐ SEGURIDAD: Respetar OcultarIdentidadLadoA para proteger identidad real
+                var ocultarId = usuario != null && usuario.OcultarIdentidadLadoA && !string.IsNullOrEmpty(usuario.Seudonimo);
                 return Json(new
                 {
                     success = true,
@@ -2545,9 +2783,9 @@ namespace Lado.Controllers
                         texto = comentario.Texto,
                         usuario = new
                         {
-                            nombre = usuario.NombreCompleto,
-                            username = usuario.UserName,
-                            fotoPerfil = usuario.FotoPerfil
+                            nombre = ocultarId ? usuario!.Seudonimo : usuario?.NombreCompleto,
+                            username = ocultarId ? usuario!.Seudonimo : usuario?.UserName,
+                            fotoPerfil = ocultarId ? (usuario!.FotoPerfilLadoB ?? usuario.FotoPerfil) : usuario?.FotoPerfil
                         },
                         fechaCreacion = comentario.FechaCreacion
                     },
@@ -2568,6 +2806,7 @@ namespace Lado.Controllers
         {
             try
             {
+                // ⭐ SEGURIDAD: Respetar OcultarIdentidadLadoA para proteger identidad real
                 var comentarios = await _context.Comentarios
                     .Include(c => c.Usuario)
                     .Where(c => c.ContenidoId == id)
@@ -2578,9 +2817,12 @@ namespace Lado.Controllers
                         texto = c.Texto,
                         usuario = new
                         {
-                            nombre = c.Usuario.NombreCompleto,
-                            username = c.Usuario.UserName,
-                            fotoPerfil = c.Usuario.FotoPerfil
+                            nombre = (c.Usuario.OcultarIdentidadLadoA && c.Usuario.Seudonimo != null)
+                                ? c.Usuario.Seudonimo : c.Usuario.NombreCompleto,
+                            username = (c.Usuario.OcultarIdentidadLadoA && c.Usuario.Seudonimo != null)
+                                ? c.Usuario.Seudonimo : c.Usuario.UserName,
+                            fotoPerfil = (c.Usuario.OcultarIdentidadLadoA && c.Usuario.Seudonimo != null)
+                                ? (c.Usuario.FotoPerfilLadoB ?? c.Usuario.FotoPerfil) : c.Usuario.FotoPerfil
                         },
                         fechaCreacion = c.FechaCreacion
                     })

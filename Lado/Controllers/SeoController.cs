@@ -390,5 +390,182 @@ namespace Lado.Controllers
 
             return Ok(new { success = true, message = "Cache de SEO y sitemaps limpiado" });
         }
+
+        /// <summary>
+        /// RSS Feed público - /feed.xml o /rss
+        /// Muestra las últimas publicaciones públicas (LadoA)
+        /// </summary>
+        [Route("feed.xml")]
+        [Route("rss")]
+        [ResponseCache(Duration = 1800)] // Cache 30 minutos
+        public async Task<IActionResult> RssFeed()
+        {
+            var cacheKey = "rss_feed";
+
+            if (!_cache.TryGetValue(cacheKey, out string? rssContent))
+            {
+                var config = await _seoConfigService.ObtenerConfiguracionAsync();
+                var baseUrl = config.UrlBase;
+
+                // Obtener contenido público reciente
+                var contenidos = await _context.Contenidos
+                    .Include(c => c.Usuario)
+                    .Where(c => c.TipoLado == TipoLado.LadoA &&
+                                !c.Censurado &&
+                                !c.OcultoSilenciosamente &&
+                                !c.EsPrivado &&
+                                c.Usuario != null &&
+                                c.Usuario.EstaActivo)
+                    .OrderByDescending(c => c.FechaPublicacion)
+                    .Take(50)
+                    .Select(c => new
+                    {
+                        c.Id,
+                        c.Descripcion,
+                        c.FechaPublicacion,
+                        c.TipoContenido,
+                        c.Thumbnail,
+                        c.RutaArchivo,
+                        CreadorNombre = c.Usuario!.Seudonimo ?? c.Usuario.NombreCompleto ?? c.Usuario.UserName,
+                        CreadorUsername = c.Usuario.UserName
+                    })
+                    .ToListAsync();
+
+                var sb = new StringBuilder();
+                sb.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+                sb.AppendLine("<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\" xmlns:media=\"http://search.yahoo.com/mrss/\">");
+                sb.AppendLine("<channel>");
+                sb.AppendLine($"  <title>{config.OrganizacionNombre} - Contenido Público</title>");
+                sb.AppendLine($"  <link>{baseUrl}</link>");
+                sb.AppendLine($"  <description>{config.DescripcionMeta}</description>");
+                sb.AppendLine($"  <language>es</language>");
+                sb.AppendLine($"  <lastBuildDate>{DateTime.UtcNow:R}</lastBuildDate>");
+                sb.AppendLine($"  <atom:link href=\"{baseUrl}/feed.xml\" rel=\"self\" type=\"application/rss+xml\"/>");
+                sb.AppendLine($"  <image>");
+                sb.AppendLine($"    <url>{baseUrl}{config.OrganizacionLogo}</url>");
+                sb.AppendLine($"    <title>{config.OrganizacionNombre}</title>");
+                sb.AppendLine($"    <link>{baseUrl}</link>");
+                sb.AppendLine($"  </image>");
+
+                foreach (var item in contenidos)
+                {
+                    var titulo = !string.IsNullOrEmpty(item.Descripcion)
+                        ? (item.Descripcion.Length > 100 ? item.Descripcion.Substring(0, 100) + "..." : item.Descripcion)
+                        : $"Contenido de {item.CreadorNombre}";
+
+                    var descripcion = !string.IsNullOrEmpty(item.Descripcion)
+                        ? System.Security.SecurityElement.Escape(item.Descripcion)
+                        : $"Nuevo contenido publicado por {item.CreadorNombre}";
+
+                    var imagen = !string.IsNullOrEmpty(item.Thumbnail)
+                        ? $"{baseUrl}{item.Thumbnail}"
+                        : (!string.IsNullOrEmpty(item.RutaArchivo) && item.TipoContenido == TipoContenido.Foto
+                            ? $"{baseUrl}{item.RutaArchivo}"
+                            : $"{baseUrl}/images/og-default.jpg");
+
+                    sb.AppendLine("  <item>");
+                    sb.AppendLine($"    <title>{System.Security.SecurityElement.Escape(titulo)}</title>");
+                    sb.AppendLine($"    <link>{baseUrl}/Feed/Detalle/{item.Id}</link>");
+                    sb.AppendLine($"    <guid isPermaLink=\"true\">{baseUrl}/Feed/Detalle/{item.Id}</guid>");
+                    sb.AppendLine($"    <pubDate>{item.FechaPublicacion:R}</pubDate>");
+                    sb.AppendLine($"    <author>{System.Security.SecurityElement.Escape(item.CreadorNombre ?? "Creador")}</author>");
+                    sb.AppendLine($"    <description><![CDATA[{descripcion}]]></description>");
+                    sb.AppendLine($"    <media:thumbnail url=\"{imagen}\"/>");
+                    sb.AppendLine($"    <media:content url=\"{imagen}\" medium=\"image\"/>");
+                    sb.AppendLine("  </item>");
+                }
+
+                sb.AppendLine("</channel>");
+                sb.AppendLine("</rss>");
+
+                rssContent = sb.ToString();
+
+                _cache.Set(cacheKey, rssContent, TimeSpan.FromMinutes(30));
+            }
+
+            return Content(rssContent ?? "", "application/rss+xml", Encoding.UTF8);
+        }
+
+        /// <summary>
+        /// RSS Feed de un creador específico - /feed/@username.xml
+        /// </summary>
+        [Route("feed/@{username}.xml")]
+        [Route("feed/{username}.xml")]
+        [ResponseCache(Duration = 1800)]
+        public async Task<IActionResult> RssFeedCreador(string username)
+        {
+            if (string.IsNullOrEmpty(username))
+                return NotFound();
+
+            username = username.TrimStart('@');
+
+            var usuario = await _context.Users
+                .FirstOrDefaultAsync(u => u.EstaActivo &&
+                    (u.UserName == username ||
+                     u.Seudonimo == username ||
+                     (u.UserName != null && u.UserName.ToLower() == username.ToLower()) ||
+                     (u.Seudonimo != null && u.Seudonimo.ToLower() == username.ToLower())));
+
+            if (usuario == null)
+                return NotFound();
+
+            var config = await _seoConfigService.ObtenerConfiguracionAsync();
+            var baseUrl = config.UrlBase;
+            var nombreCreador = usuario.Seudonimo ?? usuario.NombreCompleto ?? usuario.UserName ?? "Creador";
+
+            var contenidos = await _context.Contenidos
+                .Where(c => c.UsuarioId == usuario.Id &&
+                            c.TipoLado == TipoLado.LadoA &&
+                            !c.Censurado &&
+                            !c.OcultoSilenciosamente &&
+                            !c.EsPrivado)
+                .OrderByDescending(c => c.FechaPublicacion)
+                .Take(30)
+                .Select(c => new
+                {
+                    c.Id,
+                    c.Descripcion,
+                    c.FechaPublicacion,
+                    c.TipoContenido,
+                    c.Thumbnail,
+                    c.RutaArchivo
+                })
+                .ToListAsync();
+
+            var sb = new StringBuilder();
+            sb.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+            sb.AppendLine("<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\" xmlns:media=\"http://search.yahoo.com/mrss/\">");
+            sb.AppendLine("<channel>");
+            sb.AppendLine($"  <title>{System.Security.SecurityElement.Escape(nombreCreador)} - Lado</title>");
+            sb.AppendLine($"  <link>{baseUrl}/@{usuario.UserName}</link>");
+            sb.AppendLine($"  <description>Contenido público de {System.Security.SecurityElement.Escape(nombreCreador)} en Lado</description>");
+            sb.AppendLine($"  <language>es</language>");
+            sb.AppendLine($"  <lastBuildDate>{DateTime.UtcNow:R}</lastBuildDate>");
+            sb.AppendLine($"  <atom:link href=\"{baseUrl}/feed/{usuario.UserName}.xml\" rel=\"self\" type=\"application/rss+xml\"/>");
+
+            foreach (var item in contenidos)
+            {
+                var titulo = !string.IsNullOrEmpty(item.Descripcion)
+                    ? (item.Descripcion.Length > 100 ? item.Descripcion.Substring(0, 100) + "..." : item.Descripcion)
+                    : $"Contenido de {nombreCreador}";
+
+                var imagen = !string.IsNullOrEmpty(item.Thumbnail)
+                    ? $"{baseUrl}{item.Thumbnail}"
+                    : $"{baseUrl}/images/og-default.jpg";
+
+                sb.AppendLine("  <item>");
+                sb.AppendLine($"    <title>{System.Security.SecurityElement.Escape(titulo)}</title>");
+                sb.AppendLine($"    <link>{baseUrl}/Feed/Detalle/{item.Id}</link>");
+                sb.AppendLine($"    <guid isPermaLink=\"true\">{baseUrl}/Feed/Detalle/{item.Id}</guid>");
+                sb.AppendLine($"    <pubDate>{item.FechaPublicacion:R}</pubDate>");
+                sb.AppendLine($"    <media:thumbnail url=\"{imagen}\"/>");
+                sb.AppendLine("  </item>");
+            }
+
+            sb.AppendLine("</channel>");
+            sb.AppendLine("</rss>");
+
+            return Content(sb.ToString(), "application/rss+xml", Encoding.UTF8);
+        }
     }
 }

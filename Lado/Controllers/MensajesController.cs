@@ -256,24 +256,28 @@ namespace Lado.Controllers
                 return RedirectToAction("Index");
             }
 
-            // ⭐ CAMBIO: Verificar si existe una relación de suscripción (en cualquier dirección)
-            var existeRelacion = await _context.Suscripciones
-                .AnyAsync(s => (s.FanId == usuario.Id && s.CreadorId == id && s.EstaActiva) ||
-                              (s.FanId == id && s.CreadorId == usuario.Id && s.EstaActiva));
-
-            if (!existeRelacion)
+            // ⭐ Verificar suscripción SOLO si el destinatario es un creador
+            // Si no es creador, cualquier usuario puede enviar mensajes
+            if (destinatario.EsCreador)
             {
-                // Verificar si ya tienen una conversación previa
-                var tieneConversacion = await _context.MensajesPrivados
-                    .AnyAsync(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == id) ||
-                                  (m.RemitenteId == id && m.DestinatarioId == usuario.Id));
+                var existeRelacion = await _context.Suscripciones
+                    .AnyAsync(s => (s.FanId == usuario.Id && s.CreadorId == id && s.EstaActiva) ||
+                                  (s.FanId == id && s.CreadorId == usuario.Id && s.EstaActiva));
 
-                if (!tieneConversacion)
+                if (!existeRelacion)
                 {
-                    _logger.LogWarning("Usuario {Usuario} intentó chatear sin suscripción con {Destinatario}",
-                        usuario.UserName, destinatario.UserName);
-                    TempData["Error"] = "Debes estar suscrito para enviar mensajes a este usuario.";
-                    return RedirectToAction("Index");
+                    // Verificar si ya tienen una conversación previa
+                    var tieneConversacion = await _context.MensajesPrivados
+                        .AnyAsync(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == id) ||
+                                      (m.RemitenteId == id && m.DestinatarioId == usuario.Id));
+
+                    if (!tieneConversacion)
+                    {
+                        _logger.LogWarning("Usuario {Usuario} intentó chatear sin suscripción con creador {Destinatario}",
+                            usuario.UserName, destinatario.UserName);
+                        TempData["Error"] = "Debes estar suscrito para enviar mensajes a este creador.";
+                        return RedirectToAction("Index");
+                    }
                 }
             }
 
@@ -339,7 +343,8 @@ namespace Lado.Controllers
             IFormFile? archivo,
             int? mensajeRespondidoId,
             int? storyReferenciaId = null,
-            TipoRespuestaStory? tipoRespuestaStory = null)
+            TipoRespuestaStory? tipoRespuestaStory = null,
+            int? galeriaMediaId = null)
         {
             try
             {
@@ -380,8 +385,8 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "Destinatario no especificado" });
                 }
 
-                // Validar que haya contenido o archivo
-                if (string.IsNullOrWhiteSpace(contenido) && archivo == null)
+                // Validar que haya contenido, archivo o archivo de galería
+                if (string.IsNullOrWhiteSpace(contenido) && archivo == null && !galeriaMediaId.HasValue)
                 {
                     return Json(new { success = false, message = "Debes enviar un mensaje o un archivo" });
                 }
@@ -402,18 +407,21 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "No puedes enviar mensajes a este usuario" });
                 }
 
-                // Verificar relación de suscripción o conversación previa
-                var existeRelacion = await _context.Suscripciones
-                    .AnyAsync(s => (s.FanId == usuario.Id && s.CreadorId == destinatarioId && s.EstaActiva) ||
-                                  (s.FanId == destinatarioId && s.CreadorId == usuario.Id && s.EstaActiva));
-
-                var tieneConversacion = await _context.MensajesPrivados
-                    .AnyAsync(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == destinatarioId) ||
-                                  (m.RemitenteId == destinatarioId && m.DestinatarioId == usuario.Id));
-
-                if (!existeRelacion && !tieneConversacion)
+                // ⭐ Verificar suscripción SOLO si el destinatario es un creador
+                if (destinatario.EsCreador)
                 {
-                    return Json(new { success = false, message = "Debes estar suscrito para iniciar una conversación" });
+                    var existeRelacion = await _context.Suscripciones
+                        .AnyAsync(s => (s.FanId == usuario.Id && s.CreadorId == destinatarioId && s.EstaActiva) ||
+                                      (s.FanId == destinatarioId && s.CreadorId == usuario.Id && s.EstaActiva));
+
+                    var tieneConversacion = await _context.MensajesPrivados
+                        .AnyAsync(m => (m.RemitenteId == usuario.Id && m.DestinatarioId == destinatarioId) ||
+                                      (m.RemitenteId == destinatarioId && m.DestinatarioId == usuario.Id));
+
+                    if (!existeRelacion && !tieneConversacion)
+                    {
+                        return Json(new { success = false, message = "Debes estar suscrito para iniciar una conversación con este creador" });
+                    }
                 }
 
                 // ⭐ Verificar configuración de privacidad QuienPuedeMensajear
@@ -491,6 +499,32 @@ namespace Lado.Controllers
 
                     _logger.LogInformation("Archivo guardado: {Ruta}", mensaje.RutaArchivo);
                 }
+                // Procesar archivo de galería si se especificó y no hay archivo subido
+                else if (galeriaMediaId.HasValue && galeriaMediaId.Value > 0)
+                {
+                    var mediaGaleria = await _context.MediasGaleria
+                        .FirstOrDefaultAsync(m => m.Id == galeriaMediaId.Value && m.UsuarioId == usuario.Id);
+
+                    if (mediaGaleria != null)
+                    {
+                        mensaje.RutaArchivo = mediaGaleria.RutaArchivo;
+                        mensaje.NombreArchivoOriginal = mediaGaleria.NombreOriginal ?? "Archivo de galería";
+                        mensaje.TamanoArchivo = mediaGaleria.TamanoBytes;
+
+                        // Determinar tipo de mensaje
+                        mensaje.TipoMensaje = mediaGaleria.TipoMedia == TipoMediaGaleria.Video
+                            ? TipoMensaje.Video
+                            : TipoMensaje.Imagen;
+
+                        // Marcar el media como usado en mensaje (después de guardar)
+                        _logger.LogInformation("[Mensaje] Usando archivo de galería: {MediaId} - {Ruta}",
+                            mediaGaleria.Id, mediaGaleria.RutaArchivo);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("[Mensaje] Archivo de galería no encontrado: {MediaId}", galeriaMediaId.Value);
+                    }
+                }
 
                 // Agregar respuesta si existe
                 if (mensajeRespondidoId.HasValue && mensajeRespondidoId > 0)
@@ -506,6 +540,21 @@ namespace Lado.Controllers
                 await _context.SaveChangesAsync();
 
                 _logger.LogInformation("✅ Mensaje enviado. ID: {MensajeId}, Tipo: {Tipo}", mensaje.Id, mensaje.TipoMensaje);
+
+                // Actualizar MediaGaleria.MensajeAsociadoId si se usó un archivo de galería
+                if (galeriaMediaId.HasValue && galeriaMediaId.Value > 0)
+                {
+                    var mediaParaActualizar = await _context.MediasGaleria
+                        .FirstOrDefaultAsync(m => m.Id == galeriaMediaId.Value && m.UsuarioId == usuario.Id);
+
+                    if (mediaParaActualizar != null)
+                    {
+                        mediaParaActualizar.MensajeAsociadoId = mensaje.Id;
+                        await _context.SaveChangesAsync();
+                        _logger.LogInformation("[Mensaje] MediaGaleria {MediaId} asociado al mensaje {MensajeId}",
+                            galeriaMediaId.Value, mensaje.Id);
+                    }
+                }
 
                 // Cargar datos del mensaje respondido si existe
                 MensajePrivado? mensajeRespondido = null;
@@ -960,6 +1009,7 @@ namespace Lado.Controllers
 
                 // Buscar usuarios que coincidan con el query
                 var queryNormalizado = query.ToLower().Trim();
+                // ⭐ SEGURIDAD: Respetar OcultarIdentidadLadoA para proteger identidad real
                 var usuarios = await _context.Users
                     .Where(u => u.Id != usuario.Id && // No incluir al usuario actual
                                u.EstaActivo && // Solo usuarios activos
@@ -971,9 +1021,12 @@ namespace Lado.Controllers
                     .Select(u => new
                     {
                         id = u.Id,
-                        userName = u.UserName,
-                        nombre = u.NombreCompleto,
-                        fotoPerfil = u.FotoPerfil,
+                        userName = (u.OcultarIdentidadLadoA && u.Seudonimo != null)
+                            ? u.Seudonimo : u.UserName,
+                        nombre = (u.OcultarIdentidadLadoA && u.Seudonimo != null)
+                            ? u.Seudonimo : u.NombreCompleto,
+                        fotoPerfil = (u.OcultarIdentidadLadoA && u.Seudonimo != null)
+                            ? (u.FotoPerfilLadoB ?? u.FotoPerfil) : u.FotoPerfil,
                         esVerificado = u.CreadorVerificado,
                         esCreador = u.EsCreador
                     })

@@ -154,6 +154,48 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.LoginPath = "/Account/Login";
     options.LogoutPath = "/Account/Logout";
     options.AccessDeniedPath = "/Account/AccessDenied";
+
+    // CRÍTICO: Devolver 401 para peticiones AJAX en lugar de redirect 302
+    // Esto permite que el frontend detecte correctamente sesiones expiradas
+    options.Events = new Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationEvents
+    {
+        OnRedirectToLogin = context =>
+        {
+            // Detectar si es petición AJAX/API
+            var isAjax = context.Request.Headers["X-Requested-With"] == "XMLHttpRequest" ||
+                         context.Request.Headers.Accept.ToString().Contains("application/json") ||
+                         context.Request.Path.StartsWithSegments("/api") ||
+                         context.Request.Path.StartsWithSegments("/Contenido/RenovarToken") ||
+                         context.Request.Path.StartsWithSegments("/Contenido/VerificarSesion") ||
+                         context.Request.Headers["X-CSRF-TOKEN"].Count > 0;
+
+            if (isAjax)
+            {
+                // Devolver 401 Unauthorized para AJAX
+                context.Response.StatusCode = 401;
+                context.Response.Headers["X-Session-Expired"] = "true";
+                return Task.CompletedTask;
+            }
+
+            // Para navegación normal, redirigir al login
+            context.Response.Redirect(context.RedirectUri);
+            return Task.CompletedTask;
+        },
+        OnRedirectToAccessDenied = context =>
+        {
+            var isAjax = context.Request.Headers["X-Requested-With"] == "XMLHttpRequest" ||
+                         context.Request.Headers.Accept.ToString().Contains("application/json");
+
+            if (isAjax)
+            {
+                context.Response.StatusCode = 403;
+                return Task.CompletedTask;
+            }
+
+            context.Response.Redirect(context.RedirectUri);
+            return Task.CompletedTask;
+        }
+    };
 });
 
 builder.Services.AddControllersWithViews();
@@ -222,9 +264,11 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 });
 
 // Configurar sesiones
+// NOTA: IdleTimeout aumentado a 2 horas para mejor UX en móviles
+// El TokenManager v3.0 en el frontend maneja la renovación preventiva
 builder.Services.AddSession(options =>
 {
-    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.IdleTimeout = TimeSpan.FromHours(2);  // Antes: 30 min, ahora: 2 horas
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
@@ -293,6 +337,13 @@ builder.Services.AddSingleton<Lado.Services.IRateLimitService, Lado.Services.Rat
 // ========================================
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<Lado.Services.IExifService, Lado.Services.ExifService>();
+
+// ========================================
+// GOOGLE PHOTOS SERVICE (Importación de fotos)
+// ========================================
+builder.Services.Configure<Lado.Services.GooglePhotosSettings>(
+    builder.Configuration.GetSection("GooglePhotos"));
+builder.Services.AddScoped<Lado.Services.IGooglePhotosService, Lado.Services.GooglePhotosService>();
 
 // ========================================
 // SISTEMA LADO COINS (Dólares Premio)
@@ -365,6 +416,11 @@ builder.Services.AddScoped<Lado.Services.ITicketsService, Lado.Services.TicketsS
 // CALENDARIO ADMIN SERVICE
 // ========================================
 builder.Services.AddScoped<Lado.Services.ICalendarioService, Lado.Services.CalendarioService>();
+
+// ========================================
+// CUOTA GALERIA SERVICE
+// ========================================
+builder.Services.AddScoped<ICuotaGaleriaService, CuotaGaleriaService>();
 
 // ========================================
 // CONFIGURACIÓN DE SIGNALR (Chat en tiempo real)
@@ -480,6 +536,9 @@ app.Use(async (context, next) =>
 
 // Compresión de respuestas (gzip/brotli)
 app.UseResponseCompression();
+
+// Redirecciones 301/302 configuradas desde Admin (SEO)
+app.UseRedirects();
 
 // ⭐ CRÍTICO: UseStaticFiles DEBE estar ANTES de UseRouting
 app.UseStaticFiles(); // Sirve archivos desde wwwroot

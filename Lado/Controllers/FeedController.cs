@@ -412,6 +412,7 @@ namespace Lado.Controllers
             return await Perfil(usuario.Id, verSeudonimo: true);
         }
 
+        [AllowAnonymous]
         public async Task<IActionResult> Perfil(string id, bool verSeudonimo = false)
         {
             try
@@ -433,6 +434,21 @@ namespace Lado.Controllers
                 {
                     TempData["Error"] = "Usuario no encontrado";
                     return RedirectToAction("Index");
+                }
+
+                // Si el usuario NO está autenticado → redirigir a perfil público o login
+                if (!(User.Identity?.IsAuthenticated ?? false))
+                {
+                    // Si el perfil es privado → redirigir al login
+                    if (usuario.PerfilPrivado)
+                    {
+                        TempData["Info"] = "Este perfil es privado. Inicia sesión para verlo.";
+                        return RedirectToAction("Login", "Account", new { returnUrl = Request.Path });
+                    }
+
+                    // Perfil público → redirigir a /@username
+                    var usernamePublico = usuario.UserName ?? usuario.Id;
+                    return RedirectPermanent($"/@{usernamePublico}");
                 }
 
                 // Usar el ID real del usuario encontrado para todas las consultas
@@ -479,6 +495,7 @@ namespace Lado.Controllers
 
                 ViewBag.EstaSuscrito = estaSuscrito;
                 ViewBag.TipoLadoActual = (int)tipoLadoActual;
+                ViewBag.EsPerfilPropio = esPerfilPropio;
 
                 // ⭐ NUEVA LÓGICA: Determinar qué perfil mostrar
                 ViewBag.MostrandoSeudonimo = verSeudonimo;
@@ -641,15 +658,19 @@ namespace Lado.Controllers
             try
             {
                 // Obtener personas que siguen a este usuario (sus fans)
+                // ⭐ SEGURIDAD: Respetar OcultarIdentidadLadoA para proteger identidad real
                 var seguidores = await _context.Suscripciones
                     .Where(s => s.CreadorId == id && s.EstaActiva)
                     .Include(s => s.Fan)
                     .Select(s => new
                     {
                         id = s.Fan.Id,
-                        username = "@" + s.Fan.UserName,
-                        nombre = s.Fan.NombreCompleto,
-                        fotoPerfil = s.Fan.FotoPerfil,
+                        username = "@" + ((s.Fan.OcultarIdentidadLadoA && s.Fan.Seudonimo != null)
+                            ? s.Fan.Seudonimo : s.Fan.UserName),
+                        nombre = (s.Fan.OcultarIdentidadLadoA && s.Fan.Seudonimo != null)
+                            ? s.Fan.Seudonimo : s.Fan.NombreCompleto,
+                        fotoPerfil = (s.Fan.OcultarIdentidadLadoA && s.Fan.Seudonimo != null)
+                            ? (s.Fan.FotoPerfilLadoB ?? s.Fan.FotoPerfil) : s.Fan.FotoPerfil,
                         verificado = s.Fan.CreadorVerificado
                     })
                     .Take(100)
@@ -673,15 +694,19 @@ namespace Lado.Controllers
             try
             {
                 // Obtener personas que este usuario sigue
+                // ⭐ SEGURIDAD: Respetar OcultarIdentidadLadoA para proteger identidad real
                 var siguiendo = await _context.Suscripciones
                     .Where(s => s.FanId == id && s.EstaActiva)
                     .Include(s => s.Creador)
                     .Select(s => new
                     {
                         id = s.Creador.Id,
-                        username = "@" + s.Creador.UserName,
-                        nombre = s.Creador.NombreCompleto,
-                        fotoPerfil = s.Creador.FotoPerfil,
+                        username = "@" + ((s.Creador.OcultarIdentidadLadoA && s.Creador.Seudonimo != null)
+                            ? s.Creador.Seudonimo : s.Creador.UserName),
+                        nombre = (s.Creador.OcultarIdentidadLadoA && s.Creador.Seudonimo != null)
+                            ? s.Creador.Seudonimo : s.Creador.NombreCompleto,
+                        fotoPerfil = (s.Creador.OcultarIdentidadLadoA && s.Creador.Seudonimo != null)
+                            ? (s.Creador.FotoPerfilLadoB ?? s.Creador.FotoPerfil) : s.Creador.FotoPerfil,
                         verificado = s.Creador.CreadorVerificado
                     })
                     .Take(100)
@@ -720,14 +745,18 @@ namespace Lado.Controllers
                     .Select(s => s.CreadorId)
                     .ToListAsync();
 
+                // ⭐ SEGURIDAD: Respetar OcultarIdentidadLadoA para proteger identidad real
                 var usuarios = await _context.Users
                     .Where(u => usuariosQueDieronLike.Contains(u.Id))
                     .Select(u => new
                     {
                         id = u.Id,
-                        username = "@" + u.UserName,
-                        nombre = u.NombreCompleto,
-                        fotoPerfil = u.FotoPerfil,
+                        username = "@" + ((u.OcultarIdentidadLadoA && u.Seudonimo != null)
+                            ? u.Seudonimo : u.UserName),
+                        nombre = (u.OcultarIdentidadLadoA && u.Seudonimo != null)
+                            ? u.Seudonimo : u.NombreCompleto,
+                        fotoPerfil = (u.OcultarIdentidadLadoA && u.Seudonimo != null)
+                            ? (u.FotoPerfilLadoB ?? u.FotoPerfil) : u.FotoPerfil,
                         verificado = u.CreadorVerificado,
                         esCreador = u.EsCreador,
                         loSigo = usuariosQueSigo.Contains(u.Id),
@@ -880,7 +909,18 @@ namespace Lado.Controllers
                 ViewBag.CreadoresFavoritos = datosAuxiliares.CreadoresFavoritos;
                 ViewBag.Stories = datosAuxiliares.Stories;
                 ViewBag.Colecciones = datosAuxiliares.Colecciones;
-                ViewBag.CreadoresSugeridos = datosAuxiliares.CreadoresSugeridos;
+
+                // Filtrar sugerencias descartadas de session
+                var descartadosJson = HttpContext.Session.GetString("SugerenciasDescartadas");
+                var descartadosIds = !string.IsNullOrEmpty(descartadosJson)
+                    ? System.Text.Json.JsonSerializer.Deserialize<List<string>>(descartadosJson) ?? new List<string>()
+                    : new List<string>();
+                var sugeridosFiltrados = datosAuxiliares.CreadoresSugeridos
+                    .Where(s => !descartadosIds.Contains(s.Id))
+                    .ToList();
+                ViewBag.CreadoresSugeridos = sugeridosFiltrados;
+                ViewBag.CreadoresSugeridosJson = System.Text.Json.JsonSerializer.Serialize(sugeridosFiltrados);
+
                 ViewBag.UsuariosLadoBPorIntereses = datosAuxiliares.UsuariosLadoBPorIntereses;
 
                 // ========================================
@@ -1807,42 +1847,51 @@ namespace Lado.Controllers
                         .ToListAsync()
                     : new List<int>();
 
+                // ⭐ SEGURIDAD: Respetar OcultarIdentidadLadoA en comentarios
                 return Json(new
                 {
                     success = true,
-                    comentarios = comentariosPrincipales.Select(c => new
+                    comentarios = comentariosPrincipales.Select(c =>
                     {
-                        id = c.Id,
-                        texto = c.Texto,
-                        fechaCreacion = c.FechaCreacion,
-                        numeroLikes = c.NumeroLikes,
-                        meDioLike = misLikes.Contains(c.Id),
-                        usuario = new
+                        var ocultarC = c.Usuario != null && c.Usuario.OcultarIdentidadLadoA && !string.IsNullOrEmpty(c.Usuario.Seudonimo);
+                        return new
                         {
-                            id = c.Usuario?.Id,
-                            username = c.Usuario?.UserName,
-                            nombreCompleto = c.Usuario?.NombreCompleto,
-                            fotoPerfil = c.Usuario?.FotoPerfil
-                        },
-                        respuestas = c.Respuestas
-                            .Where(r => r.EstaActivo)
-                            .OrderBy(r => r.FechaCreacion)
-                            .Select(r => new
+                            id = c.Id,
+                            texto = c.Texto,
+                            fechaCreacion = c.FechaCreacion,
+                            numeroLikes = c.NumeroLikes,
+                            meDioLike = misLikes.Contains(c.Id),
+                            usuario = new
                             {
-                                id = r.Id,
-                                texto = r.Texto,
-                                fechaCreacion = r.FechaCreacion,
-                                numeroLikes = r.NumeroLikes,
-                                meDioLike = misLikes.Contains(r.Id),
-                                usuario = new
+                                id = c.Usuario?.Id,
+                                username = ocultarC ? c.Usuario!.Seudonimo : c.Usuario?.UserName,
+                                nombreCompleto = ocultarC ? c.Usuario!.Seudonimo : c.Usuario?.NombreCompleto,
+                                fotoPerfil = ocultarC ? (c.Usuario!.FotoPerfilLadoB ?? c.Usuario.FotoPerfil) : c.Usuario?.FotoPerfil
+                            },
+                            respuestas = c.Respuestas
+                                .Where(r => r.EstaActivo)
+                                .OrderBy(r => r.FechaCreacion)
+                                .Select(r =>
                                 {
-                                    id = r.Usuario?.Id,
-                                    username = r.Usuario?.UserName,
-                                    nombreCompleto = r.Usuario?.NombreCompleto,
-                                    fotoPerfil = r.Usuario?.FotoPerfil
-                                }
-                            }).ToList(),
-                        totalRespuestas = c.Respuestas.Count(r => r.EstaActivo)
+                                    var ocultarR = r.Usuario != null && r.Usuario.OcultarIdentidadLadoA && !string.IsNullOrEmpty(r.Usuario.Seudonimo);
+                                    return new
+                                    {
+                                        id = r.Id,
+                                        texto = r.Texto,
+                                        fechaCreacion = r.FechaCreacion,
+                                        numeroLikes = r.NumeroLikes,
+                                        meDioLike = misLikes.Contains(r.Id),
+                                        usuario = new
+                                        {
+                                            id = r.Usuario?.Id,
+                                            username = ocultarR ? r.Usuario!.Seudonimo : r.Usuario?.UserName,
+                                            nombreCompleto = ocultarR ? r.Usuario!.Seudonimo : r.Usuario?.NombreCompleto,
+                                            fotoPerfil = ocultarR ? (r.Usuario!.FotoPerfilLadoB ?? r.Usuario.FotoPerfil) : r.Usuario?.FotoPerfil
+                                        }
+                                    };
+                                }).ToList(),
+                            totalRespuestas = c.Respuestas.Count(r => r.EstaActivo)
+                        };
                     }),
                     totalComentarios,
                     hasMore = page * pageSize < totalComentarios,
@@ -1893,23 +1942,28 @@ namespace Lado.Controllers
                         .ToListAsync()
                     : new List<int>();
 
+                // ⭐ SEGURIDAD: Respetar OcultarIdentidadLadoA en respuestas
                 return Json(new
                 {
                     success = true,
-                    respuestas = respuestas.Select(r => new
+                    respuestas = respuestas.Select(r =>
                     {
-                        id = r.Id,
-                        texto = r.Texto,
-                        fechaCreacion = r.FechaCreacion,
-                        numeroLikes = r.NumeroLikes,
-                        meDioLike = misLikes.Contains(r.Id),
-                        usuario = new
+                        var ocultarR = r.Usuario != null && r.Usuario.OcultarIdentidadLadoA && !string.IsNullOrEmpty(r.Usuario.Seudonimo);
+                        return new
                         {
-                            id = r.Usuario?.Id,
-                            username = r.Usuario?.UserName,
-                            nombreCompleto = r.Usuario?.NombreCompleto,
-                            fotoPerfil = r.Usuario?.FotoPerfil
-                        }
+                            id = r.Id,
+                            texto = r.Texto,
+                            fechaCreacion = r.FechaCreacion,
+                            numeroLikes = r.NumeroLikes,
+                            meDioLike = misLikes.Contains(r.Id),
+                            usuario = new
+                            {
+                                id = r.Usuario?.Id,
+                                username = ocultarR ? r.Usuario!.Seudonimo : r.Usuario?.UserName,
+                                nombreCompleto = ocultarR ? r.Usuario!.Seudonimo : r.Usuario?.NombreCompleto,
+                                fotoPerfil = ocultarR ? (r.Usuario!.FotoPerfilLadoB ?? r.Usuario.FotoPerfil) : r.Usuario?.FotoPerfil
+                            }
+                        };
                     }),
                     totalRespuestas,
                     hasMore = skip + take < totalRespuestas
@@ -2160,14 +2214,18 @@ namespace Lado.Controllers
                     .Distinct()
                     .ToListAsync();
 
+                // ⭐ SEGURIDAD: Respetar OcultarIdentidadLadoA para proteger identidad real
                 var usuarios = await _context.Users
                     .Where(u => siguiendo.Contains(u.Id))
                     .Select(u => new
                     {
                         id = u.Id,
-                        nombre = u.NombreCompleto,
-                        username = u.UserName,
-                        fotoPerfil = u.FotoPerfil
+                        nombre = (u.OcultarIdentidadLadoA && u.Seudonimo != null)
+                            ? u.Seudonimo : u.NombreCompleto,
+                        username = (u.OcultarIdentidadLadoA && u.Seudonimo != null)
+                            ? u.Seudonimo : u.UserName,
+                        fotoPerfil = (u.OcultarIdentidadLadoA && u.Seudonimo != null)
+                            ? (u.FotoPerfilLadoB ?? u.FotoPerfil) : u.FotoPerfil
                     })
                     .OrderBy(u => u.nombre)
                     .ToListAsync();
@@ -2345,6 +2403,39 @@ namespace Lado.Controllers
         }
 
         // ========================================
+        // DESCARTAR SUGERENCIA
+        // ========================================
+
+        [HttpPost]
+        public IActionResult DescartarSugerencia(string id)
+        {
+            try
+            {
+                var descartadosJson = HttpContext.Session.GetString("SugerenciasDescartadas");
+                var descartados = !string.IsNullOrEmpty(descartadosJson)
+                    ? System.Text.Json.JsonSerializer.Deserialize<List<string>>(descartadosJson) ?? new List<string>()
+                    : new List<string>();
+
+                if (!descartados.Contains(id))
+                {
+                    descartados.Add(id);
+                    // Limitar a 50 IDs para no inflar la session
+                    if (descartados.Count > 50)
+                        descartados = descartados.Skip(descartados.Count - 50).ToList();
+                }
+
+                HttpContext.Session.SetString("SugerenciasDescartadas",
+                    System.Text.Json.JsonSerializer.Serialize(descartados));
+
+                return Json(new { success = true });
+            }
+            catch
+            {
+                return Json(new { success = false });
+            }
+        }
+
+        // ========================================
         // SEGUIR / DEJAR DE SEGUIR
         // ========================================
 
@@ -2368,6 +2459,15 @@ namespace Lado.Controllers
                 if (creador == null)
                 {
                     return Json(new { success = false, message = "Usuario no encontrado" });
+                }
+
+                // Verificar bloqueo bidireccional
+                var hayBloqueo = await _context.BloqueosUsuarios
+                    .AnyAsync(b => (b.BloqueadorId == usuarioActual.Id && b.BloqueadoId == id) ||
+                                   (b.BloqueadorId == id && b.BloqueadoId == usuarioActual.Id));
+                if (hayBloqueo)
+                {
+                    return Json(new { success = false, message = "No puedes seguir a este usuario" });
                 }
 
                 // Determinar el TipoLado (por defecto LadoA si no se especifica)
@@ -2631,9 +2731,6 @@ namespace Lado.Controllers
                 // Verificar configuración de bloqueo LadoB
                 var bloquearLadoB = usuarioActual.BloquearLadoB;
 
-                // ⚡ Obtener IDs de administradores CON CACHE
-                var adminIds = await ObtenerAdminIdsCacheadosAsync();
-
                 // ⚡ Obtener usuarios bloqueados CON CACHE
                 var usuariosBloqueadosIds = await ObtenerUsuariosBloqueadosCacheadosAsync(usuarioActual.Id);
 
@@ -2644,11 +2741,10 @@ namespace Lado.Controllers
 
                 // Mostrar creadores: EsCreador = true O tienen Seudonimo (creadores de facto)
                 var usuariosQuery = _userManager.Users
-                    .AsNoTracking() // ⚡ No tracking para read-only
+                    .AsNoTracking()
                     .Where(u => u.EstaActivo
                             && (u.EsCreador || u.Seudonimo != null)
                             && u.Id != usuarioActual.Id
-                            && !adminIds.Contains(u.Id)
                             && !usuariosBloqueadosIds.Contains(u.Id));
 
                 // Si BloquearLadoB está activo, excluir creadores con contenido adulto
@@ -3253,6 +3349,7 @@ namespace Lado.Controllers
             {
                 var usuarioActualId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
+                // ⭐ SEGURIDAD: Respetar OcultarIdentidadLadoA para proteger identidad real
                 var likes = await _context.Likes
                     .AsNoTracking()
                     .Where(l => l.ContenidoId == contenidoId)
@@ -3262,9 +3359,13 @@ namespace Lado.Controllers
                     .Select(l => new
                     {
                         id = l.UsuarioId,
-                        username = l.Usuario.UserName,
-                        nombre = l.Usuario.NombreCompleto ?? l.Usuario.UserName,
-                        foto = l.Usuario.FotoPerfil ?? "/images/default-avatar.svg",
+                        username = (l.Usuario.OcultarIdentidadLadoA && l.Usuario.Seudonimo != null)
+                            ? l.Usuario.Seudonimo : l.Usuario.UserName,
+                        nombre = (l.Usuario.OcultarIdentidadLadoA && l.Usuario.Seudonimo != null)
+                            ? l.Usuario.Seudonimo : (l.Usuario.NombreCompleto ?? l.Usuario.UserName),
+                        foto = (l.Usuario.OcultarIdentidadLadoA && l.Usuario.Seudonimo != null)
+                            ? (l.Usuario.FotoPerfilLadoB ?? l.Usuario.FotoPerfil ?? "/images/default-avatar.svg")
+                            : (l.Usuario.FotoPerfil ?? "/images/default-avatar.svg"),
                         esVerificado = l.Usuario.EsVerificado,
                         esCreador = l.Usuario.EsCreador
                     })
@@ -4168,14 +4269,18 @@ namespace Lado.Controllers
                     .ToListAsync();
 
                 // 3. Obtener información de esos usuarios
+                // ⭐ SEGURIDAD: Respetar OcultarIdentidadLadoA para proteger identidad real
                 var usuarios = await _context.Users
                     .Where(u => seguidoresEnComun.Contains(u.Id) && u.EstaActivo)
                     .Select(u => new
                     {
                         id = u.Id,
-                        username = u.UserName,
-                        nombreCompleto = u.NombreCompleto,
-                        fotoPerfil = u.FotoPerfil
+                        username = (u.OcultarIdentidadLadoA && u.Seudonimo != null)
+                            ? u.Seudonimo : u.UserName,
+                        nombreCompleto = (u.OcultarIdentidadLadoA && u.Seudonimo != null)
+                            ? u.Seudonimo : u.NombreCompleto,
+                        fotoPerfil = (u.OcultarIdentidadLadoA && u.Seudonimo != null)
+                            ? (u.FotoPerfilLadoB ?? u.FotoPerfil) : u.FotoPerfil
                     })
                     .Take(10) // Limitar a 10 para no sobrecargar
                     .ToListAsync();
@@ -4684,38 +4789,79 @@ namespace Lado.Controllers
                 ? await ObtenerUsuariosBloqueadosCacheadosAsync(usuarioId)
                 : new List<string>();
 
-            // Obtener IDs de admins para excluirlos
-            var adminIds = await ObtenerAdminIdsCacheadosAsync();
-
-            // 1. BUSCAR USUARIOS (máx 5)
+            // 1. BUSCAR USUARIOS (máx 5) - buscar en nombre, username y seudónimo
+            var bloquearLadoB = usuarioActual?.BloquearLadoB ?? false;
             var usuariosQuery = _userManager.Users
                 .AsNoTracking()
                 .Where(u => u.EstaActivo
-                    && !adminIds.Contains(u.Id)
                     && !usuariosBloqueados.Contains(u.Id)
                     && (u.UserName!.ToLower().Contains(query)
                         || (u.NombreCompleto != null && u.NombreCompleto.ToLower().Contains(query))
-                        || (u.Seudonimo != null && u.Seudonimo.ToLower().Contains(query))));
+                        || (!bloquearLadoB && u.Seudonimo != null && u.Seudonimo.ToLower().Contains(query))));
 
-            // Si el usuario tiene LadoB bloqueado, excluir creadores adultos
-            if (usuarioActual?.BloquearLadoB == true)
-            {
-                usuariosQuery = usuariosQuery.Where(u => !u.CreadorVerificado || string.IsNullOrEmpty(u.Seudonimo));
-            }
-
-            var usuarios = await usuariosQuery
+            // Traer usuarios raw para generar entradas duales (LadoA + LadoB)
+            var usuariosRaw = await usuariosQuery
                 .OrderByDescending(u => u.NumeroSeguidores)
-                .Take(5)
+                .Take(10)
                 .Select(u => new
                 {
-                    id = u.Id,
-                    username = u.UserName,
-                    nombre = u.Seudonimo ?? u.NombreCompleto ?? u.UserName,
-                    foto = u.FotoPerfil ?? "/images/default-avatar.svg",
-                    verificado = u.CreadorVerificado,
-                    seguidores = u.NumeroSeguidores
+                    u.Id,
+                    u.UserName,
+                    u.NombreCompleto,
+                    u.Seudonimo,
+                    u.FotoPerfil,
+                    u.FotoPerfilLadoB,
+                    u.FotoPortada,
+                    u.FotoPortadaLadoB,
+                    u.CreadorVerificado,
+                    u.NumeroSeguidores,
+                    u.OcultarIdentidadLadoA,
+                    TieneLadoB = u.CreadorVerificado && u.Seudonimo != null
                 })
                 .ToListAsync();
+
+            // Generar entradas: solo mostrar la identidad que coincide con la búsqueda
+            var usuarios = new List<object>();
+            foreach (var u in usuariosRaw)
+            {
+                var ladoACoincide = (u.UserName != null && u.UserName.ToLower().Contains(query))
+                    || (u.NombreCompleto != null && u.NombreCompleto.ToLower().Contains(query));
+                var ladoBCoincide = u.TieneLadoB && !bloquearLadoB
+                    && u.Seudonimo != null && u.Seudonimo.ToLower().Contains(query);
+
+                // Entrada LadoA solo si el nombre/username coincide con la búsqueda
+                if (ladoACoincide)
+                {
+                    usuarios.Add(new
+                    {
+                        id = u.Id,
+                        username = u.UserName ?? "",
+                        nombre = u.NombreCompleto ?? u.UserName ?? "",
+                        foto = u.FotoPerfil ?? "/images/default-avatar.svg",
+                        verificado = u.CreadorVerificado,
+                        seguidores = u.NumeroSeguidores,
+                        esLadoB = false
+                    });
+                }
+
+                // Entrada LadoB solo si el seudónimo coincide con la búsqueda
+                if (ladoBCoincide)
+                {
+                    usuarios.Add(new
+                    {
+                        id = u.Id,
+                        username = u.Seudonimo!,
+                        nombre = u.Seudonimo!,
+                        foto = u.FotoPerfilLadoB ?? u.FotoPerfil ?? "/images/default-avatar.svg",
+                        verificado = u.CreadorVerificado,
+                        seguidores = u.NumeroSeguidores,
+                        esLadoB = true
+                    });
+                }
+
+                if (usuarios.Count >= 5) break;
+            }
+            usuarios = usuarios.Take(5).ToList();
 
             // 2. BUSCAR CONTENIDO (máx 5) - solo LadoA público
             var contenidosQuery = _context.Contenidos
@@ -4851,21 +4997,26 @@ namespace Lado.Controllers
                     : await ObtenerUsuariosBloqueadosCacheadosAsync(usuarioId);
 
                 var ahora = DateTime.Now;
+                // ⭐ SEGURIDAD: También buscar por Seudónimo y respetar OcultarIdentidadLadoA
                 var creadores = await _context.Users
                     .Where(u => u.EsCreador
                         && u.EstaActivo
                         && (!u.FechaSuspensionFin.HasValue || u.FechaSuspensionFin.Value <= ahora)
                         && !bloqueados.Contains(u.Id)
                         && ((u.UserName != null && u.UserName.ToLower().Contains(searchLower)) ||
-                            (u.NombreCompleto != null && u.NombreCompleto.ToLower().Contains(searchLower))))
+                            (u.NombreCompleto != null && u.NombreCompleto.ToLower().Contains(searchLower)) ||
+                            (u.Seudonimo != null && u.Seudonimo.ToLower().Contains(searchLower))))
                     .OrderByDescending(u => u.NumeroSeguidores)
                     .Take(limit)
                     .Select(u => new
                     {
                         u.Id,
-                        Username = u.UserName,
-                        Nombre = u.NombreCompleto ?? u.UserName,
-                        Avatar = u.FotoPerfil,
+                        Username = (u.OcultarIdentidadLadoA && u.Seudonimo != null)
+                            ? u.Seudonimo : u.UserName,
+                        Nombre = (u.OcultarIdentidadLadoA && u.Seudonimo != null)
+                            ? u.Seudonimo : (u.NombreCompleto ?? u.UserName),
+                        Avatar = (u.OcultarIdentidadLadoA && u.Seudonimo != null)
+                            ? (u.FotoPerfilLadoB ?? u.FotoPerfil) : u.FotoPerfil,
                         Seguidores = u.NumeroSeguidores
                     })
                     .ToListAsync();

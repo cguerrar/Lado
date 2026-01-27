@@ -55,6 +55,7 @@ namespace Lado.Controllers.Api
                             NombreCompleto = s.Creador.NombreCompleto ?? "",
                             FotoPerfil = s.Creador.FotoPerfil,
                             FotoPortada = s.Creador.FotoPortada,
+                            FotoPortadaLadoB = s.Creador.FotoPortadaLadoB,
                             EstaVerificado = s.Creador.CreadorVerificado,
                             PrecioSuscripcion = s.Creador.PrecioSuscripcion,
                             TotalSuscriptores = _context.Suscripciones.Count(x => x.CreadorId == s.CreadorId && x.EstaActiva),

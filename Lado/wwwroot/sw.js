@@ -1,18 +1,20 @@
-// Service Worker para LADO PWA v12.0
+// Service Worker para LADO PWA v15.0
 // Compatible con iOS Safari y Android Chrome
-// v12: Optimizado para carga rápida con stale-while-revalidate
-const CACHE_NAME = 'lado-cache-v13';
+// v15: Caché mejorada para FeedPublico + Background Sync
+const CACHE_NAME = 'lado-cache-v15';
 const OFFLINE_URL = '/offline.html';
-const DYNAMIC_CACHE = 'lado-dynamic-v13';
-const IMAGE_CACHE = 'lado-images-v13';
+const DYNAMIC_CACHE = 'lado-dynamic-v15';
+const IMAGE_CACHE = 'lado-images-v15';
 
 // Recursos para pre-cachear (shell de la app)
 const PRECACHE_ASSETS = [
     '/',
     '/Feed',
     '/Feed/Explorar',
+    '/FeedPublico',
     '/offline.html',
     '/css/site.css',
+    '/css/feedpublico.css', // Nueva hoja de estilos para landing
     '/js/site.js',
     '/manifest.json',
     '/images/angelito.png',
@@ -25,8 +27,8 @@ const PRECACHE_ASSETS = [
 
 // Tiempo de vida de cache dinámico (24 horas)
 const DYNAMIC_CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
-// Máximo de imágenes en cache
-const IMAGE_CACHE_MAX_ITEMS = 100;
+// Máximo de imágenes en cache (aumentado para FeedPublico)
+const IMAGE_CACHE_MAX_ITEMS = 150;
 
 // Instalar - Pre-cachear recursos esenciales
 self.addEventListener('install', (event) => {
@@ -320,6 +322,7 @@ self.addEventListener('sync', (event) => {
 
 // Sincronizar likes pendientes
 async function syncLikes() {
+    let syncedCount = 0;
     try {
         const db = await openIndexedDB();
         const pendingLikes = await db.getAll('pending-likes');
@@ -329,19 +332,33 @@ async function syncLikes() {
                 const response = await fetch('/Feed/Like', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': like.token
+                        'Content-Type': 'application/x-www-form-urlencoded'
                     },
-                    body: JSON.stringify({ contenidoId: like.contenidoId })
+                    body: `id=${like.contenidoId}`
                 });
 
                 if (response.ok) {
                     await db.delete('pending-likes', like.id);
+                    syncedCount++;
                 }
             } catch (error) {
+                console.log('[SW] Error sincronizando like:', error);
             }
         }
+
+        // Notificar al frontend si se sincronizaron likes
+        if (syncedCount > 0) {
+            const clients = await self.clients.matchAll();
+            clients.forEach(client => {
+                client.postMessage({
+                    type: 'SYNC_COMPLETE',
+                    action: 'likes',
+                    count: syncedCount
+                });
+            });
+        }
     } catch (error) {
+        console.log('[SW] Error en syncLikes:', error);
     }
 }
 
@@ -385,6 +402,7 @@ async function syncComments() {
 
 // Sincronizar follows pendientes
 async function syncFollows() {
+    let syncedCount = 0;
     try {
         const db = await openIndexedDB();
         const pendingFollows = await db.getAll('pending-follows');
@@ -394,19 +412,33 @@ async function syncFollows() {
                 const response = await fetch('/Feed/Seguir', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': follow.token
+                        'Content-Type': 'application/x-www-form-urlencoded'
                     },
-                    body: JSON.stringify({ creadorId: follow.creadorId })
+                    body: `id=${follow.creadorId}`
                 });
 
                 if (response.ok) {
                     await db.delete('pending-follows', follow.id);
+                    syncedCount++;
                 }
             } catch (error) {
+                console.log('[SW] Error sincronizando follow:', error);
             }
         }
+
+        // Notificar al frontend si se sincronizaron follows
+        if (syncedCount > 0) {
+            const clients = await self.clients.matchAll();
+            clients.forEach(client => {
+                client.postMessage({
+                    type: 'SYNC_COMPLETE',
+                    action: 'follows',
+                    count: syncedCount
+                });
+            });
+        }
     } catch (error) {
+        console.log('[SW] Error en syncFollows:', error);
     }
 }
 

@@ -1,0 +1,1238 @@
+@{
+    ViewData["Title"] = "Cuotas de Galeria";
+
+    // Estadisticas
+    var estadisticas = ViewBag.Estadisticas ?? new {
+        EspacioUsadoTotal = 0L,
+        EspacioDisponible = 24L * 1024 * 1024 * 1024 * 1024, // 24 TB
+        UsuariosSobreCuota = 0,
+        PorcentajeUsoGlobal = 0.0
+    };
+
+    // Configuracion actual
+    var configuracion = ViewBag.Configuracion as Dictionary<string, string> ?? new Dictionary<string, string>();
+
+    // Usuarios con info de cuota
+    var usuarios = (IEnumerable<dynamic>?)ViewBag.Usuarios ?? Enumerable.Empty<dynamic>();
+}
+
+<style>
+    /* ==========================================
+       VARIABLES Y RESET
+       ========================================== */
+    .admin-cuotas {
+        --primary: #4682B4;
+        --primary-dark: #36648B;
+        --primary-light: rgba(70, 130, 180, 0.1);
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --purple: #8b5cf6;
+        --gray-50: #f9fafb;
+        --gray-100: #f3f4f6;
+        --gray-200: #e5e7eb;
+        --gray-300: #d1d5db;
+        --gray-400: #9ca3af;
+        --gray-500: #6b7280;
+        --gray-600: #4b5563;
+        --gray-700: #374151;
+        --gray-800: #1f2937;
+        --gray-900: #111827;
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 14px;
+        --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+        --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1);
+    }
+
+    /* ==========================================
+       PAGE HEADER
+       ========================================== */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .page-header-left h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--gray-900);
+        margin: 0 0 4px 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .page-header-left h1 i {
+        color: var(--purple);
+    }
+
+    .page-header-left p {
+        color: var(--gray-500);
+        margin: 0;
+        font-size: 0.9rem;
+    }
+
+    .page-header-right {
+        display: flex;
+        gap: 10px;
+    }
+
+    .btn-volver {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        background: white;
+        color: var(--gray-700);
+        border: 1px solid var(--gray-300);
+        border-radius: var(--radius-md);
+        font-weight: 500;
+        font-size: 0.875rem;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .btn-volver:hover {
+        background: var(--gray-50);
+        border-color: var(--gray-400);
+        color: var(--gray-900);
+    }
+
+    /* ==========================================
+       STATS CARDS
+       ========================================== */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        border: 1px solid var(--gray-200);
+        transition: all 0.2s;
+    }
+
+    .stat-card:hover {
+        border-color: var(--primary);
+        box-shadow: var(--shadow-md);
+    }
+
+    .stat-card .stat-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+    }
+
+    .stat-card .stat-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.125rem;
+    }
+
+    .stat-card .stat-icon.blue { background: var(--primary-light); color: var(--primary); }
+    .stat-card .stat-icon.green { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+    .stat-card .stat-icon.yellow { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+    .stat-card .stat-icon.red { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+    .stat-card .stat-icon.purple { background: rgba(139, 92, 246, 0.1); color: var(--purple); }
+
+    .stat-card .stat-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--gray-900);
+        line-height: 1;
+    }
+
+    .stat-card .stat-label {
+        font-size: 0.8125rem;
+        color: var(--gray-500);
+        margin-top: 4px;
+    }
+
+    .stat-card .stat-sublabel {
+        font-size: 0.75rem;
+        color: var(--gray-400);
+        margin-top: 2px;
+    }
+
+    /* ==========================================
+       CONFIGURACION SECTION
+       ========================================== */
+    .config-section {
+        background: white;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--gray-200);
+        margin-bottom: 24px;
+        overflow: hidden;
+    }
+
+    .config-section-header {
+        padding: 16px 20px;
+        background: linear-gradient(135deg, var(--purple) 0%, #a855f7 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .config-section-header h3 {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    .config-section-body {
+        padding: 20px;
+    }
+
+    .config-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+    }
+
+    .config-card {
+        background: var(--gray-50);
+        border-radius: var(--radius-md);
+        padding: 16px;
+        border: 1px solid var(--gray-200);
+    }
+
+    .config-card label {
+        display: block;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--gray-700);
+        margin-bottom: 8px;
+    }
+
+    .config-card .input-group {
+        display: flex;
+        align-items: center;
+    }
+
+    .config-card input {
+        flex: 1;
+        padding: 10px 12px;
+        border: 1px solid var(--gray-300);
+        border-radius: var(--radius-sm);
+        font-size: 0.9375rem;
+        font-weight: 600;
+        text-align: right;
+    }
+
+    .config-card input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-light);
+    }
+
+    .config-card .input-suffix {
+        padding: 10px 12px;
+        background: var(--gray-200);
+        border: 1px solid var(--gray-300);
+        border-left: none;
+        border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        font-size: 0.8125rem;
+        color: var(--gray-600);
+        font-weight: 500;
+    }
+
+    .config-card input {
+        border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    }
+
+    .config-card .hint {
+        font-size: 0.75rem;
+        color: var(--gray-500);
+        margin-top: 6px;
+    }
+
+    .config-section-footer {
+        padding: 16px 20px;
+        background: var(--gray-50);
+        border-top: 1px solid var(--gray-200);
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+
+    .btn-save {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        background: var(--purple);
+        color: white;
+        border: none;
+        border-radius: var(--radius-md);
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-save:hover {
+        background: #7c3aed;
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .btn-save:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    /* ==========================================
+       TABLE SECTION
+       ========================================== */
+    .table-section {
+        background: white;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--gray-200);
+        overflow: hidden;
+    }
+
+    .table-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--gray-200);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .table-header h3 {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--gray-900);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .table-filters {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .filter-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.875rem;
+        color: var(--gray-700);
+        cursor: pointer;
+    }
+
+    .filter-checkbox input {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+    }
+
+    .search-box {
+        position: relative;
+        min-width: 250px;
+    }
+
+    .search-box input {
+        width: 100%;
+        padding: 8px 14px 8px 36px;
+        border: 1px solid var(--gray-300);
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+    }
+
+    .search-box input:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+
+    .search-box i {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--gray-400);
+    }
+
+    .cuotas-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .cuotas-table thead {
+        background: var(--gray-50);
+        border-bottom: 1px solid var(--gray-200);
+    }
+
+    .cuotas-table th {
+        padding: 12px 16px;
+        text-align: left;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--gray-500);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .cuotas-table td {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--gray-100);
+        vertical-align: middle;
+    }
+
+    .cuotas-table tbody tr {
+        transition: background 0.15s;
+    }
+
+    .cuotas-table tbody tr:hover {
+        background: var(--gray-50);
+    }
+
+    .cuotas-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .cuotas-table tbody tr.over-quota {
+        background: rgba(239, 68, 68, 0.04);
+    }
+
+    .cuotas-table tbody tr.over-quota:hover {
+        background: rgba(239, 68, 68, 0.08);
+    }
+
+    /* User Cell */
+    .user-cell {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .user-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid var(--gray-200);
+    }
+
+    .user-avatar-placeholder {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.8125rem;
+    }
+
+    .user-info {
+        min-width: 0;
+    }
+
+    .user-name {
+        font-weight: 600;
+        color: var(--gray-900);
+        font-size: 0.875rem;
+        white-space: nowrap;
+    }
+
+    .user-email {
+        font-size: 0.75rem;
+        color: var(--gray-500);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 180px;
+    }
+
+    /* Type Badge */
+    .type-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .type-badge.fan { background: rgba(70, 130, 180, 0.1); color: var(--primary); }
+    .type-badge.creator { background: rgba(16, 185, 129, 0.1); color: #059669; }
+    .type-badge.creator-active { background: rgba(245, 158, 11, 0.1); color: #d97706; }
+    .type-badge.creator-top { background: rgba(139, 92, 246, 0.1); color: #7c3aed; }
+
+    /* Progress Bar */
+    .usage-cell {
+        min-width: 150px;
+    }
+
+    .usage-bar {
+        width: 100%;
+        height: 8px;
+        background: var(--gray-200);
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 4px;
+    }
+
+    .usage-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+
+    .usage-bar-fill.low { background: var(--success); }
+    .usage-bar-fill.medium { background: var(--warning); }
+    .usage-bar-fill.high { background: var(--danger); }
+
+    .usage-text {
+        font-size: 0.75rem;
+        color: var(--gray-600);
+    }
+
+    .usage-text.over {
+        color: var(--danger);
+        font-weight: 600;
+    }
+
+    /* Actions */
+    .btn-edit {
+        padding: 6px 12px;
+        background: var(--gray-100);
+        color: var(--gray-700);
+        border: 1px solid var(--gray-300);
+        border-radius: var(--radius-sm);
+        font-size: 0.8125rem;
+        font-weight: 500;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+    }
+
+    .btn-edit:hover {
+        background: var(--primary-light);
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--gray-500);
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        opacity: 0.3;
+        margin-bottom: 16px;
+    }
+
+    .empty-state h4 {
+        font-size: 1rem;
+        margin: 0;
+        color: var(--gray-600);
+    }
+
+    /* ==========================================
+       MODAL
+       ========================================== */
+    .modal-content {
+        border-radius: var(--radius-lg);
+        border: none;
+        overflow: hidden;
+    }
+
+    .modal-header {
+        padding: 20px 24px;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        color: white;
+        border-bottom: none;
+    }
+
+    .modal-header .modal-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+    }
+
+    .modal-body {
+        padding: 24px;
+    }
+
+    .modal-footer {
+        padding: 16px 24px;
+        border-top: 1px solid var(--gray-200);
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+    }
+
+    .modal .form-label {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--gray-700);
+        margin-bottom: 6px;
+    }
+
+    .modal .form-control {
+        padding: 10px 14px;
+        border: 1px solid var(--gray-300);
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+    }
+
+    .modal .form-control:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-light);
+        outline: none;
+    }
+
+    .modal .form-check {
+        padding: 12px 16px;
+        background: var(--gray-50);
+        border-radius: var(--radius-md);
+        margin-bottom: 16px;
+    }
+
+    .modal .btn-secondary {
+        padding: 10px 18px;
+        background: var(--gray-100);
+        color: var(--gray-700);
+        border: 1px solid var(--gray-300);
+        border-radius: var(--radius-md);
+        font-weight: 500;
+    }
+
+    .modal .btn-primary {
+        padding: 10px 18px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: var(--radius-md);
+        font-weight: 600;
+    }
+
+    .modal .btn-primary:hover {
+        background: var(--primary-dark);
+    }
+
+    .user-info-modal {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background: var(--gray-50);
+        border-radius: var(--radius-md);
+        margin-bottom: 20px;
+    }
+
+    .cuota-actual {
+        margin-top: 8px;
+        font-size: 0.8125rem;
+        color: var(--gray-500);
+    }
+
+    .cuota-actual strong {
+        color: var(--gray-700);
+    }
+
+    /* ==========================================
+       RESPONSIVE
+       ========================================== */
+    @@media (max-width: 1200px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .config-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+        .config-grid {
+            grid-template-columns: 1fr;
+        }
+        .page-header {
+            flex-direction: column;
+        }
+        .table-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .table-filters {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .search-box {
+            min-width: 100%;
+        }
+        .cuotas-table {
+            min-width: 900px;
+        }
+        .table-section {
+            overflow-x: auto;
+        }
+    }
+</style>
+
+<div class="admin-cuotas">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="page-header-left">
+            <h1>
+                <i class="fas fa-hdd"></i>
+                Cuotas de Galeria
+            </h1>
+            <p>Gestiona el espacio de almacenamiento asignado a cada usuario para su galeria privada</p>
+        </div>
+        <div class="page-header-right">
+            <a href="@Url.Action("Index")" class="btn-volver">
+                <i class="fas fa-arrow-left"></i>
+                Volver
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon purple">
+                    <i class="fas fa-database"></i>
+                </div>
+            </div>
+            <div class="stat-value" id="statEspacioUsado">@FormatBytes((long)(estadisticas.EspacioUsadoTotal ?? 0L))</div>
+            <div class="stat-label">Espacio Total Usado</div>
+            <div class="stat-sublabel">Por todas las galerias</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon green">
+                    <i class="fas fa-server"></i>
+                </div>
+            </div>
+            <div class="stat-value" id="statEspacioDisponible">@FormatBytes((long)(estadisticas.EspacioDisponible ?? 0L))</div>
+            <div class="stat-label">Espacio Disponible</div>
+            <div class="stat-sublabel">Capacidad del servidor: 24 TB</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon red">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+            </div>
+            <div class="stat-value" id="statSobreCuota">@(estadisticas.UsuariosSobreCuota ?? 0)</div>
+            <div class="stat-label">Usuarios Sobre Cuota</div>
+            <div class="stat-sublabel">Requieren atencion</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon blue">
+                    <i class="fas fa-chart-pie"></i>
+                </div>
+            </div>
+            <div class="stat-value" id="statPorcentajeUso">@((estadisticas.PorcentajeUsoGlobal ?? 0.0).ToString("F1"))%</div>
+            <div class="stat-label">Uso Global</div>
+            <div class="stat-sublabel">Del total disponible</div>
+        </div>
+    </div>
+
+    <!-- Configuracion de Cuotas -->
+    <div class="config-section">
+        <div class="config-section-header">
+            <i class="fas fa-sliders-h"></i>
+            <h3>Configuracion de Cuotas por Defecto</h3>
+        </div>
+        <form id="formConfiguracion">
+            <div class="config-section-body">
+                <div class="config-grid">
+                    <!-- Cuotas por tipo de usuario -->
+                    <div class="config-card">
+                        <label>Cuota Fan</label>
+                        <div class="input-group">
+                            <input type="number" name="CuotaFan" id="cuotaFan"
+                                   value="@(configuracion.GetValueOrDefault("CuotaFan", "500"))"
+                                   min="0" step="100">
+                            <span class="input-suffix">MB</span>
+                        </div>
+                        <div class="hint">Espacio para usuarios normales</div>
+                    </div>
+
+                    <div class="config-card">
+                        <label>Cuota Creador</label>
+                        <div class="input-group">
+                            <input type="number" name="CuotaCreador" id="cuotaCreador"
+                                   value="@(configuracion.GetValueOrDefault("CuotaCreador", "2048"))"
+                                   min="0" step="100">
+                            <span class="input-suffix">MB</span>
+                        </div>
+                        <div class="hint">Espacio para creadores basicos</div>
+                    </div>
+
+                    <div class="config-card">
+                        <label>Cuota Creador Activo</label>
+                        <div class="input-group">
+                            <input type="number" name="CuotaCreadorActivo" id="cuotaCreadorActivo"
+                                   value="@(configuracion.GetValueOrDefault("CuotaCreadorActivo", "5120"))"
+                                   min="0" step="100">
+                            <span class="input-suffix">MB</span>
+                        </div>
+                        <div class="hint">Creadores con ingresos >= umbral activo</div>
+                    </div>
+
+                    <div class="config-card">
+                        <label>Cuota Creador Top</label>
+                        <div class="input-group">
+                            <input type="number" name="CuotaCreadorTop" id="cuotaCreadorTop"
+                                   value="@(configuracion.GetValueOrDefault("CuotaCreadorTop", "10240"))"
+                                   min="0" step="100">
+                            <span class="input-suffix">MB</span>
+                        </div>
+                        <div class="hint">Creadores con ingresos >= umbral top</div>
+                    </div>
+
+                    <!-- Umbrales -->
+                    <div class="config-card">
+                        <label>Umbral Creador Activo</label>
+                        <div class="input-group">
+                            <input type="number" name="UmbralCreadorActivo" id="umbralCreadorActivo"
+                                   value="@(configuracion.GetValueOrDefault("UmbralCreadorActivo", "100"))"
+                                   min="0" step="10">
+                            <span class="input-suffix">USD</span>
+                        </div>
+                        <div class="hint">Ingresos mensuales minimos</div>
+                    </div>
+
+                    <div class="config-card">
+                        <label>Umbral Creador Top</label>
+                        <div class="input-group">
+                            <input type="number" name="UmbralCreadorTop" id="umbralCreadorTop"
+                                   value="@(configuracion.GetValueOrDefault("UmbralCreadorTop", "500"))"
+                                   min="0" step="10">
+                            <span class="input-suffix">USD</span>
+                        </div>
+                        <div class="hint">Ingresos mensuales para creador top</div>
+                    </div>
+                </div>
+            </div>
+            <div class="config-section-footer">
+                <button type="submit" class="btn-save" id="btnGuardarConfig">
+                    <i class="fas fa-save"></i>
+                    Guardar Configuracion
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabla de Usuarios -->
+    <div class="table-section">
+        <div class="table-header">
+            <h3>
+                <i class="fas fa-users"></i>
+                Usuarios por Espacio Usado
+            </h3>
+            <div class="table-filters">
+                <label class="filter-checkbox">
+                    <input type="checkbox" id="filterSobreCuota" onchange="filtrarTabla()">
+                    Solo usuarios sobre cuota
+                </label>
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchUsuario" placeholder="Buscar usuario..." onkeyup="filtrarTabla()">
+                </div>
+            </div>
+        </div>
+
+        @if (usuarios.Any())
+        {
+            <table class="cuotas-table">
+                <thead>
+                    <tr>
+                        <th>Usuario</th>
+                        <th>Tipo</th>
+                        <th>Espacio Usado</th>
+                        <th>Cuota</th>
+                        <th style="min-width: 180px;">% Uso</th>
+                        <th style="width: 120px; text-align: right;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaUsuarios">
+                    @foreach (var usuario in usuarios)
+                    {
+                        long espacioUsado = (long)(usuario.EspacioUsado ?? 0L);
+                        long cuota = (long)(usuario.Cuota ?? 0L);
+                        double porcentaje = cuota > 0 ? (espacioUsado * 100.0 / cuota) : 0;
+                        bool sobreCuota = porcentaje > 100;
+                        string tipoUsuario = (string)(usuario.TipoUsuario ?? "Fan");
+                        string tipoClass = tipoUsuario.ToLower().Replace(" ", "-");
+
+                        <tr class="usuario-row @(sobreCuota ? "over-quota" : "")"
+                            data-nombre="@((usuario.NombreCompleto ?? "").ToString().ToLower()) @((usuario.Email ?? "").ToString().ToLower())"
+                            data-sobre-cuota="@sobreCuota.ToString().ToLower()">
+                            <td>
+                                <div class="user-cell">
+                                    @if (!string.IsNullOrEmpty((string)usuario.FotoPerfil))
+                                    {
+                                        <img src="@usuario.FotoPerfil" alt="" class="user-avatar">
+                                    }
+                                    else
+                                    {
+                                        <div class="user-avatar-placeholder">
+                                            @(((string)usuario.NombreCompleto ?? "U").Substring(0, 1).ToUpper())
+                                        </div>
+                                    }
+                                    <div class="user-info">
+                                        <div class="user-name">@usuario.NombreCompleto</div>
+                                        <div class="user-email">@usuario.Email</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="type-badge @tipoClass">@tipoUsuario</span>
+                            </td>
+                            <td>
+                                <strong>@FormatBytes(espacioUsado)</strong>
+                            </td>
+                            <td>
+                                @if (usuario.CuotaPersonalizada != null)
+                                {
+                                    <span title="Cuota personalizada">
+                                        <i class="fas fa-user-cog text-purple me-1"></i>
+                                        @FormatBytes(cuota)
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span>@FormatBytes(cuota)</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="usage-cell">
+                                    <div class="usage-bar">
+                                        @{
+                                            string barClass = porcentaje <= 70 ? "low" : (porcentaje <= 90 ? "medium" : "high");
+                                            double barWidth = Math.Min(porcentaje, 100);
+                                        }
+                                        <div class="usage-bar-fill @barClass" style="width: @barWidth%"></div>
+                                    </div>
+                                    <span class="usage-text @(sobreCuota ? "over" : "")">
+                                        @porcentaje.ToString("F1")%
+                                        @if (sobreCuota)
+                                        {
+                                            <i class="fas fa-exclamation-circle ms-1"></i>
+                                        }
+                                    </span>
+                                </div>
+                            </td>
+                            <td style="text-align: right;">
+                                <button type="button" class="btn-edit"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#editarCuotaModal"
+                                        data-userid="@usuario.Id"
+                                        data-nombre="@usuario.NombreCompleto"
+                                        data-foto="@usuario.FotoPerfil"
+                                        data-cuota-actual="@(cuota / (1024 * 1024))"
+                                        data-cuota-personalizada="@(usuario.CuotaPersonalizada != null ? "true" : "false")"
+                                        data-cuota-personalizada-mb="@((usuario.CuotaPersonalizada ?? 0) / (1024 * 1024))">
+                                    <i class="fas fa-edit"></i>
+                                    Editar
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <div class="empty-state">
+                <i class="fas fa-folder-open"></i>
+                <h4>No hay usuarios con galeria activa</h4>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Modal Editar Cuota -->
+<div class="modal fade" id="editarCuotaModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-hdd"></i>
+                    Editar Cuota de Usuario
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formEditarCuota">
+                <div class="modal-body">
+                    <input type="hidden" id="editUserId" name="userId">
+
+                    <div class="user-info-modal">
+                        <div class="user-avatar-placeholder" id="editUserAvatar">U</div>
+                        <div>
+                            <strong id="editUserName">Usuario</strong>
+                            <div class="cuota-actual">
+                                Cuota actual: <strong id="editCuotaActual">0 MB</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="usarCuotaDefecto" checked>
+                        <label class="form-check-label" for="usarCuotaDefecto">
+                            <strong>Usar cuota por defecto</strong>
+                            <br>
+                            <small class="text-muted">La cuota se calculara automaticamente segun el tipo de usuario</small>
+                        </label>
+                    </div>
+
+                    <div id="cuotaPersonalizadaDiv" style="display: none;">
+                        <label class="form-label">Cuota Personalizada</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="cuotaPersonalizada" name="cuotaPersonalizada" min="0" step="100" placeholder="Ej: 5120">
+                            <span class="input-group-text">MB</span>
+                        </div>
+                        <small class="text-muted mt-1 d-block">
+                            Ingresa el espacio en megabytes. Ej: 5120 MB = 5 GB
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="btnGuardarCuota">
+                        <i class="fas fa-save me-1"></i>
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function() {
+    'use strict';
+
+    // ========================================
+    // FILTRAR TABLA
+    // ========================================
+    window.filtrarTabla = function() {
+        var searchInput = document.getElementById('searchUsuario');
+        var filterSobreCuota = document.getElementById('filterSobreCuota');
+
+        var search = searchInput ? searchInput.value.toLowerCase() : '';
+        var soloSobreCuota = filterSobreCuota ? filterSobreCuota.checked : false;
+
+        var rows = document.querySelectorAll('.usuario-row');
+
+        rows.forEach(function(row) {
+            var nombre = row.getAttribute('data-nombre') || '';
+            var esSobreCuota = row.getAttribute('data-sobre-cuota') === 'true';
+
+            var matchSearch = !search || nombre.indexOf(search) !== -1;
+            var matchSobreCuota = !soloSobreCuota || esSobreCuota;
+
+            row.style.display = (matchSearch && matchSobreCuota) ? '' : 'none';
+        });
+    };
+
+    // ========================================
+    // GUARDAR CONFIGURACION
+    // ========================================
+    document.getElementById('formConfiguracion').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        var btn = document.getElementById('btnGuardarConfig');
+        var originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+
+        var formData = new FormData(this);
+        var data = {};
+        formData.forEach(function(value, key) {
+            data[key] = value;
+        });
+
+        fetch('@Url.Action("GuardarConfiguracionCuotas", "Admin")', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(result) {
+            if (result.success) {
+                btn.innerHTML = '<i class="fas fa-check"></i> Guardado';
+                btn.classList.remove('btn-primary');
+                btn.style.background = '#10b981';
+
+                setTimeout(function() {
+                    btn.innerHTML = originalText;
+                    btn.style.background = '';
+                    btn.disabled = false;
+                }, 2000);
+            } else {
+                alert('Error: ' + result.message);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        })
+        .catch(function(error) {
+            alert('Error al guardar: ' + error.message);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+    });
+
+    // ========================================
+    // MODAL EDITAR CUOTA
+    // ========================================
+    var editarCuotaModal = document.getElementById('editarCuotaModal');
+    if (editarCuotaModal) {
+        editarCuotaModal.addEventListener('show.bs.modal', function(event) {
+            var button = event.relatedTarget;
+            if (!button) return;
+
+            var userId = button.getAttribute('data-userid');
+            var nombre = button.getAttribute('data-nombre');
+            var foto = button.getAttribute('data-foto');
+            var cuotaActual = button.getAttribute('data-cuota-actual');
+            var esPersonalizada = button.getAttribute('data-cuota-personalizada') === 'true';
+            var cuotaPersonalizadaMb = button.getAttribute('data-cuota-personalizada-mb');
+
+            document.getElementById('editUserId').value = userId;
+            document.getElementById('editUserName').textContent = nombre;
+            document.getElementById('editCuotaActual').textContent = cuotaActual + ' MB';
+
+            var avatarEl = document.getElementById('editUserAvatar');
+            if (foto) {
+                avatarEl.outerHTML = '<img src="' + foto + '" class="user-avatar" id="editUserAvatar">';
+            } else {
+                avatarEl.textContent = nombre.charAt(0).toUpperCase();
+            }
+
+            var usarDefecto = document.getElementById('usarCuotaDefecto');
+            var cuotaDiv = document.getElementById('cuotaPersonalizadaDiv');
+            var cuotaInput = document.getElementById('cuotaPersonalizada');
+
+            if (esPersonalizada) {
+                usarDefecto.checked = false;
+                cuotaDiv.style.display = 'block';
+                cuotaInput.value = cuotaPersonalizadaMb;
+            } else {
+                usarDefecto.checked = true;
+                cuotaDiv.style.display = 'none';
+                cuotaInput.value = '';
+            }
+        });
+    }
+
+    // Toggle cuota personalizada
+    document.getElementById('usarCuotaDefecto').addEventListener('change', function() {
+        var cuotaDiv = document.getElementById('cuotaPersonalizadaDiv');
+        cuotaDiv.style.display = this.checked ? 'none' : 'block';
+    });
+
+    // ========================================
+    // GUARDAR CUOTA INDIVIDUAL
+    // ========================================
+    document.getElementById('formEditarCuota').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        var btn = document.getElementById('btnGuardarCuota');
+        var originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+
+        var userId = document.getElementById('editUserId').value;
+        var usarDefecto = document.getElementById('usarCuotaDefecto').checked;
+        var cuotaPersonalizada = usarDefecto ? null : document.getElementById('cuotaPersonalizada').value;
+
+        fetch('@Url.Action("GuardarCuotaUsuario", "Admin")', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                userId: userId,
+                cuotaPersonalizadaMB: cuotaPersonalizada ? parseInt(cuotaPersonalizada) : null
+            })
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(result) {
+            if (result.success) {
+                // Cerrar modal y recargar
+                var modal = bootstrap.Modal.getInstance(editarCuotaModal);
+                modal.hide();
+                window.location.reload();
+            } else {
+                alert('Error: ' + result.message);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        })
+        .catch(function(error) {
+            alert('Error al guardar: ' + error.message);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+    });
+
+})();
+</script>
+}
+
+@functions {
+    string FormatBytes(long bytes)
+    {
+        if (bytes == 0) return "0 B";
+
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        int order = 0;
+        double len = bytes;
+
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+
+        return $"{len:F2} {sizes[order]}";
+    }
+}

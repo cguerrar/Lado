@@ -1,0 +1,321 @@
+@model List<Lado.Models.ArticuloBlog>
+@using Lado.Models
+@{
+    var categoria = ViewBag.Categoria as CategoriaBlog?;
+    var paginaActual = ViewBag.PaginaActual as int? ?? 1;
+    var totalPaginas = ViewBag.TotalPaginas as int? ?? 1;
+}
+
+<style>
+    .blog-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 30px 20px;
+    }
+
+    .blog-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    .blog-header h1 {
+        color: #4682B4;
+        font-size: 2.5rem;
+        margin-bottom: 15px;
+    }
+
+    .blog-header p {
+        color: #666;
+        font-size: 1.1rem;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .blog-categories {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+        margin-bottom: 40px;
+    }
+
+    .blog-category-btn {
+        padding: 8px 20px;
+        border: 2px solid #e0e0e0;
+        background: white;
+        border-radius: 25px;
+        text-decoration: none;
+        color: #333;
+        font-weight: 500;
+        transition: all 0.3s;
+    }
+
+    .blog-category-btn:hover,
+    .blog-category-btn.active {
+        border-color: #4682B4;
+        background: #4682B4;
+        color: white;
+    }
+
+    .blog-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 30px;
+    }
+
+    .blog-card {
+        background: white;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .blog-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+
+    .blog-card.destacado {
+        grid-column: span 2;
+    }
+
+    .blog-card-image {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+    }
+
+    .blog-card.destacado .blog-card-image {
+        height: 300px;
+    }
+
+    .blog-card-content {
+        padding: 24px;
+    }
+
+    .blog-card-category {
+        display: inline-block;
+        padding: 4px 12px;
+        background: #f0f7ff;
+        color: #4682B4;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 12px;
+    }
+
+    .blog-card-title {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #111;
+        margin-bottom: 10px;
+        line-height: 1.4;
+    }
+
+    .blog-card-title a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .blog-card-title a:hover {
+        color: #4682B4;
+    }
+
+    .blog-card-excerpt {
+        color: #666;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        margin-bottom: 16px;
+    }
+
+    .blog-card-meta {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        color: #999;
+        font-size: 0.85rem;
+    }
+
+    .blog-card-meta i {
+        margin-right: 4px;
+    }
+
+    .blog-pagination {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 40px;
+    }
+
+    .blog-pagination a,
+    .blog-pagination span {
+        padding: 10px 16px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .blog-pagination a {
+        background: white;
+        color: #4682B4;
+        border: 1px solid #e0e0e0;
+    }
+
+    .blog-pagination a:hover {
+        background: #f0f7ff;
+    }
+
+    .blog-pagination span.current {
+        background: #4682B4;
+        color: white;
+    }
+
+    .blog-empty {
+        text-align: center;
+        padding: 60px 20px;
+        color: #666;
+    }
+
+    .blog-empty i {
+        font-size: 4rem;
+        color: #ddd;
+        margin-bottom: 20px;
+    }
+
+    @@media (max-width: 768px) {
+        .blog-header h1 {
+            font-size: 1.8rem;
+        }
+
+        .blog-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .blog-card.destacado {
+            grid-column: span 1;
+        }
+
+        .blog-card.destacado .blog-card-image {
+            height: 200px;
+        }
+    }
+</style>
+
+<div class="blog-container">
+    <div class="blog-header">
+        <h1><i class="fas fa-newspaper"></i> Blog de Lado</h1>
+        <p>Noticias, tutoriales y consejos para creadores de contenido</p>
+    </div>
+
+    <div class="blog-categories">
+        <a href="@Url.Action("Index", "Blog")" class="blog-category-btn @(categoria == null ? "active" : "")">Todos</a>
+        @foreach (CategoriaBlog cat in Enum.GetValues(typeof(CategoriaBlog)))
+        {
+            <a href="@Url.Action("Index", "Blog", new { categoria = cat })"
+               class="blog-category-btn @(categoria == cat ? "active" : "")">
+                @cat
+            </a>
+        }
+    </div>
+
+    @if (Model.Any())
+    {
+        <div class="blog-grid">
+            @foreach (var articulo in Model)
+            {
+                <article class="blog-card @(articulo.EsDestacado ? "destacado" : "")">
+                    @if (!string.IsNullOrEmpty(articulo.ImagenPortada))
+                    {
+                        <img src="@articulo.ImagenPortada" alt="@articulo.Titulo" class="blog-card-image">
+                    }
+                    else
+                    {
+                        <img src="/images/blog-default.jpg" alt="@articulo.Titulo" class="blog-card-image">
+                    }
+
+                    <div class="blog-card-content">
+                        <span class="blog-card-category">@articulo.Categoria</span>
+
+                        <h2 class="blog-card-title">
+                            <a href="@Url.Action("Articulo", "Blog", new { slug = articulo.Slug })">
+                                @articulo.Titulo
+                            </a>
+                        </h2>
+
+                        @if (!string.IsNullOrEmpty(articulo.Resumen))
+                        {
+                            <p class="blog-card-excerpt">
+                                @(articulo.Resumen.Length > 150 ? articulo.Resumen.Substring(0, 150) + "..." : articulo.Resumen)
+                            </p>
+                        }
+
+                        <div class="blog-card-meta">
+                            <span><i class="far fa-calendar"></i> @articulo.FechaPublicacion?.ToString("dd MMM yyyy")</span>
+                            <span><i class="far fa-clock"></i> @articulo.TiempoLecturaMinutos min</span>
+                            <span><i class="far fa-eye"></i> @articulo.Vistas</span>
+                        </div>
+                    </div>
+                </article>
+            }
+        </div>
+
+        @if (totalPaginas > 1)
+        {
+            <div class="blog-pagination">
+                @if (paginaActual > 1)
+                {
+                    <a href="@Url.Action("Index", "Blog", new { categoria = categoria, pagina = paginaActual - 1 })">
+                        <i class="fas fa-chevron-left"></i> Anterior
+                    </a>
+                }
+
+                @for (int i = 1; i <= totalPaginas; i++)
+                {
+                    if (i == paginaActual)
+                    {
+                        <span class="current">@i</span>
+                    }
+                    else
+                    {
+                        <a href="@Url.Action("Index", "Blog", new { categoria = categoria, pagina = i })">@i</a>
+                    }
+                }
+
+                @if (paginaActual < totalPaginas)
+                {
+                    <a href="@Url.Action("Index", "Blog", new { categoria = categoria, pagina = paginaActual + 1 })">
+                        Siguiente <i class="fas fa-chevron-right"></i>
+                    </a>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <div class="blog-empty">
+            <i class="fas fa-newspaper"></i>
+            <h3>No hay articulos disponibles</h3>
+            <p>Pronto publicaremos contenido interesante para ti</p>
+        </div>
+    }
+</div>
+
+<!-- Schema.org Blog -->
+<script type="application/ld+json">
+{
+    "@@context": "https://schema.org",
+    "@@type": "Blog",
+    "name": "Blog de Lado",
+    "description": "Noticias, tutoriales y consejos para creadores de contenido en Lado",
+    "url": "https://ladoapp.com/Blog",
+    "publisher": {
+        "@@type": "Organization",
+        "name": "Lado",
+        "logo": {
+            "@@type": "ImageObject",
+            "url": "https://ladoapp.com/images/logo-512.png"
+        }
+    }
+}
+</script>

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using System.Security.Claims;
 
 namespace Lado.Controllers
 {
@@ -1337,33 +1338,44 @@ namespace Lado.Controllers
         // ========================================
         public async Task<IActionResult> Contenido(string? tipo = null, string? estado = null)
         {
-            var query = _context.Contenidos
-                .Include(c => c.Usuario)
-                .Include(c => c.Archivos)
-                .Include(c => c.CategoriaInteres)
-                .Include(c => c.ObjetosDetectados)
-                .AsQueryable();
+            try
+            {
+                var query = _context.Contenidos
+                    .Include(c => c.Usuario)
+                    .Include(c => c.Archivos)
+                    .Include(c => c.CategoriaInteres)
+                    .Include(c => c.ObjetosDetectados)
+                    .AsSplitQuery()
+                    .AsQueryable();
 
-            // Filtrar por tipo
-            if (tipo == "foto")
-                query = query.Where(c => c.TipoContenido == TipoContenido.Foto);
-            else if (tipo == "video")
-                query = query.Where(c => c.TipoContenido == TipoContenido.Video);
+                // Filtrar por tipo
+                if (tipo == "foto")
+                    query = query.Where(c => c.TipoContenido == TipoContenido.Foto);
+                else if (tipo == "video")
+                    query = query.Where(c => c.TipoContenido == TipoContenido.Video);
 
-            // Filtrar por estado
-            if (estado == "censurado")
-                query = query.Where(c => c.Censurado);
-            else if (estado == "sensible")
-                query = query.Where(c => c.EsContenidoSensible);
-            else if (estado == "shadowhide")
-                query = query.Where(c => c.OcultoSilenciosamente);
+                // Filtrar por estado
+                if (estado == "censurado")
+                    query = query.Where(c => c.Censurado);
+                else if (estado == "sensible")
+                    query = query.Where(c => c.EsContenidoSensible);
+                else if (estado == "shadowhide")
+                    query = query.Where(c => c.OcultoSilenciosamente);
 
-            var contenidos = await query
-                .OrderByDescending(c => c.FechaPublicacion)
-                .Take(100)
-                .ToListAsync();
+                var contenidos = await query
+                    .OrderByDescending(c => c.FechaPublicacion)
+                    .Take(100)
+                    .ToListAsync();
 
-            return View(contenidos);
+                return View(contenidos);
+            }
+            catch (Exception ex)
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var userName = User.Identity?.Name;
+                await _logEventoService.RegistrarErrorAsync(ex, CategoriaEvento.Admin, userId, userName);
+                throw;
+            }
         }
 
         [HttpPost]
@@ -9667,6 +9679,243 @@ Este email fue enviado a {{{{email}}}}
 
         #endregion
 
+        #region Generar Thumbnails de Videos
+
+        // Estado de generación de thumbnails
+        private static bool _thumbnailsEnProgreso = false;
+        private static int _thumbnailsTotal = 0;
+        private static int _thumbnailsProcesados = 0;
+        private static int _thumbnailsExitosos = 0;
+        private static int _thumbnailsFallidos = 0;
+        private static string _thumbnailsMensaje = "";
+
+        /// <summary>
+        /// Vista para generar thumbnails de videos que no los tienen
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GenerarThumbnailsVideos()
+        {
+            // Contar videos sin thumbnail
+            var videosSinThumb = await _context.Contenidos
+                .Where(c => c.EstaActivo
+                    && !c.EsBorrador
+                    && c.TipoContenido == TipoContenido.Video
+                    && !string.IsNullOrEmpty(c.RutaArchivo)
+                    && string.IsNullOrEmpty(c.Thumbnail))
+                .CountAsync();
+
+            // Contar archivos de carrusel tipo video sin thumbnail
+            var archivosSinThumb = await _context.ArchivosContenido
+                .Where(a => a.TipoArchivo == TipoArchivo.Video
+                    && !string.IsNullOrEmpty(a.RutaArchivo)
+                    && string.IsNullOrEmpty(a.Thumbnail))
+                .CountAsync();
+
+            ViewBag.VideosSinThumb = videosSinThumb;
+            ViewBag.ArchivosSinThumb = archivosSinThumb;
+            ViewBag.StoriesSinThumb = 0; // Stories no soportan thumbnails
+            ViewBag.TotalSinThumb = videosSinThumb + archivosSinThumb;
+            ViewBag.EnProgreso = _thumbnailsEnProgreso;
+            ViewBag.Total = _thumbnailsTotal;
+            ViewBag.Procesados = _thumbnailsProcesados;
+            ViewBag.Exitosos = _thumbnailsExitosos;
+            ViewBag.Fallidos = _thumbnailsFallidos;
+            ViewBag.Mensaje = _thumbnailsMensaje;
+
+            return View();
+        }
+
+        /// <summary>
+        /// Inicia la generación de thumbnails en segundo plano
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> IniciarGeneracionThumbnails()
+        {
+            if (_thumbnailsEnProgreso)
+            {
+                return Json(new { success = false, message = "Ya hay una generación de thumbnails en progreso" });
+            }
+
+            _thumbnailsEnProgreso = true;
+            _thumbnailsTotal = 0;
+            _thumbnailsProcesados = 0;
+            _thumbnailsExitosos = 0;
+            _thumbnailsFallidos = 0;
+            _thumbnailsMensaje = "Iniciando...";
+
+            // Obtener el userId para el log
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userName = User.Identity?.Name;
+
+            // Ejecutar en segundo plano
+            _ = Task.Run(async () =>
+            {
+                using var scope = _serviceScopeFactory.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var mediaConversion = scope.ServiceProvider.GetRequiredService<IMediaConversionService>();
+                var logService = scope.ServiceProvider.GetRequiredService<ILogEventoService>();
+                var environment = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+
+                try
+                {
+                    await EjecutarGeneracionThumbnailsAsync(context, mediaConversion, logService, environment);
+                }
+                catch (Exception ex)
+                {
+                    _thumbnailsMensaje = $"Error: {ex.Message}";
+                    await logService.RegistrarErrorAsync(ex, CategoriaEvento.Sistema, userId, userName);
+                }
+                finally
+                {
+                    _thumbnailsEnProgreso = false;
+                }
+            });
+
+            return Json(new { success = true, message = "Generación de thumbnails iniciada" });
+        }
+
+        /// <summary>
+        /// Estado de la generación de thumbnails
+        /// </summary>
+        [HttpGet]
+        public IActionResult EstadoThumbnails()
+        {
+            return Json(new
+            {
+                enProgreso = _thumbnailsEnProgreso,
+                total = _thumbnailsTotal,
+                procesados = _thumbnailsProcesados,
+                exitosos = _thumbnailsExitosos,
+                fallidos = _thumbnailsFallidos,
+                mensaje = _thumbnailsMensaje,
+                porcentaje = _thumbnailsTotal > 0 ? (int)((double)_thumbnailsProcesados / _thumbnailsTotal * 100) : 0
+            });
+        }
+
+        /// <summary>
+        /// Cancela la generación de thumbnails
+        /// </summary>
+        [HttpPost]
+        public IActionResult CancelarThumbnails()
+        {
+            _thumbnailsEnProgreso = false;
+            _thumbnailsMensaje = "Cancelado por el usuario";
+            return Json(new { success = true, message = "Generación cancelada" });
+        }
+
+        private async Task EjecutarGeneracionThumbnailsAsync(
+            ApplicationDbContext context,
+            IMediaConversionService mediaConversion,
+            ILogEventoService logService,
+            IWebHostEnvironment environment)
+        {
+            var webRoot = environment.WebRootPath;
+
+            // Obtener todos los videos sin thumbnail
+            var videosSinThumb = await context.Contenidos
+                .Where(c => c.EstaActivo
+                    && !c.EsBorrador
+                    && c.TipoContenido == TipoContenido.Video
+                    && !string.IsNullOrEmpty(c.RutaArchivo)
+                    && string.IsNullOrEmpty(c.Thumbnail))
+                .Select(c => new { c.Id, c.RutaArchivo, Tipo = "Contenido" })
+                .ToListAsync();
+
+            var archivosSinThumb = await context.ArchivosContenido
+                .Where(a => a.TipoArchivo == TipoArchivo.Video
+                    && !string.IsNullOrEmpty(a.RutaArchivo)
+                    && string.IsNullOrEmpty(a.Thumbnail))
+                .Select(a => new { a.Id, a.RutaArchivo, Tipo = "Archivo" })
+                .ToListAsync();
+
+            // Stories no tienen propiedad Thumbnail, se omiten
+
+            var todosVideos = videosSinThumb
+                .Concat(archivosSinThumb)
+                .ToList();
+
+            _thumbnailsTotal = todosVideos.Count;
+            _thumbnailsMensaje = $"Procesando {_thumbnailsTotal} videos...";
+
+            await logService.RegistrarEventoAsync(
+                $"[Thumbnails] Iniciando generación para {_thumbnailsTotal} videos",
+                CategoriaEvento.Sistema,
+                TipoLogEvento.Evento);
+
+            foreach (var video in todosVideos)
+            {
+                if (!_thumbnailsEnProgreso) break; // Cancelado
+
+                try
+                {
+                    // Convertir ruta web a ruta física
+                    var rutaRelativa = video.RutaArchivo!.TrimStart('/');
+                    var rutaCompleta = Path.Combine(webRoot, rutaRelativa.Replace("/", Path.DirectorySeparatorChar.ToString()));
+
+                    if (!System.IO.File.Exists(rutaCompleta))
+                    {
+                        _thumbnailsFallidos++;
+                        _thumbnailsProcesados++;
+                        continue;
+                    }
+
+                    // Generar thumbnail
+                    var thumbnailPath = await mediaConversion.GenerarVideoThumbnailAsync(rutaCompleta);
+
+                    if (!string.IsNullOrEmpty(thumbnailPath))
+                    {
+                        // Actualizar BD según el tipo
+                        switch (video.Tipo)
+                        {
+                            case "Contenido":
+                                var contenido = await context.Contenidos.FindAsync(video.Id);
+                                if (contenido != null)
+                                {
+                                    contenido.Thumbnail = thumbnailPath;
+                                    await context.SaveChangesAsync();
+                                }
+                                break;
+
+                            case "Archivo":
+                                var archivo = await context.ArchivosContenido.FindAsync(video.Id);
+                                if (archivo != null)
+                                {
+                                    archivo.Thumbnail = thumbnailPath;
+                                    await context.SaveChangesAsync();
+                                }
+                                break;
+                        }
+
+                        _thumbnailsExitosos++;
+                    }
+                    else
+                    {
+                        _thumbnailsFallidos++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[Thumbnails] Error procesando {Tipo} ID={Id}", video.Tipo, video.Id);
+                    _thumbnailsFallidos++;
+                }
+
+                _thumbnailsProcesados++;
+                _thumbnailsMensaje = $"Procesando {_thumbnailsProcesados}/{_thumbnailsTotal}...";
+
+                // Pequeña pausa
+                await Task.Delay(50);
+            }
+
+            _thumbnailsMensaje = $"Completado: {_thumbnailsExitosos} exitosos, {_thumbnailsFallidos} fallidos de {_thumbnailsTotal} total";
+
+            await logService.RegistrarEventoAsync(
+                $"[Thumbnails] {_thumbnailsMensaje}",
+                CategoriaEvento.Sistema,
+                _thumbnailsFallidos > 0 ? TipoLogEvento.Warning : TipoLogEvento.Evento);
+        }
+
+        #endregion
+
         #region Analizar y Reconvertir Videos
 
         public class VideoAnalisis
@@ -11642,6 +11891,275 @@ Este email fue enviado a {{{{email}}}}
         }
 
         #endregion
+
+        // ========================================
+        // CUOTAS DE GALERÍA
+        // ========================================
+
+        [HttpGet]
+        public async Task<IActionResult> CuotasGaleria()
+        {
+            try
+            {
+                // Obtener configuración actual de cuotas
+                var configuracion = await _context.ConfiguracionesPlataforma
+                    .Where(c => c.Clave.StartsWith("Cuota") ||
+                                c.Clave.StartsWith("Umbral"))
+                    .ToDictionaryAsync(c => c.Clave, c => c.Valor ?? "");
+
+                // Valores por defecto de cuotas (en MB) con parsing seguro
+                long.TryParse(configuracion.GetValueOrDefault("CuotaFan", "500"), out var cuotaFan);
+                if (cuotaFan <= 0) cuotaFan = 500;
+
+                long.TryParse(configuracion.GetValueOrDefault("CuotaCreador", "2048"), out var cuotaCreador);
+                if (cuotaCreador <= 0) cuotaCreador = 2048;
+
+                long.TryParse(configuracion.GetValueOrDefault("CuotaCreadorActivo", "5120"), out var cuotaCreadorActivo);
+                if (cuotaCreadorActivo <= 0) cuotaCreadorActivo = 5120;
+
+                long.TryParse(configuracion.GetValueOrDefault("CuotaCreadorTop", "10240"), out var cuotaCreadorTop);
+                if (cuotaCreadorTop <= 0) cuotaCreadorTop = 10240;
+
+                decimal.TryParse(configuracion.GetValueOrDefault("UmbralCreadorActivo", "100"), out var umbralActivo);
+                if (umbralActivo <= 0) umbralActivo = 100;
+
+                decimal.TryParse(configuracion.GetValueOrDefault("UmbralCreadorTop", "500"), out var umbralTop);
+                if (umbralTop <= 0) umbralTop = 500;
+
+                // Estadísticas globales
+                long totalEspacioUsado = 0;
+                try
+                {
+                    totalEspacioUsado = await _context.MediasGaleria.SumAsync(m => (long?)m.TamanoBytes) ?? 0;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "No se pudo obtener espacio usado de MediasGaleria");
+                }
+
+                var totalServidorBytes = 24L * 1024 * 1024 * 1024 * 1024; // 24 TB
+
+                // Usuarios con su uso de espacio
+                var usuarios = new List<UsuarioCuotaViewModel>();
+                try
+                {
+                    var usuariosRaw = await _context.Users
+                        .Select(u => new {
+                            u.Id,
+                            u.UserName,
+                            u.NombreCompleto,
+                            u.Email,
+                            u.FotoPerfil,
+                            u.TipoUsuario,
+                            u.EsCreador,
+                            u.TotalGanancias,
+                            u.CuotaAlmacenamientoMB,
+                            EspacioUsado = _context.MediasGaleria
+                                .Where(m => m.UsuarioId == u.Id)
+                                .Sum(m => (long?)m.TamanoBytes) ?? 0
+                        })
+                        .Where(u => u.EspacioUsado > 0)
+                        .OrderByDescending(u => u.EspacioUsado)
+                        .Take(100)
+                        .ToListAsync();
+
+                    // Calcular cuota para cada usuario
+                    foreach (var u in usuariosRaw)
+                    {
+                        long cuotaMB;
+                        string tipoUsuario;
+
+                        if (u.CuotaAlmacenamientoMB.HasValue && u.CuotaAlmacenamientoMB > 0)
+                        {
+                            cuotaMB = u.CuotaAlmacenamientoMB.Value;
+                            tipoUsuario = u.EsCreador ? "Creador" : "Fan";
+                        }
+                        else if (u.EsCreador)
+                        {
+                            if (u.TotalGanancias >= umbralTop)
+                            {
+                                cuotaMB = cuotaCreadorTop;
+                                tipoUsuario = "Creador Top";
+                            }
+                            else if (u.TotalGanancias >= umbralActivo)
+                            {
+                                cuotaMB = cuotaCreadorActivo;
+                                tipoUsuario = "Creador Activo";
+                            }
+                            else
+                            {
+                                cuotaMB = cuotaCreador;
+                                tipoUsuario = "Creador";
+                            }
+                        }
+                        else
+                        {
+                            cuotaMB = cuotaFan;
+                            tipoUsuario = "Fan";
+                        }
+
+                        usuarios.Add(new UsuarioCuotaViewModel
+                        {
+                            Id = u.Id,
+                            NombreCompleto = u.NombreCompleto ?? u.UserName ?? "Usuario",
+                            Email = u.Email ?? "",
+                            FotoPerfil = u.FotoPerfil,
+                            TipoUsuario = tipoUsuario,
+                            EspacioUsado = u.EspacioUsado,
+                            Cuota = cuotaMB * 1024 * 1024,
+                            CuotaPersonalizada = u.CuotaAlmacenamientoMB.HasValue && u.CuotaAlmacenamientoMB > 0
+                                ? (long?)(u.CuotaAlmacenamientoMB.Value * 1024 * 1024)
+                                : null
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "No se pudo obtener lista de usuarios para cuotas");
+                }
+
+                var usuariosSobreCuota = usuarios.Count(u => u.EspacioUsado > u.Cuota);
+
+                ViewBag.Estadisticas = new {
+                    EspacioUsadoTotal = totalEspacioUsado,
+                    EspacioDisponible = totalServidorBytes - totalEspacioUsado,
+                    PorcentajeUsoGlobal = totalServidorBytes > 0 ? (double)totalEspacioUsado / totalServidorBytes * 100 : 0,
+                    UsuariosSobreCuota = usuariosSobreCuota
+                };
+                ViewBag.Configuracion = configuracion;
+                ViewBag.Usuarios = usuarios;
+
+                return View();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al cargar CuotasGaleria");
+                TempData["Error"] = $"Error al cargar: {ex.Message}";
+                return RedirectToAction("Index");
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> GuardarConfiguracionCuotas([FromBody] Dictionary<string, string> configuracion)
+        {
+            try
+            {
+                foreach (var kvp in configuracion)
+                {
+                    var config = await _context.ConfiguracionesPlataforma
+                        .FirstOrDefaultAsync(c => c.Clave == kvp.Key);
+
+                    if (config != null)
+                    {
+                        config.Valor = kvp.Value;
+                        config.UltimaModificacion = DateTime.Now;
+                    }
+                    else
+                    {
+                        _context.ConfiguracionesPlataforma.Add(new ConfiguracionPlataforma
+                        {
+                            Clave = kvp.Key,
+                            Valor = kvp.Value,
+                            Descripcion = "Configuración de cuota de galería",
+                            Categoria = "Galeria",
+                            UltimaModificacion = DateTime.Now
+                        });
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+
+                // Invalidar cache del servicio de cuotas
+                CuotaGaleriaService.InvalidarCache();
+
+                return Json(new { success = true, message = "Configuración guardada" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al guardar configuración de cuotas");
+                return Json(new { success = false, message = "Error al guardar" });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ActualizarCuotaUsuario([FromBody] ActualizarCuotaUsuarioDto dto)
+        {
+            try
+            {
+                var usuario = await _context.Users.FindAsync(dto.UsuarioId);
+                if (usuario == null)
+                    return Json(new { success = false, message = "Usuario no encontrado" });
+
+                usuario.CuotaAlmacenamientoMB = dto.UsarPorDefecto ? null : dto.CuotaMB;
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Cuota actualizada" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al actualizar cuota de usuario");
+                return Json(new { success = false, message = "Error al actualizar" });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> GuardarCuotaUsuario([FromBody] GuardarCuotaUsuarioRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(request.UserId))
+                    return Json(new { success = false, message = "Usuario no especificado" });
+
+                var usuario = await _context.Users.FindAsync(request.UserId);
+                if (usuario == null)
+                    return Json(new { success = false, message = "Usuario no encontrado" });
+
+                // Si cuotaPersonalizadaMB es null, usar cuota por defecto
+                usuario.CuotaAlmacenamientoMB = request.CuotaPersonalizadaMB;
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Cuota actualizada correctamente" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al guardar cuota de usuario {UserId}", request.UserId);
+                return Json(new { success = false, message = "Error al guardar cuota" });
+            }
+        }
+
+        public class GuardarCuotaUsuarioRequest
+        {
+            public string? UserId { get; set; }
+            public long? CuotaPersonalizadaMB { get; set; }
+        }
+
+        public class UsuarioCuotaViewModel
+        {
+            public string Id { get; set; } = "";
+            public string NombreCompleto { get; set; } = "";
+            public string Email { get; set; } = "";
+            public string? FotoPerfil { get; set; }
+            public string TipoUsuario { get; set; } = "Fan";
+            public long EspacioUsado { get; set; }
+            public long Cuota { get; set; }
+            public long? CuotaPersonalizada { get; set; }
+        }
+
+        private static string FormatearBytes(long bytes)
+        {
+            if (bytes >= 1099511627776) return $"{bytes / 1099511627776.0:F2} TB";
+            if (bytes >= 1073741824) return $"{bytes / 1073741824.0:F2} GB";
+            if (bytes >= 1048576) return $"{bytes / 1048576.0:F2} MB";
+            if (bytes >= 1024) return $"{bytes / 1024.0:F2} KB";
+            return $"{bytes} B";
+        }
+
+        public class ActualizarCuotaUsuarioDto
+        {
+            public string UsuarioId { get; set; }
+            public long? CuotaMB { get; set; }
+            public bool UsarPorDefecto { get; set; }
+        }
     }
 
     // ViewModels para LadoCoins Admin

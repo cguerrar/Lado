@@ -24,6 +24,7 @@ namespace Lado.DTOs.Usuario
         public string? Biografia { get; set; }
         public string? FotoPerfil { get; set; }
         public string? FotoPortada { get; set; }
+        public string? FotoPortadaLadoB { get; set; }
         public bool EsCreador { get; set; }
         public bool EstaVerificado { get; set; }
 
@@ -67,6 +68,7 @@ namespace Lado.DTOs.Usuario
         public string NombreCompleto { get; set; } = string.Empty;
         public string? FotoPerfil { get; set; }
         public string? FotoPortada { get; set; }
+        public string? FotoPortadaLadoB { get; set; }
         public bool EstaVerificado { get; set; }
         public decimal? PrecioSuscripcion { get; set; }
         public int TotalSuscriptores { get; set; }

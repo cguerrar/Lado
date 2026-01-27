@@ -229,6 +229,7 @@ namespace Lado.Controllers
                     return Json(new { success = false, message = "Tipo de reacción inválido" });
                 }
 
+                // ⭐ SEGURIDAD: Respetar OcultarIdentidadLadoA para proteger identidad real
                 var usuarios = await _context.Reacciones
                     .Include(r => r.Usuario)
                     .Where(r => r.ContenidoId == contenidoId && r.TipoReaccion == tipoReaccion)
@@ -236,9 +237,12 @@ namespace Lado.Controllers
                     .Select(r => new
                     {
                         id = r.Usuario.Id,
-                        nombre = r.Usuario.NombreCompleto,
-                        username = r.Usuario.UserName,
-                        avatar = r.Usuario.FotoPerfil,
+                        nombre = (r.Usuario.OcultarIdentidadLadoA && r.Usuario.Seudonimo != null)
+                            ? r.Usuario.Seudonimo : r.Usuario.NombreCompleto,
+                        username = (r.Usuario.OcultarIdentidadLadoA && r.Usuario.Seudonimo != null)
+                            ? r.Usuario.Seudonimo : r.Usuario.UserName,
+                        avatar = (r.Usuario.OcultarIdentidadLadoA && r.Usuario.Seudonimo != null)
+                            ? (r.Usuario.FotoPerfilLadoB ?? r.Usuario.FotoPerfil) : r.Usuario.FotoPerfil,
                         fechaReaccion = r.FechaReaccion
                     })
                     .Take(50)

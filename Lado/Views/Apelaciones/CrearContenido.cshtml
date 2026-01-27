@@ -204,11 +204,13 @@
 
     @if (contenido != null)
     {
+        var primerArchivo = contenido.Archivos?.FirstOrDefault();
+        var thumbnail = primerArchivo?.Thumbnail ?? primerArchivo?.RutaArchivo ?? contenido.Thumbnail ?? contenido.RutaArchivo;
+
         <div class="contenido-preview">
-            @if (contenido.Archivos != null && contenido.Archivos.Any())
+            @if (!string.IsNullOrEmpty(thumbnail))
             {
-                var primerArchivo = contenido.Archivos.First();
-                <img src="@primerArchivo.RutaArchivo" alt="Preview del contenido">
+                <img src="@thumbnail" alt="Preview del contenido" onerror="this.style.display='none'">
             }
             else
             {
@@ -217,11 +219,18 @@
                 </div>
             }
             <div class="contenido-info">
-                <h4>@(!string.IsNullOrEmpty(contenido.Descripcion) ? contenido.Descripcion.Substring(0, Math.Min(50, contenido.Descripcion.Length)) + "..." : "Publicacion #" + contenido.Id)</h4>
+                <h4>@(!string.IsNullOrEmpty(contenido.Descripcion) ? (contenido.Descripcion.Length > 50 ? contenido.Descripcion.Substring(0, 50) + "..." : contenido.Descripcion) : "Publicacion #" + contenido.Id)</h4>
                 <p>
                     <i class="fas fa-calendar me-1"></i>
                     Publicado el @contenido.FechaPublicacion.ToString("dd MMM yyyy")
                 </p>
+                @if (!string.IsNullOrEmpty(contenido.RazonCensura))
+                {
+                    <div style="margin-top: 12px; padding: 10px 12px; background: #fef2f2; border-left: 3px solid #ef4444; border-radius: 4px;">
+                        <strong style="font-size: 11px; color: #991b1b; display: block; margin-bottom: 2px;">RAZON DEL RECHAZO:</strong>
+                        <span style="color: #dc2626; font-size: 13px;">@contenido.RazonCensura</span>
+                    </div>
+                }
             </div>
         </div>
     }
@@ -240,20 +249,24 @@
     <div class="form-card">
         <form asp-action="CrearContenido" method="post">
             <input type="hidden" name="contenidoId" value="@contenido?.Id" />
+            <input type="hidden" name="razonRechazo" value="@(contenido?.RazonCensura ?? "No especificada")" />
 
-            <div class="form-group">
-                <label for="razonRechazo">Razon del rechazo <span>*</span></label>
-                <select name="razonRechazo" id="razonRechazo" class="form-control" required>
-                    <option value="">Selecciona la razon indicada...</option>
-                    <option value="Contenido inapropiado">Contenido inapropiado</option>
-                    <option value="Violacion de derechos de autor">Violacion de derechos de autor</option>
-                    <option value="Spam o contenido no deseado">Spam o contenido no deseado</option>
-                    <option value="Contenido violento o peligroso">Contenido violento o peligroso</option>
-                    <option value="Incumplimiento de normas">Incumplimiento de normas comunitarias</option>
-                    <option value="Otro">Otro motivo</option>
-                </select>
-                <small>Selecciona la razon que te indicaron para el rechazo</small>
-            </div>
+            @if (string.IsNullOrEmpty(contenido?.RazonCensura))
+            {
+                <div class="form-group">
+                    <label for="razonRechazoManual">Razon del rechazo <span>*</span></label>
+                    <select name="razonRechazo" id="razonRechazoManual" class="form-control" required>
+                        <option value="">Selecciona la razon indicada...</option>
+                        <option value="Contenido inapropiado">Contenido inapropiado</option>
+                        <option value="Violacion de derechos de autor">Violacion de derechos de autor</option>
+                        <option value="Spam o contenido no deseado">Spam o contenido no deseado</option>
+                        <option value="Contenido violento o peligroso">Contenido violento o peligroso</option>
+                        <option value="Incumplimiento de normas">Incumplimiento de normas comunitarias</option>
+                        <option value="Otro">Otro motivo</option>
+                    </select>
+                    <small>Selecciona la razon que te indicaron para el rechazo</small>
+                </div>
+            }
 
             <div class="form-group">
                 <label for="argumentos">Tu argumento <span>*</span></label>

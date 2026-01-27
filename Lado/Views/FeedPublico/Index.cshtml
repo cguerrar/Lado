@@ -2,684 +2,72 @@
 @using Lado.Models
 @{
     ViewData["Title"] = "LADO - Descubre";
-    Layout = "~/Views/Shared/_LayoutPublico.cshtml";
+    Layout = null; // Sin layout - pantalla completa negra
     var contenidoLista = Model?.ToList() ?? new List<Contenido>();
     var estaAutenticado = ViewBag.EstaAutenticado as bool? ?? false;
 }
 
-<style>
-    /* ========================================
-       RESET Y BASE
-       ======================================== */
-    .mosaic-page {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        overflow: hidden;
-        background: #000;
-        z-index: 1;
-    }
-
-    /* ========================================
-       MOSAICO DE IMAGENES
-       ======================================== */
-    .mosaic-container {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        display: grid;
-        gap: 4px;
-        animation: mosaicFloat 20s ease-in-out infinite;
-    }
-
-    @@keyframes mosaicFloat {
-        0%, 100% { transform: translate(-50%, -50%) scale(1); }
-        50% { transform: translate(-50%, -51%) scale(1.02); }
-    }
-
-    .mosaic-item {
-        position: relative;
-        overflow: hidden;
-        cursor: pointer;
-        transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        border-radius: 4px;
-    }
-
-    .mosaic-item::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.2);
-        z-index: 1;
-        transition: background 0.3s ease;
-    }
-
-    .mosaic-item:hover {
-        transform: scale(1.15);
-        z-index: 100;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
-    }
-
-    .mosaic-item:hover::before {
-        background: rgba(0, 0, 0, 0);
-    }
-
-    .mosaic-item img,
-    .mosaic-item video {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: block;
-        transition: transform 0.4s ease, opacity 0.5s ease;
-    }
-
-    /* Estado inicial: oculto hasta que cargue */
-    .mosaic-item img:not(.loaded),
-    .mosaic-item video:not(.loaded) {
-        opacity: 0;
-    }
-
-    .mosaic-item img.loaded,
-    .mosaic-item video.loaded {
-        opacity: 1;
-    }
-
-    /* Skeleton/placeholder mientras carga - efecto shimmer visible */
-    .mosaic-item {
-        background: linear-gradient(
-            110deg,
-            #0d0d0d 0%,
-            #1a1a1a 20%,
-            #2d2d2d 40%,
-            #1a1a1a 60%,
-            #0d0d0d 100%
-        );
-        background-size: 300% 100%;
-        animation: shimmer 1.2s ease-in-out infinite;
-    }
-
-    .mosaic-item.media-loaded {
-        background: #111;
-        animation: none;
-    }
-
-    @@keyframes shimmer {
-        0% { background-position: 100% 0; }
-        100% { background-position: -100% 0; }
-    }
-
-    /* Animación de aparición suave cuando carga */
-    .mosaic-item img.loaded,
-    .mosaic-item video.loaded {
-        animation: fadeInScale 0.3s ease-out forwards;
-    }
-
-    @@keyframes fadeInScale {
-        from {
-            opacity: 0;
-            transform: scale(0.95);
-        }
-        to {
-            opacity: 1;
-            transform: scale(1);
-        }
-    }
-
-    /* Placeholder para videos con error */
-    .video-error-placeholder {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    }
-
-    .video-error-placeholder svg {
-        width: 40%;
-        height: 40%;
-        opacity: 0.5;
-    }
-
-    /* Video placeholder mientras carga */
-    .video-placeholder {
-        opacity: 0;
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    }
-
-    .mosaic-item:hover img,
-    .mosaic-item:hover video {
-        transform: scale(1.1);
-    }
-
-    /* ========================================
-       OVERLAY OSCURO CON GRADIENTE
-       ======================================== */
-    .mosaic-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        pointer-events: none;
-        z-index: 10;
-    }
-
-    .mosaic-overlay::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 40%;
-        background: linear-gradient(to bottom,
-            rgba(0, 0, 0, 1) 0%,
-            rgba(0, 0, 0, 0.9) 20%,
-            rgba(0, 0, 0, 0.6) 50%,
-            rgba(0, 0, 0, 0) 100%
-        );
-    }
-
-    .mosaic-overlay::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 45%;
-        background: linear-gradient(to top,
-            rgba(0, 0, 0, 1) 0%,
-            rgba(0, 0, 0, 0.95) 25%,
-            rgba(0, 0, 0, 0.7) 50%,
-            rgba(0, 0, 0, 0) 100%
-        );
-    }
-
-    /* Gradientes laterales */
-    .mosaic-overlay-left,
-    .mosaic-overlay-right {
-        position: fixed;
-        top: 0;
-        bottom: 0;
-        width: 15%;
-        pointer-events: none;
-        z-index: 10;
-    }
-
-    .mosaic-overlay-left {
-        left: 0;
-        background: linear-gradient(to right, rgba(0, 0, 0, 0.8), transparent);
-    }
-
-    .mosaic-overlay-right {
-        right: 0;
-        background: linear-gradient(to left, rgba(0, 0, 0, 0.8), transparent);
-    }
-
-    /* ========================================
-       CONTENIDO CENTRAL (LOGO Y CTA)
-       ======================================== */
-    .mosaic-content {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        z-index: 100;
-        text-align: center;
-        pointer-events: none;
-    }
-
-    .mosaic-logo {
-        font-size: 5rem;
-        font-weight: 900;
-        color: #fff;
-        letter-spacing: -3px;
-        margin-bottom: 16px;
-        text-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
-        animation: logoGlow 3s ease-in-out infinite alternate;
-    }
-
-    @@keyframes logoGlow {
-        from { text-shadow: 0 4px 30px rgba(0, 0, 0, 0.5); }
-        to { text-shadow: 0 4px 60px rgba(70, 130, 180, 0.3), 0 0 100px rgba(70, 130, 180, 0.1); }
-    }
-
-    .mosaic-tagline {
-        font-size: 1.4rem;
-        color: rgba(255, 255, 255, 0.85);
-        margin-bottom: 40px;
-        font-weight: 400;
-        letter-spacing: 2px;
-        text-transform: uppercase;
-    }
-
-    .mosaic-buttons {
-        display: flex;
-        gap: 16px;
-        justify-content: center;
-        pointer-events: auto;
-    }
-
-    .mosaic-btn {
-        padding: 16px 40px;
-        border-radius: 50px;
-        font-size: 16px;
-        font-weight: 700;
-        text-decoration: none;
-        transition: all 0.3s ease;
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .mosaic-btn-primary {
-        background: linear-gradient(135deg, #4682B4 0%, #2c5f8a 100%);
-        color: #fff;
-        box-shadow: 0 8px 30px rgba(70, 130, 180, 0.4);
-    }
-
-    .mosaic-btn-primary:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 12px 40px rgba(70, 130, 180, 0.6);
-    }
-
-    .mosaic-btn-secondary {
-        background: rgba(255, 255, 255, 0.1);
-        color: #fff;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        backdrop-filter: blur(10px);
-    }
-
-    .mosaic-btn-secondary:hover {
-        background: rgba(255, 255, 255, 0.2);
-        border-color: rgba(255, 255, 255, 0.5);
-        transform: translateY(-3px);
-    }
-
-    .mosaic-btn svg {
-        width: 20px;
-        height: 20px;
-    }
-
-    /* Botón "¿Qué es Lado?" - Solo visible en móvil */
-    .mosaic-btn-info {
-        display: none;
-        background: transparent;
-        color: rgba(255, 255, 255, 0.7);
-        border: none;
-        font-size: 13px;
-        padding: 10px 16px;
-        text-decoration: underline;
-        text-underline-offset: 3px;
-    }
-
-    .mosaic-btn-info:hover {
-        color: #fff;
-    }
-
-    @@media (max-width: 768px) {
-        .mosaic-btn-info {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#000000" />
+    <title>@ViewData["Title"]</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/feedpublico.css" asp-append-version="true" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            background: #000;
+            overflow: hidden;
+            height: 100%;
             width: 100%;
-            justify-content: center;
-            margin-top: 8px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
-
-        .mosaic-btn-info i {
-            font-size: 12px;
-        }
-    }
-
-    /* ========================================
-       DEGRADADO INFERIOR ADICIONAL
-       ======================================== */
-    .mosaic-bottom-fade {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 120px;
-        background: linear-gradient(to top, #000 0%, transparent 100%);
-        pointer-events: none;
-        z-index: 9;
-        opacity: 0.8;
-    }
-
-    /* ========================================
-       BADGE DE VIDEO
-       ======================================== */
-    .video-badge {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        background: rgba(0, 0, 0, 0.6);
-        border-radius: 4px;
-        padding: 4px 6px;
-        z-index: 5;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .video-badge svg {
-        width: 12px;
-        height: 12px;
-        fill: #fff;
-    }
-
-    /* ========================================
-       RESPONSIVE - TABLETS
-       ======================================== */
-    @@media (max-width: 1024px) {
-        .mosaic-logo {
-            font-size: 4rem;
-        }
-
-        .mosaic-tagline {
-            font-size: 1.2rem;
-        }
-    }
-
-    /* ========================================
-       RESPONSIVE - MOVILES
-       ======================================== */
-    @@media (max-width: 768px) {
-        .mosaic-logo {
-            font-size: 3.5rem;
-            letter-spacing: -2px;
-        }
-
-        .mosaic-tagline {
-            font-size: 0.95rem;
-            padding: 0 20px;
-            letter-spacing: 1px;
-            margin-bottom: 30px;
-        }
-
-        .mosaic-buttons {
-            flex-direction: column;
-            padding: 0 30px;
-            gap: 12px;
-            width: 100%;
-            max-width: 300px;
-            margin: 0 auto;
-            align-items: center;
-        }
-
-        .mosaic-btn {
-            padding: 14px 24px;
-            font-size: 14px;
-            justify-content: center;
-            width: 100%;
-            text-align: center;
-        }
-
-        .mosaic-content {
-            width: 90%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        /* Ajustar overlays para moviles */
-        .mosaic-overlay::before {
-            height: 35%;
-        }
-
-        .mosaic-overlay::after {
-            height: 40%;
-        }
-
-        .mosaic-overlay-left,
-        .mosaic-overlay-right {
-            width: 10%;
-        }
-
-        /* Items mas pequenos en movil */
-        .mosaic-item {
-            border-radius: 3px;
-        }
-
-        .video-badge {
-            top: 4px;
-            right: 4px;
-            padding: 2px 4px;
-        }
-
-        .video-badge svg {
-            width: 10px;
-            height: 10px;
-        }
-    }
-
-    /* ========================================
-       RESPONSIVE - MOVILES PEQUENOS
-       ======================================== */
-    @@media (max-width: 480px) {
-        .mosaic-logo {
-            font-size: 2.8rem;
-        }
-
-        .mosaic-tagline {
-            font-size: 0.85rem;
-            margin-bottom: 24px;
-        }
-
-        .mosaic-buttons {
-            padding: 0 24px;
-            max-width: 280px;
-            margin: 0 auto;
-            align-items: center;
-        }
-
-        .mosaic-btn {
-            padding: 12px 20px;
-            font-size: 13px;
-            text-align: center;
-        }
-
-        .mosaic-btn svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        .mosaic-content {
-            width: 95%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-    }
-
-    /* ========================================
-       SOPORTE TACTIL (iOS/Android)
-       ======================================== */
-    @@media (hover: none) and (pointer: coarse) {
-        /* En dispositivos tactiles, no usar hover para agrandar */
-        .mosaic-item:hover {
-            transform: none;
-            z-index: auto;
-            box-shadow: none;
-        }
-
-        .mosaic-item:hover::before {
-            background: rgba(0, 0, 0, 0.2);
-        }
-
-        .mosaic-item:hover img,
-        .mosaic-item:hover video {
-            transform: none;
-        }
-
-        /* Efecto de tap en lugar de hover */
-        .mosaic-item:active {
-            transform: scale(0.95);
-            opacity: 0.9;
-        }
-
-        /* Botones mas grandes para tocar */
-        .mosaic-btn {
-            min-height: 48px;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        /* Desactivar parallax en moviles */
-        .mosaic-container {
-            animation: none !important;
-        }
-    }
-
-    /* ========================================
-       iOS SAFE AREAS
-       ======================================== */
-    @@supports (padding-top: env(safe-area-inset-top)) {
-        .mosaic-page {
-            padding-top: env(safe-area-inset-top);
-            padding-bottom: env(safe-area-inset-bottom);
-            padding-left: env(safe-area-inset-left);
-            padding-right: env(safe-area-inset-right);
-        }
-
-    }
-
-    /* ========================================
-       LANDSCAPE EN MOVILES
-       ======================================== */
-    @@media (max-height: 500px) and (orientation: landscape) {
-        .mosaic-logo {
-            font-size: 2.2rem;
-            margin-bottom: 8px;
-        }
-
-        .mosaic-tagline {
-            font-size: 0.8rem;
-            margin-bottom: 16px;
-        }
-
-        .mosaic-buttons {
-            flex-direction: row;
-            gap: 10px;
-        }
-
-        .mosaic-btn {
-            padding: 10px 20px;
-            font-size: 12px;
-        }
-    }
-
-    /* Ocultar todo el header, navbar y footer en esta pagina */
-    .navbar, footer, .mobile-nav, header, .header,
-    .top-bar, .site-header, nav, .nav-container,
-    .navbar-brand, .public-header {
-        display: none !important;
-        height: 0 !important;
-        min-height: 0 !important;
-        max-height: 0 !important;
-        overflow: hidden !important;
-    }
-
-    body {
-        overflow: hidden !important;
-        padding-top: 0 !important;
-        margin-top: 0 !important;
-    }
-
-    html {
-        padding-top: 0 !important;
-    }
-
-    main, .main-content, #main-content, .public-main {
-        padding-top: 0 !important;
-        margin-top: 0 !important;
-        min-height: 100vh !important;
-    }
-</style>
+    </style>
+</head>
+<body>
 
 <div class="mosaic-page">
     <!-- Mosaico de imagenes -->
     <div class="mosaic-container" id="mosaicGrid">
         @{
-            // Crear un grid de imagenes aleatorias
-            var random = new Random();
-            var contenidoConArchivo = contenidoLista
-                .Where(c => !string.IsNullOrEmpty(c.RutaArchivo))
-                .ToList();
+            // Grid con contenido aleatorio del servidor - 200 items para mosaico denso
+            var itemsNecesarios = 200;
+            var cargarDirecto = 24;   // Primeras 24 imágenes cargan inmediatamente
+            var videosConAutoplay = 12;
 
-            var contenidoAleatorio = contenidoConArchivo
-                .OrderBy(x => random.Next())
-                .ToList();
+            var contenidoFinal = contenidoLista.ToList();
 
-            // Necesitamos suficientes items para llenar toda la pantalla
-            // Para pantalla 1920x1080 con items de 100px = ~20 cols x 12 rows = 240 items
-            var itemsNecesarios = 250;
-
-            // Solo duplicar si hay contenido disponible (protección contra loop infinito)
-            if (contenidoConArchivo.Any())
+            // Solo duplicar si hay muy poco contenido
+            if (contenidoFinal.Count > 0 && contenidoFinal.Count < itemsNecesarios)
             {
-                while (contenidoAleatorio.Count < itemsNecesarios)
+                var random = new Random();
+                while (contenidoFinal.Count < itemsNecesarios)
                 {
-                    contenidoAleatorio.AddRange(contenidoConArchivo
-                        .OrderBy(x => random.Next()));
+                    contenidoFinal.AddRange(contenidoLista.OrderBy(x => random.Next()));
                 }
             }
 
-            var itemsParaMostrar = contenidoAleatorio.Take(itemsNecesarios).ToList();
+            var itemsParaMostrar = contenidoFinal.Take(itemsNecesarios).ToList();
             var hayContenido = itemsParaMostrar.Any();
+            var contador = 0;
+            var contadorVideos = 0;
         }
 
         @if (hayContenido)
         {
-            var contador = 0;
-            var contadorVideos = 0;
-            var cargarDirecto = 6; // Solo 6 imágenes cargan directo (feedback inmediato)
-            var videosConAutoplay = 15; // Videos con autoplay para dar vida al mosaico
-
-            // Función para limpiar y normalizar rutas (datos legacy)
-            string LimpiarRuta(string ruta, string? carpetaUsuario = null) {
-                if (string.IsNullOrEmpty(ruta)) return "";
-                // Remover todo tipo de comillas y escapes
-                var limpia = ruta.Trim();
-                // Quitar comillas al inicio
-                while (limpia.StartsWith("\"") || limpia.StartsWith("'") || limpia.StartsWith("\\\""))
-                    limpia = limpia.TrimStart('"', '\'', '\\');
-                // Quitar comillas al final
-                while (limpia.EndsWith("\"") || limpia.EndsWith("'") || limpia.EndsWith("\\\""))
-                    limpia = limpia.TrimEnd('"', '\'', '\\');
-                // Limpiar cualquier comilla restante y entidades HTML
-                limpia = limpia.Replace("\"", "").Replace("'", "").Replace("&quot;", "").Replace("%22", "");
-
-                // Normalizar ruta
-                if (string.IsNullOrEmpty(limpia)) return "";
-
-                // Si solo es nombre de archivo (sin path), construir ruta completa
-                if (!limpia.Contains("/") && !limpia.Contains("\\") && !string.IsNullOrEmpty(carpetaUsuario))
-                {
-                    limpia = $"/uploads/{carpetaUsuario}/{limpia}";
-                }
-                // Si la ruta no comienza con /, agregarla
-                else if (!limpia.StartsWith("/") && !limpia.StartsWith("http"))
-                {
-                    limpia = "/" + limpia;
-                }
-
-                return limpia;
-            }
-
             foreach (var item in itemsParaMostrar)
             {
                 var esVideo = item.TipoContenido == TipoContenido.Video;
-                var carpetaUsuario = item.Usuario?.UserName ?? item.Usuario?.NombreCompleto?.Replace(" ", "_") ?? "default";
-                // Limpiar comillas de rutas (puede haber datos legacy con comillas)
+                var carpetaUsuario = item.Usuario?.UserName ?? "default";
+
+                // Limpiar rutas (datos legacy con comillas)
                 var rutaArchivo = LimpiarRuta(item.RutaArchivo, carpetaUsuario);
                 var thumbnailUrl = LimpiarRuta(item.Thumbnail, carpetaUsuario);
-                // Usar thumbnail si existe para carga más rápida
                 var imagenSrc = !string.IsNullOrEmpty(thumbnailUrl) ? thumbnailUrl : rutaArchivo;
+
                 var usarLazy = contador >= cargarDirecto;
                 var videoAutoplay = esVideo && contadorVideos < videosConAutoplay;
                 if (esVideo) contadorVideos++;
@@ -688,15 +76,10 @@
                 <div class="mosaic-item @(usarLazy ? "" : "media-loaded")" data-tipo="@(esVideo ? "video" : "image")" onclick="window.location.href='@Url.Action("Login", "Account")'">
                     @if (esVideo)
                     {
-                        // Videos: usar thumbnail como imagen si existe, evitar cargar video innecesariamente
                         var posterUrl = !string.IsNullOrEmpty(thumbnailUrl) ? thumbnailUrl : "";
                         if (!string.IsNullOrEmpty(posterUrl))
                         {
-                            // Si hay thumbnail, mostrar imagen con badge de video (más eficiente)
-                            <img src="@posterUrl"
-                                 alt=""
-                                 class="loaded"
-                                 loading="eager"
+                            <img src="@posterUrl" alt="" class="loaded" loading="eager"
                                  onload="this.parentElement.classList.add('media-loaded');"
                                  onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E'; this.parentElement.classList.add('media-loaded');">
                             <div class="video-badge">
@@ -705,17 +88,7 @@
                         }
                         else
                         {
-                            // Sin thumbnail: intentar cargar video, pero con manejo de errores robusto
-                            <video data-video-src="@rutaArchivo"
-                                   @(videoAutoplay ? "autoplay" : "")
-                                   muted
-                                   loop
-                                   playsinline
-                                   webkit-playsinline
-                                   preload="metadata"
-                                   style="background:#000;"
-                                   class="video-placeholder">
-                            </video>
+                            <video data-video-src="@rutaArchivo" @(videoAutoplay ? "autoplay" : "") muted loop playsinline webkit-playsinline preload="metadata" style="background:#000;" class="video-placeholder"></video>
                             <div class="video-badge">
                                 <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                             </div>
@@ -726,18 +99,12 @@
                         if (usarLazy)
                         {
                             <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E"
-                                 data-src="@imagenSrc"
-                                 alt=""
-                                 loading="lazy"
-                                 decoding="async"
+                                 data-src="@imagenSrc" alt="" loading="lazy" decoding="async"
                                  onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E'; this.classList.add('loaded'); this.parentElement.classList.add('media-loaded');">
                         }
                         else
                         {
-                            <img src="@imagenSrc"
-                                 alt=""
-                                 class="loaded"
-                                 loading="eager"
+                            <img src="@imagenSrc" alt="" class="loaded" loading="eager"
                                  onload="this.parentElement.classList.add('media-loaded');"
                                  onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E'; this.parentElement.classList.add('media-loaded');">
                         }
@@ -755,7 +122,7 @@
                     <polyline points="21 15 16 10 5 21"/>
                 </svg>
                 <h3 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 10px; color: white;">Bienvenido a LADO</h3>
-                <p style="font-size: 1rem; opacity: 0.8; max-width: 400px;">Pronto habrá contenido increíble para descubrir. ¡Regístrate para ser de los primeros!</p>
+                <p style="font-size: 1rem; opacity: 0.8; max-width: 400px;">Pronto habrá contenido increíble para descubrir.</p>
             </div>
         }
     </div>
@@ -788,9 +155,8 @@
                         <polyline points="10 17 15 12 10 7"></polyline>
                         <line x1="15" y1="12" x2="3" y2="12"></line>
                     </svg>
-                    Iniciar sesion
+                    Iniciar sesión
                 </a>
-                <!-- Enlace a landing informativo (solo móvil) -->
                 <a href="/Home/Index?desktop=true" class="mosaic-btn-info">
                     <i class="fas fa-info-circle"></i>
                     ¿Qué es Lado?
@@ -810,366 +176,189 @@
             </div>
         }
     </div>
-
 </div>
 
-@section Scripts {
-    <script>
-        (function() {
-            // ========================================
-            // MANEJO SILENCIOSO DE ERRORES DE RECURSOS
-            // ========================================
-            // Capturar errores de carga de recursos (img, video) para evitar spam en consola
-            window.addEventListener('error', function(e) {
-                if (e.target && (e.target.tagName === 'IMG' || e.target.tagName === 'VIDEO')) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    // Marcar el elemento como con error para manejo posterior
-                    e.target.dataset.loadError = 'true';
-                    return false;
-                }
-            }, true);
+@functions {
+    /// <summary>
+    /// Limpia y normaliza rutas de archivos (maneja datos legacy con comillas)
+    /// </summary>
+    string LimpiarRuta(string? ruta, string carpetaUsuario)
+    {
+        if (string.IsNullOrEmpty(ruta)) return "";
 
+        var limpia = ruta.Trim().Trim('"', '\'', '\\');
+        limpia = limpia.Replace("\"", "").Replace("'", "").Replace("&quot;", "").Replace("%22", "");
+
+        if (string.IsNullOrEmpty(limpia)) return "";
+
+        // Si solo es nombre de archivo, construir ruta completa
+        if (!limpia.Contains("/") && !limpia.Contains("\\"))
+        {
+            return $"/uploads/{carpetaUsuario}/{limpia}";
+        }
+
+        // Asegurar que comienza con /
+        if (!limpia.StartsWith("/") && !limpia.StartsWith("http"))
+        {
+            limpia = "/" + limpia;
+        }
+
+        return limpia;
+    }
+}
+
+<script>
+        (function() {
+            // MOSAICO OPTIMIZADO v2 - Carga rápida sin verificación HTTP previa
             const grid = document.getElementById('mosaicGrid');
             if (!grid) return;
 
             const items = grid.querySelectorAll('.mosaic-item');
-
-            // Detectar si es dispositivo tactil
-            const isTouchDevice = ('ontouchstart' in window) ||
-                (navigator.maxTouchPoints > 0) ||
-                (navigator.msMaxTouchPoints > 0);
-
-            // Detectar iOS
+            const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-
-            // ========================================
-            // SISTEMA DE CARGA ASÍNCRONA CON CONTROL DE CONCURRENCIA
-            // ========================================
-
-            // Imagen de fallback en caso de error (fondo oscuro simple)
             const fallbackSrc = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%231a1a2e' width='100' height='100'/%3E%3C/svg%3E";
 
-            // Tracking de items cargados y URLs fallidas
-            const loadedItems = new Set();
-            const failedUrls = new Set();
-            const pendingLoads = new Map(); // Para cancelar requests en curso
-
-            // Control de concurrencia - máximo 4 cargas simultáneas
-            const MAX_CONCURRENT_LOADS = 4;
+            // Control de carga paralela - aumentado para 200 items
+            const MAX_CONCURRENT = 16;
             let activeLoads = 0;
             const loadQueue = [];
+            const loadedItems = new Set();
 
-            // Timeout ultra-corto para evitar bloqueos (1.5s para imágenes, 3s para videos)
-            const IMG_TIMEOUT = 1500;
-            const VIDEO_TIMEOUT = 3000;
+            // Suprimir errores de recursos en consola
+            window.addEventListener('error', (e) => {
+                if (e.target?.tagName === 'IMG' || e.target?.tagName === 'VIDEO') {
+                    e.preventDefault();
+                    return false;
+                }
+            }, true);
 
-            // Función para procesar la cola de carga
-            function processLoadQueue() {
-                while (activeLoads < MAX_CONCURRENT_LOADS && loadQueue.length > 0) {
-                    const task = loadQueue.shift();
-                    if (task && !loadedItems.has(task.item)) {
-                        executeLoad(task);
-                    }
+            function processQueue() {
+                while (activeLoads < MAX_CONCURRENT && loadQueue.length > 0) {
+                    const item = loadQueue.shift();
+                    if (item && !loadedItems.has(item)) loadItem(item);
                 }
             }
 
-            // Función para encolar una carga
-            function queueLoad(item, priority = false) {
+            function queueItem(item, priority = false) {
                 if (loadedItems.has(item)) return;
-
-                const task = { item };
-                if (priority) {
-                    loadQueue.unshift(task);
-                } else {
-                    loadQueue.push(task);
-                }
-                processLoadQueue();
+                priority ? loadQueue.unshift(item) : loadQueue.push(item);
+                processQueue();
             }
 
-            // Ejecutar la carga de un item
-            function executeLoad(task) {
-                const { item } = task;
-                if (loadedItems.has(item)) {
-                    processLoadQueue();
-                    return;
-                }
-
+            function loadItem(item) {
                 loadedItems.add(item);
                 activeLoads++;
-
-                const img = item.querySelector('img');
-                const video = item.querySelector('video');
-
-                // Marcar como cargado visualmente (eliminar shimmer)
                 item.classList.add('media-loaded');
 
-                if (img && img.hasAttribute('data-src')) {
-                    loadImageAsync(img, item);
-                } else if (img && !img.hasAttribute('data-src')) {
-                    img.classList.add('loaded');
+                const img = item.querySelector('img[data-src]');
+                const video = item.querySelector('video[data-video-src]');
+
+                if (img) loadImage(img);
+                else if (video) loadVideo(video);
+                else {
+                    item.querySelector('img')?.classList.add('loaded');
                     activeLoads--;
-                    processLoadQueue();
-                } else if (video && video.hasAttribute('data-video-src')) {
-                    loadVideoAsync(video, item);
-                } else {
-                    activeLoads--;
-                    processLoadQueue();
+                    processQueue();
                 }
             }
 
-            // Cargar imagen de forma asíncrona con AbortController
-            function loadImageAsync(img, item) {
+            function loadImage(img) {
                 const src = img.getAttribute('data-src');
                 img.removeAttribute('data-src');
 
-                // Si la URL ya falló antes, usar fallback inmediatamente
-                if (failedUrls.has(src)) {
+                const timeout = setTimeout(() => {
+                    if (!img.classList.contains('loaded')) {
+                        img.src = fallbackSrc;
+                        img.classList.add('loaded');
+                    }
+                    activeLoads--;
+                    processQueue();
+                }, 1500); // Reducido de 3000ms a 1500ms
+
+                img.onload = () => {
+                    clearTimeout(timeout);
+                    img.classList.add('loaded');
+                    activeLoads--;
+                    processQueue();
+                };
+
+                img.onerror = () => {
+                    clearTimeout(timeout);
                     img.src = fallbackSrc;
                     img.classList.add('loaded');
                     activeLoads--;
-                    processLoadQueue();
-                    return;
-                }
+                    processQueue();
+                };
 
-                // Crear controlador de aborto para cancelar si tarda demasiado
-                const controller = new AbortController();
-                const loadId = Date.now() + Math.random();
-                pendingLoads.set(loadId, controller);
-
-                // Timeout agresivo
-                const timeoutId = setTimeout(() => {
-                    controller.abort();
-                    failedUrls.add(src);
-                    if (!img.classList.contains('loaded')) {
-                        img.src = fallbackSrc;
-                        img.classList.add('loaded');
-                    }
-                    pendingLoads.delete(loadId);
-                    activeLoads--;
-                    processLoadQueue();
-                }, IMG_TIMEOUT);
-
-                // Usar fetch con HEAD para verificar rápidamente si existe
-                fetch(src, {
-                    method: 'HEAD',
-                    signal: controller.signal,
-                    cache: 'force-cache'
-                })
-                .then(response => {
-                    clearTimeout(timeoutId);
-                    pendingLoads.delete(loadId);
-
-                    if (response.ok) {
-                        // El archivo existe, cargar la imagen
-                        img.onload = () => {
-                            img.classList.add('loaded');
-                        };
-                        img.onerror = () => {
-                            failedUrls.add(src);
-                            img.src = fallbackSrc;
-                            img.classList.add('loaded');
-                        };
-                        img.src = src;
-                    } else {
-                        // 404 u otro error - usar fallback
-                        failedUrls.add(src);
-                        img.src = fallbackSrc;
-                        img.classList.add('loaded');
-                    }
-                    activeLoads--;
-                    processLoadQueue();
-                })
-                .catch(err => {
-                    clearTimeout(timeoutId);
-                    pendingLoads.delete(loadId);
-
-                    // Error de red o abortado - usar fallback
-                    if (!img.classList.contains('loaded')) {
-                        failedUrls.add(src);
-                        img.src = fallbackSrc;
-                        img.classList.add('loaded');
-                    }
-                    activeLoads--;
-                    processLoadQueue();
-                });
+                img.src = src;
             }
 
-            // Cargar video de forma asíncrona
-            function loadVideoAsync(video, item) {
+            function loadVideo(video) {
                 const src = video.getAttribute('data-video-src');
                 video.removeAttribute('data-video-src');
 
-                // Si la URL ya falló, mostrar placeholder
-                if (failedUrls.has(src)) {
-                    showVideoPlaceholder(video);
+                const timeout = setTimeout(() => {
+                    if (!video.classList.contains('loaded')) replaceWithPlaceholder(video);
                     activeLoads--;
-                    processLoadQueue();
-                    return;
-                }
+                    processQueue();
+                }, 2500);
 
-                const showVideoPlaceholder = (v) => {
-                    const placeholder = document.createElement('div');
-                    placeholder.className = 'video-error-placeholder loaded';
-                    placeholder.innerHTML = '<svg viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)"><path d="M8 5v14l11-7z"/></svg>';
-                    v.replaceWith(placeholder);
-                };
-
-                // Timeout para video
-                const timeoutId = setTimeout(() => {
-                    if (!video.classList.contains('loaded')) {
-                        failedUrls.add(src);
-                        showVideoPlaceholder(video);
-                    }
-                    activeLoads--;
-                    processLoadQueue();
-                }, VIDEO_TIMEOUT);
-
-                video.onloadeddata = function() {
-                    clearTimeout(timeoutId);
+                video.onloadeddata = () => {
+                    clearTimeout(timeout);
                     video.classList.remove('video-placeholder');
                     video.classList.add('loaded');
                     video.muted = true;
                     video.loop = true;
                     video.play().catch(() => {});
                     activeLoads--;
-                    processLoadQueue();
+                    processQueue();
                 };
 
-                video.onerror = function() {
-                    clearTimeout(timeoutId);
-                    failedUrls.add(src);
-                    showVideoPlaceholder(video);
+                video.onerror = () => {
+                    clearTimeout(timeout);
+                    replaceWithPlaceholder(video);
                     activeLoads--;
-                    processLoadQueue();
+                    processQueue();
                 };
 
                 video.src = src;
             }
 
-            // Fallback para mostrar placeholder de video
-            function showVideoPlaceholder(video) {
+            function replaceWithPlaceholder(video) {
                 const placeholder = document.createElement('div');
                 placeholder.className = 'video-error-placeholder loaded';
                 placeholder.innerHTML = '<svg viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)"><path d="M8 5v14l11-7z"/></svg>';
                 video.replaceWith(placeholder);
             }
 
-            // Crear Intersection Observer para carga lazy
-            const observerOptions = {
-                root: null,
-                rootMargin: '300px',
-                threshold: 0
-            };
-
-            const imageObserver = new IntersectionObserver((entries) => {
+            // IntersectionObserver para lazy loading
+            const observer = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
-                        queueLoad(entry.target, true); // Prioridad alta para items visibles
-                        imageObserver.unobserve(entry.target);
+                        queueItem(entry.target, true);
+                        observer.unobserve(entry.target);
                     }
                 });
-            }, observerOptions);
+            }, { rootMargin: '400px', threshold: 0 }); // Aumentado de 200px a 400px
 
-            // Observar todos los items
-            items.forEach(item => {
-                imageObserver.observe(item);
-            });
-
-            // Ordenar y encolar items desde el centro hacia afuera
-            function buildLoadQueue() {
-                const centerX = window.innerWidth / 2;
-                const centerY = window.innerHeight / 2;
-
-                const sortedItems = Array.from(items)
-                    .map(item => {
-                        const rect = item.getBoundingClientRect();
-                        const itemCenterX = rect.left + rect.width / 2;
-                        const itemCenterY = rect.top + rect.height / 2;
-                        const distance = Math.sqrt(
-                            Math.pow(itemCenterX - centerX, 2) +
-                            Math.pow(itemCenterY - centerY, 2)
-                        );
-                        return { item, distance, visible: item.style.display !== 'none' };
-                    })
-                    .filter(i => i.visible && !loadedItems.has(i.item))
-                    .sort((a, b) => a.distance - b.distance);
-
-                // Encolar en orden de distancia
-                sortedItems.forEach(s => queueLoad(s.item));
-            }
-
-            // Fallback: revelar todos los items visualmente
-            function forceRevealAll() {
-                items.forEach(item => {
-                    item.classList.add('media-loaded');
-                    const img = item.querySelector('img');
-                    const video = item.querySelector('video');
-                    if (img) {
-                        img.classList.add('loaded');
-                        if (!img.src || img.src.includes("viewBox='0 0 1 1'")) {
-                            img.src = fallbackSrc;
-                        }
-                    }
-                    if (video) video.classList.add('loaded');
-                });
-            }
-
-            // Iniciar carga progresiva
-            function initLoading() {
-                // Revelar todos los items visualmente (sin shimmer)
-                forceRevealAll();
-
-                requestAnimationFrame(() => {
-                    // Construir cola ordenada desde el centro
-                    buildLoadQueue();
-
-                    // Fallback total después de 8 segundos
-                    setTimeout(() => {
-                        // Cancelar todas las cargas pendientes
-                        pendingLoads.forEach(controller => controller.abort());
-                        pendingLoads.clear();
-                        forceRevealAll();
-                    }, 8000);
-                });
-            }
-
-            // Ejecutar cuando el DOM esté listo
-            if (document.readyState === 'complete' || document.readyState === 'interactive') {
-                setTimeout(initLoading, 50);
-            } else {
-                document.addEventListener('DOMContentLoaded', initLoading);
-            }
-
+            // Configurar grid responsive
             function setupGrid() {
                 const vw = window.innerWidth;
                 const vh = window.innerHeight;
 
-                let cols, itemSize, gap;
+                // Items más pequeños para más densidad, con espacio negro arriba/abajo
+                let itemSize, gap;
+                if (vw > 1600) { itemSize = 90; gap = 3; }
+                else if (vw > 1200) { itemSize = 80; gap = 3; }
+                else if (vw > 1024) { itemSize = 70; gap = 3; }
+                else if (vw > 768) { itemSize = 60; gap = 2; }
+                else if (vw > 480) { itemSize = 50; gap = 2; }
+                else { itemSize = 45; gap = 2; }
 
-                // Determinar tamano de items y columnas segun ancho
-                if (vw > 1600) {
-                    itemSize = 110; gap = 4;
-                } else if (vw > 1400) {
-                    itemSize = 100; gap = 4;
-                } else if (vw > 1200) {
-                    itemSize = 95; gap = 4;
-                } else if (vw > 1024) {
-                    itemSize = 90; gap = 3;
-                } else if (vw > 768) {
-                    itemSize = 80; gap = 3;
-                } else if (vw > 480) {
-                    itemSize = 65; gap = 2;
-                } else {
-                    itemSize = 55; gap = 2;
-                }
-
-                // Calcular columnas y filas para LLENAR toda la pantalla + extra
-                cols = Math.ceil(vw / (itemSize + gap)) + 2;
-                let rows = Math.ceil(vh / (itemSize + gap)) + 2;
-
-                // Asegurar minimo de filas para que el mosaico cubra todo
-                rows = Math.max(rows, 10);
+                // Usar solo 65% del alto para dejar espacio negro arriba y abajo
+                const visibleHeight = vh * 0.65;
+                const cols = Math.ceil(vw / (itemSize + gap)) + 4; // Más columnas para 200 items
+                const rows = Math.max(Math.ceil(visibleHeight / (itemSize + gap)), 6);
 
                 grid.style.gridTemplateColumns = `repeat(${cols}, ${itemSize}px)`;
                 grid.style.gridTemplateRows = `repeat(${rows}, ${itemSize}px)`;
@@ -1179,105 +368,43 @@
                 items.forEach((item, index) => {
                     const shouldShow = index < maxItems;
                     item.style.display = shouldShow ? 'block' : 'none';
+                    if (shouldShow && !loadedItems.has(item)) observer.observe(item);
+                });
+            }
 
-                    // Cargar items que ahora son visibles pero no estaban cargados
-                    if (shouldShow && !loadedItems.has(item)) {
-                        queueLoad(item);
+            // Inicializar
+            function init() {
+                setupGrid();
+
+                // Marcar items y cargar primeros 16 inmediatamente
+                items.forEach((item, index) => {
+                    item.classList.add('media-loaded');
+                    const img = item.querySelector('img:not([data-src])');
+                    if (img) img.classList.add('loaded');
+
+                    if (index < 24 && item.style.display !== 'none') {
+                        queueItem(item, true);
+                    } else if (item.style.display !== 'none' && !loadedItems.has(item)) {
+                        observer.observe(item);
                     }
                 });
             }
 
-            setupGrid();
+            // Ejecutar
+            if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                requestAnimationFrame(init);
+            } else {
+                document.addEventListener('DOMContentLoaded', init);
+            }
 
-            // Debounce para resize
+            // Resize handler con debounce
             let resizeTimeout;
-            window.addEventListener('resize', () => {
+            const handleResize = () => {
                 clearTimeout(resizeTimeout);
                 resizeTimeout = setTimeout(setupGrid, 100);
-            });
-            window.addEventListener('orientationchange', () => {
-                setTimeout(setupGrid, 100);
-            });
-
-            // Reproducir videos automáticamente (silenciados, en loop)
-            function playVideoAutomatically(video) {
-                if (!video.src || video.classList.contains('video-placeholder')) return;
-
-                video.muted = true;
-                video.loop = true;
-                video.playsInline = true;
-
-                // Cuando esté listo, reproducir
-                const startPlayback = () => {
-                    video.classList.add('loaded');
-                    video.closest('.mosaic-item')?.classList.add('media-loaded');
-                    video.play().catch(() => {
-                        // Si falla, al menos mostrar el primer frame
-                        video.currentTime = 0.001;
-                    });
-                };
-
-                if (video.readyState >= 2) {
-                    startPlayback();
-                } else {
-                    video.addEventListener('canplay', startPlayback, { once: true });
-                }
-            }
-
-            // Inicializar videos que ya tienen src (reproducir automáticamente)
-            const preloadedVideos = grid.querySelectorAll('video[src]:not(.video-placeholder)');
-            preloadedVideos.forEach(playVideoAutomatically);
-
-            // Manejo de videos - interacción en hover (pausar/reanudar)
-            if (!isTouchDevice) {
-                // Desktop: pausar en hover para ver mejor, reanudar al salir
-                items.forEach(item => {
-                    item.addEventListener('mouseenter', () => {
-                        const video = item.querySelector('video');
-                        if (video && video.src && video.readyState >= 2) {
-                            // Ya está reproduciéndose, no hacer nada
-                        }
-                    });
-                    item.addEventListener('mouseleave', () => {
-                        const video = item.querySelector('video');
-                        if (video && video.src && video.paused) {
-                            video.play().catch(() => {});
-                            video.currentTime = 0.001;
-                        }
-                    });
-                });
-            }
-
-            // Animar stats
-            function animateValue(id, start, end, duration) {
-                const obj = document.getElementById(id);
-                if (!obj) return;
-
-                let startTimestamp = null;
-                const step = (timestamp) => {
-                    if (!startTimestamp) startTimestamp = timestamp;
-                    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-                    const easeOut = 1 - Math.pow(1 - progress, 3);
-                    const current = Math.floor(easeOut * (end - start) + start);
-
-                    if (current >= 1000) {
-                        obj.textContent = (current / 1000).toFixed(1) + 'K';
-                    } else {
-                        obj.textContent = current;
-                    }
-
-                    if (progress < 1) {
-                        window.requestAnimationFrame(step);
-                    }
-                };
-                window.requestAnimationFrame(step);
-            }
-
-            setTimeout(() => {
-                animateValue('statCreadores', 0, @(ViewBag.TotalCreadores ?? 50), 2000);
-                animateValue('statContenido', 0, @(ViewBag.TotalContenido ?? 500), 2000);
-                animateValue('statComunidad', 0, @(ViewBag.TotalUsuarios ?? 1000), 2000);
-            }, 500);
+            };
+            window.addEventListener('resize', handleResize);
+            window.addEventListener('orientationchange', () => setTimeout(setupGrid, 100));
 
             // Parallax solo en desktop
             if (!isTouchDevice) {
@@ -1288,22 +415,38 @@
                 });
             }
 
-            // Prevenir scroll en iOS
+            // iOS fixes
             if (isIOS) {
-                document.body.style.position = 'fixed';
-                document.body.style.width = '100%';
-                document.body.style.height = '100%';
+                document.body.style.cssText = 'position: fixed; width: 100%; height: 100%;';
+                let lastTouchEnd = 0;
+                document.addEventListener('touchend', (e) => {
+                    const now = Date.now();
+                    if (now - lastTouchEnd <= 300) e.preventDefault();
+                    lastTouchEnd = now;
+                }, false);
             }
 
-            // Prevenir zoom en doble tap (iOS)
-            let lastTouchEnd = 0;
-            document.addEventListener('touchend', (e) => {
-                const now = Date.now();
-                if (now - lastTouchEnd <= 300) {
-                    e.preventDefault();
-                }
-                lastTouchEnd = now;
-            }, false);
+            // Animacion de estadisticas (si existen los elementos)
+            function animateValue(id, end, duration) {
+                const obj = document.getElementById(id);
+                if (!obj) return;
+                let startTime = null;
+                const step = (timestamp) => {
+                    if (!startTime) startTime = timestamp;
+                    const progress = Math.min((timestamp - startTime) / duration, 1);
+                    const current = Math.floor((1 - Math.pow(1 - progress, 3)) * end);
+                    obj.textContent = current >= 1000 ? (current / 1000).toFixed(1) + 'K' : current;
+                    if (progress < 1) requestAnimationFrame(step);
+                };
+                requestAnimationFrame(step);
+            }
+
+            setTimeout(() => {
+                animateValue('statCreadores', @(ViewBag.TotalCreadores ?? 50), 2000);
+                animateValue('statContenido', @(ViewBag.TotalContenido ?? 500), 2000);
+                animateValue('statComunidad', @(ViewBag.TotalUsuarios ?? 1000), 2000);
+            }, 500);
         })();
-    </script>
-}
+</script>
+</body>
+</html>

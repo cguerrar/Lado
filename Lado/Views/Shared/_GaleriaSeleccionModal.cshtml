@@ -1,0 +1,474 @@
+@*
+    Modal reutilizable para seleccionar archivos de la galeria privada.
+
+    Uso: @await Html.PartialAsync("_GaleriaSeleccionModal", new { Multiple = true, TipoFiltro = "imagen" })
+
+    Parametros ViewData:
+    - Multiple (bool): Permitir seleccion multiple (default: true)
+    - TipoFiltro (string): "imagen", "video" o null para todos (default: null)
+    - MaxSeleccion (int): Maximo de archivos a seleccionar (default: 10)
+
+    Eventos JavaScript que emite:
+    - 'galeriaSeleccionConfirmada': { archivos: [{id, rutaArchivo, thumbnail, tipoMedia}] }
+    - 'galeriaSeleccionCancelada': {}
+*@
+
+@{
+    var multiple = ViewData["Multiple"] as bool? ?? true;
+    var tipoFiltro = ViewData["TipoFiltro"] as string;
+    var maxSeleccion = ViewData["MaxSeleccion"] as int? ?? 10;
+}
+
+<!-- Modal Selector de Galeria -->
+<div class="modal-overlay galeria-selector-overlay" id="galeriaSeleccionModal" style="display: none;">
+    <div class="modal-content galeria-selector-modal">
+        <div class="modal-header">
+            <div class="galeria-selector-header">
+                <h3>Seleccionar de mi galeria</h3>
+                @if (multiple)
+                {
+                    <span class="selection-info">(<span id="gsSelectedCount">0</span>/@maxSeleccion)</span>
+                }
+            </div>
+            <button class="btn-close" id="gsClose">&times;</button>
+        </div>
+        <div class="modal-body">
+            <!-- Filtros -->
+            <div class="galeria-selector-filters">
+                <button class="filter-btn @(string.IsNullOrEmpty(tipoFiltro) ? "active" : "")" data-tipo="">Todos</button>
+                @if (string.IsNullOrEmpty(tipoFiltro) || tipoFiltro == "imagen")
+                {
+                    <button class="filter-btn @(tipoFiltro == "imagen" ? "active" : "")" data-tipo="imagen">Imagenes</button>
+                }
+                @if (string.IsNullOrEmpty(tipoFiltro) || tipoFiltro == "video")
+                {
+                    <button class="filter-btn @(tipoFiltro == "video" ? "active" : "")" data-tipo="video">Videos</button>
+                }
+                <button class="filter-btn" data-favoritos="true">Favoritos</button>
+            </div>
+
+            <!-- Albums -->
+            <div class="galeria-selector-albums" id="gsAlbums">
+                <select id="gsAlbumSelect">
+                    <option value="">Todos los archivos</option>
+                </select>
+            </div>
+
+            <!-- Grid de archivos -->
+            <div class="galeria-selector-grid" id="gsGrid">
+                <div class="selector-loading">
+                    <p>Cargando...</p>
+                </div>
+            </div>
+
+            <!-- Estado vacio -->
+            <div class="selector-empty" id="gsEmpty" style="display: none;">
+                <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <p>No hay archivos en tu galeria</p>
+                <a href="/Galeria" class="btn-secondary" target="_blank">Ir a mi galeria</a>
+            </div>
+
+            <!-- Paginacion -->
+            <div class="galeria-selector-pagination" id="gsPagination" style="display: none;">
+                <button class="btn-secondary btn-sm" id="gsLoadMore">Cargar mas</button>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" id="gsCancel">Cancelar</button>
+            <button class="btn-primary" id="gsConfirm" disabled>
+                <span>Seleccionar</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .galeria-selector-modal {
+        max-width: 700px;
+        max-height: 80vh;
+    }
+
+    .galeria-selector-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .selection-info {
+        font-size: 13px;
+        color: var(--muted);
+        font-weight: normal;
+    }
+
+    .galeria-selector-filters {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+    }
+
+    .galeria-selector-albums {
+        margin-bottom: 16px;
+    }
+
+    .galeria-selector-albums select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--text);
+        font-size: 14px;
+    }
+
+    .galeria-selector-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 8px;
+        max-height: 350px;
+        overflow-y: auto;
+        padding: 4px;
+    }
+
+    .selector-item {
+        position: relative;
+        aspect-ratio: 1;
+        border-radius: 8px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: all 0.15s;
+        border: 3px solid transparent;
+        background: var(--bg);
+    }
+
+    .selector-item:hover {
+        border-color: var(--primary);
+        opacity: 0.9;
+    }
+
+    .selector-item.selected {
+        border-color: var(--primary);
+    }
+
+    .selector-item.selected::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: rgba(99, 102, 241, 0.3);
+        z-index: 1;
+    }
+
+    .selector-item.selected::after {
+        content: '\2713';
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 22px;
+        height: 22px;
+        background: var(--primary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 12px;
+        font-weight: bold;
+        z-index: 2;
+    }
+
+    .selector-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .selector-item .video-badge {
+        position: absolute;
+        bottom: 6px;
+        left: 6px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 10px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .selector-loading,
+    .selector-empty {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--muted);
+    }
+
+    .selector-empty svg {
+        margin-bottom: 12px;
+        opacity: 0.5;
+    }
+
+    .galeria-selector-pagination {
+        text-align: center;
+        margin-top: 16px;
+    }
+
+    .btn-sm {
+        padding: 8px 16px;
+        font-size: 13px;
+    }
+
+    .filter-btn {
+        padding: 6px 14px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .filter-btn:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .filter-btn.active {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: white;
+    }
+</style>
+
+<script>
+(function() {
+    // Configuracion
+    const config = {
+        multiple: @(multiple ? "true" : "false"),
+        tipoFiltro: '@(tipoFiltro ?? "")',
+        maxSeleccion: @maxSeleccion
+    };
+
+    // Estado
+    let archivosSeleccionados = new Map();
+    let pagina = 1;
+    let tipoActual = config.tipoFiltro;
+    let albumActual = null;
+    let soloFavoritos = false;
+    let totalArchivos = 0;
+
+    // Elementos DOM
+    const modal = document.getElementById('galeriaSeleccionModal');
+    const grid = document.getElementById('gsGrid');
+    const empty = document.getElementById('gsEmpty');
+    const pagination = document.getElementById('gsPagination');
+    const albumSelect = document.getElementById('gsAlbumSelect');
+    const selectedCountEl = document.getElementById('gsSelectedCount');
+    const confirmBtn = document.getElementById('gsConfirm');
+
+    // API publica
+    window.GaleriaSelector = {
+        abrir: abrirModal,
+        cerrar: cerrarModal,
+        getSeleccionados: () => Array.from(archivosSeleccionados.values())
+    };
+
+    // Eventos
+    document.getElementById('gsClose')?.addEventListener('click', cerrarModal);
+    document.getElementById('gsCancel')?.addEventListener('click', () => {
+        document.dispatchEvent(new CustomEvent('galeriaSeleccionCancelada'));
+        cerrarModal();
+    });
+
+    document.getElementById('gsConfirm')?.addEventListener('click', () => {
+        const archivos = Array.from(archivosSeleccionados.values());
+        document.dispatchEvent(new CustomEvent('galeriaSeleccionConfirmada', {
+            detail: { archivos }
+        }));
+        cerrarModal();
+    });
+
+    document.getElementById('gsLoadMore')?.addEventListener('click', () => {
+        pagina++;
+        cargarArchivos(true);
+    });
+
+    // Filtros
+    document.querySelectorAll('.galeria-selector-filters .filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (btn.dataset.favoritos) {
+                soloFavoritos = !soloFavoritos;
+                btn.classList.toggle('active', soloFavoritos);
+            } else {
+                document.querySelectorAll('.filter-btn[data-tipo]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                tipoActual = btn.dataset.tipo;
+            }
+            pagina = 1;
+            archivosSeleccionados.clear();
+            actualizarSeleccion();
+            cargarArchivos(false);
+        });
+    });
+
+    albumSelect?.addEventListener('change', () => {
+        albumActual = albumSelect.value || null;
+        pagina = 1;
+        cargarArchivos(false);
+    });
+
+    // Click fuera para cerrar
+    modal?.addEventListener('click', (e) => {
+        if (e.target === modal) cerrarModal();
+    });
+
+    // Funciones
+    function abrirModal() {
+        archivosSeleccionados.clear();
+        pagina = 1;
+        tipoActual = config.tipoFiltro;
+        albumActual = null;
+        soloFavoritos = false;
+        actualizarSeleccion();
+        modal.style.display = 'flex';
+        cargarAlbums();
+        cargarArchivos(false);
+    }
+
+    function cerrarModal() {
+        modal.style.display = 'none';
+        archivosSeleccionados.clear();
+    }
+
+    async function cargarAlbums() {
+        try {
+            const response = await fetch('/Galeria/ObtenerAlbums');
+            const result = await response.json();
+            if (result.success && result.albums) {
+                albumSelect.innerHTML = '<option value="">Todos los archivos</option>';
+                result.albums.forEach(album => {
+                    albumSelect.innerHTML += `<option value="${album.id}">${album.nombre} (${album.cantidadArchivos})</option>`;
+                });
+            }
+        } catch (error) {
+            console.error('Error cargando albums:', error);
+        }
+    }
+
+    async function cargarArchivos(append) {
+        if (!append) {
+            grid.innerHTML = '<div class="selector-loading"><p>Cargando...</p></div>';
+        }
+
+        try {
+            let url = `/Galeria/ObtenerArchivos?pagina=${pagina}&cantidad=30`;
+            if (tipoActual) url += `&tipo=${tipoActual}`;
+            if (albumActual) url += `&albumId=${albumActual}`;
+            if (soloFavoritos) url += `&soloFavoritos=true`;
+
+            const response = await fetch(url);
+            const result = await response.json();
+
+            if (!result.success) {
+                grid.innerHTML = '<div class="selector-loading"><p>Error al cargar</p></div>';
+                return;
+            }
+
+            totalArchivos = result.total;
+
+            if (result.archivos.length === 0 && !append) {
+                grid.innerHTML = '';
+                empty.style.display = 'block';
+                pagination.style.display = 'none';
+                return;
+            }
+
+            empty.style.display = 'none';
+
+            const html = result.archivos.map(archivo => {
+                const isVideo = archivo.tipoMedia === 'video';
+                const thumb = archivo.thumbnail || archivo.rutaArchivo;
+                const isSelected = archivosSeleccionados.has(archivo.id);
+
+                return `
+                    <div class="selector-item ${isSelected ? 'selected' : ''}"
+                         data-id="${archivo.id}"
+                         data-ruta="${archivo.rutaArchivo}"
+                         data-thumb="${thumb}"
+                         data-tipo="${archivo.tipoMedia}">
+                        <img src="${thumb}" alt="" loading="lazy">
+                        ${isVideo ? `<div class="video-badge"><svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            if (append) {
+                grid.insertAdjacentHTML('beforeend', html);
+            } else {
+                grid.innerHTML = html;
+            }
+
+            // Mostrar/ocultar paginacion
+            const totalMostrados = pagina * 30;
+            pagination.style.display = totalMostrados < totalArchivos ? 'block' : 'none';
+
+            // Eventos de click
+            grid.querySelectorAll('.selector-item').forEach(item => {
+                item.addEventListener('click', () => toggleSeleccion(item));
+            });
+
+        } catch (error) {
+            console.error('Error:', error);
+            grid.innerHTML = '<div class="selector-loading"><p>Error al cargar</p></div>';
+        }
+    }
+
+    function toggleSeleccion(item) {
+        const id = parseInt(item.dataset.id);
+        const archivo = {
+            id,
+            rutaArchivo: item.dataset.ruta,
+            thumbnail: item.dataset.thumb,
+            tipoMedia: item.dataset.tipo
+        };
+
+        if (config.multiple) {
+            if (archivosSeleccionados.has(id)) {
+                archivosSeleccionados.delete(id);
+                item.classList.remove('selected');
+            } else if (archivosSeleccionados.size < config.maxSeleccion) {
+                archivosSeleccionados.set(id, archivo);
+                item.classList.add('selected');
+            }
+        } else {
+            // Seleccion unica
+            archivosSeleccionados.clear();
+            document.querySelectorAll('.selector-item.selected').forEach(el => el.classList.remove('selected'));
+            archivosSeleccionados.set(id, archivo);
+            item.classList.add('selected');
+        }
+
+        actualizarSeleccion();
+    }
+
+    function actualizarSeleccion() {
+        const count = archivosSeleccionados.size;
+        if (selectedCountEl) selectedCountEl.textContent = count;
+        confirmBtn.disabled = count === 0;
+
+        if (count > 0) {
+            confirmBtn.querySelector('span').textContent = config.multiple
+                ? `Seleccionar (${count})`
+                : 'Seleccionar';
+        } else {
+            confirmBtn.querySelector('span').textContent = 'Seleccionar';
+        }
+    }
+})();
+</script>

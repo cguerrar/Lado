@@ -1347,6 +1347,12 @@
                         <span>Distribuir en días</span>
                     </label>
                 </div>
+                <!-- Orden aleatorio - dentro de distribución para visibilidad -->
+                <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;font-size:13px">
+                    <input type="checkbox" id="ordenAleatorio" style="width:16px;height:16px;accent-color:var(--primary)">
+                    <span>Orden aleatorio</span>
+                    <span style="font-size:11px;color:var(--muted)">(mezcla videos e imágenes)</span>
+                </label>
             </div>
 
             <!-- Opciones de distribución en días -->
@@ -1413,10 +1419,18 @@ document.getElementById('formPerfil').addEventListener('submit', async function(
     e.preventDefault();
     const formData = new FormData(this);
     formData.append('id', usuarioId);
-    formData.append('esCreador', this.querySelector('[name="esCreador"]').checked);
-    formData.append('estaActivo', this.querySelector('[name="estaActivo"]').checked);
-    formData.append('esVerificado', this.querySelector('[name="esVerificado"]').checked);
-    formData.append('creadorVerificado', this.querySelector('[name="creadorVerificado"]').checked);
+
+    // Eliminar valores duplicados de checkboxes (FormData los envía como "on")
+    formData.delete('esCreador');
+    formData.delete('estaActivo');
+    formData.delete('esVerificado');
+    formData.delete('creadorVerificado');
+
+    // Añadir valores booleanos correctos
+    formData.append('esCreador', this.querySelector('[name="esCreador"]').checked ? 'true' : 'false');
+    formData.append('estaActivo', this.querySelector('[name="estaActivo"]').checked ? 'true' : 'false');
+    formData.append('esVerificado', this.querySelector('[name="esVerificado"]').checked ? 'true' : 'false');
+    formData.append('creadorVerificado', this.querySelector('[name="creadorVerificado"]').checked ? 'true' : 'false');
     formData.append('__RequestVerificationToken', token);
 
     try {
@@ -2210,7 +2224,8 @@ async function confirmarProgramacion() {
         horaFin: horaFin,
         distribuirEnDias: distribucion === 'varios-dias',
         publicacionesPorDia: distribucion === 'varios-dias' ? parseInt(document.getElementById('pubsPorDia').value) : mediaSeleccionados.size,
-        intervaloMinutos: distribucion === 'varios-dias' ? parseInt(document.getElementById('intervaloMinutos').value) : 0
+        intervaloMinutos: distribucion === 'varios-dias' ? parseInt(document.getElementById('intervaloMinutos').value) : 0,
+        ordenAleatorio: document.getElementById('ordenAleatorio').checked
     };
 
     const btn = document.querySelector('#modalProgramar .btn-primary');

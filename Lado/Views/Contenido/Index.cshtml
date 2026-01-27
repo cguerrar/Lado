@@ -4,6 +4,9 @@
     var filtroActual = ViewBag.FiltroActual?.ToString() ?? "todos";
 }
 
+<!-- Token global para AJAX -->
+@Html.AntiForgeryToken()
+
 <div class="content-manager">
     <!-- Header -->
     <header class="cm-header">
@@ -63,7 +66,7 @@
                 var esVideo = (int)contenido.TipoContenido == 2;
                 var tieneThumb = !string.IsNullOrEmpty(contenido.Thumbnail);
 
-                <article class="cm-card @(contenido.EsBorrador ? "draft" : "")" data-tipo="@((int)contenido.TipoContenido)" data-es-reel="@contenido.EsReel.ToString().ToLower()">
+                <article class="cm-card @(contenido.EsBorrador ? "draft" : "")" data-id="@contenido.Id" data-tipo="@((int)contenido.TipoContenido)" data-es-reel="@contenido.EsReel.ToString().ToLower()">
                     <a href="/Feed/Detalle/@contenido.Id" class="cm-card-media">
                         @if (!string.IsNullOrEmpty(contenido.RutaArchivo))
                         {
@@ -226,10 +229,7 @@
         <p>Esta acción no se puede deshacer</p>
         <div class="cm-modal-actions">
             <button type="button" class="cm-modal-btn cancel" onclick="hideDeleteModal()">Cancelar</button>
-            <form id="deleteForm" method="post">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="cm-modal-btn confirm">Eliminar</button>
-            </form>
+            <button type="button" class="cm-modal-btn confirm" id="confirmDeleteBtn" onclick="confirmarEliminacion()">Eliminar</button>
         </div>
     </div>
 </div>
@@ -973,12 +973,13 @@ document.addEventListener('DOMContentLoaded', function() {
     tipoFilter?.addEventListener('change', filterCards);
 });
 
+let contenidoAEliminar = null;
+
 function showDeleteModal(id, tipo) {
     const modal = document.getElementById('deleteModal');
-    const form = document.getElementById('deleteForm');
     const typeSpan = document.getElementById('deleteType');
 
-    form.action = '/Contenido/Eliminar/' + id;
+    contenidoAEliminar = id;
     typeSpan.textContent = tipo;
     modal.classList.add('show');
     document.body.style.overflow = 'hidden';
@@ -987,6 +988,78 @@ function showDeleteModal(id, tipo) {
 function hideDeleteModal() {
     document.getElementById('deleteModal').classList.remove('show');
     document.body.style.overflow = '';
+    contenidoAEliminar = null;
+}
+
+async function confirmarEliminacion() {
+    if (!contenidoAEliminar) return;
+
+    const btn = document.getElementById('confirmDeleteBtn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Eliminando...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/Contenido/EliminarAjax/' + contenidoAEliminar, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Error del servidor: ' + response.status);
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Eliminar la tarjeta del DOM con animación
+            const card = document.querySelector(`.cm-card[data-id="${contenidoAEliminar}"]`);
+            if (card) {
+                card.style.transition = 'opacity 0.3s, transform 0.3s';
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.9)';
+                setTimeout(() => card.remove(), 300);
+            }
+            hideDeleteModal();
+
+            // Mostrar mensaje de éxito
+            mostrarToast('Contenido eliminado correctamente', 'success');
+        } else {
+            mostrarToast(data.message || 'Error al eliminar', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        mostrarToast('Error de conexión', 'error');
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+function mostrarToast(mensaje, tipo) {
+    const toast = document.createElement('div');
+    toast.className = `toast-message ${tipo}`;
+    toast.textContent = mensaje;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 12px 24px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 10000;
+        animation: slideUp 0.3s ease;
+        background: ${tipo === 'success' ? '#10b981' : '#ef4444'};
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
 
 document.getElementById('deleteModal').addEventListener('click', function(e) {

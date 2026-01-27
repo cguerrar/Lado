@@ -49,6 +49,17 @@
 <html lang="es" data-theme="light">
 <head>
 	<meta charset="utf-8" />
+	<script>
+		// Detectar tema ANTES de renderizar para evitar flash
+		(function() {
+			try {
+				var theme = localStorage.getItem('theme');
+				if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+					document.documentElement.setAttribute('data-theme', 'dark');
+				}
+			} catch(e) {}
+		})();
+	</script>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 	<!-- iOS PWA Support -->
 	<meta name="mobile-web-app-capable" content="yes">
@@ -131,9 +142,22 @@
 	@await Html.PartialAsync("_SeoPartial")
 	@await RenderSectionAsync("StructuredData", required: false)
 
+	<!-- RSS Feed -->
+	<link rel="alternate" type="application/rss+xml" title="Lado - Contenido Público" href="/feed.xml">
+
+	<!-- Preload CSS crítico para mejor LCP -->
+	<link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" as="style">
 	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
-	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer">
-	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+	<!-- Font Awesome - carga diferida (no crítico) -->
+	<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+	<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
+
+	<!-- Google Fonts con font-display: swap para evitar FOIT -->
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+	<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"></noscript>
 	<!-- iOS Safari Compatibility Fixes -->
 	<link rel="stylesheet" href="~/css/ios-fixes.css" asp-append-version="true">
 	<style>
@@ -514,6 +538,7 @@
 			inset: 0;
 			opacity: 0;
 			transition: opacity 0.3s;
+			pointer-events: none;
 		}
 
 		.lado-option.active {
@@ -555,6 +580,11 @@
 		.lado-option:not(.active) .lado-icon {
 			background: var(--bg-secondary);
 			color: var(--muted);
+		}
+
+		.lado-icon,
+		.lado-name {
+			pointer-events: none;
 		}
 
 		.lado-name {
@@ -1685,15 +1715,13 @@
 		}
 
 		@@media (max-width: 768px) {
-			/* === TOP NAVBAR MÓVIL === */
+			/* === TOP NAVBAR MÓVIL - Layout 3 secciones balanceadas === */
 			.top-navbar {
 				display: flex;
 				align-items: center;
-				justify-content: flex-start;
+				justify-content: space-between; /* Clave: distribuir espacio */
 				gap: 0;
 				padding: 14px 16px;
-				/* Padding superior generoso para Dynamic Island/Notch */
-				/* safe-area-inset-top + 18px de separación visual */
 				padding-top: calc(env(safe-area-inset-top, 0px) + 18px);
 				min-height: 56px;
 				height: auto;
@@ -1704,23 +1732,47 @@
 				z-index: 100;
 			}
 
-			/* Hamburguesa visible */
+			/* Sección izquierda: hamburguesa + muro */
 			.hamburger-btn {
 				display: flex;
 				order: 1;
 				flex-shrink: 0;
 			}
 
-			/* Logo móvil centrado */
+			/* Muro button MÓVIL - después de hamburguesa */
+			.muro-btn-mobile {
+				display: flex !important;
+				align-items: center;
+				justify-content: center;
+				order: 2;
+				width: 36px;
+				height: 36px;
+				padding: 0;
+				border-radius: 8px;
+				margin-left: 8px;
+				background: var(--surface);
+				border: 2px solid var(--primary);
+				color: var(--primary);
+				flex-shrink: 0;
+			}
+
+			.muro-btn-mobile svg {
+				width: 18px;
+				height: 18px;
+			}
+
+			/* Logo móvil - centrado naturalmente con flex */
 			.mobile-logo {
 				display: flex;
 				align-items: center;
 				gap: 8px;
 				text-decoration: none;
 				order: 3;
-				position: absolute;
-				left: 50%;
-				transform: translateX(-50%);
+				/* Ya NO usamos position: absolute - dejamos que flex lo centre */
+				position: static;
+				transform: none;
+				flex: 1; /* Ocupa espacio central */
+				justify-content: center; /* Centra su contenido */
 			}
 
 			.mobile-logo-badge {
@@ -1742,43 +1794,22 @@
 				color: var(--fg);
 			}
 
-			/* Búsqueda oculta - Explorar tiene su propia */
+			/* Búsqueda oculta */
 			.search-box {
 				display: none;
 			}
 
-			/* User menu - Solo theme toggle visible, empujado a la derecha */
+			/* Sección derecha: tema + notificaciones */
 			.user-menu {
 				display: flex;
 				align-items: center;
 				gap: 8px;
 				order: 4;
-				margin-left: auto;
-			}
-
-			/* Muro button MÓVIL - Visible entre hamburguesa y logo */
-			.muro-btn-mobile {
-				display: flex !important;
-				align-items: center;
-				justify-content: center;
-				order: 2;
-				width: 36px;
-				height: 36px;
-				padding: 0;
-				border-radius: 8px;
-				margin-left: 8px;
-				background: var(--surface);
-				border: 2px solid var(--primary);
-				color: var(--primary);
-			}
-
-			.muro-btn-mobile svg {
-				width: 18px;
-				height: 18px;
+				flex-shrink: 0;
+				/* NO margin-left: auto - el space-between ya lo maneja */
 			}
 
 			/* === OCULTAR ELEMENTOS DUPLICADOS === */
-			/* Estos están en el bottom nav */
 			.feed-btn,
 			.muro-btn,
 			.fullview-btn,
@@ -1789,7 +1820,7 @@
 				display: none !important;
 			}
 
-			/* Theme toggle - Visible y más pequeño */
+			/* Theme toggle */
 			.theme-toggle {
 				display: flex;
 				width: 36px;
@@ -2027,52 +2058,66 @@
 	<a href="#main-content" class="skip-to-content">Saltar al contenido</a>
 
 	<!-- PWA Splash Screen - Se muestra instantáneamente mientras carga el contenido -->
-	<div id="pwa-splash" style="
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		z-index: 99999;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		background: #ffffff;
-		transition: opacity 0.3s ease-out, visibility 0.3s ease-out;
-	">
-		<!-- Logo -->
-		<img src="/images/logo.png" alt="Lado" style="
+	<style>
+		.pwa-splash {
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			z-index: 99999;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			background: #ffffff;
+			transition: opacity 0.3s ease-out, visibility 0.3s ease-out;
+		}
+		/* Modo oscuro: por tema del documento o preferencia del sistema */
+		[data-theme="dark"] .pwa-splash {
+			background: #1e293b;
+		}
+		.splash-logo {
 			width: 120px;
 			height: 120px;
 			border-radius: 24px;
 			box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-		">
-		<!-- Barra de progreso -->
-		<div style="
+		}
+		[data-theme="dark"] .splash-logo {
+			box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+		}
+		.splash-progress-track {
 			margin-top: 24px;
 			width: 200px;
 			height: 4px;
 			background: rgba(70, 130, 180, 0.2);
 			border-radius: 2px;
 			overflow: hidden;
-		">
-			<div style="
-				width: 40%;
-				height: 100%;
-				background: steelblue;
-				border-radius: 2px;
-				animation: splash-progress 1.2s ease-in-out infinite;
-			"></div>
-		</div>
-	</div>
-	<style>
+		}
+		[data-theme="dark"] .splash-progress-track {
+			background: rgba(70, 130, 180, 0.3);
+		}
+		.splash-progress-bar {
+			width: 40%;
+			height: 100%;
+			background: steelblue;
+			border-radius: 2px;
+			animation: splash-progress 1.2s ease-in-out infinite;
+		}
 		@@keyframes splash-progress {
 			0% { transform: translateX(-100%); }
 			50% { transform: translateX(150%); }
 			100% { transform: translateX(250%); }
 		}
 	</style>
+	<div id="pwa-splash" class="pwa-splash">
+		<!-- Logo -->
+		<img src="/images/logo.png" alt="Lado" class="splash-logo">
+		<!-- Barra de progreso -->
+		<div class="splash-progress-track">
+			<div class="splash-progress-bar"></div>
+		</div>
+	</div>
 	<script>
 		// Ocultar splash cuando el DOM esté listo y los estilos cargados
 		(function() {
@@ -2202,6 +2247,18 @@
 							<line x1="7" y1="7" x2="7.01" y2="7"></line>
 						</svg>
 						Mis Compras
+					</a>
+				</li>
+
+				<li class="nav-item">
+					<a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Galeria" ? "active" : "")" href="/Galeria">
+						<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<rect x="3" y="3" width="7" height="7"></rect>
+							<rect x="14" y="3" width="7" height="7"></rect>
+							<rect x="14" y="14" width="7" height="7"></rect>
+							<rect x="3" y="14" width="7" height="7"></rect>
+						</svg>
+						Mi Galeria
 					</a>
 				</li>
 
@@ -3311,10 +3368,13 @@
 			}
 		}
 
-		// Actualizar contador cada 30 segundos
+		// Actualizar contador cada 30 segundos (diferido para no bloquear carga inicial)
 		document.addEventListener('DOMContentLoaded', function() {
-			cargarContadorNotificaciones();
-			setInterval(cargarContadorNotificaciones, 30000);
+			// Diferir 2s para priorizar renderizado inicial
+			setTimeout(function() {
+				cargarContadorNotificaciones();
+				setInterval(cargarContadorNotificaciones, 30000);
+			}, 2000);
 		});
 
 
@@ -3522,7 +3582,217 @@
 						// Verificar actualizaciones cada hora
 						setInterval(() => registration.update(), 60 * 60 * 1000);
 
+						// Guardar referencia global del registration
+						window.swRegistration = registration;
+
+						// Registrar Periodic Sync para chequear notificaciones (si está soportado)
+						if ('periodicSync' in registration) {
+							try {
+								const status = await navigator.permissions.query({ name: 'periodic-background-sync' });
+								if (status.state === 'granted') {
+									await registration.periodicSync.register('check-notifications', {
+										minInterval: 12 * 60 * 60 * 1000 // Cada 12 horas
+									});
+								}
+							} catch (e) {
+								// Periodic sync no soportado o permiso denegado
+							}
+						}
+
 					} catch (error) {
+					}
+				});
+			}
+
+			// ========================================
+			// BACKGROUND SYNC - Helper para modo offline
+			// ========================================
+			window.LadoOfflineSync = (function() {
+				let db = null;
+
+				// Abrir/crear IndexedDB
+				async function openDB() {
+					if (db) return db;
+
+					return new Promise((resolve, reject) => {
+						const request = indexedDB.open('lado-offline', 2);
+
+						request.onerror = () => reject(request.error);
+						request.onsuccess = () => {
+							db = request.result;
+							resolve(db);
+						};
+
+						request.onupgradeneeded = (event) => {
+							const database = event.target.result;
+							if (!database.objectStoreNames.contains('pending-likes')) {
+								database.createObjectStore('pending-likes', { keyPath: 'id', autoIncrement: true });
+							}
+							if (!database.objectStoreNames.contains('pending-comments')) {
+								database.createObjectStore('pending-comments', { keyPath: 'id', autoIncrement: true });
+							}
+							if (!database.objectStoreNames.contains('pending-follows')) {
+								database.createObjectStore('pending-follows', { keyPath: 'id', autoIncrement: true });
+							}
+						};
+					});
+				}
+
+				// Guardar like pendiente
+				async function savePendingLike(contenidoId) {
+					try {
+						const database = await openDB();
+						const tx = database.transaction('pending-likes', 'readwrite');
+						const store = tx.objectStore('pending-likes');
+
+						await new Promise((resolve, reject) => {
+							const req = store.add({
+								contenidoId: contenidoId,
+								timestamp: Date.now()
+							});
+							req.onsuccess = resolve;
+							req.onerror = () => reject(req.error);
+						});
+
+						// Registrar sync tag
+						if (window.swRegistration && 'sync' in window.swRegistration) {
+							await window.swRegistration.sync.register('sync-likes');
+						}
+
+						return true;
+					} catch (error) {
+						console.error('[OfflineSync] Error guardando like:', error);
+						return false;
+					}
+				}
+
+				// Guardar comentario pendiente
+				async function savePendingComment(contenidoId, texto) {
+					try {
+						const database = await openDB();
+						const tx = database.transaction('pending-comments', 'readwrite');
+						const store = tx.objectStore('pending-comments');
+
+						await new Promise((resolve, reject) => {
+							const req = store.add({
+								contenidoId: contenidoId,
+								texto: texto,
+								timestamp: Date.now()
+							});
+							req.onsuccess = resolve;
+							req.onerror = () => reject(req.error);
+						});
+
+						// Registrar sync tag
+						if (window.swRegistration && 'sync' in window.swRegistration) {
+							await window.swRegistration.sync.register('sync-comments');
+						}
+
+						return true;
+					} catch (error) {
+						console.error('[OfflineSync] Error guardando comentario:', error);
+						return false;
+					}
+				}
+
+				// Guardar follow pendiente
+				async function savePendingFollow(creadorId) {
+					try {
+						const database = await openDB();
+						const tx = database.transaction('pending-follows', 'readwrite');
+						const store = tx.objectStore('pending-follows');
+
+						await new Promise((resolve, reject) => {
+							const req = store.add({
+								creadorId: creadorId,
+								timestamp: Date.now()
+							});
+							req.onsuccess = resolve;
+							req.onerror = () => reject(req.error);
+						});
+
+						// Registrar sync tag
+						if (window.swRegistration && 'sync' in window.swRegistration) {
+							await window.swRegistration.sync.register('sync-follows');
+						}
+
+						return true;
+					} catch (error) {
+						console.error('[OfflineSync] Error guardando follow:', error);
+						return false;
+					}
+				}
+
+				// Verificar si hay acciones pendientes
+				async function hasPendingActions() {
+					try {
+						const database = await openDB();
+						const stores = ['pending-likes', 'pending-comments', 'pending-follows'];
+
+						for (const storeName of stores) {
+							const tx = database.transaction(storeName, 'readonly');
+							const store = tx.objectStore(storeName);
+							const count = await new Promise((resolve) => {
+								const req = store.count();
+								req.onsuccess = () => resolve(req.result);
+								req.onerror = () => resolve(0);
+							});
+							if (count > 0) return true;
+						}
+						return false;
+					} catch (error) {
+						return false;
+					}
+				}
+
+				// Forzar sincronización manual
+				async function forceSync() {
+					if (window.swRegistration && 'sync' in window.swRegistration) {
+						try {
+							await window.swRegistration.sync.register('sync-likes');
+							await window.swRegistration.sync.register('sync-comments');
+							await window.swRegistration.sync.register('sync-follows');
+							return true;
+						} catch (error) {
+							return false;
+						}
+					}
+					return false;
+				}
+
+				return {
+					savePendingLike,
+					savePendingComment,
+					savePendingFollow,
+					hasPendingActions,
+					forceSync
+				};
+			})();
+
+			// Escuchar mensajes del Service Worker
+			if ('serviceWorker' in navigator) {
+				navigator.serviceWorker.addEventListener('message', (event) => {
+					if (event.data.type === 'SYNC_COMPLETE') {
+						// Notificar que se sincronizaron acciones offline
+						if (window.showToast) {
+							window.showToast('Acciones sincronizadas');
+						}
+					} else if (event.data.type === 'COMMENT_SYNCED') {
+						// Recargar comentarios si estamos en la misma publicación
+						const contenidoId = event.data.contenidoId;
+						if (window.recargarComentarios) {
+							window.recargarComentarios(contenidoId);
+						}
+					}
+				});
+
+				// Cuando vuelve la conexión, forzar sync
+				window.addEventListener('online', async () => {
+					if (window.LadoOfflineSync) {
+						const hasPending = await window.LadoOfflineSync.hasPendingActions();
+						if (hasPending) {
+							await window.LadoOfflineSync.forceSync();
+						}
 					}
 				});
 			}
@@ -3792,6 +4062,12 @@
 	   ======================================== */
 	.bottom-nav {
 		display: none;
+	}
+
+	/* Ocultar bottom-nav cuando hay un fullscreen viewer activo */
+	body.fullscreen-active .bottom-nav {
+		display: none !important;
+		visibility: hidden !important;
 	}
 
 	@@media (max-width: 768px) {
@@ -4979,12 +5255,14 @@
 			}
 		});
 
-		// Iniciar carga de popups cuando el DOM este listo
+		// Iniciar carga de popups cuando el DOM este listo (diferido para priorizar renderizado)
+		function initPopups() {
+			setTimeout(loadPopups, 2500); // Diferir 2.5s para no competir con carga inicial
+		}
 		if (document.readyState === 'loading') {
-			document.addEventListener('DOMContentLoaded', loadPopups);
+			document.addEventListener('DOMContentLoaded', initPopups);
 		} else {
-			// Pequeño delay para no interferir con carga inicial
-			setTimeout(loadPopups, 1000);
+			initPopups();
 		}
 	})();
 

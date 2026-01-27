@@ -78,6 +78,7 @@ namespace Lado.Controllers
                     NombreMostrado = usuario.NombreCompleto,
                     UsernameMostrado = usuario.UserName,
                     FotoPerfil = usuario.FotoPerfil,
+                    FotoPortada = usuario.FotoPortada,
                     Biografia = usuario.Biografia,
                     NumeroSeguidores = usuario.NumeroSeguidores,
                     CreadorVerificado = usuario.CreadorVerificado,
@@ -93,6 +94,7 @@ namespace Lado.Controllers
                         NombreMostrado = usuario.Seudonimo,
                         UsernameMostrado = usuario.Seudonimo.ToLower().Replace(" ", ""),
                         FotoPerfil = usuario.FotoPerfilLadoB ?? usuario.FotoPerfil,
+                        FotoPortada = usuario.FotoPortadaLadoB ?? usuario.FotoPortada,
                         Biografia = usuario.BiografiaLadoB ?? usuario.Biografia,
                         NumeroSeguidores = usuario.NumeroSeguidores,
                         CreadorVerificado = usuario.CreadorVerificado,
@@ -532,6 +534,7 @@ namespace Lado.Controllers
         public string NombreMostrado { get; set; }
         public string UsernameMostrado { get; set; }
         public string? FotoPerfil { get; set; }
+        public string? FotoPortada { get; set; }
         public string? Biografia { get; set; }
         public int NumeroSeguidores { get; set; }
         public bool CreadorVerificado { get; set; }

@@ -77,6 +77,16 @@ namespace Lado.Controllers
                     return RedirectToAction("Index", "Feed");
                 }
 
+                // Verificar bloqueo bidireccional
+                var hayBloqueo = await _context.BloqueosUsuarios
+                    .AnyAsync(b => (b.BloqueadorId == usuarioId && b.BloqueadoId == creadorId) ||
+                                   (b.BloqueadorId == creadorId && b.BloqueadoId == usuarioId));
+                if (hayBloqueo)
+                {
+                    TempData["Error"] = "No puedes seguir a este usuario";
+                    return RedirectToAction("Index", "Feed");
+                }
+
                 // Determinar duración (default: mensual)
                 var tipoDuracion = duracion.HasValue
                     ? (DuracionSuscripcion)duracion.Value

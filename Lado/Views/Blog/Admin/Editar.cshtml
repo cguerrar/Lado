@@ -1,0 +1,291 @@
+@model Lado.Models.ArticuloBlog
+@using Lado.Models
+@{
+    ViewData["Title"] = "Editar Articulo";
+    Layout = "_Layout";
+}
+
+<style>
+    .form-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 30px 20px;
+    }
+
+    .form-header {
+        margin-bottom: 30px;
+    }
+
+    .form-header h1 {
+        color: #111;
+        font-size: 1.8rem;
+    }
+
+    .form-card {
+        background: white;
+        border-radius: 12px;
+        padding: 30px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+
+    .form-group {
+        margin-bottom: 24px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .form-group input[type="text"],
+    .form-group textarea,
+    .form-group select {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 1rem;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: #4682B4;
+        box-shadow: 0 0 0 3px rgba(70, 130, 180, 0.1);
+    }
+
+    .form-group textarea {
+        min-height: 150px;
+        resize: vertical;
+    }
+
+    .form-group textarea.content-editor {
+        min-height: 400px;
+        font-family: monospace;
+    }
+
+    .form-hint {
+        font-size: 0.85rem;
+        color: #666;
+        margin-top: 6px;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+    }
+
+    .form-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .form-checkbox input {
+        width: 20px;
+        height: 20px;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 30px;
+    }
+
+    .btn-submit {
+        padding: 14px 28px;
+        background: #4682B4;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .btn-submit:hover {
+        background: #36648B;
+    }
+
+    .btn-cancel {
+        padding: 14px 28px;
+        background: #f5f5f5;
+        color: #333;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .current-image {
+        max-width: 200px;
+        margin-top: 12px;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+    }
+
+    .image-preview {
+        max-width: 300px;
+        margin-top: 12px;
+        border-radius: 8px;
+    }
+
+    .article-stats {
+        display: flex;
+        gap: 20px;
+        padding: 16px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin-bottom: 24px;
+        font-size: 0.9rem;
+        color: #666;
+    }
+
+    @@media (max-width: 768px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="form-container">
+    <div class="form-header">
+        <a href="@Url.Action("AdminIndex", "Blog")" style="color: #4682B4; text-decoration: none; margin-bottom: 12px; display: inline-block;">
+            <i class="fas fa-arrow-left"></i> Volver
+        </a>
+        <h1><i class="fas fa-edit"></i> Editar Articulo</h1>
+    </div>
+
+    <div class="article-stats">
+        <span><i class="far fa-eye"></i> @Model.Vistas vistas</span>
+        <span><i class="far fa-calendar"></i> Creado: @Model.FechaCreacion.ToString("dd/MM/yyyy")</span>
+        @if (Model.FechaPublicacion.HasValue)
+        {
+            <span><i class="fas fa-check"></i> Publicado: @Model.FechaPublicacion.Value.ToString("dd/MM/yyyy")</span>
+        }
+        @if (Model.FechaModificacion.HasValue)
+        {
+            <span><i class="fas fa-pencil-alt"></i> Modificado: @Model.FechaModificacion.Value.ToString("dd/MM/yyyy")</span>
+        }
+    </div>
+
+    <form method="post" enctype="multipart/form-data" class="form-card">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="Id" value="@Model.Id">
+
+        <div class="form-group">
+            <label for="Titulo">Titulo *</label>
+            <input type="text" id="Titulo" name="Titulo" value="@Model.Titulo" required>
+        </div>
+
+        <div class="form-group">
+            <label for="Slug">Slug (URL amigable)</label>
+            <input type="text" id="Slug" name="Slug" value="@Model.Slug" readonly style="background: #f5f5f5;">
+            <p class="form-hint">El slug no se puede cambiar despues de creado</p>
+        </div>
+
+        <div class="form-group">
+            <label for="Resumen">Resumen</label>
+            <textarea id="Resumen" name="Resumen" rows="3" maxlength="300">@Model.Resumen</textarea>
+            <p class="form-hint">Breve descripcion que aparece en las tarjetas (max 300 caracteres)</p>
+        </div>
+
+        <div class="form-group">
+            <label for="Contenido">Contenido *</label>
+            <textarea id="Contenido" name="Contenido" class="content-editor" required>@Model.Contenido</textarea>
+            <p class="form-hint">Puedes usar HTML para formato (h2, h3, p, ul, ol, a, img, blockquote, code, pre)</p>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="Categoria">Categoria</label>
+                <select id="Categoria" name="Categoria">
+                    @foreach (CategoriaBlog cat in Enum.GetValues(typeof(CategoriaBlog)))
+                    {
+                        if (Model.Categoria == cat)
+                        {
+                            <option value="@cat" selected>@cat</option>
+                        }
+                        else
+                        {
+                            <option value="@cat">@cat</option>
+                        }
+                    }
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="imagenPortada">Cambiar imagen de portada</label>
+                <input type="file" id="imagenPortada" name="imagenPortada" accept="image/*">
+                @if (!string.IsNullOrEmpty(Model.ImagenPortada))
+                {
+                    <img src="@Model.ImagenPortada" alt="Imagen actual" class="current-image">
+                }
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Meta SEO</label>
+            <div class="form-row" style="margin-top: 12px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <input type="text" name="MetaTitulo" value="@Model.MetaTitulo" placeholder="Meta titulo (opcional)">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <input type="text" name="PalabrasClave" value="@Model.PalabrasClave" placeholder="Palabras clave (separadas por coma)">
+                </div>
+            </div>
+            <textarea name="MetaDescripcion" rows="2" style="margin-top: 12px;" placeholder="Meta descripcion (opcional)">@Model.MetaDescripcion</textarea>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <div class="form-checkbox">
+                    <input type="checkbox" id="EstaPublicado" name="EstaPublicado" value="true" @(Model.EstaPublicado ? "checked" : "")>
+                    <label for="EstaPublicado" style="margin: 0;">Publicado</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="form-checkbox">
+                    <input type="checkbox" id="EsDestacado" name="EsDestacado" value="true" @(Model.EsDestacado ? "checked" : "")>
+                    <label for="EsDestacado" style="margin: 0;">Articulo destacado</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-submit">
+                <i class="fas fa-save"></i> Guardar Cambios
+            </button>
+            <a href="@Url.Action("AdminIndex", "Blog")" class="btn-cancel">Cancelar</a>
+            @if (Model.EstaPublicado)
+            {
+                <a href="@Url.Action("Articulo", "Blog", new { slug = Model.Slug })" target="_blank" class="btn-cancel" style="margin-left: auto;">
+                    <i class="fas fa-external-link-alt"></i> Ver articulo
+                </a>
+            }
+        </div>
+    </form>
+</div>
+
+<script>
+    // Preview de imagen
+    document.getElementById('imagenPortada').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                let preview = document.querySelector('.image-preview');
+                if (!preview) {
+                    preview = document.createElement('img');
+                    preview.className = 'image-preview';
+                    document.getElementById('imagenPortada').parentNode.appendChild(preview);
+                }
+                preview.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+</script>

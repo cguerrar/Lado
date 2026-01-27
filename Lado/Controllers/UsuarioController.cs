@@ -84,7 +84,8 @@ namespace Lado.Controllers
             ApplicationUser model,
             IFormFile? fotoPerfil,
             IFormFile? fotoPerfilLadoB,
-            IFormFile? fotoPortada)
+            IFormFile? fotoPortada,
+            IFormFile? fotoPortadaLadoB)
         {
             var usuario = await _userManager.GetUserAsync(User);
             if (usuario == null)
@@ -134,11 +135,18 @@ namespace Lado.Controllers
                     if (fileName != null) usuario.FotoPerfilLadoB = fileName;
                 }
 
-                // Procesar foto de portada (opcional, solo creadores)
-                if (fotoPortada != null && fotoPortada.Length > 0 && usuario.TipoUsuario == 1)
+                // Procesar foto de portada LadoA
+                if (fotoPortada != null && fotoPortada.Length > 0)
                 {
                     var fileName = await GuardarArchivo(fotoPortada, "portadas");
                     if (fileName != null) usuario.FotoPortada = fileName;
+                }
+
+                // Procesar foto de portada LadoB (premium)
+                if (fotoPortadaLadoB != null && fotoPortadaLadoB.Length > 0)
+                {
+                    var fileName = await GuardarArchivo(fotoPortadaLadoB, "portadas-ladob");
+                    if (fileName != null) usuario.FotoPortadaLadoB = fileName;
                 }
             }
             catch (InvalidOperationException ex)
@@ -195,18 +203,31 @@ namespace Lado.Controllers
             }
 
             string? fotoPath = null;
+            string mensajeExito;
 
-            if (lado == "B")
+            if (lado == "Portada")
             {
-                // Eliminar foto de LadoB
+                fotoPath = usuario.FotoPortada;
+                usuario.FotoPortada = null;
+                mensajeExito = "Foto de portada eliminada";
+            }
+            else if (lado == "PortadaB")
+            {
+                fotoPath = usuario.FotoPortadaLadoB;
+                usuario.FotoPortadaLadoB = null;
+                mensajeExito = "Foto de portada LadoB eliminada";
+            }
+            else if (lado == "B")
+            {
                 fotoPath = usuario.FotoPerfilLadoB;
                 usuario.FotoPerfilLadoB = null;
+                mensajeExito = "Foto de perfil LadoB eliminada";
             }
             else
             {
-                // Eliminar foto de LadoA
                 fotoPath = usuario.FotoPerfil;
                 usuario.FotoPerfil = null;
+                mensajeExito = "Foto de perfil LadoA eliminada";
             }
 
             // Eliminar archivo físico si existe
@@ -221,7 +242,7 @@ namespace Lado.Controllers
 
             await _userManager.UpdateAsync(usuario);
 
-            TempData["Success"] = $"Foto de perfil Lado{lado} eliminada";
+            TempData["Success"] = mensajeExito;
             return RedirectToAction(nameof(EditarPerfil));
         }
 
@@ -957,6 +978,39 @@ namespace Lado.Controllers
             });
         }
 
+        // POST: /Usuario/CambiarMostrarLinkInBio
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CambiarMostrarLinkInBio([FromBody] CambiarMostrarLinkInBioRequest request)
+        {
+            if (request == null)
+            {
+                return Json(new { success = false, message = "Datos inválidos" });
+            }
+
+            var usuario = await _userManager.GetUserAsync(User);
+            if (usuario == null)
+            {
+                return Json(new { success = false, message = "No autenticado" });
+            }
+
+            usuario.MostrarLinkInBio = request.Mostrar;
+            var result = await _userManager.UpdateAsync(usuario);
+
+            if (!result.Succeeded)
+            {
+                var errores = string.Join(", ", result.Errors.Select(e => e.Description));
+                return Json(new { success = false, message = $"Error al guardar: {errores}" });
+            }
+
+            return Json(new {
+                success = true,
+                message = request.Mostrar
+                    ? "Tu Link in Bio ahora es visible en tu perfil."
+                    : "Tu Link in Bio ya no aparecerá en tu perfil."
+            });
+        }
+
         // POST: /Usuario/CambiarPromocionLadoB
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -1216,6 +1270,10 @@ namespace Lado.Controllers
                 if (!string.IsNullOrEmpty(usuario.FotoPortada))
                 {
                     EliminarArchivoFisico(usuario.FotoPortada);
+                }
+                if (!string.IsNullOrEmpty(usuario.FotoPortadaLadoB))
+                {
+                    EliminarArchivoFisico(usuario.FotoPortadaLadoB);
                 }
 
                 // 23. Guardar todos los cambios
@@ -1901,6 +1959,12 @@ namespace Lado.Controllers
     {
         [System.Text.Json.Serialization.JsonPropertyName("ocultar")]
         public bool Ocultar { get; set; } = false;
+    }
+
+    public class CambiarMostrarLinkInBioRequest
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("mostrar")]
+        public bool Mostrar { get; set; } = true;
     }
 
     public class CambiarPromocionLadoBRequest

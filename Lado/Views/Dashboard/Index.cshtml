@@ -1773,14 +1773,56 @@
     </div>
     @{
         var baseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
-        var perfilUrl = $"{baseUrl}/@{Model.UserName}";
+        var perfilUrlLadoA = $"{baseUrl}/@{Model.UserName}";
+        var tieneLadoB = Model.EsCreador && Model.TieneLadoB();
+        var tieneSeudonimo = !string.IsNullOrEmpty(Model.Seudonimo);
+        var perfilUrlLadoB = tieneSeudonimo ? $"{baseUrl}/@{Model.Seudonimo}" : perfilUrlLadoA;
     }
-    <div class="link-share">
-        <input type="text" class="link-input" id="linkPerfil" value="@perfilUrl" readonly>
-        <button class="btn btn-primary btn-sm" onclick="copiarLink()">
-            <i class="fas fa-copy"></i>
-        </button>
+
+    <!-- LadoA -->
+    <div style="margin-bottom: 12px;">
+        <label style="font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <i class="fas fa-sun" style="color: var(--primary);"></i> Perfil LadoA (Público)
+        </label>
+        <div class="link-share">
+            <input type="text" class="link-input" id="linkPerfilLadoA" value="@perfilUrlLadoA" readonly>
+            <button class="btn btn-primary btn-sm" onclick="copiarLink('linkPerfilLadoA')" title="Copiar link LadoA">
+                <i class="fas fa-copy"></i>
+            </button>
+        </div>
     </div>
+
+    @if (tieneLadoB && tieneSeudonimo)
+    {
+        <!-- LadoB con Seudónimo -->
+        <div>
+            <label style="font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                <i class="fas fa-moon" style="color: var(--accent);"></i> Perfil LadoB (Premium)
+            </label>
+            <div class="link-share">
+                <input type="text" class="link-input" id="linkPerfilLadoB" value="@perfilUrlLadoB" readonly style="border-color: var(--accent);">
+                <button class="btn btn-sm" onclick="copiarLink('linkPerfilLadoB')" title="Copiar link LadoB" style="background: var(--accent); color: white;">
+                    <i class="fas fa-copy"></i>
+                </button>
+            </div>
+            <small style="color: var(--muted); font-size: 0.75rem; margin-top: 4px; display: block;">
+                <i class="fas fa-shield-alt"></i> Este link no revela tu identidad de LadoA
+            </small>
+        </div>
+    }
+    else if (tieneLadoB && !tieneSeudonimo)
+    {
+        <!-- LadoB sin Seudónimo - Advertencia -->
+        <div style="margin-top: 8px; padding: 10px; background: rgba(var(--accent-rgb), 0.1); border-radius: 8px; border-left: 3px solid var(--accent);">
+            <p style="font-size: 0.85rem; color: var(--muted); margin: 0;">
+                <i class="fas fa-exclamation-triangle" style="color: var(--accent);"></i>
+                Configura un <strong>seudónimo</strong> en tu perfil para tener un link LadoB separado y proteger tu privacidad.
+            </p>
+            <a href="/Usuario/ConfiguracionCreador" style="font-size: 0.8rem; color: var(--accent); text-decoration: none; margin-top: 6px; display: inline-block;">
+                <i class="fas fa-cog"></i> Configurar seudónimo
+            </a>
+        </div>
+    }
 </div>
 
 <!-- Grid principal -->
@@ -1928,11 +1970,17 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    function copiarLink() {
-        const input = document.getElementById('linkPerfil');
+    function copiarLink(inputId) {
+        const input = document.getElementById(inputId || 'linkPerfilLadoA');
         input.select();
         navigator.clipboard.writeText(input.value).then(() => {
-            alert('¡Link copiado!');
+            // Mostrar feedback visual
+            const btn = input.nextElementSibling;
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i>';
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+            }, 1500);
         });
     }
 

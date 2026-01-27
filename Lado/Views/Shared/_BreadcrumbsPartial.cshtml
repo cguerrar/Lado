@@ -1,0 +1,107 @@
+@*
+    Partial de Breadcrumbs con Schema.org
+    Uso: @await Html.PartialAsync("_BreadcrumbsPartial", new List<(string, string)> { ("Inicio", "/"), ("Feed", "/Feed"), ("Detalle", null) })
+    El último elemento (con url null) es la página actual
+*@
+@model List<(string Nombre, string Url)>
+
+@if (Model != null && Model.Any())
+{
+    var baseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+
+    <!-- Breadcrumbs visuales -->
+    <nav aria-label="breadcrumb" class="breadcrumb-nav">
+        <ol class="breadcrumb">
+            @for (int i = 0; i < Model.Count; i++)
+            {
+                var item = Model[i];
+                var esUltimo = i == Model.Count - 1;
+
+                @if (esUltimo || string.IsNullOrEmpty(item.Url))
+                {
+                    <li class="breadcrumb-item active" aria-current="page">@item.Nombre</li>
+                }
+                else
+                {
+                    <li class="breadcrumb-item">
+                        <a href="@item.Url">@item.Nombre</a>
+                    </li>
+                }
+            }
+        </ol>
+    </nav>
+
+    <!-- Schema.org BreadcrumbList -->
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "BreadcrumbList",
+        "itemListElement": [
+            @for (int i = 0; i < Model.Count; i++)
+            {
+                var item = Model[i];
+                var itemUrl = !string.IsNullOrEmpty(item.Url)
+                    ? (item.Url.StartsWith("http") ? item.Url : $"{baseUrl}{item.Url}")
+                    : $"{baseUrl}{Context.Request.Path}";
+
+                <text>{
+                    "@@type": "ListItem",
+                    "position": @(i + 1),
+                    "name": "@item.Nombre",
+                    "item": "@itemUrl"
+                }@(i < Model.Count - 1 ? "," : "")</text>
+            }
+        ]
+    }
+    </script>
+
+    <style>
+        .breadcrumb-nav {
+            padding: 12px 0;
+            margin-bottom: 16px;
+        }
+
+        .breadcrumb {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 0;
+            margin: 0;
+            list-style: none;
+            background: transparent;
+            font-size: 14px;
+        }
+
+        .breadcrumb-item {
+            color: #6b7280;
+        }
+
+        .breadcrumb-item + .breadcrumb-item::before {
+            content: "/";
+            padding: 0 8px;
+            color: #9ca3af;
+        }
+
+        .breadcrumb-item a {
+            color: #4682B4;
+            text-decoration: none;
+        }
+
+        .breadcrumb-item a:hover {
+            text-decoration: underline;
+        }
+
+        .breadcrumb-item.active {
+            color: #111827;
+            font-weight: 500;
+        }
+
+        @@media (prefers-color-scheme: dark) {
+            .breadcrumb-item {
+                color: #9ca3af;
+            }
+            .breadcrumb-item.active {
+                color: #f3f4f6;
+            }
+        }
+    </style>
+}

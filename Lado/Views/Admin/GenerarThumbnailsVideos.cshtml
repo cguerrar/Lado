@@ -1,0 +1,289 @@
+@{
+    ViewData["Title"] = "Generar Thumbnails de Videos";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+@Html.AntiForgeryToken()
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">Generar Thumbnails de Videos</h1>
+            <p class="text-muted mb-0">Crear miniaturas para videos que no las tienen</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/Admin/MigracionMedias" class="btn btn-outline-primary">
+                <i class="fas fa-exchange-alt"></i> Migrar Medios
+            </a>
+            <a href="/Admin" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </div>
+    </div>
+
+    <!-- Resumen de videos sin thumbnail -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-primary">
+                        <i class="fas fa-film"></i> Contenidos
+                    </h5>
+                    <h2 class="display-5 mb-0">@ViewBag.VideosSinThumb</h2>
+                    <small class="text-muted">videos sin thumbnail</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-success">
+                        <i class="fas fa-images"></i> Carrusel
+                    </h5>
+                    <h2 class="display-5 mb-0">@ViewBag.ArchivosSinThumb</h2>
+                    <small class="text-muted">archivos sin thumbnail</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-warning">
+                        <i class="fas fa-mobile-alt"></i> Stories
+                    </h5>
+                    <h2 class="display-5 mb-0">@ViewBag.StoriesSinThumb</h2>
+                    <small class="text-muted">stories sin thumbnail</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm bg-danger text-white">
+                <div class="card-body text-center">
+                    <h5 class="card-title">
+                        <i class="fas fa-exclamation-triangle"></i> Total
+                    </h5>
+                    <h2 class="display-5 mb-0">@ViewBag.TotalSinThumb</h2>
+                    <small>videos sin miniatura</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de control -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">Control de Generacion</h5>
+        </div>
+        <div class="card-body">
+            @if (ViewBag.TotalSinThumb == 0)
+            {
+                <div class="alert alert-success mb-0">
+                    <i class="fas fa-check-circle"></i> Todos los videos tienen sus thumbnails generados. No hay nada que procesar.
+                </div>
+            }
+            else
+            {
+                <div id="controles-thumbnails">
+                    <div class="row align-items-center mb-3">
+                        <div class="col-md-6">
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-info-circle"></i>
+                                Se generara una miniatura (frame del segundo 1) para cada video usando FFmpeg.
+                                Las miniaturas se guardaran junto al video original con sufijo <code>_thumb.jpg</code>.
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <button id="btnIniciar" class="btn btn-primary btn-lg w-100" onclick="iniciarGeneracion()">
+                                <i class="fas fa-play"></i> Iniciar Generacion
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button id="btnCancelar" class="btn btn-danger btn-lg w-100" onclick="cancelarGeneracion()" disabled>
+                                <i class="fas fa-stop"></i> Cancelar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Nota:</strong> Este proceso requiere FFmpeg instalado en el servidor.
+                        El proceso es rapido (menos de 1 segundo por video).
+                    </div>
+                </div>
+
+                <!-- Progreso -->
+                <div id="progreso-thumbnails" style="display: none;">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span id="mensaje-progreso">Preparando...</span>
+                            <span id="porcentaje-progreso">0%</span>
+                        </div>
+                        <div class="progress" style="height: 25px;">
+                            <div id="barra-progreso" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="row text-center">
+                        <div class="col-3">
+                            <div class="h4 mb-0" id="stat-procesados">0</div>
+                            <small class="text-muted">Procesados</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="h4 mb-0 text-success" id="stat-exitosos">0</div>
+                            <small class="text-muted">Exitosos</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="h4 mb-0 text-danger" id="stat-fallidos">0</div>
+                            <small class="text-muted">Fallidos</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="h4 mb-0" id="stat-total">0</div>
+                            <small class="text-muted">Total</small>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Informacion -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">Informacion</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="fas fa-image text-primary"></i> Thumbnails generados</h6>
+                    <ul class="small">
+                        <li>Formato: JPEG</li>
+                        <li>Ancho maximo: 480px (mantiene aspect ratio)</li>
+                        <li>Frame extraido: segundo 1 del video</li>
+                        <li>Calidad: Alta (q:v 2)</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6><i class="fas fa-question-circle text-info"></i> ¿Por que son necesarios?</h6>
+                    <ul class="small">
+                        <li>Permiten mostrar preview sin cargar el video completo</li>
+                        <li>Mejoran significativamente el rendimiento del feed</li>
+                        <li>Reducen el consumo de datos del usuario</li>
+                        <li>Son necesarios para las tarjetas de creadores en el Muro</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    let intervaloEstado = null;
+
+    function iniciarGeneracion() {
+        if (!confirm('¿Iniciar generacion de thumbnails? Este proceso es relativamente rapido.')) {
+            return;
+        }
+
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+
+        fetch('/Admin/IniciarGeneracionThumbnails', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `__RequestVerificationToken=${encodeURIComponent(token)}`
+        })
+        .then(r => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
+        .then(data => {
+            if (data.success) {
+                document.getElementById('btnIniciar').disabled = true;
+                document.getElementById('btnCancelar').disabled = false;
+                document.getElementById('progreso-thumbnails').style.display = 'block';
+                intervaloEstado = setInterval(actualizarEstado, 1000);
+                actualizarEstado();
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            alert('Error al iniciar: ' + err.message);
+        });
+    }
+
+    function cancelarGeneracion() {
+        if (!confirm('¿Cancelar la generacion en progreso?')) {
+            return;
+        }
+
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+
+        fetch('/Admin/CancelarThumbnails', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `__RequestVerificationToken=${encodeURIComponent(token)}`
+        })
+        .then(r => r.json())
+        .then(data => {
+            alert(data.message);
+            if (data.success) {
+                finalizarGeneracion();
+            }
+        })
+        .catch(err => {
+            alert('Error al cancelar: ' + err.message);
+        });
+    }
+
+    function actualizarEstado() {
+        fetch('/Admin/EstadoThumbnails')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('mensaje-progreso').textContent = data.mensaje || 'Sin mensaje';
+            document.getElementById('porcentaje-progreso').textContent = (data.porcentaje || 0) + '%';
+            document.getElementById('barra-progreso').style.width = (data.porcentaje || 0) + '%';
+            document.getElementById('stat-procesados').textContent = data.procesados || 0;
+            document.getElementById('stat-exitosos').textContent = data.exitosos || 0;
+            document.getElementById('stat-fallidos').textContent = data.fallidos || 0;
+            document.getElementById('stat-total').textContent = data.total || 0;
+
+            if (!data.enProgreso) {
+                finalizarGeneracion();
+            }
+        })
+        .catch(err => {
+            console.error('Error obteniendo estado:', err);
+        });
+    }
+
+    function finalizarGeneracion() {
+        if (intervaloEstado) {
+            clearInterval(intervaloEstado);
+            intervaloEstado = null;
+        }
+        document.getElementById('btnIniciar').disabled = false;
+        document.getElementById('btnCancelar').disabled = true;
+        document.getElementById('barra-progreso').classList.remove('progress-bar-animated');
+    }
+
+    // Verificar estado al cargar la pagina
+    @if (ViewBag.EnProgreso)
+    {
+        <text>
+        document.getElementById('btnIniciar').disabled = true;
+        document.getElementById('btnCancelar').disabled = false;
+        document.getElementById('progreso-thumbnails').style.display = 'block';
+        intervaloEstado = setInterval(actualizarEstado, 1000);
+        actualizarEstado();
+        </text>
+    }
+</script>
+}

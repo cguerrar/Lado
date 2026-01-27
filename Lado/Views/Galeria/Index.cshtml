@@ -1,0 +1,2117 @@
+@{
+    ViewData["Title"] = "Mi Galeria";
+    var albums = ViewBag.Albums as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+    var archivos = ViewBag.Archivos as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+    var albumActual = ViewBag.AlbumActual as int?;
+    var filtroActual = ViewBag.FiltroActual as string;
+    var totalArchivos = ViewBag.TotalArchivos as int? ?? 0;
+    var totalEspacio = ViewBag.TotalEspacio as long? ?? 0;
+    var albumActualInfo = ViewBag.AlbumActualInfo as Lado.Models.Album;
+    var infoCuota = ViewBag.InfoCuota as Lado.Services.CuotaGaleriaInfo;
+
+    string FormatearTamano(long bytes) {
+        if (bytes >= 1073741824) return $"{bytes / 1073741824.0:F1} GB";
+        if (bytes >= 1048576) return $"{bytes / 1048576.0:F1} MB";
+        if (bytes >= 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes} B";
+    }
+}
+
+<link rel="stylesheet" href="~/css/galeria.css" asp-append-version="true" />
+
+@Html.AntiForgeryToken()
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Sidebar Backdrop (mobile) -->
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+<div class="galeria-page">
+    <!-- Sidebar -->
+    <aside class="galeria-sidebar" id="galeriaSidebar" role="navigation" aria-label="Navegacion de galeria">
+        <div class="galeria-header">
+            <h2>Mi Galeria</h2>
+            <button class="btn-icon" id="btnNuevoAlbum" title="Crear album" aria-label="Crear nuevo album">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M5 12h14"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Estadisticas -->
+        <div class="galeria-stats">
+            <div class="stat">
+                <span class="stat-value">@totalArchivos</span>
+                <span class="stat-label">archivos</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value">@(infoCuota?.EspacioUsadoFormateado ?? FormatearTamano(totalEspacio))</span>
+                <span class="stat-label">de @(infoCuota?.CuotaMaximaFormateada ?? "ilimitado")</span>
+            </div>
+        </div>
+
+        <!-- Barra de cuota de almacenamiento -->
+        <div class="cuota-progress @(infoCuota?.NivelAlerta ?? "")">
+            <div class="cuota-bar">
+                <div class="cuota-fill" style="width: @(infoCuota != null ? Math.Min(infoCuota.PorcentajeUso, 100) : 0)%"></div>
+            </div>
+            <span class="cuota-text">@(infoCuota?.PorcentajeUso ?? 0)% usado</span>
+            <span class="cuota-alert" style="display: @(!string.IsNullOrEmpty(infoCuota?.MensajeAlerta) ? "block" : "none")">@(infoCuota?.MensajeAlerta ?? "")</span>
+        </div>
+
+        <!-- Filtros rapidos -->
+        <nav class="galeria-nav" aria-label="Filtros">
+            <a href="/Galeria" class="nav-item @(string.IsNullOrEmpty(filtroActual) && !albumActual.HasValue ? "active" : "")" aria-current="@(string.IsNullOrEmpty(filtroActual) && !albumActual.HasValue ? "page" : "false")">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                <span>Todos</span>
+            </a>
+            <a href="/Galeria?filtro=favoritos" class="nav-item @(filtroActual == "favoritos" ? "active" : "")">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                </svg>
+                <span>Favoritos</span>
+            </a>
+            <a href="/Galeria?filtro=imagenes" class="nav-item @(filtroActual == "imagenes" ? "active" : "")">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <span>Imagenes</span>
+            </a>
+            <a href="/Galeria?filtro=videos" class="nav-item @(filtroActual == "videos" ? "active" : "")">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                </svg>
+                <span>Videos</span>
+            </a>
+            <a href="/Galeria?filtro=sin-album" class="nav-item @(filtroActual == "sin-album" ? "active" : "")">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>Sin album</span>
+            </a>
+        </nav>
+
+        <!-- Lista de albums -->
+        <div class="galeria-albums">
+            <div class="albums-header">
+                <h3>Albums</h3>
+            </div>
+            <div class="albums-list" id="albumsList">
+                @foreach (var album in albums)
+                {
+                    <a href="/Galeria?albumId=@album.Id" class="album-item @(albumActual == album.Id ? "active" : "")">
+                        <div class="album-cover">
+                            @if (!string.IsNullOrEmpty((string)album.ImagenPortada))
+                            {
+                                <img src="@album.ImagenPortada" alt="Portada de @album.Nombre" loading="lazy">
+                            }
+                            else
+                            {
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                                </svg>
+                            }
+                        </div>
+                        <div class="album-info">
+                            <span class="album-name">@album.Nombre</span>
+                            <span class="album-count">@album.CantidadArchivos archivos</span>
+                        </div>
+                    </a>
+                }
+                @if (!albums.Any())
+                {
+                    <p class="no-albums">No tienes albums aun</p>
+                }
+            </div>
+        </div>
+    </aside>
+
+    <!-- Contenido principal -->
+    <main class="galeria-main" role="main">
+        <!-- Header -->
+        <div class="galeria-header">
+            <div class="header-left">
+                <!-- Hamburger menu (mobile) -->
+                <button class="btn-hamburger" id="btnHamburger" aria-label="Abrir menu" aria-expanded="false">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+
+                @if (albumActualInfo != null)
+                {
+                    <a href="/Galeria" class="btn-back" aria-label="Volver a todos los archivos">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"/>
+                        </svg>
+                    </a>
+                    <h1>@albumActualInfo.Nombre</h1>
+                    <button class="btn-icon btn-edit-album" data-album-id="@albumActualInfo.Id" title="Editar album" aria-label="Editar album">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                }
+                else if (!string.IsNullOrEmpty(filtroActual))
+                {
+                    <h1>
+                        @(filtroActual switch {
+                            "favoritos" => "Favoritos",
+                            "imagenes" => "Imagenes",
+                            "videos" => "Videos",
+                            "sin-album" => "Sin album",
+                            _ => "Galeria"
+                        })
+                    </h1>
+                }
+                else
+                {
+                    <h1>Todos los archivos</h1>
+                }
+            </div>
+            <div class="header-actions">
+                <div class="selection-actions" id="selectionActions" style="display: none;">
+                    <span class="selection-count"><span id="selectedCount">0</span> seleccionados</span>
+                    <button class="btn-action btn-success" id="btnPublicarSeleccion" title="Publicar" aria-label="Publicar seleccionados">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                            <polyline points="16 6 12 2 8 6"></polyline>
+                            <line x1="12" y1="2" x2="12" y2="15"></line>
+                        </svg>
+                        <span>Publicar</span>
+                    </button>
+                    <button class="btn-action" id="btnMoverSeleccion" title="Mover a album" aria-label="Mover seleccionados a album">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                    </button>
+                    <button class="btn-action btn-danger" id="btnEliminarSeleccion" title="Eliminar" aria-label="Eliminar seleccionados">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                    <button class="btn-action" id="btnCancelarSeleccion" title="Cancelar seleccion" aria-label="Cancelar seleccion">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <button class="btn-secondary" id="btnGooglePhotos" title="Importar desde Google Photos">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                    </svg>
+                    <span class="btn-text-desktop">Google Photos</span>
+                </button>
+                <button class="btn-primary" id="btnSubirArchivos" aria-label="Subir archivos">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <span>Subir</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Info de privacidad -->
+        <div class="galeria-privacy-info">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            <div class="privacy-text">
+                <strong>Tu galeria privada</strong>
+                <span>Estos archivos son solo tuyos. Nadie mas puede verlos hasta que decidas publicarlos.</span>
+            </div>
+        </div>
+
+        <!-- Grid de archivos -->
+        <div class="galeria-grid" id="galeriaGrid" role="grid" aria-label="Archivos de galeria">
+            @foreach (var archivo in archivos)
+            {
+                var tipoMedia = (Lado.Models.TipoMediaGaleria)archivo.TipoMedia;
+                var esVideo = tipoMedia == Lado.Models.TipoMediaGaleria.Video;
+                var thumbnail = !string.IsNullOrEmpty((string)archivo.Thumbnail) ? archivo.Thumbnail : archivo.RutaArchivo;
+
+                <div class="media-item" data-id="@archivo.Id" data-tipo="@(esVideo ? "video" : "imagen")" tabindex="0" role="gridcell" aria-label="@(archivo.NombreOriginal ?? (esVideo ? "Video" : "Imagen"))">
+                    <div class="media-checkbox">
+                        <input type="checkbox" class="media-select" data-id="@archivo.Id" aria-label="Seleccionar archivo">
+                    </div>
+                    @if (esVideo)
+                    {
+                        <div class="media-thumbnail video">
+                            <img src="@thumbnail" alt="@(archivo.NombreOriginal ?? "Video")" loading="lazy">
+                            <div class="video-indicator">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                                @if (archivo.DuracionSegundos != null)
+                                {
+                                    var duracion = TimeSpan.FromSeconds((int)archivo.DuracionSegundos);
+                                    <span class="video-duration">@duracion.ToString(@"m\:ss")</span>
+                                }
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="media-thumbnail">
+                            <img src="@thumbnail" alt="@(archivo.NombreOriginal ?? "Imagen")" loading="lazy">
+                        </div>
+                    }
+                    @if ((bool)archivo.EsFavorito)
+                    {
+                        <div class="favorito-badge" aria-label="Favorito">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                            </svg>
+                        </div>
+                    }
+                    @if (archivo.ContenidoAsociadoId != null || archivo.MensajeAsociadoId != null)
+                    {
+                        <div class="usado-badge" title="Usado en publicacion o mensaje" aria-label="Usado">
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true">
+                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                            </svg>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        @if (!archivos.Any())
+        {
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" width="80" height="80" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <h3>Tu galeria esta vacia</h3>
+                <p>Sube fotos y videos para guardarlos de forma privada y usarlos en tus publicaciones</p>
+                <button class="btn-primary" id="btnSubirVacio">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    Subir archivos
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="items-count">
+                Mostrando @archivos.Count() de @totalArchivos archivos
+            </div>
+        }
+
+        <!-- Cargar mas -->
+        <div class="load-more" id="loadMore" style="display: @(archivos.Count() < totalArchivos ? "block" : "none");">
+            <button class="btn-secondary" id="btnCargarMas">Cargar mas</button>
+        </div>
+    </main>
+</div>
+
+<!-- Modal de subida -->
+<div class="modal-overlay" id="modalSubida" role="dialog" aria-modal="true" aria-labelledby="modalSubidaTitulo">
+    <div class="modal-content upload-modal">
+        <div class="modal-header">
+            <h3 id="modalSubidaTitulo">Subir archivos</h3>
+            <button class="btn-close" id="cerrarModalSubida" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="upload-zone" id="uploadZone">
+                <input type="file" id="fileInput" multiple accept="image/*,video/*,.heic,.heif,.mov,.mp4,.avi,.mkv" aria-label="Seleccionar archivos">
+                <div class="upload-content">
+                    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <p>Arrastra archivos aqui o haz clic para seleccionar</p>
+                    <span class="upload-hint">Imagenes hasta 50MB | Videos hasta 500MB</span>
+                </div>
+            </div>
+            <div class="upload-album-select">
+                <label for="albumSelect">Agregar a album (opcional):</label>
+                <select id="albumSelect">
+                    <option value="">Sin album</option>
+                    @foreach (var album in albums)
+                    {
+                        if (albumActual == album.Id)
+                        {
+                            <option value="@album.Id" selected>@album.Nombre</option>
+                        }
+                        else
+                        {
+                            <option value="@album.Id">@album.Nombre</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="upload-preview" id="uploadPreview" style="display: none;">
+                <div class="preview-grid" id="previewGrid"></div>
+            </div>
+            <div class="upload-progress" id="uploadProgress" style="display: none;">
+                <div class="progress-header">
+                    <span id="progressText">Subiendo...</span>
+                    <span class="progress-percent" id="progressPercent">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-details">
+                    <span id="progressSpeed">--</span>
+                    <button class="btn-cancel-upload" id="btnCancelUpload" type="button">Cancelar</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" id="cancelarSubida">Cancelar</button>
+            <button class="btn-primary" id="confirmarSubida" disabled>
+                <span id="btnSubidaText">Subir</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de visualizacion - Lightbox Premium -->
+<div class="modal-overlay" id="modalVisualizacion" role="dialog" aria-modal="true" aria-label="Visualizador de archivos">
+    <!-- Botón cerrar FUERA del viewer-modal para z-index correcto -->
+    <button class="viewer-close" id="cerrarViewer" aria-label="Cerrar">&times;</button>
+
+    <!-- Navegación FUERA del viewer-modal -->
+    <div class="viewer-nav">
+        <button class="btn-nav btn-prev" id="btnPrev" aria-label="Imagen anterior">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+        </button>
+        <button class="btn-nav btn-next" id="btnNext" aria-label="Siguiente imagen">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Contador de posición -->
+    <div class="viewer-counter" id="viewerCounter">1 / 1</div>
+
+    <div class="modal-content viewer-modal">
+        <!-- Área de contenido (imagen/video) -->
+        <div class="viewer-content" id="viewerContent">
+            <div class="loading-spinner"></div>
+        </div>
+
+        <!-- Sidebar con información y acciones -->
+        <div class="viewer-sidebar">
+            <div class="viewer-info">
+                <h4 id="viewerNombre">-</h4>
+                <p id="viewerFecha">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <span>-</span>
+                </p>
+                <p id="viewerTamano">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    <span>-</span>
+                </p>
+            </div>
+            <div class="viewer-actions">
+                <button class="btn-action" id="btnFavorito" data-label="Favorito" aria-label="Marcar como favorito">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" id="favoritoIcon" aria-hidden="true">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                    </svg>
+                </button>
+                <button class="btn-action" id="btnPublicar" data-label="Publicar" aria-label="Crear publicacion con este archivo">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                        <polyline points="16 6 12 2 8 6"></polyline>
+                        <line x1="12" y1="2" x2="12" y2="15"></line>
+                    </svg>
+                </button>
+                <button class="btn-action" id="btnDescargar" data-label="Descargar" aria-label="Descargar archivo">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                </button>
+                <button class="btn-action btn-danger" id="btnEliminarViewer" data-label="Eliminar" aria-label="Eliminar archivo">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal elegir tipo de publicacion -->
+<div class="modal-overlay" id="modalPublicar" role="dialog" aria-modal="true" aria-labelledby="modalPublicarTitulo">
+    <div class="modal-content publish-type-modal">
+        <div class="modal-header">
+            <h3 id="modalPublicarTitulo">Publicar como...</h3>
+            <button class="btn-close" id="cerrarModalPublicar" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p class="publish-subtitle"><span id="publishMediaCount">0</span> archivo(s) seleccionado(s)</p>
+            <div class="publish-options">
+                <button class="publish-option" id="opcionPost" data-tipo="post">
+                    <div class="publish-option-icon">
+                        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                    </div>
+                    <div class="publish-option-text">
+                        <span class="publish-option-title">Publicacion / Carrusel</span>
+                        <span class="publish-option-desc">Publica 1 o mas fotos/videos en tu perfil. Si seleccionas varios, se crea un carrusel.</span>
+                    </div>
+                </button>
+                <button class="publish-option" id="opcionReel" data-tipo="reel">
+                    <div class="publish-option-icon reel-icon">
+                        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="2" y="2" width="20" height="20" rx="2" ry="2"></rect>
+                            <line x1="7" y1="2" x2="7" y2="22"></line>
+                            <line x1="17" y1="2" x2="17" y2="22"></line>
+                            <line x1="2" y1="12" x2="22" y2="12"></line>
+                            <polygon points="10 8 16 12 10 16 10 8" fill="currentColor"></polygon>
+                        </svg>
+                    </div>
+                    <div class="publish-option-text">
+                        <span class="publish-option-title">Reel</span>
+                        <span class="publish-option-desc">Video corto vertical con musica y efectos. Solo 1 archivo.</span>
+                    </div>
+                </button>
+                <button class="publish-option" id="opcionStory" data-tipo="story">
+                    <div class="publish-option-icon story-icon">
+                        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <circle cx="12" cy="12" r="6" stroke-dasharray="4 2"></circle>
+                            <circle cx="12" cy="12" r="2" fill="currentColor"></circle>
+                        </svg>
+                    </div>
+                    <div class="publish-option-text">
+                        <span class="publish-option-title">Historia</span>
+                        <span class="publish-option-desc">Contenido temporal que desaparece en 24 horas. Solo 1 archivo.</span>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal crear album -->
+<div class="modal-overlay" id="modalAlbum" role="dialog" aria-modal="true" aria-labelledby="modalAlbumTitulo">
+    <div class="modal-content album-modal">
+        <div class="modal-header">
+            <h3 id="modalAlbumTitulo">Crear album</h3>
+            <button class="btn-close" id="cerrarModalAlbum" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="albumEditId" value="">
+            <div class="form-group">
+                <label for="albumNombre">Nombre <span class="required">*</span></label>
+                <input type="text" id="albumNombre" maxlength="100" placeholder="Nombre del album" required>
+            </div>
+            <div class="form-group">
+                <label for="albumDescripcion">Descripcion (opcional)</label>
+                <textarea id="albumDescripcion" maxlength="500" rows="3" placeholder="Descripcion del album"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-danger" id="eliminarAlbumBtn" style="display: none;">Eliminar</button>
+            <button class="btn-secondary" id="cancelarAlbum">Cancelar</button>
+            <button class="btn-primary" id="guardarAlbum">Guardar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal mover a album -->
+<div class="modal-overlay" id="modalMover" role="dialog" aria-modal="true" aria-labelledby="modalMoverTitulo">
+    <div class="modal-content mover-modal">
+        <div class="modal-header">
+            <h3 id="modalMoverTitulo">Mover a album</h3>
+            <button class="btn-close" id="cerrarModalMover" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="album-options" id="albumOptions" role="radiogroup" aria-label="Seleccionar album destino">
+                <label class="album-option">
+                    <input type="radio" name="albumDestino" value="" checked>
+                    <span>Sin album</span>
+                </label>
+                @foreach (var album in albums)
+                {
+                    <label class="album-option">
+                        <input type="radio" name="albumDestino" value="@album.Id">
+                        <span>@album.Nombre</span>
+                    </label>
+                }
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" id="cancelarMover">Cancelar</button>
+            <button class="btn-primary" id="confirmarMover">Mover</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmacion -->
+<div class="modal-overlay" id="modalConfirm" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitulo" aria-describedby="confirmMensaje">
+    <div class="modal-content confirm-modal">
+        <div class="modal-body">
+            <div class="confirm-icon">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+            </div>
+            <h4 id="confirmTitulo">Confirmar eliminacion</h4>
+            <p id="confirmMensaje">¿Estas seguro de que deseas eliminar estos archivos?</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" id="confirmCancelar">Cancelar</button>
+            <button class="btn-danger" id="confirmAceptar">Eliminar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Google Photos -->
+<div class="modal-overlay" id="modalGooglePhotos" role="dialog" aria-modal="true" aria-labelledby="modalGooglePhotosTitulo">
+    <div class="modal-content google-photos-modal">
+        <div class="modal-header">
+            <h3 id="modalGooglePhotosTitulo">
+                <svg viewBox="0 0 24 24" width="24" height="24" style="margin-right: 8px;">
+                    <path fill="#4285F4" d="M12 7V2.5L6 7h6z"/>
+                    <path fill="#EA4335" d="M12 7h5.5L12 2.5V7z"/>
+                    <path fill="#FBBC05" d="M12 17v4.5l6-4.5h-6z"/>
+                    <path fill="#34A853" d="M12 17H6.5l5.5 4.5V17z"/>
+                    <path fill="#4285F4" d="M7 12H2.5L7 6v6z"/>
+                    <path fill="#EA4335" d="M17 12h4.5L17 6v6z"/>
+                    <path fill="#FBBC05" d="M7 12v6l-4.5-6H7z"/>
+                    <path fill="#34A853" d="M17 12v6l4.5-6H17z"/>
+                </svg>
+                Importar desde Google Photos
+            </h3>
+            <button class="btn-close" id="cerrarModalGooglePhotos" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="modal-body">
+            <!-- Estado: No conectado -->
+            <div id="gpNotConnected" class="gp-connect-prompt">
+                <p>Conecta tu cuenta de Google para importar fotos y videos.</p>
+                <a href="/GooglePhotos/Conectar" class="btn-primary btn-google">
+                    <svg viewBox="0 0 24 24" width="20" height="20" style="margin-right: 8px;">
+                        <path fill="#fff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#fff" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#fff" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#fff" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Conectar con Google
+                </a>
+            </div>
+
+            <!-- Estado: Conectado - Selector -->
+            <div id="gpConnected" style="display: none;">
+                <!-- Tabs: Albumes / Todas las fotos -->
+                <div class="gp-tabs">
+                    <button class="gp-tab active" data-tab="albums">Albumes</button>
+                    <button class="gp-tab" data-tab="all">Todas las fotos</button>
+                </div>
+
+                <!-- Vista de albumes -->
+                <div id="gpAlbumsView" class="gp-view active">
+                    <div class="gp-albums-grid" id="gpAlbumsGrid">
+                        <!-- Se llena dinamicamente -->
+                    </div>
+                    <button class="btn-secondary gp-load-more" id="gpLoadMoreAlbums" style="display: none;">Cargar mas albumes</button>
+                </div>
+
+                <!-- Vista de fotos (todas o de un album) -->
+                <div id="gpPhotosView" class="gp-view" style="display: none;">
+                    <div class="gp-photos-header">
+                        <button class="btn-back-albums" id="gpBackToAlbums" style="display: none;">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 12H5M12 19l-7-7 7-7"/>
+                            </svg>
+                            Volver a albumes
+                        </button>
+                        <span class="gp-selected-count">0 seleccionadas</span>
+                    </div>
+                    <div class="gp-photos-grid" id="gpPhotosGrid">
+                        <!-- Se llena dinamicamente -->
+                    </div>
+                    <button class="btn-secondary gp-load-more" id="gpLoadMorePhotos" style="display: none;">Cargar mas fotos</button>
+                </div>
+
+                <!-- Progreso de importacion -->
+                <div id="gpImportProgress" style="display: none;">
+                    <div class="gp-import-status">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="gpProgressFill"></div>
+                        </div>
+                        <span id="gpProgressText">Importando 0 de 0...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer" id="gpFooter" style="display: none;">
+            <select id="gpAlbumDestino" class="gp-album-select">
+                <option value="">Sin album</option>
+                @foreach (var album in albums)
+                {
+                    <option value="@album.Id">@album.Nombre</option>
+                }
+            </select>
+            <button class="btn-secondary" id="gpDesconectar">Desconectar</button>
+            <button class="btn-primary" id="gpImportar" disabled>Importar seleccionadas</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('[Galeria] Iniciando...');
+
+    // ========================================
+    // TOAST NOTIFICATIONS
+    // ========================================
+    function showToast(message, type = 'success', duration = 4000, action = null) {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+
+        const icons = {
+            success: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+            error: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>',
+            warning: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>'
+        };
+
+        toast.innerHTML = `
+            <span class="toast-icon">${icons[type] || icons.success}</span>
+            <span class="toast-message">${message}</span>
+            ${action ? `<button class="toast-action" onclick="${action.callback}">${action.text}</button>` : ''}
+            <button class="toast-close" aria-label="Cerrar">&times;</button>
+        `;
+
+        container.appendChild(toast);
+
+        toast.querySelector('.toast-close').addEventListener('click', () => removeToast(toast));
+
+        if (duration > 0) {
+            setTimeout(() => removeToast(toast), duration);
+        }
+
+        return toast;
+    }
+
+    function removeToast(toast) {
+        toast.classList.add('hiding');
+        setTimeout(() => toast.remove(), 300);
+    }
+
+    // ========================================
+    // MODAL MANAGEMENT
+    // ========================================
+    let modalOriginalParent = null;
+
+    function openModal(modal) {
+        // Para el visualizador, moverlo al body para evitar problemas de stacking context
+        if (modal.id === 'modalVisualizacion') {
+            modalOriginalParent = modal.parentElement;
+            document.body.appendChild(modal);
+        }
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        modal.querySelector('.btn-close, .modal-content')?.focus();
+    }
+
+    function closeModal(modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+        const video = modal.querySelector('video');
+        if (video) video.pause();
+
+        // Restaurar el modal a su posición original si fue movido
+        if (modal.id === 'modalVisualizacion' && modalOriginalParent) {
+            modalOriginalParent.appendChild(modal);
+            modalOriginalParent = null;
+        }
+    }
+
+    // ========================================
+    // ESTADO Y ELEMENTOS
+    // ========================================
+    let archivosParaSubir = [];
+    let seleccionados = new Set();
+    let mediaActualIndex = -1;
+    let mediaItems = [];
+    let pagina = 1;
+    let uploadXHR = null;
+    const albumActual = @(albumActual.HasValue ? albumActual.Value.ToString() : "null");
+    const filtroActual = '@(filtroActual ?? "")';
+    const csrfToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+
+    // Elementos DOM
+    const grid = document.getElementById('galeriaGrid');
+    const sidebar = document.getElementById('galeriaSidebar');
+    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    const modalSubida = document.getElementById('modalSubida');
+    const modalVisualizacion = document.getElementById('modalVisualizacion');
+    const modalAlbum = document.getElementById('modalAlbum');
+    const modalMover = document.getElementById('modalMover');
+    const modalConfirm = document.getElementById('modalConfirm');
+    const fileInput = document.getElementById('fileInput');
+    const uploadZone = document.getElementById('uploadZone');
+    const uploadPreview = document.getElementById('uploadPreview');
+    const previewGrid = document.getElementById('previewGrid');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    const progressPercent = document.getElementById('progressPercent');
+    const progressSpeed = document.getElementById('progressSpeed');
+    const selectionActions = document.getElementById('selectionActions');
+    const selectedCount = document.getElementById('selectedCount');
+
+    // Inicializar lista de media items
+    mediaItems = Array.from(document.querySelectorAll('.media-item')).map(el => ({
+        id: parseInt(el.dataset.id),
+        tipo: el.dataset.tipo
+    }));
+
+    console.log('[Galeria] Inicializado con', mediaItems.length, 'items');
+
+    // ========================================
+    // MOBILE SIDEBAR
+    // ========================================
+    const btnHamburger = document.getElementById('btnHamburger');
+
+    btnHamburger?.addEventListener('click', () => {
+        const isOpen = sidebar.classList.toggle('open');
+        sidebarBackdrop.classList.toggle('active', isOpen);
+        btnHamburger.setAttribute('aria-expanded', isOpen);
+    });
+
+    sidebarBackdrop?.addEventListener('click', () => {
+        sidebar.classList.remove('open');
+        sidebarBackdrop.classList.remove('active');
+        btnHamburger?.setAttribute('aria-expanded', 'false');
+    });
+
+    // ========================================
+    // SUBIDA DE ARCHIVOS
+    // ========================================
+    document.getElementById('btnSubirArchivos')?.addEventListener('click', () => abrirModalSubida());
+    document.getElementById('btnSubirVacio')?.addEventListener('click', () => abrirModalSubida());
+    document.getElementById('cerrarModalSubida')?.addEventListener('click', () => cerrarModalSubida());
+    document.getElementById('cancelarSubida')?.addEventListener('click', () => cerrarModalSubida());
+
+    function abrirModalSubida() {
+        openModal(modalSubida);
+        archivosParaSubir = [];
+        actualizarPreview();
+    }
+
+    function cerrarModalSubida() {
+        if (uploadXHR) {
+            uploadXHR.abort();
+            uploadXHR = null;
+        }
+        closeModal(modalSubida);
+        archivosParaSubir = [];
+        fileInput.value = '';
+        actualizarPreview();
+        uploadProgress.style.display = 'none';
+    }
+
+    // Drag and drop
+    uploadZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadZone.classList.add('dragover');
+    });
+
+    uploadZone.addEventListener('dragleave', () => {
+        uploadZone.classList.remove('dragover');
+    });
+
+    uploadZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+        const files = Array.from(e.dataTransfer.files);
+        agregarArchivos(files);
+    });
+
+    uploadZone.addEventListener('click', (e) => {
+        if (e.target !== fileInput) {
+            fileInput.click();
+        }
+    });
+
+    fileInput.addEventListener('change', () => {
+        const files = Array.from(fileInput.files);
+        agregarArchivos(files);
+    });
+
+    function agregarArchivos(files) {
+        const maxFiles = 20;
+        if (archivosParaSubir.length + files.length > maxFiles) {
+            showToast(`Maximo ${maxFiles} archivos por subida`, 'warning');
+            files = files.slice(0, maxFiles - archivosParaSubir.length);
+        }
+        archivosParaSubir = [...archivosParaSubir, ...files];
+        actualizarPreview();
+    }
+
+    function actualizarPreview() {
+        if (archivosParaSubir.length === 0) {
+            uploadPreview.style.display = 'none';
+            document.getElementById('confirmarSubida').disabled = true;
+            document.getElementById('btnSubidaText').textContent = 'Subir';
+            return;
+        }
+
+        uploadPreview.style.display = 'block';
+        document.getElementById('confirmarSubida').disabled = false;
+        document.getElementById('btnSubidaText').textContent = `Subir (${archivosParaSubir.length})`;
+
+        previewGrid.innerHTML = archivosParaSubir.map((file, index) => {
+            const isVideo = file.type.startsWith('video/');
+            const url = URL.createObjectURL(file);
+            const size = formatearTamano(file.size);
+            return `
+                <div class="preview-item" title="${file.name} (${size})">
+                    ${isVideo
+                        ? `<video src="${url}" muted></video><div class="preview-video-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`
+                        : `<img src="${url}" alt="${file.name}">`
+                    }
+                    <button class="preview-remove" data-index="${index}" aria-label="Quitar ${file.name}">&times;</button>
+                    <span class="preview-name">${file.name}</span>
+                </div>
+            `;
+        }).join('');
+
+        previewGrid.querySelectorAll('.preview-remove').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const index = parseInt(btn.dataset.index);
+                archivosParaSubir.splice(index, 1);
+                actualizarPreview();
+            });
+        });
+    }
+
+    // Subida con progreso real usando XMLHttpRequest
+    document.getElementById('confirmarSubida')?.addEventListener('click', () => {
+        if (archivosParaSubir.length === 0) return;
+
+        const formData = new FormData();
+        archivosParaSubir.forEach(file => formData.append('archivos', file));
+
+        const albumId = document.getElementById('albumSelect').value;
+        if (albumId) formData.append('albumId', albumId);
+
+        if (csrfToken) {
+            formData.append('__RequestVerificationToken', csrfToken);
+        }
+
+        uploadProgress.style.display = 'block';
+        document.getElementById('confirmarSubida').disabled = true;
+
+        let startTime = Date.now();
+        let lastLoaded = 0;
+
+        uploadXHR = new XMLHttpRequest();
+
+        uploadXHR.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                progressFill.style.width = percent + '%';
+                progressPercent.textContent = percent + '%';
+
+                // Calcular velocidad
+                const elapsed = (Date.now() - startTime) / 1000;
+                const speed = e.loaded / elapsed;
+                progressSpeed.textContent = formatearTamano(speed) + '/s';
+
+                progressText.textContent = `Subiendo ${archivosParaSubir.length} archivo(s)...`;
+            }
+        });
+
+        uploadXHR.addEventListener('load', () => {
+            if (uploadXHR.status === 200) {
+                try {
+                    const result = JSON.parse(uploadXHR.responseText);
+                    if (result.success) {
+                        showToast(result.message, 'success');
+
+                        // Agregar archivos al grid dinamicamente
+                        if (result.archivos && result.archivos.length > 0) {
+                            agregarArchivosAlGrid(result.archivos);
+                        }
+
+                        // Actualizar estadísticas del sidebar
+                        if (result.estadisticas || result.infoCuota) {
+                            actualizarEstadisticas(result.estadisticas, result.infoCuota);
+                        }
+
+                        cerrarModalSubida();
+
+                        // Mostrar errores si los hay
+                        if (result.errores && result.errores.length > 0) {
+                            result.errores.forEach(err => showToast(err, 'warning', 6000));
+                        }
+                    } else {
+                        showToast(result.message || 'Error al subir', 'error');
+                        if (result.errores && result.errores.length > 0) {
+                            result.errores.forEach(err => showToast(err, 'warning', 6000));
+                        }
+                        uploadProgress.style.display = 'none';
+                        document.getElementById('confirmarSubida').disabled = false;
+                    }
+                } catch (e) {
+                    showToast('Error al procesar respuesta', 'error');
+                    uploadProgress.style.display = 'none';
+                    document.getElementById('confirmarSubida').disabled = false;
+                }
+            } else {
+                showToast('Error HTTP ' + uploadXHR.status, 'error');
+                uploadProgress.style.display = 'none';
+                document.getElementById('confirmarSubida').disabled = false;
+            }
+            uploadXHR = null;
+        });
+
+        uploadXHR.addEventListener('error', () => {
+            showToast('Error de conexion', 'error');
+            uploadProgress.style.display = 'none';
+            document.getElementById('confirmarSubida').disabled = false;
+            uploadXHR = null;
+        });
+
+        uploadXHR.addEventListener('abort', () => {
+            showToast('Subida cancelada', 'warning');
+            uploadProgress.style.display = 'none';
+            document.getElementById('confirmarSubida').disabled = false;
+            uploadXHR = null;
+        });
+
+        uploadXHR.open('POST', '/Galeria/Subir');
+        uploadXHR.send(formData);
+    });
+
+    document.getElementById('btnCancelUpload')?.addEventListener('click', () => {
+        if (uploadXHR) {
+            uploadXHR.abort();
+        }
+    });
+
+    // ========================================
+    // VISUALIZACION DE ARCHIVOS
+    // ========================================
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    grid?.addEventListener('click', async (e) => {
+        const item = e.target.closest('.media-item');
+        if (!item) return;
+
+        if (e.target.classList.contains('media-select')) {
+            handleSeleccion(e.target);
+            return;
+        }
+
+        const mediaId = parseInt(item.dataset.id);
+        mediaActualIndex = mediaItems.findIndex(m => m.id === mediaId);
+        await mostrarMedia(mediaId);
+    });
+
+    // Soporte para teclado en grid items
+    grid?.addEventListener('keydown', (e) => {
+        const item = e.target.closest('.media-item');
+        if (!item) return;
+
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            const mediaId = parseInt(item.dataset.id);
+            mediaActualIndex = mediaItems.findIndex(m => m.id === mediaId);
+            mostrarMedia(mediaId);
+        }
+    });
+
+    async function mostrarMedia(mediaId) {
+        const viewerContent = document.getElementById('viewerContent');
+        viewerContent.innerHTML = '<div class="loading-spinner"></div>';
+        openModal(modalVisualizacion);
+
+        try {
+            const response = await fetch(`/Galeria/ObtenerMedia/${mediaId}`);
+            const result = await response.json();
+
+            if (!result.success) {
+                showToast(result.message, 'error');
+                closeModal(modalVisualizacion);
+                return;
+            }
+
+            const media = result.media;
+
+            if (media.tipoMedia === 'video') {
+                viewerContent.innerHTML = `<video src="${media.rutaArchivo}" controls autoplay playsinline></video>`;
+            } else {
+                viewerContent.innerHTML = `<img src="${media.rutaArchivo}" alt="${media.nombreOriginal || 'Imagen'}">`;
+            }
+
+            document.getElementById('viewerNombre').textContent = media.nombreOriginal || 'Sin nombre';
+            document.getElementById('viewerFecha').querySelector('span').textContent = new Date(media.fechaSubida).toLocaleDateString('es-ES', {
+                day: 'numeric', month: 'long', year: 'numeric'
+            });
+            document.getElementById('viewerTamano').querySelector('span').textContent = formatearTamano(media.tamanoBytes);
+
+            // Actualizar contador
+            document.getElementById('viewerCounter').textContent = `${mediaActualIndex + 1} / ${mediaItems.length}`;
+
+            // Actualizar boton favorito
+            const favIcon = document.getElementById('favoritoIcon');
+            const btnFavorito = document.getElementById('btnFavorito');
+            if (media.esFavorito) {
+                favIcon.setAttribute('fill', 'var(--danger)');
+                btnFavorito.classList.add('active');
+            } else {
+                favIcon.setAttribute('fill', 'none');
+                btnFavorito.classList.remove('active');
+            }
+
+            // Actualizar botones de navegacion
+            document.getElementById('btnPrev').disabled = mediaActualIndex === 0;
+            document.getElementById('btnNext').disabled = mediaActualIndex === mediaItems.length - 1;
+
+            // Guardar datos para acciones
+            modalVisualizacion.dataset.mediaId = media.id;
+            modalVisualizacion.dataset.rutaArchivo = media.rutaArchivo;
+            modalVisualizacion.dataset.esFavorito = media.esFavorito;
+
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Error al cargar archivo', 'error');
+            closeModal(modalVisualizacion);
+        }
+    }
+
+    function formatearTamano(bytes) {
+        if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + ' GB';
+        if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+        if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return bytes + ' B';
+    }
+
+    // Actualizar estadísticas del sidebar sin recargar página
+    function actualizarEstadisticas(stats, infoCuota) {
+        if (!stats && !infoCuota) return;
+
+        // Actualizar total de archivos en sidebar
+        const statValues = document.querySelectorAll('.galeria-stats .stat-value');
+        if (stats && statValues.length >= 1 && stats.totalArchivos !== undefined) {
+            statValues[0].textContent = stats.totalArchivos;
+        }
+
+        // Actualizar espacio usado en sidebar (usar infoCuota si está disponible)
+        if (infoCuota && statValues.length >= 2) {
+            statValues[1].textContent = infoCuota.espacioUsado;
+        } else if (stats && statValues.length >= 2 && stats.totalEspacio) {
+            statValues[1].textContent = stats.totalEspacio;
+        }
+
+        // Actualizar contadores de álbumes en sidebar
+        if (stats && stats.albumCounts) {
+            for (const [albumId, count] of Object.entries(stats.albumCounts)) {
+                const albumItem = document.querySelector(`.album-item[href="/Galeria?albumId=${albumId}"]`);
+                if (albumItem) {
+                    const countEl = albumItem.querySelector('.album-count');
+                    if (countEl) {
+                        countEl.textContent = `${count} archivos`;
+                    }
+                }
+            }
+        }
+
+        // Actualizar contador "Mostrando X de Y archivos"
+        const itemsCount = document.querySelector('.items-count');
+        if (stats && itemsCount && stats.totalArchivos !== undefined) {
+            const visibles = document.querySelectorAll('.media-item').length;
+            itemsCount.textContent = `Mostrando ${visibles} de ${stats.totalArchivos} archivos`;
+        }
+
+        // Actualizar barra de cuota
+        if (infoCuota) {
+            const cuotaFill = document.querySelector('.cuota-fill');
+            const cuotaText = document.querySelector('.cuota-text');
+            const cuotaProgress = document.querySelector('.cuota-progress');
+            const cuotaAlert = document.querySelector('.cuota-alert');
+
+            if (cuotaFill) cuotaFill.style.width = Math.min(infoCuota.porcentajeUso, 100) + '%';
+            if (cuotaText) cuotaText.textContent = infoCuota.porcentajeUso + '% usado';
+
+            if (cuotaProgress) {
+                cuotaProgress.classList.remove('warning', 'danger');
+                if (infoCuota.nivelAlerta) {
+                    cuotaProgress.classList.add(infoCuota.nivelAlerta);
+                }
+            }
+
+            // Actualizar mensaje de alerta
+            if (cuotaAlert && infoCuota.mensajeAlerta) {
+                cuotaAlert.textContent = infoCuota.mensajeAlerta;
+                cuotaAlert.style.display = 'block';
+            } else if (cuotaAlert) {
+                cuotaAlert.style.display = 'none';
+            }
+
+            // Actualizar el label de cuota en stats
+            const statLabels = document.querySelectorAll('.galeria-stats .stat-label');
+            if (statLabels.length >= 2 && infoCuota.cuotaMaxima) {
+                statLabels[1].textContent = 'de ' + infoCuota.cuotaMaxima;
+            }
+        }
+
+        console.log('[Galeria] Estadísticas actualizadas:', stats, 'Cuota:', infoCuota);
+    }
+
+    // Agregar archivos subidos al grid dinamicamente
+    function agregarArchivosAlGrid(archivos) {
+        // Quitar empty state si existe
+        const emptyState = document.querySelector('.empty-state');
+        if (emptyState) {
+            emptyState.remove();
+        }
+
+        // Asegurarse de que el grid existe
+        if (!grid) return;
+
+        // Agregar cada archivo al inicio del grid
+        archivos.forEach(archivo => {
+            const esVideo = archivo.tipoMedia === 1 || archivo.tipoMedia === 'Video';
+            const thumbnail = archivo.thumbnail || archivo.rutaArchivo;
+            const nombreOriginal = archivo.nombreOriginal || (esVideo ? 'Video' : 'Imagen');
+
+            const itemHtml = `
+                <div class="media-item" data-id="${archivo.id}" data-tipo="${esVideo ? 'video' : 'imagen'}" tabindex="0" role="gridcell" aria-label="${nombreOriginal}">
+                    <div class="media-checkbox">
+                        <input type="checkbox" class="media-select" data-id="${archivo.id}" aria-label="Seleccionar archivo">
+                    </div>
+                    ${esVideo ? `
+                        <div class="media-thumbnail video">
+                            <img src="${thumbnail}" alt="${nombreOriginal}" loading="lazy">
+                            <div class="video-indicator">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="media-thumbnail">
+                            <img src="${thumbnail}" alt="${nombreOriginal}" loading="lazy">
+                        </div>
+                    `}
+                </div>
+            `;
+
+            grid.insertAdjacentHTML('afterbegin', itemHtml);
+
+            // Agregar al array de mediaItems al inicio
+            mediaItems.unshift({
+                id: archivo.id,
+                tipo: esVideo ? 'video' : 'imagen'
+            });
+        });
+
+        // Actualizar contador de items si existe
+        const itemsCount = document.querySelector('.items-count');
+        if (itemsCount) {
+            const totalArchivos = mediaItems.length;
+            itemsCount.textContent = `Mostrando ${totalArchivos} de ${totalArchivos} archivos`;
+        }
+
+        console.log('[Galeria] Agregados', archivos.length, 'archivos al grid. Total:', mediaItems.length);
+    }
+
+    document.getElementById('cerrarViewer')?.addEventListener('click', () => {
+        closeModal(modalVisualizacion);
+    });
+
+    document.getElementById('btnPrev')?.addEventListener('click', () => {
+        if (mediaActualIndex > 0) {
+            mediaActualIndex--;
+            mostrarMedia(mediaItems[mediaActualIndex].id);
+        }
+    });
+
+    document.getElementById('btnNext')?.addEventListener('click', () => {
+        if (mediaActualIndex < mediaItems.length - 1) {
+            mediaActualIndex++;
+            mostrarMedia(mediaItems[mediaActualIndex].id);
+        }
+    });
+
+    // Swipe navigation para mobile
+    modalVisualizacion?.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    modalVisualizacion?.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    }, { passive: true });
+
+    function handleSwipe() {
+        const diff = touchStartX - touchEndX;
+        const threshold = 50;
+
+        if (Math.abs(diff) > threshold) {
+            if (diff > 0 && mediaActualIndex < mediaItems.length - 1) {
+                // Swipe left - next
+                mediaActualIndex++;
+                mostrarMedia(mediaItems[mediaActualIndex].id);
+            } else if (diff < 0 && mediaActualIndex > 0) {
+                // Swipe right - prev
+                mediaActualIndex--;
+                mostrarMedia(mediaItems[mediaActualIndex].id);
+            }
+        }
+    }
+
+    // Navegacion con teclado
+    document.addEventListener('keydown', (e) => {
+        // Viewer shortcuts
+        if (modalVisualizacion.classList.contains('active')) {
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                document.getElementById('btnPrev')?.click();
+            }
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                document.getElementById('btnNext')?.click();
+            }
+            if (e.key === 'Escape') {
+                closeModal(modalVisualizacion);
+            }
+            if (e.key === 'f' || e.key === 'F') {
+                e.preventDefault();
+                document.getElementById('btnFavorito')?.click();
+            }
+            if (e.key === 'd' || e.key === 'D') {
+                e.preventDefault();
+                document.getElementById('btnDescargar')?.click();
+            }
+            if (e.key === 'Delete') {
+                e.preventDefault();
+                document.getElementById('btnEliminarViewer')?.click();
+            }
+            return;
+        }
+
+        // Grid shortcuts
+        if (!modalSubida.classList.contains('active') &&
+            !modalAlbum.classList.contains('active') &&
+            !modalMover.classList.contains('active')) {
+
+            // Ctrl+A para seleccionar todo
+            if (e.ctrlKey && e.key === 'a') {
+                e.preventDefault();
+                mediaItems.forEach(m => seleccionados.add(m.id));
+                document.querySelectorAll('.media-select').forEach(cb => cb.checked = true);
+                actualizarSeleccion();
+            }
+
+            // Escape para deseleccionar
+            if (e.key === 'Escape' && seleccionados.size > 0) {
+                document.getElementById('btnCancelarSeleccion')?.click();
+            }
+
+            // Delete para eliminar seleccionados
+            if (e.key === 'Delete' && seleccionados.size > 0) {
+                document.getElementById('btnEliminarSeleccion')?.click();
+            }
+
+            // U para subir
+            if (e.key === 'u' || e.key === 'U') {
+                e.preventDefault();
+                abrirModalSubida();
+            }
+        }
+    });
+
+    // Acciones del visualizador
+    document.getElementById('btnFavorito')?.addEventListener('click', async () => {
+        const mediaId = modalVisualizacion.dataset.mediaId;
+        try {
+            const response = await fetch('/Galeria/ToggleFavorito', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': csrfToken || ''
+                },
+                body: JSON.stringify({ mediaId: parseInt(mediaId) })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                const favIcon = document.getElementById('favoritoIcon');
+                const btnFavorito = document.getElementById('btnFavorito');
+                if (result.esFavorito) {
+                    favIcon.setAttribute('fill', 'var(--danger)');
+                    btnFavorito.classList.add('active');
+                    showToast('Agregado a favoritos', 'success', 2000);
+                } else {
+                    favIcon.setAttribute('fill', 'none');
+                    btnFavorito.classList.remove('active');
+                    showToast('Quitado de favoritos', 'success', 2000);
+                }
+                modalVisualizacion.dataset.esFavorito = result.esFavorito;
+
+                // Actualizar badge en grid
+                const item = document.querySelector(`.media-item[data-id="${mediaId}"]`);
+                if (item) {
+                    const badge = item.querySelector('.favorito-badge');
+                    if (result.esFavorito && !badge) {
+                        item.insertAdjacentHTML('beforeend', `
+                            <div class="favorito-badge" aria-label="Favorito">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                </svg>
+                            </div>
+                        `);
+                    } else if (!result.esFavorito && badge) {
+                        badge.remove();
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Error al cambiar favorito', 'error');
+        }
+    });
+
+    document.getElementById('btnDescargar')?.addEventListener('click', () => {
+        const rutaArchivo = modalVisualizacion.dataset.rutaArchivo;
+        const a = document.createElement('a');
+        a.href = rutaArchivo;
+        a.download = '';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showToast('Descargando archivo...', 'success', 2000);
+    });
+
+    // Publicar desde el visor (lightbox) - abre el modal de selección de tipo
+    document.getElementById('btnPublicar')?.addEventListener('click', () => {
+        const mediaId = parseInt(modalVisualizacion.dataset.mediaId);
+        if (!mediaId) {
+            showToast('No hay archivo seleccionado', 'error');
+            return;
+        }
+
+        // Cerrar el visor y abrir el modal de publicar
+        closeModal(modalVisualizacion);
+
+        // Temporalmente agregar este ID a seleccionados para usar el mismo flujo
+        seleccionados.clear();
+        seleccionados.add(mediaId);
+
+        const countEl = document.getElementById('publishMediaCount');
+        if (countEl) countEl.textContent = '1';
+
+        // Abrir modal después de un pequeño delay para que se cierre el visor
+        setTimeout(() => {
+            const modalPub = document.getElementById('modalPublicar');
+            if (modalPub) openModal(modalPub);
+        }, 200);
+    });
+
+    document.getElementById('btnEliminarViewer')?.addEventListener('click', () => {
+        const mediaId = modalVisualizacion.dataset.mediaId;
+        mostrarConfirmacion(
+            'Eliminar archivo',
+            '¿Estas seguro de que deseas eliminar este archivo? Esta accion no se puede deshacer.',
+            async () => {
+                try {
+                    const response = await fetch('/Galeria/Eliminar', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': csrfToken || ''
+                        },
+                        body: JSON.stringify({ ids: [parseInt(mediaId)] })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        closeModal(modalVisualizacion);
+                        document.querySelector(`.media-item[data-id="${mediaId}"]`)?.remove();
+                        mediaItems = mediaItems.filter(m => m.id !== parseInt(mediaId));
+                        showToast('Archivo eliminado', 'success');
+
+                        // Actualizar estadísticas del sidebar
+                        if (result.estadisticas || result.infoCuota) {
+                            actualizarEstadisticas(result.estadisticas, result.infoCuota);
+                        }
+                    } else {
+                        showToast(result.message, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showToast('Error al eliminar', 'error');
+                }
+            }
+        );
+    });
+
+    // ========================================
+    // CONFIRMACION MODAL
+    // ========================================
+    let confirmCallback = null;
+
+    function mostrarConfirmacion(titulo, mensaje, callback) {
+        document.getElementById('confirmTitulo').textContent = titulo;
+        document.getElementById('confirmMensaje').textContent = mensaje;
+        confirmCallback = callback;
+        openModal(modalConfirm);
+    }
+
+    document.getElementById('confirmAceptar')?.addEventListener('click', () => {
+        closeModal(modalConfirm);
+        if (confirmCallback) {
+            confirmCallback();
+            confirmCallback = null;
+        }
+    });
+
+    document.getElementById('confirmCancelar')?.addEventListener('click', () => {
+        closeModal(modalConfirm);
+        confirmCallback = null;
+    });
+
+    // ========================================
+    // SELECCION MULTIPLE
+    // ========================================
+    function handleSeleccion(checkbox) {
+        const mediaId = parseInt(checkbox.dataset.id);
+        if (checkbox.checked) {
+            seleccionados.add(mediaId);
+        } else {
+            seleccionados.delete(mediaId);
+        }
+        actualizarSeleccion();
+    }
+
+    function actualizarSeleccion() {
+        selectedCount.textContent = seleccionados.size;
+        selectionActions.style.display = seleccionados.size > 0 ? 'flex' : 'none';
+
+        document.querySelectorAll('.media-item').forEach(item => {
+            const id = parseInt(item.dataset.id);
+            item.classList.toggle('selected', seleccionados.has(id));
+        });
+    }
+
+    document.getElementById('btnCancelarSeleccion')?.addEventListener('click', () => {
+        seleccionados.clear();
+        document.querySelectorAll('.media-select').forEach(cb => cb.checked = false);
+        actualizarSeleccion();
+    });
+
+    // ========================================
+    // PUBLICAR SELECCIONADOS
+    // ========================================
+    const modalPublicar = document.getElementById('modalPublicar');
+    const publishMediaCount = document.getElementById('publishMediaCount');
+
+    document.getElementById('btnPublicarSeleccion')?.addEventListener('click', () => {
+        if (seleccionados.size === 0) {
+            showToast('Selecciona al menos un archivo', 'error');
+            return;
+        }
+        publishMediaCount.textContent = seleccionados.size;
+        openModal(modalPublicar);
+    });
+
+    document.getElementById('cerrarModalPublicar')?.addEventListener('click', () => {
+        closeModal(modalPublicar);
+    });
+
+    // Opcion: Publicacion (Post/Carrusel)
+    document.getElementById('opcionPost')?.addEventListener('click', () => {
+        const ids = Array.from(seleccionados);
+        closeModal(modalPublicar);
+
+        if (ids.length === 0) {
+            showToast('Selecciona al menos un archivo', 'error');
+            return;
+        }
+
+        // Siempre usar galeriaMediaIds (el backend maneja 1 o más)
+        const params = ids.map(id => `galeriaMediaIds=${id}`).join('&');
+        showToast(`Redirigiendo a crear publicación con ${ids.length} archivo(s)...`, 'success', 1500);
+        setTimeout(() => {
+            window.location.href = `/Contenido/Crear?${params}`;
+        }, 500);
+    });
+
+    // Opcion: Reel (solo 1 video)
+    document.getElementById('opcionReel')?.addEventListener('click', () => {
+        const ids = Array.from(seleccionados);
+        closeModal(modalPublicar);
+
+        // Buscar el primer video seleccionado
+        const primerVideo = mediaItems.find(m => seleccionados.has(m.id) && m.tipo === 'video');
+
+        if (primerVideo) {
+            showToast('Redirigiendo al editor de Reels...', 'success', 1500);
+            setTimeout(() => {
+                window.location.href = `/Stories/Editor?modo=reel&galeriaMediaId=${primerVideo.id}`;
+            }, 500);
+        } else if (ids.length > 0) {
+            // Si no hay video, usar la primera imagen
+            showToast('Redirigiendo al editor de Reels con imagen...', 'success', 1500);
+            setTimeout(() => {
+                window.location.href = `/Stories/Editor?modo=reel&galeriaMediaId=${ids[0]}`;
+            }, 500);
+        } else {
+            showToast('Selecciona un archivo para crear el Reel', 'error');
+        }
+    });
+
+    // Opcion: Historia (1 archivo por historia)
+    document.getElementById('opcionStory')?.addEventListener('click', () => {
+        const ids = Array.from(seleccionados);
+        closeModal(modalPublicar);
+
+        if (ids.length === 0) {
+            showToast('Selecciona un archivo para la historia', 'error');
+            return;
+        }
+
+        if (ids.length > 1) {
+            showToast('Se usará el primer archivo seleccionado para la historia', 'info', 2000);
+        }
+
+        showToast('Redirigiendo al editor de Historias...', 'success', 1500);
+        setTimeout(() => {
+            window.location.href = `/Stories/Editor?galeriaMediaId=${ids[0]}`;
+        }, 500);
+    });
+
+    // Cerrar modal con clic en overlay
+    modalPublicar?.addEventListener('click', (e) => {
+        if (e.target === modalPublicar) {
+            closeModal(modalPublicar);
+        }
+    });
+
+    // Cerrar con Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modalPublicar?.classList.contains('active')) {
+            closeModal(modalPublicar);
+        }
+    });
+
+    document.getElementById('btnEliminarSeleccion')?.addEventListener('click', () => {
+        mostrarConfirmacion(
+            'Eliminar archivos',
+            `¿Estas seguro de que deseas eliminar ${seleccionados.size} archivo(s)? Esta accion no se puede deshacer.`,
+            async () => {
+                try {
+                    const cantidadAEliminar = seleccionados.size;
+                    const response = await fetch('/Galeria/Eliminar', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': csrfToken || ''
+                        },
+                        body: JSON.stringify({ ids: Array.from(seleccionados) })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        seleccionados.forEach(id => {
+                            document.querySelector(`.media-item[data-id="${id}"]`)?.remove();
+                        });
+                        mediaItems = mediaItems.filter(m => !seleccionados.has(m.id));
+                        showToast(`${cantidadAEliminar} archivo(s) eliminado(s)`, 'success');
+                        seleccionados.clear();
+                        actualizarSeleccion();
+
+                        // Actualizar estadísticas del sidebar
+                        if (result.estadisticas || result.infoCuota) {
+                            actualizarEstadisticas(result.estadisticas, result.infoCuota);
+                        }
+                    } else {
+                        showToast(result.message, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showToast('Error al eliminar', 'error');
+                }
+            }
+        );
+    });
+
+    document.getElementById('btnMoverSeleccion')?.addEventListener('click', () => {
+        openModal(modalMover);
+    });
+
+    // ========================================
+    // MOVER A ALBUM
+    // ========================================
+    document.getElementById('cerrarModalMover')?.addEventListener('click', () => closeModal(modalMover));
+    document.getElementById('cancelarMover')?.addEventListener('click', () => closeModal(modalMover));
+
+    document.getElementById('confirmarMover')?.addEventListener('click', async () => {
+        const albumId = document.querySelector('input[name="albumDestino"]:checked')?.value;
+
+        try {
+            const response = await fetch('/Galeria/MoverAAlbum', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': csrfToken || ''
+                },
+                body: JSON.stringify({
+                    mediaIds: Array.from(seleccionados),
+                    albumId: albumId ? parseInt(albumId) : null
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                closeModal(modalMover);
+                showToast(result.message, 'success');
+                setTimeout(() => window.location.reload(), 800);
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Error al mover archivos', 'error');
+        }
+    });
+
+    // ========================================
+    // GESTION DE ALBUMS
+    // ========================================
+    document.getElementById('btnNuevoAlbum')?.addEventListener('click', () => {
+        document.getElementById('modalAlbumTitulo').textContent = 'Crear album';
+        document.getElementById('albumEditId').value = '';
+        document.getElementById('albumNombre').value = '';
+        document.getElementById('albumDescripcion').value = '';
+        document.getElementById('eliminarAlbumBtn').style.display = 'none';
+        openModal(modalAlbum);
+        document.getElementById('albumNombre').focus();
+    });
+
+    document.querySelectorAll('.btn-edit-album').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const albumId = btn.dataset.albumId;
+            document.getElementById('modalAlbumTitulo').textContent = 'Editar album';
+            document.getElementById('albumEditId').value = albumId;
+            document.getElementById('eliminarAlbumBtn').style.display = 'block';
+            openModal(modalAlbum);
+
+            // Cargar datos del album actual
+            const albumName = document.querySelector('.header-left h1')?.textContent;
+            document.getElementById('albumNombre').value = albumName || '';
+        });
+    });
+
+    document.getElementById('cerrarModalAlbum')?.addEventListener('click', () => closeModal(modalAlbum));
+    document.getElementById('cancelarAlbum')?.addEventListener('click', () => closeModal(modalAlbum));
+
+    document.getElementById('guardarAlbum')?.addEventListener('click', async () => {
+        const editId = document.getElementById('albumEditId').value;
+        const nombre = document.getElementById('albumNombre').value.trim();
+        const descripcion = document.getElementById('albumDescripcion').value.trim();
+
+        if (!nombre) {
+            showToast('El nombre es requerido', 'warning');
+            document.getElementById('albumNombre').focus();
+            return;
+        }
+
+        try {
+            const url = editId ? '/Galeria/EditarAlbum' : '/Galeria/CrearAlbum';
+            const body = editId
+                ? { id: parseInt(editId), nombre, descripcion }
+                : { nombre, descripcion };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': csrfToken || ''
+                },
+                body: JSON.stringify(body)
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                closeModal(modalAlbum);
+                showToast(editId ? 'Album actualizado' : 'Album creado', 'success');
+                setTimeout(() => window.location.reload(), 800);
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Error al guardar album', 'error');
+        }
+    });
+
+    document.getElementById('eliminarAlbumBtn')?.addEventListener('click', () => {
+        mostrarConfirmacion(
+            'Eliminar album',
+            '¿Estas seguro de que deseas eliminar este album? Los archivos NO se eliminaran, solo se moveran a "Sin album".',
+            async () => {
+                const editId = document.getElementById('albumEditId').value;
+                try {
+                    const response = await fetch('/Galeria/EliminarAlbum', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': csrfToken || ''
+                        },
+                        body: JSON.stringify({ id: parseInt(editId) })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        showToast('Album eliminado', 'success');
+                        window.location.href = '/Galeria';
+                    } else {
+                        showToast(result.message, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showToast('Error al eliminar album', 'error');
+                }
+            }
+        );
+    });
+
+    // Cerrar modales al hacer clic fuera
+    [modalSubida, modalVisualizacion, modalAlbum, modalMover, modalConfirm].forEach(modal => {
+        modal?.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal(modal);
+            }
+        });
+    });
+
+    // Cerrar con Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            [modalSubida, modalAlbum, modalMover, modalConfirm].forEach(modal => {
+                if (modal?.classList.contains('active')) {
+                    closeModal(modal);
+                }
+            });
+        }
+    });
+
+    // ========================================
+    // GOOGLE PHOTOS INTEGRATION
+    // ========================================
+    const modalGooglePhotos = document.getElementById('modalGooglePhotos');
+    let gpAccessToken = null;
+    let gpAlbumsPageToken = null;
+    let gpPhotosPageToken = null;
+    let gpCurrentAlbumId = null;
+    let gpSelectedPhotos = new Map(); // id -> {baseUrl, filename, mimeType}
+
+    // Abrir modal
+    document.getElementById('btnGooglePhotos')?.addEventListener('click', () => {
+        openModal(modalGooglePhotos);
+        checkGooglePhotosConnection();
+    });
+
+    document.getElementById('cerrarModalGooglePhotos')?.addEventListener('click', () => {
+        closeModal(modalGooglePhotos);
+    });
+
+    // Verificar si ya esta conectado
+    async function checkGooglePhotosConnection() {
+        try {
+            const response = await fetch('/GooglePhotos/Estado');
+            const result = await response.json();
+
+            if (result.conectado) {
+                document.getElementById('gpNotConnected').style.display = 'none';
+                document.getElementById('gpConnected').style.display = 'block';
+                document.getElementById('gpFooter').style.display = 'flex';
+                loadGooglePhotosAlbums();
+            } else {
+                document.getElementById('gpNotConnected').style.display = 'block';
+                document.getElementById('gpConnected').style.display = 'none';
+                document.getElementById('gpFooter').style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Error verificando conexion Google Photos:', error);
+        }
+    }
+
+    // Cargar albumes
+    async function loadGooglePhotosAlbums(append = false) {
+        try {
+            const url = gpAlbumsPageToken ? `/GooglePhotos/Albumes?pageToken=${gpAlbumsPageToken}` : '/GooglePhotos/Albumes';
+            const response = await fetch(url);
+            const result = await response.json();
+
+            if (!result.success) {
+                if (result.requiresAuth) {
+                    document.getElementById('gpNotConnected').style.display = 'block';
+                    document.getElementById('gpConnected').style.display = 'none';
+                }
+                return;
+            }
+
+            const grid = document.getElementById('gpAlbumsGrid');
+            if (!append) grid.innerHTML = '';
+
+            result.albums?.albums?.forEach(album => {
+                const div = document.createElement('div');
+                div.className = 'gp-album-item';
+                div.dataset.albumId = album.id;
+                div.innerHTML = `
+                    <div class="gp-album-cover">
+                        ${album.coverPhotoBaseUrl ? `<img src="${album.coverPhotoBaseUrl}=w200-h200-c" alt="${album.title}">` : '<div class="gp-album-placeholder"></div>'}
+                    </div>
+                    <div class="gp-album-info">
+                        <span class="gp-album-title">${album.title}</span>
+                        <span class="gp-album-count">${album.mediaItemsCount || 0} items</span>
+                    </div>
+                `;
+                div.addEventListener('click', () => openGooglePhotosAlbum(album.id, album.title));
+                grid.appendChild(div);
+            });
+
+            gpAlbumsPageToken = result.albums?.nextPageToken;
+            document.getElementById('gpLoadMoreAlbums').style.display = gpAlbumsPageToken ? 'block' : 'none';
+        } catch (error) {
+            console.error('Error cargando albumes:', error);
+            showToast('Error al cargar albumes de Google Photos', 'error');
+        }
+    }
+
+    // Abrir un album
+    function openGooglePhotosAlbum(albumId, title) {
+        gpCurrentAlbumId = albumId;
+        gpPhotosPageToken = null;
+        document.getElementById('gpAlbumsView').style.display = 'none';
+        document.getElementById('gpPhotosView').style.display = 'block';
+        document.getElementById('gpBackToAlbums').style.display = 'flex';
+        loadGooglePhotosPhotos();
+    }
+
+    // Cargar fotos
+    async function loadGooglePhotosPhotos(append = false) {
+        try {
+            let url = '/GooglePhotos/Fotos';
+            const params = new URLSearchParams();
+            if (gpCurrentAlbumId) params.append('albumId', gpCurrentAlbumId);
+            if (gpPhotosPageToken) params.append('pageToken', gpPhotosPageToken);
+            if (params.toString()) url += '?' + params.toString();
+
+            const response = await fetch(url);
+            const result = await response.json();
+
+            if (!result.success) return;
+
+            const grid = document.getElementById('gpPhotosGrid');
+            if (!append) grid.innerHTML = '';
+
+            result.mediaItems?.mediaItems?.forEach(item => {
+                const isVideo = item.mimeType?.startsWith('video/');
+                const div = document.createElement('div');
+                div.className = 'gp-photo-item' + (gpSelectedPhotos.has(item.id) ? ' selected' : '');
+                div.dataset.id = item.id;
+                div.innerHTML = `
+                    <img src="${item.baseUrl}=w200-h200-c" alt="${item.filename || ''}">
+                    ${isVideo ? '<div class="gp-video-badge"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>' : ''}
+                    <div class="gp-photo-check"></div>
+                `;
+                div.addEventListener('click', () => toggleGooglePhotoSelection(item));
+                grid.appendChild(div);
+            });
+
+            gpPhotosPageToken = result.mediaItems?.nextPageToken;
+            document.getElementById('gpLoadMorePhotos').style.display = gpPhotosPageToken ? 'block' : 'none';
+        } catch (error) {
+            console.error('Error cargando fotos:', error);
+            showToast('Error al cargar fotos de Google Photos', 'error');
+        }
+    }
+
+    // Seleccionar/deseleccionar foto
+    function toggleGooglePhotoSelection(item) {
+        const el = document.querySelector(`.gp-photo-item[data-id="${item.id}"]`);
+        if (gpSelectedPhotos.has(item.id)) {
+            gpSelectedPhotos.delete(item.id);
+            el?.classList.remove('selected');
+        } else {
+            if (gpSelectedPhotos.size >= 50) {
+                showToast('Maximo 50 fotos por importacion', 'warning');
+                return;
+            }
+            gpSelectedPhotos.set(item.id, {
+                id: item.id,
+                baseUrl: item.baseUrl,
+                filename: item.filename,
+                mimeType: item.mimeType
+            });
+            el?.classList.add('selected');
+        }
+        updateGooglePhotosSelection();
+    }
+
+    function updateGooglePhotosSelection() {
+        const count = gpSelectedPhotos.size;
+        document.querySelector('.gp-selected-count').textContent = `${count} seleccionada${count !== 1 ? 's' : ''}`;
+        document.getElementById('gpImportar').disabled = count === 0;
+    }
+
+    // Tabs
+    document.querySelectorAll('.gp-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.gp-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            if (tab.dataset.tab === 'albums') {
+                document.getElementById('gpAlbumsView').style.display = 'block';
+                document.getElementById('gpPhotosView').style.display = 'none';
+            } else {
+                gpCurrentAlbumId = null;
+                gpPhotosPageToken = null;
+                document.getElementById('gpAlbumsView').style.display = 'none';
+                document.getElementById('gpPhotosView').style.display = 'block';
+                document.getElementById('gpBackToAlbums').style.display = 'none';
+                loadGooglePhotosPhotos();
+            }
+        });
+    });
+
+    // Volver a albumes
+    document.getElementById('gpBackToAlbums')?.addEventListener('click', () => {
+        document.getElementById('gpAlbumsView').style.display = 'block';
+        document.getElementById('gpPhotosView').style.display = 'none';
+        document.querySelectorAll('.gp-tab').forEach(t => t.classList.remove('active'));
+        document.querySelector('.gp-tab[data-tab="albums"]').classList.add('active');
+    });
+
+    // Cargar mas
+    document.getElementById('gpLoadMoreAlbums')?.addEventListener('click', () => loadGooglePhotosAlbums(true));
+    document.getElementById('gpLoadMorePhotos')?.addEventListener('click', () => loadGooglePhotosPhotos(true));
+
+    // Importar
+    document.getElementById('gpImportar')?.addEventListener('click', async () => {
+        if (gpSelectedPhotos.size === 0) return;
+
+        const mediaItems = Array.from(gpSelectedPhotos.values());
+        const albumId = document.getElementById('gpAlbumDestino').value || null;
+
+        document.getElementById('gpImportProgress').style.display = 'block';
+        document.getElementById('gpImportar').disabled = true;
+
+        try {
+            const response = await fetch('/GooglePhotos/Importar', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': csrfToken || ''
+                },
+                body: JSON.stringify({ mediaItems, albumId: albumId ? parseInt(albumId) : null })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast(`${result.importados} archivo(s) importado(s)`, 'success');
+                if (result.archivos?.length > 0) {
+                    agregarArchivosAlGrid(result.archivos);
+                }
+                if (result.estadisticas || result.infoCuota) {
+                    actualizarEstadisticas(result.estadisticas, result.infoCuota);
+                }
+                gpSelectedPhotos.clear();
+                updateGooglePhotosSelection();
+                closeModal(modalGooglePhotos);
+            } else {
+                showToast(result.message || 'Error al importar', 'error');
+            }
+        } catch (error) {
+            console.error('Error importando:', error);
+            showToast('Error al importar fotos', 'error');
+        } finally {
+            document.getElementById('gpImportProgress').style.display = 'none';
+            document.getElementById('gpImportar').disabled = false;
+        }
+    });
+
+    // Desconectar
+    document.getElementById('gpDesconectar')?.addEventListener('click', async () => {
+        try {
+            await fetch('/GooglePhotos/Desconectar', { method: 'POST' });
+            document.getElementById('gpNotConnected').style.display = 'block';
+            document.getElementById('gpConnected').style.display = 'none';
+            document.getElementById('gpFooter').style.display = 'none';
+            gpSelectedPhotos.clear();
+            showToast('Desconectado de Google Photos', 'success');
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    });
+
+    // Abrir modal si viene del callback
+    if (new URLSearchParams(window.location.search).get('abrirGooglePhotos') === 'true') {
+        // Limpiar URL
+        window.history.replaceState({}, '', window.location.pathname);
+        setTimeout(() => {
+            document.getElementById('btnGooglePhotos')?.click();
+        }, 500);
+    }
+
+    // Cerrar modal Google Photos con clic en overlay
+    modalGooglePhotos?.addEventListener('click', (e) => {
+        if (e.target === modalGooglePhotos) {
+            closeModal(modalGooglePhotos);
+        }
+    });
+
+    console.log('[Galeria] Script completamente cargado');
+});
+</script>
+}

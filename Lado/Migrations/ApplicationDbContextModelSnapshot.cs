@@ -210,6 +210,54 @@ namespace Lado.Migrations
                     b.ToTable("Agencias");
                 });
 
+            modelBuilder.Entity("Lado.Models.Album", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Descripcion")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("EsPrivado")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("FechaActualizacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ImagenPortada")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Orden")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId")
+                        .HasDatabaseName("IX_Albums_UsuarioId");
+
+                    b.HasIndex("UsuarioId", "Orden")
+                        .HasDatabaseName("IX_Albums_UsuarioId_Orden");
+
+                    b.ToTable("Albums");
+                });
+
             modelBuilder.Entity("Lado.Models.AlgoritmoFeed", b =>
                 {
                     b.Property<int>("Id")
@@ -637,6 +685,9 @@ namespace Lado.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<long?>("CuotaAlmacenamientoMB")
+                        .HasColumnType("bigint");
+
                     b.Property<bool>("DetectarUbicacionAutomaticamente")
                         .HasColumnType("bit");
 
@@ -720,6 +771,9 @@ namespace Lado.Migrations
                     b.Property<string>("FotoPortada")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("FotoPortadaLadoB")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("Genero")
                         .HasColumnType("int");
 
@@ -759,6 +813,9 @@ namespace Lado.Migrations
                         .HasColumnType("bit");
 
                     b.Property<bool>("MostrarEstadoEnLinea")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("MostrarLinkInBio")
                         .HasColumnType("bit");
 
                     b.Property<bool>("MostrarSeguidores")
@@ -1016,6 +1073,82 @@ namespace Lado.Migrations
                         .HasDatabaseName("IX_ArchivosContenido_Contenido_Orden");
 
                     b.ToTable("ArchivosContenido");
+                });
+
+            modelBuilder.Entity("Lado.Models.ArticuloBlog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AutorId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("Categoria")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Contenido")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("EsDestacado")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("EstaPublicado")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FechaModificacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FechaPublicacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ImagenPortada")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("MetaDescripcion")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("MetaTitulo")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("PalabrasClave")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Resumen")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("TiempoLecturaMinutos")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Vistas")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AutorId");
+
+                    b.ToTable("ArticulosBlog");
                 });
 
             modelBuilder.Entity("Lado.Models.AuditoriaConfiguracion", b =>
@@ -1603,6 +1736,10 @@ namespace Lado.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("ImagenPortada")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
                     b.Property<string>("Nombre")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -1610,6 +1747,10 @@ namespace Lado.Migrations
 
                     b.Property<int>("Orden")
                         .HasColumnType("int");
+
+                    b.Property<string>("Slug")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.HasKey("Id");
 
@@ -2315,7 +2456,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "ComisionBilleteraElectronica",
                             Descripcion = "Comision por usar billetera electronica (%)",
-                            UltimaModificacion = new DateTime(2026, 1, 16, 21, 42, 53, 552, DateTimeKind.Local).AddTicks(5939),
+                            UltimaModificacion = new DateTime(2026, 1, 26, 23, 28, 42, 772, DateTimeKind.Local).AddTicks(1708),
                             Valor = "2.5"
                         },
                         new
@@ -2324,7 +2465,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "TiempoProcesoRetiro",
                             Descripcion = "Tiempo estimado para procesar retiros",
-                            UltimaModificacion = new DateTime(2026, 1, 16, 21, 42, 53, 552, DateTimeKind.Local).AddTicks(6017),
+                            UltimaModificacion = new DateTime(2026, 1, 26, 23, 28, 42, 772, DateTimeKind.Local).AddTicks(1838),
                             Valor = "3-5 dias habiles"
                         },
                         new
@@ -2333,7 +2474,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMinimoRecarga",
                             Descripcion = "Monto minimo para recargar saldo",
-                            UltimaModificacion = new DateTime(2026, 1, 16, 21, 42, 53, 552, DateTimeKind.Local).AddTicks(6028),
+                            UltimaModificacion = new DateTime(2026, 1, 26, 23, 28, 42, 772, DateTimeKind.Local).AddTicks(1840),
                             Valor = "5"
                         },
                         new
@@ -2342,7 +2483,7 @@ namespace Lado.Migrations
                             Categoria = "Billetera",
                             Clave = "MontoMaximoRecarga",
                             Descripcion = "Monto maximo para recargar saldo",
-                            UltimaModificacion = new DateTime(2026, 1, 16, 21, 42, 53, 552, DateTimeKind.Local).AddTicks(6030),
+                            UltimaModificacion = new DateTime(2026, 1, 26, 23, 28, 42, 772, DateTimeKind.Local).AddTicks(1842),
                             Valor = "1000"
                         },
                         new
@@ -2351,7 +2492,7 @@ namespace Lado.Migrations
                             Categoria = "General",
                             Clave = "ComisionPlataforma",
                             Descripcion = "Comision general de la plataforma (%)",
-                            UltimaModificacion = new DateTime(2026, 1, 16, 21, 42, 53, 552, DateTimeKind.Local).AddTicks(6032),
+                            UltimaModificacion = new DateTime(2026, 1, 26, 23, 28, 42, 772, DateTimeKind.Local).AddTicks(1844),
                             Valor = "20"
                         });
                 });
@@ -4124,6 +4265,97 @@ namespace Lado.Migrations
                     b.HasIndex("UsuarioId");
 
                     b.ToTable("MediaBiblioteca");
+                });
+
+            modelBuilder.Entity("Lado.Models.MediaGaleria", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AlbumId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("Alto")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("Ancho")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ContenidoAsociadoId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Descripcion")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("DuracionSegundos")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("EsFavorito")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("FechaSubida")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("HashArchivo")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int?>("MensajeAsociadoId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("NombreOriginal")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("RutaArchivo")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Tags")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<long>("TamanoBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Thumbnail")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("TipoMedia")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AlbumId")
+                        .HasDatabaseName("IX_MediasGaleria_AlbumId");
+
+                    b.HasIndex("ContenidoAsociadoId");
+
+                    b.HasIndex("HashArchivo")
+                        .HasDatabaseName("IX_MediasGaleria_HashArchivo");
+
+                    b.HasIndex("MensajeAsociadoId");
+
+                    b.HasIndex("UsuarioId")
+                        .HasDatabaseName("IX_MediasGaleria_UsuarioId");
+
+                    b.HasIndex("UsuarioId", "EsFavorito")
+                        .HasDatabaseName("IX_MediasGaleria_UsuarioId_EsFavorito");
+
+                    b.HasIndex("UsuarioId", "FechaSubida")
+                        .HasDatabaseName("IX_MediasGaleria_UsuarioId_FechaSubida");
+
+                    b.ToTable("MediasGaleria");
                 });
 
             modelBuilder.Entity("Lado.Models.MensajeDesafio", b =>
@@ -7328,6 +7560,17 @@ namespace Lado.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("Lado.Models.Album", b =>
+                {
+                    b.HasOne("Lado.Models.ApplicationUser", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("Lado.Models.Anuncio", b =>
                 {
                     b.HasOne("Lado.Models.Agencia", "Agencia")
@@ -7382,6 +7625,15 @@ namespace Lado.Migrations
                         .IsRequired();
 
                     b.Navigation("Contenido");
+                });
+
+            modelBuilder.Entity("Lado.Models.ArticuloBlog", b =>
+                {
+                    b.HasOne("Lado.Models.ApplicationUser", "Autor")
+                        .WithMany()
+                        .HasForeignKey("AutorId");
+
+                    b.Navigation("Autor");
                 });
 
             modelBuilder.Entity("Lado.Models.AuditoriaConfiguracion", b =>
@@ -7948,6 +8200,38 @@ namespace Lado.Migrations
                     b.Navigation("ContenidoPublicado");
 
                     b.Navigation("StoryPublicado");
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("Lado.Models.MediaGaleria", b =>
+                {
+                    b.HasOne("Lado.Models.Album", "Album")
+                        .WithMany("Archivos")
+                        .HasForeignKey("AlbumId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Lado.Models.Contenido", "ContenidoAsociado")
+                        .WithMany()
+                        .HasForeignKey("ContenidoAsociadoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Lado.Models.ChatMensaje", "MensajeAsociado")
+                        .WithMany()
+                        .HasForeignKey("MensajeAsociadoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Lado.Models.ApplicationUser", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Album");
+
+                    b.Navigation("ContenidoAsociado");
+
+                    b.Navigation("MensajeAsociado");
 
                     b.Navigation("Usuario");
                 });
@@ -8680,6 +8964,11 @@ namespace Lado.Migrations
                     b.Navigation("Anuncios");
 
                     b.Navigation("Transacciones");
+                });
+
+            modelBuilder.Entity("Lado.Models.Album", b =>
+                {
+                    b.Navigation("Archivos");
                 });
 
             modelBuilder.Entity("Lado.Models.Anuncio", b =>

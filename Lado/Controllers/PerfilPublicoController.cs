@@ -48,25 +48,47 @@ namespace Lado.Controllers
                 return RedirectToAction("Index", "Home");
             }
 
+            // Determinar si se accedió via Seudonimo (LadoB) o UserName (LadoA)
+            var accesoViaSeudonimo = !string.IsNullOrEmpty(usuario.Seudonimo) &&
+                usuario.Seudonimo.Equals(username, StringComparison.OrdinalIgnoreCase);
+
             var estaAutenticado = User.Identity?.IsAuthenticated ?? false;
             var esCreadorLadoBVerificado = usuario.EsCreador && usuario.CreadorVerificado && usuario.TieneLadoB();
 
-            // Si es creador LadoB verificado → siempre mostrar perfil público
-            // para que cualquier persona pueda verlo y suscribirse
-            if (esCreadorLadoBVerificado)
+            // Si el perfil es privado y el usuario no está autenticado → redirigir al login
+            if (usuario.PerfilPrivado && !estaAutenticado)
             {
-                _logger.LogInformation("Redirigiendo /@{Username} a perfil público LadoB (ID: {Id})",
+                _logger.LogInformation("Perfil privado /@{Username} → redirigir a login (ID: {Id})",
                     username, usuario.Id);
-                return RedirectToAction("VerPerfil", "FeedPublico", new { id = usuario.Id });
+                TempData["Info"] = "Este perfil es privado. Inicia sesión para verlo.";
+                return RedirectToAction("Login", "Account", new { returnUrl = $"/@{username}" });
             }
 
-            // Si está autenticado → perfil privado en Feed
-            if (estaAutenticado)
+            // Si accedió via Seudonimo y es creador LadoB verificado → mostrar perfil LadoB
+            if (accesoViaSeudonimo && esCreadorLadoBVerificado)
             {
-                return RedirectToAction("Perfil", "Feed", new { id = usuario.Id });
+                _logger.LogInformation("Acceso via Seudonimo /@{Seudonimo} → perfil LadoB", username);
+                // ⭐ SEGURIDAD: Pasar seudónimo como identificador, NO el user ID real
+                return RedirectToAction("VerPerfil", "FeedPublico", new { id = usuario.Seudonimo, ladoB = true });
             }
 
-            // Si no está autenticado y no es LadoB → mostrar perfil público básico
+            // Si accedió via UserName → mostrar perfil LadoA (público/gratuito)
+            if (!accesoViaSeudonimo)
+            {
+                _logger.LogInformation("Acceso via UserName /@{Username} → perfil LadoA", username);
+
+                // Si está autenticado → perfil privado en Feed
+                if (estaAutenticado)
+                {
+                    return RedirectToAction("Perfil", "Feed", new { id = usuario.Id, verSeudonimo = false });
+                }
+
+                // Si no está autenticado → mostrar perfil público LadoA
+                return RedirectToAction("VerPerfil", "FeedPublico", new { id = usuario.Id, ladoB = false });
+            }
+
+            // Fallback: Si accedió via Seudonimo pero no es LadoB verificado → redirigir a LadoA
+            _logger.LogWarning("Acceso via Seudonimo pero usuario no tiene LadoB activo: {Username}", username);
             return RedirectToAction("VerPerfil", "FeedPublico", new { id = usuario.Id });
         }
     }

@@ -81,6 +81,16 @@ namespace Lado.Services
         /// Obtiene el último error de FFmpeg para diagnóstico
         /// </summary>
         string? ObtenerUltimoError();
+
+        /// <summary>
+        /// Genera un thumbnail de un video usando FFmpeg
+        /// </summary>
+        /// <param name="rutaVideo">Ruta del archivo de video</param>
+        /// <param name="carpetaDestino">Carpeta donde guardar el thumbnail</param>
+        /// <param name="segundos">Segundo del video del cual extraer el frame (default: 1)</param>
+        /// <param name="maxWidth">Ancho máximo del thumbnail</param>
+        /// <returns>Ruta del thumbnail generado o null si falla</returns>
+        Task<string?> GenerarVideoThumbnailAsync(string rutaVideo, string? carpetaDestino = null, double segundos = 1.0, int maxWidth = 480);
     }
 
     /// <summary>
@@ -220,6 +230,88 @@ namespace Lado.Services
         /// Obtiene el último error de FFmpeg (útil para diagnóstico)
         /// </summary>
         public string? ObtenerUltimoError() => _ultimoErrorFFmpeg;
+
+        /// <summary>
+        /// Genera un thumbnail de un video usando FFmpeg
+        /// </summary>
+        public async Task<string?> GenerarVideoThumbnailAsync(string rutaVideo, string? carpetaDestino = null, double segundos = 1.0, int maxWidth = 480)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(rutaVideo) || !File.Exists(rutaVideo))
+                {
+                    _logger.LogWarning("[VideoThumbnail] Archivo no encontrado: {Ruta}", rutaVideo);
+                    return null;
+                }
+
+                // Determinar carpeta destino (misma que el video si no se especifica)
+                var directorio = carpetaDestino ?? Path.GetDirectoryName(rutaVideo);
+                if (string.IsNullOrEmpty(directorio))
+                {
+                    _logger.LogWarning("[VideoThumbnail] No se pudo determinar directorio para: {Ruta}", rutaVideo);
+                    return null;
+                }
+
+                Directory.CreateDirectory(directorio);
+
+                var nombreSinExtension = Path.GetFileNameWithoutExtension(rutaVideo);
+                var rutaThumbnail = Path.Combine(directorio, $"{nombreSinExtension}_thumb.jpg");
+
+                // Comando FFmpeg para extraer un frame y redimensionar
+                // -ss: posición en segundos
+                // -vframes 1: solo un frame
+                // -vf scale: redimensionar manteniendo aspect ratio
+                var argumentos = $"-y -ss {segundos:F1} -i \"{rutaVideo}\" -vframes 1 -vf \"scale={maxWidth}:-1\" -q:v 2 \"{rutaThumbnail}\"";
+
+                var processInfo = new ProcessStartInfo
+                {
+                    FileName = _ffmpegPath,
+                    Arguments = argumentos,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                _logger.LogInformation("[VideoThumbnail] Ejecutando: {Cmd} {Args}", _ffmpegPath, argumentos);
+
+                using var proceso = new Process { StartInfo = processInfo };
+                proceso.Start();
+
+                var errorOutput = await proceso.StandardError.ReadToEndAsync();
+                await proceso.WaitForExitAsync();
+
+                if (proceso.ExitCode != 0)
+                {
+                    _ultimoErrorFFmpeg = errorOutput;
+                    _logger.LogWarning("[VideoThumbnail] FFmpeg falló con código {Code}: {Error}",
+                        proceso.ExitCode, errorOutput.Length > 500 ? errorOutput[..500] : errorOutput);
+                    return null;
+                }
+
+                if (!File.Exists(rutaThumbnail))
+                {
+                    _logger.LogWarning("[VideoThumbnail] No se generó el archivo: {Ruta}", rutaThumbnail);
+                    return null;
+                }
+
+                _logger.LogInformation("[VideoThumbnail] Thumbnail generado: {Ruta}", rutaThumbnail);
+
+                // Convertir a ruta web
+                var webRoot = _environment.WebRootPath;
+                if (rutaThumbnail.StartsWith(webRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    return rutaThumbnail.Substring(webRoot.Length).Replace("\\", "/");
+                }
+
+                return rutaThumbnail;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[VideoThumbnail] Error generando thumbnail para: {Ruta}", rutaVideo);
+                return null;
+            }
+        }
 
         public bool ImagenRequiereConversion(string extension)
         {

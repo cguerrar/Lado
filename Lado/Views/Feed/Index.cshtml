@@ -7,7 +7,8 @@
     var usuariosSeguidosIds = ViewBag.UsuariosSeguidosIds as List<string> ?? new List<string>();
     var stories = ViewBag.Stories as IEnumerable<dynamic>;
     var usuarioActual = ViewBag.UsuarioActual as ApplicationUser;
-    var creadoresSugeridos = ViewBag.CreadoresSugeridos as List<ApplicationUser> ?? new List<ApplicationUser>();
+    var creadoresSugeridos = ViewBag.CreadoresSugeridos as List<Lado.Services.CreadorSugeridoDto> ?? new List<Lado.Services.CreadorSugeridoDto>();
+    var creadoresSugeridosJson = ViewBag.CreadoresSugeridosJson as string ?? "[]";
     var contenidoBloqueadoIds = ViewBag.ContenidoBloqueadoIds as List<int> ?? new List<int>();
     // DEBUG
     var debugSuscripcionesLadoBIds = ViewBag.DEBUG_SuscripcionesLadoBIds as List<int> ?? new List<int>();
@@ -72,7 +73,14 @@
     .feed-sidebar {
         position: sticky;
         top: 90px;
-        height: fit-content;
+        max-height: calc(100vh - 100px);
+        overflow-y: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .feed-sidebar::-webkit-scrollbar {
+        display: none;
     }
 
     .feed-container {
@@ -2753,7 +2761,7 @@
         top: calc(70px + env(safe-area-inset-top, 0px));
         left: 50%;
         transform: translateX(-50%) translateY(-100%);
-        z-index: 1001;
+        z-index: 1060;
         transition: opacity 0.2s ease, transform 0.2s ease;
         opacity: 0;
         pointer-events: none;
@@ -2834,71 +2842,6 @@
     }
 
     /* ========================================
-       BOTON FLOTANTE DE REFRESH (alternativa)
-       ======================================== */
-    .refresh-fab {
-        position: fixed;
-        bottom: calc(90px + env(safe-area-inset-bottom, 0px));
-        right: 16px;
-        width: 48px;
-        height: 48px;
-        background: var(--primary);
-        border: none;
-        border-radius: 50%;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 15px rgba(70, 130, 180, 0.4);
-        cursor: pointer;
-        z-index: 999;
-        transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
-        opacity: 0;
-    }
-
-    .refresh-fab.visible {
-        display: flex;
-        opacity: 1;
-    }
-
-    .refresh-fab:hover {
-        transform: scale(1.1);
-        box-shadow: 0 6px 20px rgba(70, 130, 180, 0.5);
-    }
-
-    .refresh-fab:active {
-        transform: scale(0.95);
-    }
-
-    .refresh-fab svg {
-        width: 22px;
-        height: 22px;
-        color: white;
-    }
-
-    .refresh-fab.refreshing svg {
-        animation: spin 0.8s linear infinite;
-    }
-
-    /* Badge de nuevos posts en el FAB */
-    .refresh-fab-badge {
-        position: absolute;
-        top: -4px;
-        right: -4px;
-        min-width: 20px;
-        height: 20px;
-        background: #ef4444;
-        border-radius: 10px;
-        color: white;
-        font-size: 11px;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0 6px;
-        border: 2px solid var(--bg-primary);
-    }
-
-    /* ========================================
        INFINITE SCROLL LOADER
        ======================================== */
     .infinite-scroll-loader {
@@ -2936,7 +2879,7 @@
         top: 80px;
         left: 50%;
         transform: translateX(-50%) translateY(-100px);
-        z-index: 1000;
+        z-index: 1060;
         background: var(--primary);
         color: white;
         padding: 12px 24px;
@@ -2950,6 +2893,20 @@
         gap: 8px;
         transition: transform 0.3s ease, opacity 0.3s ease;
         opacity: 0;
+    }
+
+    @@media (max-width: 768px) {
+        .new-posts-banner {
+            top: 70px;
+        }
+    }
+
+    @@media (max-width: 576px) {
+        .new-posts-banner {
+            top: 60px;
+            padding: 10px 18px;
+            font-size: 13px;
+        }
     }
 
     .new-posts-banner.visible {
@@ -3754,18 +3711,25 @@
         cursor: pointer;
         color: var(--fg);
         font-size: 24px;
-        width: 32px;
-        height: 32px;
+        width: 40px;
+        height: 40px;
         display: flex;
         align-items: center;
         justify-content: center;
         border-radius: 50%;
-        transition: opacity 0.15s;
+        transition: background 0.15s;
         font-weight: 300;
+        z-index: 10;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
     }
 
     .share-modal-close:hover {
-        opacity: 0.7;
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .share-modal-close:active {
+        background: rgba(255, 255, 255, 0.2);
     }
 
     /* Buscador */
@@ -4476,83 +4440,301 @@
         text-decoration: underline;
     }
 
-    .suggestion-item {
+    /* ========================================
+       CREADORES SUGERIDOS - Cards verticales con paginación
+       ======================================== */
+    .suggestions-section {
+        background: var(--bg);
+        border-radius: 16px;
+        padding: 20px;
+    }
+
+    .suggestions-section-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--fg);
+        margin-bottom: 16px;
+    }
+
+    .suggestions-pages-wrap {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .suggestions-page {
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .suggestions-page.is-active {
         display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 12px;
     }
 
-    .suggestion-item:last-child {
-        margin-bottom: 0;
+    /* Card = toda la imagen con overlays */
+    .suggestion-card {
+        border-radius: 14px;
+        overflow: hidden;
+        position: relative;
+        transition: transform 0.25s, opacity 0.25s;
     }
 
-    .suggestion-avatar {
-        width: 32px;
-        height: 32px;
+    .suggestion-card.is-dismissing {
+        transform: scale(0.85);
+        opacity: 0;
+    }
+
+    .suggestion-card.is-removing {
+        max-height: 0;
+        margin: 0;
+        overflow: hidden;
+        transition: max-height 0.3s, margin 0.3s;
+    }
+
+    /* Cover = toda la card */
+    .suggestion-card-cover {
+        position: relative;
+        height: 180px;
+        background: linear-gradient(135deg, #2a2a3e 0%, #1a1a2e 100%);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+    }
+
+    .suggestion-card-cover > img.suggestion-card-bg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: 0;
+    }
+
+    /* Gradient fuerte en la parte inferior para legibilidad */
+    .suggestion-card-cover::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 100%;
+        background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.25) 50%, transparent 100%);
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    /* Avatar dentro del cover, abajo-izquierda, encima del texto */
+    .suggestion-card-avatar-wrap {
+        position: absolute;
+        bottom: 60px;
+        left: 14px;
+        z-index: 3;
+    }
+
+    .suggestion-card-avatar {
+        width: 56px;
+        height: 56px;
         border-radius: 50%;
         object-fit: cover;
+        border: 3px solid rgba(255,255,255,0.3);
+        background: var(--bg);
     }
 
-    .suggestion-avatar-placeholder {
-        width: 32px;
-        height: 32px;
+    .suggestion-card-avatar-placeholder {
+        width: 56px;
+        height: 56px;
         border-radius: 50%;
         background: var(--primary);
+        border: 3px solid rgba(255,255,255,0.3);
         display: flex;
         align-items: center;
         justify-content: center;
         color: white;
-        font-weight: 600;
-        font-size: 12px;
+        font-weight: 700;
+        font-size: 20px;
     }
 
-    .suggestion-info {
-        flex: 1;
-        min-width: 0;
+    .suggestion-card-activity {
+        position: absolute;
+        bottom: 2px;
+        right: 2px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #22c55e;
+        border: 2px solid rgba(0,0,0,0.5);
+        z-index: 4;
     }
 
-    .suggestion-name {
+    /* Botón Seguir - pill blanco, alineado con nombre a la derecha */
+    .suggestion-card-follow {
+        position: absolute;
+        bottom: 18px;
+        right: 14px;
+        z-index: 3;
+        padding: 8px 22px;
+        border: none;
+        border-radius: 20px;
+        background: #fff;
+        color: #111;
         font-size: 14px;
         font-weight: 600;
-        color: var(--fg);
+        cursor: pointer;
+        transition: transform 0.15s, background 0.2s;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .suggestion-card-follow:hover {
+        background: #f0f0f0;
+    }
+
+    .suggestion-card-follow:active {
+        transform: scale(0.95);
+    }
+
+    .suggestion-card-follow.is-following {
+        background: rgba(255,255,255,0.2);
+        color: white;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+    }
+
+    /* Nombre y username SOBRE el cover (abajo) */
+    .suggestion-card-info {
+        position: relative;
+        z-index: 2;
+        padding: 4px 14px 12px 14px;
+    }
+
+    .suggestion-card-name {
+        font-size: 16px;
+        font-weight: 700;
+        color: #fff;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        text-decoration: none;
+        display: block;
+        line-height: 1.3;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.5);
     }
 
-    .suggestion-name:hover {
-        color: var(--primary);
+    .suggestion-card-name:hover {
+        opacity: 0.85;
     }
 
-    .suggestion-badge-b {
-        background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
-        color: white;
-        padding: 1px 5px;
-        border-radius: 3px;
-        font-size: 10px;
-        font-weight: 600;
-        margin-left: 4px;
-        vertical-align: middle;
+    .suggestion-card-username {
+        font-size: 13px;
+        color: rgba(255,255,255,0.7);
+        margin-top: 1px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.5);
     }
 
-    .suggestion-reason {
-        font-size: 12px;
-        color: var(--muted);
-    }
-
-    .suggestion-follow-btn {
-        background: none;
+    /* Dismiss button */
+    .suggestion-card-dismiss {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.45);
         border: none;
-        color: var(--primary);
-        font-size: 12px;
-        font-weight: 600;
+        color: white;
+        font-size: 16px;
         cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.2s;
+        z-index: 4;
+        line-height: 1;
         padding: 0;
     }
 
-    .suggestion-follow-btn:hover {
-        opacity: 0.7;
+    .suggestion-card:hover .suggestion-card-dismiss {
+        opacity: 1;
+    }
+
+    @@media (hover: none) {
+        .suggestion-card-dismiss {
+            opacity: 0.8;
+        }
+    }
+
+    /* Paginación: flechas + dots */
+    .suggestions-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 16px;
+        padding: 0 4px;
+    }
+
+    .suggestions-nav-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--fg);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s, border-color 0.2s;
+    }
+
+    .suggestions-nav-btn:hover {
+        background: var(--bg);
+        border-color: var(--muted);
+    }
+
+    .suggestions-nav-btn:disabled {
+        opacity: 0.3;
+        cursor: default;
+    }
+
+    .suggestions-nav-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .suggestions-dots {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .suggestions-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--line);
+        transition: background 0.2s, transform 0.2s;
+    }
+
+    .suggestions-dot.is-active {
+        background: var(--fg);
+        transform: scale(1.2);
+    }
+
+    /* Mobile inline suggestions (entre posts) */
+    .suggestions-inline-mobile {
+        display: none;
+        margin: 16px 0;
+    }
+
+    @@media (max-width: 960px) {
+        .suggestions-inline-mobile {
+            display: block;
+        }
     }
 
     .sidebar-footer {
@@ -4880,16 +5062,31 @@
 
     body.fullscreen-mode {
         overflow: hidden !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
 
-    body.fullscreen-mode .main-content {
-        margin-left: 0 !important;
-        padding-top: 0 !important;
+    body.fullscreen-mode .main-content,
+    body.fullscreen-mode .feed-page-layout {
+        margin: 0 !important;
+        padding: 0 !important;
+        padding-bottom: 0 !important;
     }
 
     /* ========================================
        FULLSCREEN MEDIA VIEWER (TikTok-style)
        ======================================== */
+
+    /* Forzar fondo negro en todo el documento cuando fullscreen está activo */
+    html.fullscreen-active,
+    body.fullscreen-active,
+    html:has(.fullscreen-viewer.active),
+    html:has(body.fullscreen-active) {
+        background: #000 !important;
+        background-color: #000 !important;
+        overflow: hidden !important;
+    }
+
     .fullscreen-viewer {
         display: none;
         position: fixed;
@@ -4897,18 +5094,57 @@
         left: 0;
         right: 0;
         bottom: 0;
+        /* Fondo negro sólido */
         background: #000;
-        z-index: 9999;
+        background-color: #000;
+        z-index: 1100;
         overflow: hidden;
-        /* iOS Safari fix: usar altura dinámica del viewport */
-        height: 100vh;
-        height: 100dvh;
-        height: -webkit-fill-available;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        /* iOS: Asegurar que cubra todo incluyendo safe-area */
+        min-height: 100vh;
+        min-height: 100dvh;
+        min-height: -webkit-fill-available;
     }
 
     .fullscreen-viewer.active {
-        display: flex;
-        flex-direction: column;
+        display: block;
+    }
+
+    /* Ocultar TODOS los elementos de navegación cuando fullscreen está activo */
+    body.fullscreen-active .bottom-nav,
+    body.fullscreen-active #bottomNav,
+    body.fullscreen-active .top-navbar,
+    body.fullscreen-active #topNavbar,
+    body.fullscreen-active .sidebar,
+    body.fullscreen-active .navbar,
+    body.fullscreen-active nav:not(.fullscreen-nav-arrows) {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        z-index: -1 !important;
+    }
+
+    /* Evitar espacio blanco en iOS */
+    .fullscreen-viewer,
+    .fullscreen-viewer * {
+        box-sizing: border-box;
+    }
+
+    /* iOS: Pseudo-elemento para cubrir safe-area inferior con negro */
+    .fullscreen-viewer::before {
+        content: '';
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        /* Altura generosa para cubrir cualquier safe-area */
+        height: calc(env(safe-area-inset-bottom, 0px) + 50px);
+        background: #000;
+        z-index: -1; /* Negativo para estar DETRÁS del contenido */
+        pointer-events: none;
     }
 
     /* iOS Safari: NO agregar padding al slide, solo ajustar elementos UI */
@@ -4916,8 +5152,8 @@
 
     .fullscreen-viewer-close {
         position: fixed;
-        /* iOS: Posicionar debajo del safe area */
-        top: max(20px, calc(env(safe-area-inset-top, 0) + 10px));
+        /* iOS: Posicionar debajo del botón de mute (alineado en columna derecha) */
+        top: max(74px, calc(env(safe-area-inset-top, 0) + 64px));
         right: 20px;
         width: 44px;
         height: 44px;
@@ -4925,7 +5161,7 @@
         border: none;
         border-radius: 50%;
         cursor: pointer;
-        z-index: 10001;
+        z-index: 1101; /* Reducido - relativo al viewer */
         display: flex;
         align-items: center;
         justify-content: center;
@@ -4943,19 +5179,26 @@
     }
 
     .fullscreen-slides-container {
-        flex: 1;
-        /* iOS Safari fix: altura explícita para evitar desplazamiento */
+        /* Cubrir todo el viewer incluyendo safe-area */
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
         height: 100%;
-        max-height: 100vh;
-        max-height: 100dvh;
         overflow-y: scroll;
         overflow-x: hidden;
-        scroll-snap-type: y mandatory;
+        scroll-snap-type: y mandatory; /* mandatory para snap obligatorio estilo TikTok */
+        scroll-behavior: smooth;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
         -ms-overflow-style: none;
         overscroll-behavior-y: contain;
-        /* Remover scroll-behavior smooth para mejor snap inicial */
+        /* Eliminar espacio blanco */
+        margin: 0;
+        padding: 0;
+        background: #000;
     }
 
     .fullscreen-slides-container::-webkit-scrollbar {
@@ -4964,11 +5207,16 @@
 
     .fullscreen-slide {
         width: 100%;
+        /* Cascada de fallbacks para altura del viewport:
+           1. --vh-full (calculado por JS con window.innerHeight)
+           2. 100dvh (iOS Safari 15.4+)
+           3. 100vh (fallback final) */
         height: 100vh;
         height: 100dvh;
+        height: var(--vh-full, 100dvh);
         min-height: 100vh;
         min-height: 100dvh;
-        /* iOS Safari fix: usar 'start' en lugar de 'center' para evitar desplazamiento */
+        min-height: var(--vh-full, 100dvh);
         scroll-snap-align: start;
         scroll-snap-stop: always;
         display: flex;
@@ -5012,7 +5260,7 @@
         justify-content: center;
         z-index: 10;
         pointer-events: none;
-        animation: tapPulse 1.5s ease-in-out infinite;
+        animation: tapPulse 1.5s ease-in-out 4; /* Limitado a 4 ciclos (6s) */
     }
 
     .fullscreen-slide.needs-tap::before {
@@ -5041,6 +5289,15 @@
        ======================================== */
     .fullscreen-slide.has-carousel {
         padding: 0;
+        /* Permitir que Swiper maneje swipes horizontales */
+        touch-action: pan-y pinch-zoom;
+        overscroll-behavior-x: contain;
+    }
+
+    /* Cuando se está haciendo swipe horizontal en carrusel, desactivar scroll snap del contenedor */
+    .fullscreen-slides-container.carousel-swiping {
+        scroll-snap-type: none !important;
+        overflow-y: hidden !important;
     }
 
     .fs-carousel-wrapper {
@@ -5180,6 +5437,21 @@
             right: 15px;
             font-size: 12px;
         }
+
+        /* MÓVIL: Forzar fondos negros en fullscreen para evitar franjas blancas */
+        .fullscreen-viewer,
+        .fullscreen-slides-container,
+        .fullscreen-slide {
+            background: #000 !important;
+            background-color: #000 !important;
+        }
+
+        /* MÓVIL: Asegurar que el body tenga fondo negro cuando fullscreen activo */
+        body.fullscreen-active {
+            background: #000 !important;
+            background-color: #000 !important;
+            overflow: hidden !important;
+        }
     }
 
     /* Desktop - carrusel más grande */
@@ -5200,10 +5472,23 @@
         width: 100%;
         height: 100%;
         position: relative;
+        /* Permitir swipe horizontal (Swiper) mientras vertical pasa al contenedor padre */
+        touch-action: pan-y pinch-zoom;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        /* Aislar del scroll snap del padre */
+        scroll-snap-type: none;
+        overscroll-behavior: contain;
+        overscroll-behavior-x: contain;
+        /* Forzar contexto de stacking */
+        isolation: isolate;
+        z-index: 5;
     }
 
     .fs-swiper-carousel .swiper-wrapper {
         align-items: center;
+        touch-action: pan-y;
     }
 
     .fs-swiper-carousel .swiper-slide {
@@ -5212,6 +5497,7 @@
         justify-content: center;
         width: 100%;
         height: 100%;
+        touch-action: pan-y;
     }
 
     .fs-swiper-carousel .swiper-slide img,
@@ -5248,9 +5534,14 @@
     @@media (max-width: 768px) {
         .fs-swiper-carousel .swiper-button-next,
         .fs-swiper-carousel .swiper-button-prev {
-            opacity: 0.8;
+            opacity: 1 !important;
             width: 40px;
             height: 40px;
+            display: flex !important;
+        }
+
+        .fs-swiper-carousel .swiper-button-disabled {
+            opacity: 0.3 !important;
         }
     }
 
@@ -5371,7 +5662,7 @@
             background: rgba(255, 255, 255, 0.4);
             border-radius: 2px;
             transform: translateY(-50%);
-            animation: swipeHint 2s ease-in-out infinite;
+            animation: swipeHint 2s ease-in-out 3; /* Limitado a 3 ciclos (6s) */
             opacity: 0;
         }
 
@@ -5387,15 +5678,9 @@
 
     /* Responsive para Swiper */
     @@media (max-width: 768px) {
-        .fs-swiper-carousel .swiper-button-next,
-        .fs-swiper-carousel .swiper-button-prev {
-            width: 36px;
-            height: 36px;
-        }
-
         .fs-swiper-carousel .swiper-button-next:after,
         .fs-swiper-carousel .swiper-button-prev:after {
-            font-size: 14px;
+            font-size: 16px;
         }
 
         .fs-swiper-counter {
@@ -5403,6 +5688,17 @@
             right: 15px;
             font-size: 12px;
             padding: 4px 10px;
+        }
+
+        /* Pagination más visible en móvil */
+        .fs-swiper-carousel .swiper-pagination-bullet {
+            width: 8px;
+            height: 8px;
+        }
+
+        .fs-swiper-carousel .swiper-pagination-bullet-active {
+            width: 20px;
+            border-radius: 4px;
         }
     }
 
@@ -5619,13 +5915,14 @@
         }
     }
 
-    /* Media loaded state - show content */
+    /* Media state - mostrar video/poster inmediatamente, transición suave */
     .fullscreen-slide img,
     .fullscreen-slide video {
-        opacity: 0;
-        transition: opacity 0.2s ease;
+        opacity: 1; /* Mostrar inmediatamente (el poster es visible mientras carga) */
+        transition: opacity 0.3s ease;
     }
 
+    /* Opcional: efecto fade-in cuando el media está completamente cargado */
     .fullscreen-slide.media-loaded img,
     .fullscreen-slide.media-loaded video {
         opacity: 1;
@@ -5666,11 +5963,18 @@
         }
 
         .fullscreen-viewer-close {
-            top: 30px;
+            top: 90px; /* Debajo del botón mute en pantallas grandes */
             right: 30px;
             width: 50px;
             height: 50px;
             background: rgba(255, 255, 255, 0.15);
+        }
+
+        .fullscreen-mute-btn-global {
+            top: 30px;
+            right: 30px;
+            width: 50px;
+            height: 50px;
         }
 
         .fullscreen-viewer-close:hover {
@@ -5769,7 +6073,7 @@
     /* 🍎 iOS: Badge que requiere tap para reproducir */
     .music-badge.needs-tap {
         background: rgba(255, 165, 0, 0.4);
-        animation: needsTapPulse 1.5s ease-in-out infinite;
+        animation: needsTapPulse 1.5s ease-in-out 4; /* Limitado a 4 ciclos (6s) */
     }
 
     .music-badge.needs-tap::after {
@@ -5778,7 +6082,7 @@
         top: -8px;
         right: -8px;
         font-size: 16px;
-        animation: tapBounce 0.6s ease-in-out infinite;
+        animation: tapBounce 0.6s ease-in-out 10; /* Limitado a 10 ciclos (6s) */
     }
 
     @@keyframes needsTapPulse {
@@ -5791,11 +6095,11 @@
         50% { transform: translateY(-4px); }
     }
 
-    /* Fullscreen Mute Button Global - Arriba Izquierda */
+    /* Fullscreen Mute Button Global - Arriba Derecha (alineado con acciones) */
     .fullscreen-mute-btn-global {
         position: fixed;
-        top: 20px;
-        left: 20px;
+        top: max(20px, calc(env(safe-area-inset-top, 0) + 10px));
+        right: 20px;
         width: 44px;
         height: 44px;
         background: rgba(255, 255, 255, 0.1);
@@ -6068,7 +6372,7 @@
         z-index: 50;
         pointer-events: none;
         padding: 20px;
-        padding-bottom: 30px;
+        padding-bottom: 20px;
         background: linear-gradient(transparent, rgba(0,0,0,0.7));
     }
 
@@ -6357,15 +6661,7 @@
        Posicionado en esquina superior derecha, debajo del botón cerrar
        ======================================== */
     .fullscreen-nav-arrows {
-        position: fixed;
-        right: 20px;
-        top: 80px; /* Debajo del botón cerrar */
-        bottom: auto;
-        transform: none;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        z-index: 10002;
+        display: none !important; /* Ocultas - navegación por scroll/swipe */
     }
 
     .fullscreen-nav-btn {
@@ -6512,6 +6808,366 @@
         .credits-description {
             -webkit-line-clamp: 1;
             font-size: 12px;
+        }
+    }
+
+    /* ========================================
+       COMMENTS BOTTOM SHEET (Instagram-style)
+       ======================================== */
+    .comments-bottomsheet-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1200;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .comments-bottomsheet-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .comments-bottomsheet {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1201;
+        background: #262626;
+        border-radius: 16px 16px 0 0;
+        max-height: 70vh;
+        max-height: 70dvh;
+        min-height: 50vh;
+        min-height: 50dvh;
+        display: flex;
+        flex-direction: column;
+        transform: translateY(100%);
+        transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    .comments-bottomsheet.active {
+        transform: translateY(0);
+    }
+
+    .comments-bottomsheet.dragging {
+        transition: none;
+    }
+
+    .comments-bs-drag-handle {
+        display: flex;
+        justify-content: center;
+        padding: 12px 0 4px 0;
+        cursor: grab;
+        flex-shrink: 0;
+    }
+
+    .comments-bs-drag-handle::after {
+        content: '';
+        width: 40px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 2px;
+    }
+
+    .comments-bs-header {
+        text-align: center;
+        padding: 8px 16px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        flex-shrink: 0;
+    }
+
+    .comments-bs-header h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 700;
+        color: #fff;
+    }
+
+    .comments-bs-body {
+        flex: 1;
+        overflow-y: auto;
+        overscroll-behavior-y: contain;
+        -webkit-overflow-scrolling: touch;
+        padding: 12px 16px;
+    }
+
+    .comments-bs-body::-webkit-scrollbar {
+        width: 0;
+        display: none;
+    }
+
+    .comments-bs-loading {
+        display: flex;
+        justify-content: center;
+        padding: 40px 0;
+    }
+
+    .comments-bs-loading .spinner {
+        width: 24px;
+        height: 24px;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    .comments-bs-empty {
+        text-align: center;
+        padding: 40px 0;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 14px;
+    }
+
+    .comments-bs-load-more {
+        text-align: center;
+        padding: 12px 0;
+    }
+
+    .comments-bs-load-more button {
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 13px;
+        cursor: pointer;
+        padding: 8px 16px;
+    }
+
+    /* Comment item */
+    .bs-comment-item {
+        display: flex;
+        gap: 12px;
+        padding: 10px 0;
+    }
+
+    .bs-comment-avatar {
+        flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+    }
+
+    .bs-comment-avatar img {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .bs-comment-avatar-initial {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary, #8b5cf6) 0%, #6366f1 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .bs-comment-body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .bs-comment-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 4px;
+    }
+
+    .bs-comment-username {
+        font-size: 13px;
+        font-weight: 600;
+        color: #fff;
+        text-decoration: none;
+    }
+
+    .bs-comment-time {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.4);
+    }
+
+    .bs-comment-text {
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.9);
+        line-height: 1.4;
+        margin: 0;
+        word-break: break-word;
+    }
+
+    .bs-comment-actions {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-top: 8px;
+    }
+
+    .bs-comment-action-btn {
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 12px;
+        cursor: pointer;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .bs-comment-action-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .bs-comment-action-btn.liked {
+        color: #ef4444;
+    }
+
+    .bs-comment-action-btn.liked svg {
+        fill: #ef4444;
+    }
+
+    .bs-comment-reply-btn {
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 0;
+    }
+
+    /* Replies */
+    .bs-comment-replies {
+        margin-top: 8px;
+        padding-left: 0;
+    }
+
+    .bs-show-replies-btn {
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 4px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .bs-show-replies-btn::before {
+        content: '';
+        display: inline-block;
+        width: 24px;
+        height: 1px;
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .bs-reply-item {
+        display: flex;
+        gap: 10px;
+        padding: 8px 0;
+    }
+
+    .bs-reply-item .bs-comment-avatar,
+    .bs-reply-item .bs-comment-avatar img,
+    .bs-reply-item .bs-comment-avatar-initial {
+        width: 24px;
+        height: 24px;
+        font-size: 10px;
+    }
+
+    /* Comment input */
+    .comments-bs-input-area {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        background: #262626;
+        flex-shrink: 0;
+    }
+
+    .comments-bs-reply-indicator {
+        display: none;
+        padding: 8px 16px 0;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+        background: #262626;
+        flex-shrink: 0;
+    }
+
+    .comments-bs-reply-indicator.active {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .comments-bs-reply-cancel {
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 12px;
+        cursor: pointer;
+        padding: 4px;
+    }
+
+    .comments-bs-input {
+        flex: 1;
+        background: transparent;
+        border: none;
+        color: #fff;
+        font-size: 14px;
+        outline: none;
+        padding: 8px 0;
+        min-width: 0;
+    }
+
+    .comments-bs-input::placeholder {
+        color: rgba(255, 255, 255, 0.4);
+    }
+
+    .comments-bs-send-btn {
+        background: none;
+        border: none;
+        color: #0095f6;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 8px;
+        opacity: 0.4;
+        transition: opacity 0.2s;
+        flex-shrink: 0;
+    }
+
+    .comments-bs-send-btn.enabled {
+        opacity: 1;
+    }
+
+    /* Responsive */
+    @@media (min-width: 768px) {
+        .comments-bottomsheet {
+            max-width: 500px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100%);
+            border-radius: 16px 16px 0 0;
+        }
+
+        .comments-bottomsheet.active {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .comments-bottomsheet.dragging {
+            transition: none;
         }
     }
 
@@ -7333,7 +7989,10 @@
             max-width: 100%;
             border-radius: 16px 16px 0 0;
             max-height: 80vh;
+            min-height: 50vh; /* Altura mínima para que no se vea cortado */
             transform: translateY(100%);
+            /* Safe area para iOS */
+            padding-bottom: env(safe-area-inset-bottom, 20px);
         }
 
         .likes-modal-overlay.visible .likes-modal {
@@ -7347,6 +8006,26 @@
         justify-content: space-between;
         padding: 16px 20px;
         border-bottom: 1px solid var(--line, #efefef);
+        position: relative;
+    }
+
+    /* Handle visual estilo iOS para bottom sheet */
+    @@media (max-width: 480px) {
+        .likes-modal-header {
+            padding-top: 24px; /* Espacio para el handle */
+        }
+
+        .likes-modal-header::before {
+            content: '';
+            position: absolute;
+            top: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 36px;
+            height: 4px;
+            background: var(--line, #dbdbdb);
+            border-radius: 2px;
+        }
     }
 
     .likes-modal-title {
@@ -7369,12 +8048,37 @@
         flex: 1;
         overflow-y: auto;
         padding: 12px 20px 20px;
+        min-height: 200px; /* Altura mínima para el contenido */
     }
 
     .likes-modal-list {
         display: flex;
         flex-direction: column;
         gap: 12px;
+    }
+
+    /* Loading y empty states mejorados */
+    .likes-modal-loading,
+    .likes-modal-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        color: var(--muted, #8e8e8e);
+        text-align: center;
+        min-height: 150px;
+    }
+
+    .likes-modal-loading i,
+    .likes-modal-empty i {
+        font-size: 24px;
+        margin-bottom: 12px;
+    }
+
+    .likes-modal-empty p {
+        margin: 0;
+        font-size: 14px;
     }
 
     .likes-modal-user {
@@ -7705,25 +8409,6 @@
             padding: 3px 10px;
         }
 
-        /* Refresh FAB ajustado para móvil */
-        .refresh-fab {
-            width: 44px;
-            height: 44px;
-            bottom: calc(80px + env(safe-area-inset-bottom, 0px));
-            right: 12px;
-        }
-
-        .refresh-fab svg {
-            width: 20px;
-            height: 20px;
-        }
-
-        .refresh-fab-badge {
-            min-width: 18px;
-            height: 18px;
-            font-size: 10px;
-        }
-
         /* Carrusel optimizado */
         .carousel-btn {
             width: 36px;
@@ -7937,15 +8622,6 @@
         <span class="pull-text" id="pullText">Desliza para actualizar</span>
     </div>
 
-    <!-- Boton flotante de refresh (alternativa al gesto) -->
-    <button class="refresh-fab" id="refreshFab" onclick="refreshFeedFromFab()" title="Actualizar feed">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-        </svg>
-        <span class="refresh-fab-badge" id="refreshFabBadge" style="display: none;">0</span>
-    </button>
-
     <!-- Banner de nuevos posts -->
     <div class="new-posts-banner" id="newPostsBanner" onclick="cargarNuevosPosts()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -8084,7 +8760,7 @@
                 ? (post.Usuario?.FotoPerfilLadoB ?? post.Usuario?.FotoPerfil)
                 : post.Usuario?.FotoPerfil;
             var sigueAlCreador = usuariosSeguidosIds.Contains(post.UsuarioId);
-            <article class="post @(estaBloqueado ? "post-locked" : "")" data-post-id="@post.Id" data-locked="@estaBloqueado.ToString().ToLower()" data-creator-id="@post.UsuarioId" data-creator-name="@(post.Usuario?.Seudonimo ?? post.Usuario?.NombreCompleto ?? "Creador")" data-creator-photo="@(post.Usuario?.FotoPerfilLadoB ?? post.Usuario?.FotoPerfil)" data-creator-price="@(post.Usuario?.PrecioSuscripcion.ToString("0.00") ?? "0.00")" data-likes="@post.NumeroLikes" data-comments="@post.NumeroComentarios" data-is-following="@sigueAlCreador.ToString().ToLower()">
+            <article id="post-@post.Id" class="post @(estaBloqueado ? "post-locked" : "")" data-post-id="@post.Id" data-locked="@estaBloqueado.ToString().ToLower()" data-creator-id="@post.UsuarioId" data-creator-name="@(post.Usuario?.Seudonimo ?? post.Usuario?.NombreCompleto ?? "Creador")" data-creator-photo="@(post.Usuario?.FotoPerfilLadoB ?? post.Usuario?.FotoPerfil)" data-creator-price="@(post.Usuario?.PrecioSuscripcion.ToString("0.00") ?? "0.00")" data-likes="@post.NumeroLikes" data-comments="@post.NumeroComentarios" data-is-following="@sigueAlCreador.ToString().ToLower()">
                 <!-- Header -->
                 <header class="post-header">
                     <a href="@urlPerfil" class="post-header-left">
@@ -8255,7 +8931,7 @@
                 {
                     // Preparar datos JSON de archivos para el fullscreen viewer
                     var archivosJson = System.Text.Json.JsonSerializer.Serialize(archivosCarrusel.Select(a => new {
-                        src = a.RutaArchivo,
+                        src = LimpiarRuta(a.RutaArchivo),
                         type = a.TipoArchivo == TipoArchivo.Video ? "video" : "image"
                     }));
                     var primerArchivo = archivosCarrusel.First();
@@ -8800,6 +9476,79 @@
                     </div>
                 </article>
             }
+
+            @* Insertar sugerencias inline (mobile) después del 3er post *@
+            if (postIndex == 3 && creadoresSugeridos.Any())
+            {
+                var mobileCardsPerPage = 3;
+                var mobileTotalPages = (int)Math.Ceiling((double)creadoresSugeridos.Count / mobileCardsPerPage);
+
+                <div class="suggestions-inline-mobile" id="suggestionsInlineMobile">
+                    <div class="suggestions-section" data-suggestions="mobile">
+                        <div class="suggestions-section-title">Creadores sugeridos</div>
+                        <div class="suggestions-pages-wrap">
+                            @for (var mPageIdx = 0; mPageIdx < mobileTotalPages; mPageIdx++)
+                            {
+                                var mPageItems = creadoresSugeridos.Skip(mPageIdx * mobileCardsPerPage).Take(mobileCardsPerPage).ToList();
+                                <div class="suggestions-page @(mPageIdx == 0 ? "is-active" : "")" data-page="@mPageIdx">
+                                    @foreach (var creador in mPageItems)
+                                    {
+                                        var inicialMobile = !string.IsNullOrEmpty(creador.NombreMostrar) ? creador.NombreMostrar.Substring(0, 1).ToUpper() : "?";
+                                        <div class="suggestion-card" data-user-id="@creador.Id">
+                                            <div class="suggestion-card-cover">
+                                                @if (!string.IsNullOrEmpty(creador.FotoPortada))
+                                                {
+                                                    <img class="suggestion-card-bg" src="@creador.FotoPortada" alt="" loading="lazy">
+                                                }
+                                                <button class="suggestion-card-dismiss" onclick="descartarSugerencia('@creador.Id', this)" title="No me interesa">&times;</button>
+                                                <div class="suggestion-card-avatar-wrap">
+                                                    @if (!string.IsNullOrEmpty(creador.FotoPerfil))
+                                                    {
+                                                        <img src="@creador.FotoPerfil" alt="" class="suggestion-card-avatar" loading="lazy">
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="suggestion-card-avatar-placeholder">@inicialMobile</div>
+                                                    }
+                                                    @if (creador.TextoActividad == "Activo ahora")
+                                                    {
+                                                        <span class="suggestion-card-activity"></span>
+                                                    }
+                                                </div>
+                                                <button class="suggestion-card-follow" data-user-id="@creador.Id"
+                                                        onclick="seguirUsuarioCard('@creador.Id', this)">
+                                                    Seguir
+                                                </button>
+                                                <div class="suggestion-card-info">
+                                                    <a href="@creador.UrlPerfil" class="suggestion-card-name">@creador.NombreMostrar</a>
+                                                    <div class="suggestion-card-username">@@@creador.UserName</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                        @if (mobileTotalPages > 1)
+                        {
+                            <div class="suggestions-nav">
+                                <button class="suggestions-nav-btn" data-dir="prev" onclick="navigateSuggestions(this, -1)" disabled>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                                </button>
+                                <div class="suggestions-dots">
+                                    @for (var dm = 0; dm < mobileTotalPages; dm++)
+                                    {
+                                        <span class="suggestions-dot @(dm == 0 ? "is-active" : "")"></span>
+                                    }
+                                </div>
+                                <button class="suggestions-nav-btn" data-dir="next" onclick="navigateSuggestions(this, 1)">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
         }
     }
     else
@@ -8848,59 +9597,72 @@
             </div>
         }
 
-        <!-- Sugerencias -->
+        <!-- Creadores sugeridos - Cards verticales con paginación -->
         @if (creadoresSugeridos.Any())
         {
-            <div class="sidebar-section">
-                <div class="sidebar-header">
-                    <span class="sidebar-title">Sugerencias para ti</span>
-                    <a href="/Feed/Explorar" class="sidebar-see-all">Ver todo</a>
-                </div>
-                @foreach (var creador in creadoresSugeridos.Take(5))
-                {
-                    // Mostrar según LadoPreferido del creador (solo si tiene LadoB configurado)
-                    var tieneLadoB = creador.EsCreador && !string.IsNullOrEmpty(creador.Seudonimo);
-                    var mostrarComoLadoB = tieneLadoB && creador.LadoPreferido == TipoLado.LadoB;
-                    var nombreMostrar = mostrarComoLadoB ? creador.Seudonimo : creador.NombreCompleto;
-                    var fotoMostrar = mostrarComoLadoB ? (creador.FotoPerfilLadoB ?? creador.FotoPerfil) : creador.FotoPerfil;
-                    var urlPerfil = mostrarComoLadoB ? $"/Feed/Creador/{creador.Seudonimo}" : $"/Feed/Perfil/{creador.Id}";
-                    var inicialMostrar = !string.IsNullOrEmpty(nombreMostrar) ? nombreMostrar.Substring(0, 1).ToUpper() : "?";
+            var cardsPerPage = 3;
+            var totalPages = (int)Math.Ceiling((double)creadoresSugeridos.Count / cardsPerPage);
 
-                    <div class="suggestion-item">
-                        @if (!string.IsNullOrEmpty(fotoMostrar))
-                        {
-                            <img src="@fotoMostrar" alt="" class="suggestion-avatar">
-                        }
-                        else
-                        {
-                            <div class="suggestion-avatar-placeholder">
-                                @inicialMostrar
-                            </div>
-                        }
-                        <div class="suggestion-info">
-                            <a href="@urlPerfil" class="suggestion-name">
-                                @nombreMostrar
-                                @if (mostrarComoLadoB)
-                                {
-                                    <span class="suggestion-badge-b">B</span>
-                                }
-                            </a>
-                            <div class="suggestion-reason">
-                                @if (creador.CreadorVerificado)
-                                {
-                                    <text>Creador verificado</text>
-                                }
-                                else if (creador.NumeroSeguidores > 0)
-                                {
-                                    <text>@creador.NumeroSeguidores seguidores</text>
-                                }
-                                else
-                                {
-                                    <text>Sugerido para ti</text>
-                                }
-                            </div>
+            <div class="suggestions-section" data-suggestions="desktop">
+                <div class="suggestions-section-title">Creadores sugeridos</div>
+                <div class="suggestions-pages-wrap">
+                    @for (var pageIdx = 0; pageIdx < totalPages; pageIdx++)
+                    {
+                        var pageItems = creadoresSugeridos.Skip(pageIdx * cardsPerPage).Take(cardsPerPage).ToList();
+                        <div class="suggestions-page @(pageIdx == 0 ? "is-active" : "")" data-page="@pageIdx">
+                            @foreach (var creador in pageItems)
+                            {
+                                var inicialMostrar = !string.IsNullOrEmpty(creador.NombreMostrar) ? creador.NombreMostrar.Substring(0, 1).ToUpper() : "?";
+                                <div class="suggestion-card" data-user-id="@creador.Id">
+                                    <div class="suggestion-card-cover">
+                                        @if (!string.IsNullOrEmpty(creador.FotoPortada))
+                                        {
+                                            <img class="suggestion-card-bg" src="@creador.FotoPortada" alt="" loading="lazy">
+                                        }
+                                        <button class="suggestion-card-dismiss" onclick="descartarSugerencia('@creador.Id', this)" title="No me interesa">&times;</button>
+                                        <div class="suggestion-card-avatar-wrap">
+                                            @if (!string.IsNullOrEmpty(creador.FotoPerfil))
+                                            {
+                                                <img src="@creador.FotoPerfil" alt="" class="suggestion-card-avatar" loading="lazy">
+                                            }
+                                            else
+                                            {
+                                                <div class="suggestion-card-avatar-placeholder">@inicialMostrar</div>
+                                            }
+                                            @if (creador.TextoActividad == "Activo ahora")
+                                            {
+                                                <span class="suggestion-card-activity"></span>
+                                            }
+                                        </div>
+                                        <button class="suggestion-card-follow" data-user-id="@creador.Id"
+                                                onclick="seguirUsuarioCard('@creador.Id', this)">
+                                            Seguir
+                                        </button>
+                                        <div class="suggestion-card-info">
+                                            <a href="@creador.UrlPerfil" class="suggestion-card-name">@creador.NombreMostrar</a>
+                                            <div class="suggestion-card-username">@@@creador.UserName</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
                         </div>
-                        <button class="suggestion-follow-btn" onclick="seguirUsuario('@creador.Id', this)">Seguir</button>
+                    }
+                </div>
+                @if (totalPages > 1)
+                {
+                    <div class="suggestions-nav">
+                        <button class="suggestions-nav-btn" data-dir="prev" onclick="navigateSuggestions(this, -1)" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        </button>
+                        <div class="suggestions-dots">
+                            @for (var d = 0; d < totalPages; d++)
+                            {
+                                <span class="suggestions-dot @(d == 0 ? "is-active" : "")"></span>
+                            }
+                        </div>
+                        <button class="suggestions-nav-btn" data-dir="next" onclick="navigateSuggestions(this, 1)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        </button>
                     </div>
                 }
             </div>
@@ -9373,6 +10135,34 @@
     });
 
     // ========================================
+    // SCROLL AL POST DESDE HASH (para volver del fullscreen)
+    // ========================================
+    document.addEventListener('DOMContentLoaded', function() {
+        // Detectar si hay un hash #post-{id} en la URL
+        const hash = window.location.hash;
+        if (hash && hash.startsWith('#post-')) {
+            const postElement = document.querySelector(hash);
+            if (postElement) {
+                // Delay suficiente para que el DOM esté completamente renderizado
+                setTimeout(() => {
+                    // Asegurar que no hay estado residual de fullscreen
+                    document.body.classList.remove('fullscreen-active', 'fullscreen-mode');
+                    document.documentElement.classList.remove('fullscreen-active');
+                    document.body.style.overflow = '';
+
+                    // Scroll al post
+                    postElement.scrollIntoView({ behavior: 'instant', block: 'center' });
+
+                    // Limpiar el hash de la URL sin recargar
+                    setTimeout(() => {
+                        history.replaceState(null, '', window.location.pathname + window.location.search);
+                    }, 100);
+                }, 300);
+            }
+        }
+    });
+
+    // ========================================
     // LIKES EN COMENTARIOS DEL FEED
     // ========================================
 
@@ -9577,29 +10367,15 @@
         });
     }
 
-    // ⚡ Refresh desde el botón flotante (FAB)
-    async function refreshFeedFromFab() {
-        const fab = document.getElementById('refreshFab');
-        if (!fab || fab.classList.contains('refreshing')) return;
-
-        fab.classList.add('refreshing');
-        triggerHaptic();
-
-        try {
-            await refreshFeed();
-        } finally {
-            fab.classList.remove('refreshing');
-        }
-    }
-
     async function refreshFeed() {
         const pullIndicator = document.getElementById('pullToRefresh');
         pullIndicator.classList.remove('ready');
         pullIndicator.classList.add('refreshing');
 
         try {
-            // ⚡ MEJORADO: No enviar IDs para refresh (queremos los más recientes)
-            const response = await fetch('/Feed/CargarMasPosts?cantidad=10');
+            // ⚡ FIX: Enviar IDs ya vistos para que el servidor los excluya y devuelva posts nuevos
+            const idsVistosParam = Array.from(loadedPostIds).slice(0, 100).join(',');
+            const response = await fetch(`/Feed/CargarMasPosts?cantidad=10&idsVistos=${encodeURIComponent(idsVistosParam)}`);
             const data = await response.json();
 
             if (data.success && data.posts.length > 0) {
@@ -9633,6 +10409,7 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
         } catch (error) {
+            console.error('[Feed] Error en refreshFeed:', error);
         } finally {
             pullIndicator.classList.remove('refreshing', 'visible');
             pullIndicator.style.transform = 'translateX(-50%) translateY(-100%)';
@@ -9835,7 +10612,12 @@
                 </div>`;
         } else if (rutaArchivoLimpia) {
             if (post.esCarrusel && post.archivos.length > 1) {
-                const archivosJson = JSON.stringify(post.archivos).replace(/"/g, '&quot;');
+                // Convertir archivos al formato esperado por el fullscreen viewer
+                const archivosParaFullscreen = post.archivos.map(a => ({
+                    src: limpiarRuta(a.rutaArchivo),
+                    type: a.tipoArchivo === 1 ? 'video' : 'image'
+                }));
+                const archivosJson = JSON.stringify(archivosParaFullscreen).replace(/"/g, '&quot;');
 
                 // Construir badges y audio para carruseles con música
                 let carouselMusicHtml = '';
@@ -10054,7 +10836,7 @@
         const showFollowBtn = currentUserId && !isOwnPost && !isFollowing;
 
         return `
-            <article class="post" data-post-id="${post.id}" data-creator-id="${post.usuarioId}" data-is-following="${isFollowing}">
+            <article id="post-${post.id}" class="post" data-post-id="${post.id}" data-creator-id="${post.usuarioId}" data-creator-name="${escapeHtml(nombreMostrado)}" data-creator-photo="${fotoPerfilMostrar || ''}" data-likes="${post.numeroLikes || 0}" data-comments="${post.numeroComentarios || 0}" data-is-following="${isFollowing}">
                 <header class="post-header">
                     <a href="${urlPerfil}" class="post-header-left">
                         ${avatarHtml}
@@ -10876,7 +11658,6 @@
             if (data.success && data.hayNuevos && data.cantidad > 0) {
                 pendingNewPosts = data.cantidad;
                 showNewPostsBanner(data.cantidad);
-                showRefreshFab(data.cantidad); // ⚡ También mostrar el FAB
             }
         } catch (error) {
             console.log('[Feed] Error verificando nuevos posts:', error);
@@ -10899,37 +11680,12 @@
         if (banner) {
             banner.classList.remove('visible');
         }
-    }
-
-    // ⚡ Mostrar FAB con badge de nuevos posts
-    function showRefreshFab(cantidad) {
-        const fab = document.getElementById('refreshFab');
-        const badge = document.getElementById('refreshFabBadge');
-        if (fab) {
-            fab.classList.add('visible');
-            if (badge && cantidad > 0) {
-                badge.textContent = cantidad > 99 ? '99+' : cantidad;
-                badge.style.display = 'flex';
-            }
-        }
-    }
-
-    function hideRefreshFab() {
-        const fab = document.getElementById('refreshFab');
-        const badge = document.getElementById('refreshFabBadge');
-        if (fab) {
-            fab.classList.remove('visible');
-            if (badge) {
-                badge.style.display = 'none';
-            }
-        }
         pendingNewPosts = 0;
     }
 
     // Cargar nuevos posts cuando el usuario hace clic en el banner
     window.cargarNuevosPosts = async function() {
         hideNewPostsBanner();
-        hideRefreshFab();
 
         // Scroll al inicio
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -10990,9 +11746,8 @@
                     }
                 }
 
-                // Ocultar banners ya que acabamos de actualizar
+                // Ocultar banner ya que acabamos de actualizar
                 hideNewPostsBanner();
-                hideRefreshFab();
             } else {
                 // Solo verificar si hay nuevos posts
                 checkForNewPosts();
@@ -11003,37 +11758,17 @@
         }
     });
 
-    // ⚡ Mostrar FAB también cuando el usuario hace scroll hacia arriba
-    let lastScrollY = window.scrollY;
-    let fabScrollTimeout = null;
-
-    function handleFabOnScroll() {
-        const currentScrollY = window.scrollY;
-        const fab = document.getElementById('refreshFab');
-
-        // Si hay posts pendientes y el usuario hace scroll hacia arriba
-        if (pendingNewPosts > 0 && currentScrollY < lastScrollY) {
-            showRefreshFab(pendingNewPosts);
-        }
-
-        // Si está en la parte superior, mostrar FAB si hay posts pendientes
-        if (currentScrollY < 100 && pendingNewPosts > 0) {
-            showRefreshFab(pendingNewPosts);
-        }
-
-        lastScrollY = currentScrollY;
-    }
-
-    window.addEventListener('scroll', () => {
-        if (fabScrollTimeout) clearTimeout(fabScrollTimeout);
-        fabScrollTimeout = setTimeout(handleFabOnScroll, 100);
-    }, { passive: true });
-
-    // Inicializar al cargar
+    // Inicializar al cargar - prioriza funciones críticas primero
     document.addEventListener('DOMContentLoaded', function() {
-        initPullToRefresh();
+        // Crítico: funcionalidad principal del feed
         initInfiniteScroll();
-        initBlackScreenDetector();
+
+        // Diferir funciones no críticas para no bloquear renderizado
+        var deferInit = window.requestIdleCallback || function(cb) { setTimeout(cb, 100); };
+        deferInit(function() {
+            initPullToRefresh();
+            initBlackScreenDetector();
+        });
 
         // Iniciar auto-refresh despues de 10 segundos
         setTimeout(startAutoRefresh, 10000);
@@ -11237,9 +11972,10 @@
         });
     }
 
-    // Observar todas las fotos con música al cargar
+    // Observar todas las fotos con música al cargar (diferido)
     document.addEventListener('DOMContentLoaded', () => {
-        initPhotoMusicObserversForNewPosts();
+        var defer = window.requestIdleCallback || function(cb) { setTimeout(cb, 200); };
+        defer(initPhotoMusicObserversForNewPosts);
     });
 
     // 🍎 iOS: Evento cuando el media se desbloquea (disparado por iOSMediaFix)
@@ -11352,6 +12088,12 @@
                     const likesSpan = document.getElementById(`likes-${postId}`);
                     if (likesSpan && data.likes !== undefined) {
                         likesSpan.textContent = `${data.likes} Me gusta`;
+                    }
+
+                    // Actualizar data-likes en el article para el fullscreen viewer
+                    const postArticle = postMedia?.closest('.post');
+                    if (postArticle && data.likes !== undefined) {
+                        postArticle.dataset.likes = data.likes;
                     }
                 }
             } catch (err) {
@@ -11590,6 +12332,9 @@
                 btn.classList.toggle('liked', data.liked);
                 const likesEl = document.getElementById(`likes-${postId}`);
                 if (likesEl) likesEl.textContent = `${data.likes} Me gusta`;
+                // Actualizar data-likes en el article para el fullscreen viewer
+                const postArticle = btn.closest('.post');
+                if (postArticle) postArticle.dataset.likes = data.likes;
             }
         } catch (err) {
             console.error('Like error:', err);
@@ -11686,6 +12431,12 @@
                     newComment.className = 'comment-preview';
                     newComment.innerHTML = `<span class="comment-preview-username">${escapeHtml(data.comentario.username)}</span> <span class="comment-preview-text">${escapeHtml(data.comentario.texto)}</span>`;
                     preview.appendChild(newComment);
+
+                    // Actualizar data-comments en el article para el fullscreen viewer
+                    const postArticle = post.closest('.post') || post;
+                    if (postArticle && data.totalComentarios !== undefined) {
+                        postArticle.dataset.comments = data.totalComentarios;
+                    }
                 }
             } else {
                 showToast(data.message || 'Error al comentar');
@@ -11873,8 +12624,9 @@
                     'RequestVerificationToken': token
                 },
                 body: JSON.stringify({
-                    contenidoId: currentSharePostId,
-                    amigoIds: [contactId]
+                    ContenidoId: currentSharePostId,
+                    AmigosIds: [contactId],
+                    Url: currentShareUrl
                 })
             });
 
@@ -12002,32 +12754,32 @@
     // ⚠️ GLOBAL para onclick en HTML
     window.copyShareUrl = function() {
         const input = document.getElementById('shareUrlInput');
-        const copyBtn = document.getElementById('shareCopyBtn');
+        const linkLabel = document.querySelector('.share-app-icon.link')?.parentElement?.querySelector('.share-app-label');
 
         // Usar API moderna de clipboard si está disponible
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(input.value).then(() => {
-                copyBtn.textContent = 'Copiado';
-                copyBtn.classList.add('copied');
+                if (linkLabel) {
+                    linkLabel.textContent = 'Copiado ✓';
+                    setTimeout(() => {
+                        linkLabel.textContent = 'Copiar enlace';
+                    }, 2000);
+                }
                 showToast('Enlace copiado');
-
-                setTimeout(() => {
-                    copyBtn.textContent = 'Copiar';
-                    copyBtn.classList.remove('copied');
-                }, 2000);
+            }).catch(() => {
+                showToast('Error al copiar');
             });
         } else {
             // Fallback para navegadores antiguos
             input.select();
             document.execCommand('copy');
-            copyBtn.textContent = 'Copiado';
-            copyBtn.classList.add('copied');
+            if (linkLabel) {
+                linkLabel.textContent = 'Copiado ✓';
+                setTimeout(() => {
+                    linkLabel.textContent = 'Copiar enlace';
+                }, 2000);
+            }
             showToast('Enlace copiado');
-
-            setTimeout(() => {
-                copyBtn.textContent = 'Copiar';
-                copyBtn.classList.remove('copied');
-            }, 2000);
         }
     };
 
@@ -12193,9 +12945,9 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contenidoId: currentSharePostId,
-                    amigosIds: friendIds,
-                    url: currentShareUrl
+                    ContenidoId: currentSharePostId,
+                    AmigosIds: friendIds,
+                    Url: currentShareUrl
                 })
             });
 
@@ -12310,6 +13062,116 @@
         } catch (err) {
             showToast('Error al seguir usuario');
         }
+    };
+
+    // ========================================
+    // CREADORES SUGERIDOS - Paginación
+    // ========================================
+
+    // Navegar entre páginas de sugerencias
+    // ⚠️ GLOBAL para onclick en HTML
+    window.navigateSuggestions = function(btn, direction) {
+        const section = btn.closest('.suggestions-section');
+        if (!section) return;
+
+        const pages = section.querySelectorAll('.suggestions-page');
+        const dots = section.querySelectorAll('.suggestions-dot');
+        const prevBtn = section.querySelector('[data-dir="prev"]');
+        const nextBtn = section.querySelector('[data-dir="next"]');
+
+        let currentIdx = 0;
+        pages.forEach((page, i) => {
+            if (page.classList.contains('is-active')) currentIdx = i;
+        });
+
+        const newIdx = currentIdx + direction;
+        if (newIdx < 0 || newIdx >= pages.length) return;
+
+        // Cambiar página
+        pages[currentIdx].classList.remove('is-active');
+        pages[newIdx].classList.add('is-active');
+
+        // Actualizar dots
+        dots.forEach((dot, i) => {
+            dot.classList.toggle('is-active', i === newIdx);
+        });
+
+        // Actualizar estado botones
+        if (prevBtn) prevBtn.disabled = (newIdx === 0);
+        if (nextBtn) nextBtn.disabled = (newIdx === pages.length - 1);
+    };
+
+    // Seguir usuario desde card de sugerencias (con animación)
+    // ⚠️ GLOBAL para onclick en HTML
+    window.seguirUsuarioCard = async function(userId, btn) {
+        try {
+            const tipoLado = 0;
+            const res = await fetch('/Feed/Seguir', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `id=${userId}&tipoLado=${tipoLado}`
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                // Animación bounce
+                btn.style.transform = 'scale(1.15)';
+                setTimeout(() => { btn.style.transform = ''; }, 200);
+
+                if (data.siguiendo) {
+                    btn.textContent = 'Siguiendo';
+                    btn.classList.add('is-following');
+                } else {
+                    btn.textContent = 'Seguir';
+                    btn.classList.remove('is-following');
+                }
+
+                // Sincronizar cards con mismo userId en desktop y mobile
+                document.querySelectorAll(`.suggestion-card-follow[data-user-id="${userId}"]`).forEach(otherBtn => {
+                    if (otherBtn !== btn) {
+                        if (data.siguiendo) {
+                            otherBtn.textContent = 'Siguiendo';
+                            otherBtn.classList.add('is-following');
+                        } else {
+                            otherBtn.textContent = 'Seguir';
+                            otherBtn.classList.remove('is-following');
+                        }
+                    }
+                });
+
+                const msg = data.siguiendo ? 'Ahora sigues a este usuario' : 'Has dejado de seguir';
+                showToast(msg);
+            } else {
+                showToast(data.message || 'Error al seguir');
+            }
+        } catch (err) {
+            showToast('Error al seguir usuario');
+        }
+    };
+
+    // Descartar sugerencia con animación
+    // ⚠️ GLOBAL para onclick en HTML
+    window.descartarSugerencia = function(userId, btn) {
+        // Encontrar todas las cards con este userId en ambas secciones
+        const cards = document.querySelectorAll(`.suggestion-card[data-user-id="${userId}"]`);
+        cards.forEach(card => {
+            card.classList.add('is-dismissing');
+            setTimeout(() => {
+                card.classList.add('is-removing');
+                card.style.maxHeight = '0';
+                card.style.margin = '0';
+                setTimeout(() => {
+                    card.remove();
+                }, 300);
+            }, 250);
+        });
+
+        // Fire-and-forget al server
+        fetch('/Feed/DescartarSugerencia', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `id=${userId}`
+        }).catch(() => {});
     };
 
     // ========================================
@@ -12525,8 +13387,11 @@
         });
     }
 
-    // Inicializar carruseles cuando el DOM esté listo
-    document.addEventListener('DOMContentLoaded', initCarousels);
+    // Inicializar carruseles cuando el DOM esté listo (diferido)
+    document.addEventListener('DOMContentLoaded', function() {
+        var defer = window.requestIdleCallback || function(cb) { setTimeout(cb, 150); };
+        defer(initCarousels);
+    });
 
     // ========================================
     // FUNCIONES DEL MENU DE 3 PUNTOS
@@ -12783,9 +13648,13 @@
         }
 
         try {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
             const res = await fetch('/Usuario/BloquearUsuario', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': token
+                },
                 body: JSON.stringify({ usuarioId: userId })
             });
             const data = await res.json();
@@ -13021,9 +13890,11 @@
         }
     };
 
-    // Actualizar barra de progreso del audio
+    // Actualizar barra de progreso del audio (diferido)
     document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.post-audio-player').forEach(audio => {
+        var defer = window.requestIdleCallback || function(cb) { setTimeout(cb, 300); };
+        defer(function() {
+            document.querySelectorAll('.post-audio-player').forEach(audio => {
             audio.addEventListener('timeupdate', function() {
                 const container = this.closest('.post-media-audio');
                 const progressBar = container?.querySelector('.audio-progress-bar');
@@ -13045,15 +13916,19 @@
                     if (progressBar) progressBar.style.width = '0%';
                 }
             });
-        });
+            });
+        }); // cierra defer
     });
 
-    // Inicializar observers para videos existentes al cargar la página
+    // Inicializar observers para videos existentes al cargar la página (diferido)
     document.addEventListener('DOMContentLoaded', function() {
-        // Usar la funcion unificada de inicializacion
-        initVideoObserversForNewPosts();
-        // Actualizar iconos de mute
-        updateAllMuteIcons();
+        var defer = window.requestIdleCallback || function(cb) { setTimeout(cb, 250); };
+        defer(function() {
+            // Usar la funcion unificada de inicializacion
+            initVideoObserversForNewPosts();
+            // Actualizar iconos de mute
+            updateAllMuteIcons();
+        });
     });
 
     // ========================================
@@ -13154,6 +14029,17 @@
 
         const estaSiguiendo = btn.classList.contains('siguiendo');
 
+        // Si no hay conexión y es para seguir (no dejar de seguir), guardar offline
+        if (!navigator.onLine && !estaSiguiendo && window.LadoOfflineSync) {
+            await window.LadoOfflineSync.savePendingFollow(userId);
+            btn.classList.remove('seguir');
+            btn.classList.add('siguiendo');
+            btn.textContent = 'Siguiendo';
+            _feedToast('Seguimiento guardado - se sincronizará cuando vuelva la conexión');
+            btn.disabled = false;
+            return;
+        }
+
         try {
             const response = await fetch(estaSiguiendo ? '/Feed/DejarDeSeguir' : '/Feed/Seguir', {
                 method: 'POST',
@@ -13189,7 +14075,16 @@
             }
         } catch (error) {
             console.error('Error al seguir:', error);
-            _feedToast('Error de conexión');
+            // Si falló por red y era para seguir, guardar offline
+            if (!navigator.onLine && !estaSiguiendo && window.LadoOfflineSync) {
+                await window.LadoOfflineSync.savePendingFollow(userId);
+                btn.classList.remove('seguir');
+                btn.classList.add('siguiendo');
+                btn.textContent = 'Siguiendo';
+                _feedToast('Seguimiento guardado - se sincronizará cuando vuelva la conexión');
+            } else {
+                _feedToast('Error de conexión');
+            }
         } finally {
             btn.disabled = false;
         }
@@ -13291,8 +14186,11 @@
         });
     }
 
-    // Inicializar al cargar
-    document.addEventListener('DOMContentLoaded', initLikesTooltipEvents);
+    // Inicializar al cargar (diferido - no crítico)
+    document.addEventListener('DOMContentLoaded', function() {
+        var defer = window.requestIdleCallback || function(cb) { setTimeout(cb, 400); };
+        defer(initLikesTooltipEvents);
+    });
 
     // Re-inicializar cuando se carguen nuevos posts
     const likesObserver = new MutationObserver((mutations) => {
@@ -13315,12 +14213,9 @@
      POPUP DE MENSAJES - ESTILO INSTAGRAM DM
      ======================================== -->
 <style>
-    /* Floating Messages Popup Container */
+    /* Floating Messages Popup Container - Oculto */
     .dm-popup-container {
-        position: fixed;
-        bottom: 24px;
-        right: 24px;
-        z-index: 9999;
+        display: none !important;
     }
 
     /* FAB Button */
@@ -14407,11 +15302,12 @@
         }
     }
 
-    // Cargar badge al iniciar
+    // Cargar badge al iniciar (diferido para priorizar renderizado)
     document.addEventListener('DOMContentLoaded', function() {
-        updateDmBadge();
-        // Actualizar cada 30 segundos
-        setInterval(updateDmBadge, 30000);
+        setTimeout(function() {
+            updateDmBadge();
+            setInterval(updateDmBadge, 30000);
+        }, 3000); // Diferir 3s para no competir con carga inicial
     });
 </script>
 
@@ -14453,6 +15349,35 @@
 
     <div class="fullscreen-slides-container" id="fullscreenSlidesContainer">
         <!-- Slides se generan dinamicamente -->
+    </div>
+
+    <!-- Comments Bottom Sheet (Instagram-style) -->
+    <div class="comments-bottomsheet-overlay" id="commentsBsOverlay" onclick="closeCommentsBottomSheet()"></div>
+    <div class="comments-bottomsheet" id="commentsBottomSheet">
+        <div class="comments-bs-drag-handle" id="commentsBsDragHandle"></div>
+        <div class="comments-bs-header">
+            <h3>Comentarios</h3>
+        </div>
+        <div class="comments-bs-body" id="commentsBsBody">
+            <div class="comments-bs-loading" id="commentsBsLoading">
+                <div class="spinner"></div>
+            </div>
+            <div class="comments-bs-empty" id="commentsBsEmpty" style="display:none;">
+                Aun no hay comentarios. Se el primero en comentar.
+            </div>
+            <div id="commentsBsList"></div>
+            <div class="comments-bs-load-more" id="commentsBsLoadMore" style="display:none;">
+                <button onclick="loadMoreBsComments()">Cargar mas comentarios</button>
+            </div>
+        </div>
+        <div class="comments-bs-reply-indicator" id="commentsBsReplyIndicator">
+            <span id="commentsBsReplyTo">Respondiendo a @@usuario</span>
+            <button class="comments-bs-reply-cancel" onclick="cancelBsReply()">Cancelar</button>
+        </div>
+        <div class="comments-bs-input-area">
+            <input type="text" class="comments-bs-input" id="commentsBsInput" placeholder="Agrega un comentario..." autocomplete="off">
+            <button class="comments-bs-send-btn" id="commentsBsSendBtn" onclick="sendBsComment()">Publicar</button>
+        </div>
     </div>
 </div>
 
@@ -14559,6 +15484,22 @@
 <script>
     // Usar window.escapeHtml directamente (definida en script anterior)
 
+    // iOS Safari fix: calcular altura real del viewport y actualizar en resize
+    function updateVhVariable() {
+        const vh = window.innerHeight;
+        document.documentElement.style.setProperty('--vh-full', `${vh}px`);
+
+        // También calcular safe-area-inset-bottom via JS para fallback
+        const safeAreaBottom = getComputedStyle(document.documentElement).getPropertyValue('--safe-area-inset-bottom') || '0px';
+        document.documentElement.style.setProperty('--vh-with-safe-area', `calc(${vh}px + ${safeAreaBottom})`);
+    }
+    updateVhVariable(); // Calcular al cargar
+    window.addEventListener('resize', updateVhVariable);
+    window.addEventListener('orientationchange', () => {
+        // Delay para orientationchange porque innerHeight puede no actualizarse inmediatamente
+        setTimeout(updateVhVariable, 100);
+    });
+
     // Variables globales del fullscreen viewer
     let fullscreenPosts = [];
     let currentFullscreenIndex = 0;
@@ -14611,9 +15552,10 @@
     document.addEventListener('touchstart', unlockAudio, { once: true });
     document.addEventListener('click', unlockAudio, { once: true });
 
-    // Cache de medios precargados
+    // Cache de medios precargados con límite LRU
     const preloadedMedia = new Map();
-    const PRELOAD_RANGE = 3; // Precargar N slides adelante y atras
+    const PRELOAD_RANGE = 4; // Precargar N slides adelante y atrás (aumentado para mejor anticipación)
+    const MAX_PRELOAD_CACHE = 12; // Máximo de items en cache para evitar memory leaks
 
     // Pausar cualquier audio/video del feed
     function pauseFeedMedia() {
@@ -14815,20 +15757,44 @@
         console.log('[FullView] Posts recolectados:', fullscreenPosts.length);
     }
 
-    // Precargar medios adyacentes
+    // Precargar medios adyacentes con limpieza LRU y estrategia escalonada
     function preloadAdjacentMedia(centerIndex) {
         const indicesToPreload = [];
+        const validSrcs = new Set();
 
-        // Agregar indices a precargar (actual, anteriores y siguientes)
+        // Agregar indices a precargar (actual, anteriores y siguientes) con distancia
         for (let i = -PRELOAD_RANGE; i <= PRELOAD_RANGE; i++) {
             const idx = centerIndex + i;
             if (idx >= 0 && idx < fullscreenPosts.length) {
-                indicesToPreload.push(idx);
+                indicesToPreload.push({ idx, distance: Math.abs(i) });
+                if (fullscreenPosts[idx]?.src) {
+                    validSrcs.add(fullscreenPosts[idx].src);
+                }
             }
         }
 
-        // Precargar cada uno
-        indicesToPreload.forEach(idx => {
+        // Limpiar items fuera del rango para evitar memory leaks
+        if (preloadedMedia.size > MAX_PRELOAD_CACHE) {
+            for (const [src, media] of preloadedMedia.entries()) {
+                if (!validSrcs.has(src)) {
+                    // Liberar memoria del video
+                    if (media instanceof HTMLVideoElement) {
+                        media.pause();
+                        media.removeAttribute('src');
+                        media.load();
+                    }
+                    preloadedMedia.delete(src);
+                    // Parar si ya estamos dentro del límite
+                    if (preloadedMedia.size <= MAX_PRELOAD_CACHE) break;
+                }
+            }
+        }
+
+        // Ordenar por proximidad (precargar primero los más cercanos)
+        indicesToPreload.sort((a, b) => a.distance - b.distance);
+
+        // Precargar cada uno con estrategia escalonada
+        indicesToPreload.forEach(({ idx, distance }) => {
             const post = fullscreenPosts[idx];
             if (!post || preloadedMedia.has(post.src)) return;
 
@@ -14843,9 +15809,19 @@
                 img.src = post.src;
                 preloadedMedia.set(post.src, img);
             } else if (post.type === 'video') {
-                // Precargar video (solo metadata primero, luego mas)
+                // Precargar video con estrategia escalonada según distancia
                 const video = document.createElement('video');
-                video.preload = 'auto';
+
+                // Estrategia de precarga:
+                // - distance 0 (actual): auto (descarga completa)
+                // - distance 1 (±1): auto (siguiente inmediato también completo)
+                // - distance 2+ : metadata (solo info, carga rápida)
+                if (distance <= 1) {
+                    video.preload = 'auto';
+                } else {
+                    video.preload = 'metadata';
+                }
+
                 video.muted = true;
                 video.oncanplaythrough = () => {
                     post.loaded = true;
@@ -14877,6 +15853,14 @@
 
         // IMPORTANTE: Marcar fullscreen como activo para bloquear el IntersectionObserver del feed
         isFullscreenActive = true;
+
+        // Agregar clase al body y html para ocultar elementos de navegación y forzar fondo negro
+        document.body.classList.add('fullscreen-active');
+        document.documentElement.classList.add('fullscreen-active');
+
+        // iOS Safari fix: calcular altura real del viewport
+        const vh = window.innerHeight;
+        document.documentElement.style.setProperty('--vh-full', `${vh}px`);
 
         // Guardar el índice del carrusel para este post (si aplica)
         console.log('[FullView] openFullscreenViewer - postId:', postId, 'carouselStartIndex:', carouselStartIndex);
@@ -15028,7 +16012,7 @@
                             <span class="credits-likes-count">${formatNumber(post.likes || 0)}</span>
                         </button>
 
-                        <button class="credits-action-btn credits-comments-btn" onclick="event.stopPropagation(); window.location.href='/Feed/Detalle/${post.id}'">
+                        <button class="credits-action-btn credits-comments-btn" onclick="event.stopPropagation(); openCommentsBottomSheet(${post.id})">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                             </svg>
@@ -15344,10 +16328,25 @@
                     </div>
                     ${generateCreditsHtml(post)}
                 `;
-                // Marcar como cargado cuando el video este listo
+                // Marcar como cargado cuando el video esté listo (múltiples eventos para mayor rapidez)
                 const videoEl = slide.querySelector('video');
-                videoEl.oncanplaythrough = () => slide.classList.add('media-loaded');
-                videoEl.onloadeddata = () => slide.classList.add('media-loaded');
+                const markLoaded = () => {
+                    slide.classList.add('media-loaded');
+                    // Limpiar el timeout de seguridad si existe
+                    if (slide._loadingTimeout) {
+                        clearTimeout(slide._loadingTimeout);
+                        slide._loadingTimeout = null;
+                    }
+                };
+                videoEl.oncanplaythrough = markLoaded;
+                videoEl.onloadeddata = markLoaded;
+                videoEl.onplaying = markLoaded; // Se dispara más rápido cuando el video comienza a reproducirse
+                videoEl.oncanplay = markLoaded; // También cuando puede comenzar a reproducir
+
+                // Timeout de seguridad: ocultar spinner después de 8 segundos máximo
+                slide._loadingTimeout = setTimeout(() => {
+                    slide.classList.add('media-loaded');
+                }, 8000);
             } else if (post.type === 'audio') {
                 slide.innerHTML = `
                     <div class="fullscreen-audio-content">
@@ -15508,15 +16507,22 @@
                 touchEventsTarget: 'container',
                 simulateTouch: true,
                 allowTouchMove: true,
-                touchRatio: 1.2, // Más sensible al swipe
-                touchAngle: 35, // Más tolerante al ángulo
+                touchRatio: 1,
+                touchAngle: 45, // Más tolerante al ángulo para detectar horizontal
                 grabCursor: true,
-                passiveListeners: true,
+                passiveListeners: false, // Permitir preventDefault para capturar swipes
                 touchStartPreventDefault: false,
                 touchMoveStopPropagation: true,
+                preventInteractionOnTransition: true,
+                edgeSwipeDetection: true,
+                edgeSwipeThreshold: 20,
 
-                // Threshold para detectar swipe (en px)
-                threshold: 10,
+                // Threshold bajo para detectar swipe rápido
+                threshold: 5,
+                shortSwipes: true,
+                longSwipes: true,
+                longSwipesRatio: 0.3,
+                longSwipesMs: 150,
 
                 // Resistencia en los bordes
                 resistance: true,
@@ -15578,17 +16584,109 @@
                             }
                         });
                     },
-                    touchStart: function() {
-                        // Detener propagación para evitar conflictos con scroll vertical
-                        this.el.style.touchAction = 'pan-y';
+                    touchStart: function(swiper, event) {
+                        // Guardar posición inicial del touch
+                        swiper.touchStartX = event.touches ? event.touches[0].clientX : event.clientX;
+                        swiper.touchStartY = event.touches ? event.touches[0].clientY : event.clientY;
+                        swiper.touchDirection = null;
                     },
-                    touchEnd: function() {
-                        this.el.style.touchAction = '';
+                    touchMove: function(swiper, event) {
+                        if (!swiper.touchStartX) return;
+
+                        const currentX = event.touches ? event.touches[0].clientX : event.clientX;
+                        const currentY = event.touches ? event.touches[0].clientY : event.clientY;
+                        const deltaX = Math.abs(currentX - swiper.touchStartX);
+                        const deltaY = Math.abs(currentY - swiper.touchStartY);
+
+                        // Determinar dirección del swipe con umbral bajo
+                        if (!swiper.touchDirection && (deltaX > 5 || deltaY > 5)) {
+                            swiper.touchDirection = deltaX > deltaY ? 'horizontal' : 'vertical';
+
+                            // Si es horizontal, bloquear scroll inmediatamente
+                            if (swiper.touchDirection === 'horizontal') {
+                                const container = document.getElementById('fullscreenSlidesContainer');
+                                if (container) {
+                                    container.classList.add('carousel-swiping');
+                                }
+                            }
+                        }
+
+                        // Si es horizontal, seguir bloqueando
+                        if (swiper.touchDirection === 'horizontal') {
+                            event.stopPropagation();
+                        }
+                    },
+                    touchEnd: function(swiper) {
+                        swiper.touchStartX = null;
+                        swiper.touchStartY = null;
+                        swiper.touchDirection = null;
+                        // Restaurar scroll con delay
+                        setTimeout(() => {
+                            const container = document.getElementById('fullscreenSlidesContainer');
+                            if (container) {
+                                container.classList.remove('carousel-swiping');
+                            }
+                        }, 150);
                     }
                 }
             });
 
             fullscreenSwipers.set(postId, swiper);
+
+            // Añadir event listeners directos al elemento para garantizar captura de touch
+            swiperEl.addEventListener('touchstart', function(e) {
+                this._touchStartX = e.touches[0].clientX;
+                this._touchStartY = e.touches[0].clientY;
+                this._isHorizontalSwipe = null;
+            }, { passive: true });
+
+            swiperEl.addEventListener('touchmove', function(e) {
+                if (!this._touchStartX) return;
+
+                const deltaX = Math.abs(e.touches[0].clientX - this._touchStartX);
+                const deltaY = Math.abs(e.touches[0].clientY - this._touchStartY);
+
+                // Detectar si es swipe horizontal (umbral bajo para detectar rápido)
+                if (this._isHorizontalSwipe === null && (deltaX > 5 || deltaY > 5)) {
+                    this._isHorizontalSwipe = deltaX > deltaY;
+
+                    // Si es horizontal, bloquear scroll y snap del contenedor padre inmediatamente
+                    if (this._isHorizontalSwipe) {
+                        const container = document.getElementById('fullscreenSlidesContainer');
+                        if (container) {
+                            container.classList.add('carousel-swiping');
+                        }
+                    }
+                }
+
+                // Continuar bloqueando si es horizontal
+                if (this._isHorizontalSwipe) {
+                    e.stopPropagation();
+                }
+            }, { passive: true });
+
+            swiperEl.addEventListener('touchend', function() {
+                this._touchStartX = null;
+                this._touchStartY = null;
+                this._isHorizontalSwipe = null;
+                // Restaurar scroll y snap con delay para evitar glitches
+                setTimeout(() => {
+                    const container = document.getElementById('fullscreenSlidesContainer');
+                    if (container) {
+                        container.classList.remove('carousel-swiping');
+                    }
+                }, 150);
+            }, { passive: true });
+
+            swiperEl.addEventListener('touchcancel', function() {
+                this._touchStartX = null;
+                this._touchStartY = null;
+                this._isHorizontalSwipe = null;
+                const container = document.getElementById('fullscreenSlidesContainer');
+                if (container) {
+                    container.classList.remove('carousel-swiping');
+                }
+            }, { passive: true });
         });
     }
 
@@ -15763,6 +16861,27 @@
         if (likeInProgress.has(postId)) return;
         likeInProgress.add(postId);
 
+        // Función para actualizar UI optimistamente
+        function updateLikeUIOptimistic() {
+            if (likeBtn) likeBtn.classList.add('liked');
+            if (creditsLikeBtn) {
+                creditsLikeBtn.classList.add('liked');
+                const svg = creditsLikeBtn.querySelector('svg');
+                if (svg) svg.setAttribute('fill', 'currentColor');
+            }
+            const postIndex = fullscreenPosts.findIndex(p => p.id === postId);
+            if (postIndex !== -1) fullscreenPosts[postIndex].isLiked = true;
+        }
+
+        // Si no hay conexión, guardar para sincronizar después
+        if (!navigator.onLine && window.LadoOfflineSync) {
+            window.LadoOfflineSync.savePendingLike(postId);
+            updateLikeUIOptimistic();
+            showToast('Like guardado - se sincronizará cuando vuelva la conexión');
+            setTimeout(() => likeInProgress.delete(postId), 500);
+            return;
+        }
+
         // Llamar al API de like (solo si no tiene like)
         fetch('/Feed/Like', {
             method: 'POST',
@@ -15808,9 +16927,16 @@
                 }
             }
         })
-        .catch(err => {
+        .catch(async err => {
             console.error('Error al dar like:', err);
-            showToast('Error al procesar tu reacción');
+            // Si falló por red, intentar guardar offline
+            if (!navigator.onLine && window.LadoOfflineSync) {
+                await window.LadoOfflineSync.savePendingLike(postId);
+                updateLikeUIOptimistic();
+                showToast('Like guardado - se sincronizará cuando vuelva la conexión');
+            } else {
+                showToast('Error al procesar tu reacción');
+            }
         })
         .finally(() => {
             setTimeout(() => likeInProgress.delete(postId), 500);
@@ -15824,6 +16950,34 @@
         likeInProgress.add(postId);
 
         const isLiked = button.classList.contains('liked');
+
+        // Función para actualizar UI optimistamente (solo para dar like, no quitar)
+        function updateLikeUIOptimistic() {
+            button.classList.add('liked');
+            button.querySelector('svg')?.setAttribute('fill', 'currentColor');
+            const feedLikeBtn = document.querySelector(`.like-btn[data-id="${postId}"]`);
+            if (feedLikeBtn) feedLikeBtn.classList.add('liked');
+            const postIndex = fullscreenPosts.findIndex(p => p.id === postId);
+            if (postIndex !== -1) fullscreenPosts[postIndex].isLiked = true;
+            // Mostrar animación del corazón
+            const slide = button.closest('.fullscreen-slide');
+            const heart = slide?.querySelector('.fullscreen-heart-animation');
+            if (heart) {
+                heart.classList.remove('animate');
+                void heart.offsetWidth;
+                heart.classList.add('animate');
+                setTimeout(() => heart.classList.remove('animate'), 800);
+            }
+        }
+
+        // Si no hay conexión y es para dar like (no quitar), guardar offline
+        if (!navigator.onLine && !isLiked && window.LadoOfflineSync) {
+            window.LadoOfflineSync.savePendingLike(postId);
+            updateLikeUIOptimistic();
+            showToast('Like guardado - se sincronizará cuando vuelva la conexión');
+            setTimeout(() => likeInProgress.delete(postId), 500);
+            return;
+        }
 
         fetch('/Feed/Like', {
             method: 'POST',
@@ -15884,11 +17038,24 @@
                     fullscreenPosts[postIndex].isLiked = data.liked;
                     fullscreenPosts[postIndex].likes = data.likes;
                 }
+
+                // Actualizar data-likes en el article del feed para mantener sincronizado
+                const postArticle = document.querySelector(`.post[data-post-id="${postId}"]`);
+                if (postArticle && data.likes !== undefined) {
+                    postArticle.dataset.likes = data.likes;
+                }
             }
         })
-        .catch(err => {
+        .catch(async err => {
             console.error('Error al dar like desde fullscreen:', err);
-            showToast('Error al procesar tu reacción');
+            // Si falló por red y era para dar like, guardar offline
+            if (!navigator.onLine && !isLiked && window.LadoOfflineSync) {
+                await window.LadoOfflineSync.savePendingLike(postId);
+                updateLikeUIOptimistic();
+                showToast('Like guardado - se sincronizará cuando vuelva la conexión');
+            } else {
+                showToast('Error al procesar tu reacción');
+            }
         })
         .finally(() => {
             // Liberar después de 500ms para evitar spam
@@ -15958,7 +17125,7 @@
             lastScrollIndex = newIndex;
         }
 
-        // Debounce para detectar cuando el scroll termina
+        // Debounce reducido para detección más rápida del cambio de slide
         clearTimeout(scrollTimeout);
         scrollTimeout = setTimeout(() => {
             isScrolling = false;
@@ -15984,7 +17151,7 @@
                 });
                 loadMoreFullscreenPosts();
             }
-        }, 150);
+        }, 75); // Reducido de 150ms para mayor responsividad
     }
 
     // Cargar más posts para el FullView
@@ -16205,6 +17372,8 @@
                     if (!success) {
                         // Mostrar indicador de tap-to-play
                         slide.classList.add('needs-tap');
+                        // Detener animación después de 5s para ahorrar CPU/batería
+                        setTimeout(() => slide.classList.remove('needs-tap'), 5000);
                     } else {
                         slide.classList.remove('needs-tap');
                     }
@@ -16311,14 +17480,484 @@
         }
     }
 
+    // ========================================
+    // COMMENTS BOTTOM SHEET (Instagram-style)
+    // ========================================
+    let bsCurrentPostId = null;
+    let bsCurrentPage = 1;
+    let bsHasMore = false;
+    let bsReplyToId = null;
+    let bsIsLoading = false;
+
+    // Abrir el bottom sheet de comentarios
+    window.openCommentsBottomSheet = function(postId) {
+        bsCurrentPostId = postId;
+        bsCurrentPage = 1;
+        bsHasMore = false;
+        bsReplyToId = null;
+        bsIsLoading = false;
+
+        // Reset UI
+        document.getElementById('commentsBsList').innerHTML = '';
+        document.getElementById('commentsBsLoading').style.display = 'flex';
+        document.getElementById('commentsBsEmpty').style.display = 'none';
+        document.getElementById('commentsBsLoadMore').style.display = 'none';
+        document.getElementById('commentsBsInput').value = '';
+        document.getElementById('commentsBsSendBtn').classList.remove('enabled');
+        cancelBsReply();
+
+        // Mostrar overlay y bottom sheet
+        document.getElementById('commentsBsOverlay').classList.add('active');
+        document.getElementById('commentsBottomSheet').classList.add('active');
+
+        // Cargar comentarios
+        loadBsComments(postId, 1);
+
+        // Inicializar drag gesture
+        initBsDragGesture();
+    };
+
+    // Cerrar el bottom sheet
+    window.closeCommentsBottomSheet = function() {
+        document.getElementById('commentsBsOverlay').classList.remove('active');
+        document.getElementById('commentsBottomSheet').classList.remove('active');
+        bsCurrentPostId = null;
+        bsReplyToId = null;
+    };
+
+    // Cargar comentarios via AJAX
+    async function loadBsComments(postId, page) {
+        if (bsIsLoading) return;
+        bsIsLoading = true;
+
+        try {
+            const res = await fetch(`/Feed/ObtenerComentarios?contenidoId=${postId}&page=${page}&pageSize=15`);
+            const data = await res.json();
+
+            document.getElementById('commentsBsLoading').style.display = 'none';
+
+            if (data.success) {
+                if (data.comentarios && data.comentarios.length > 0) {
+                    const list = document.getElementById('commentsBsList');
+                    data.comentarios.forEach(c => {
+                        list.appendChild(createBsCommentElement(c));
+                    });
+                    document.getElementById('commentsBsEmpty').style.display = 'none';
+                } else if (page === 1) {
+                    document.getElementById('commentsBsEmpty').style.display = 'block';
+                }
+
+                bsHasMore = data.hasMore;
+                bsCurrentPage = page;
+                document.getElementById('commentsBsLoadMore').style.display = bsHasMore ? 'block' : 'none';
+            }
+        } catch (err) {
+            console.error('Error cargando comentarios:', err);
+            document.getElementById('commentsBsLoading').style.display = 'none';
+        } finally {
+            bsIsLoading = false;
+        }
+    }
+
+    // Cargar mas comentarios
+    window.loadMoreBsComments = function() {
+        if (bsCurrentPostId && bsHasMore) {
+            loadBsComments(bsCurrentPostId, bsCurrentPage + 1);
+        }
+    };
+
+    // Crear elemento HTML de un comentario
+    function createBsCommentElement(comment) {
+        const div = document.createElement('div');
+        div.className = 'bs-comment-item';
+        div.dataset.commentId = comment.id;
+
+        const timeAgo = formatTimeAgo(comment.fechaCreacion);
+        const avatarHtml = comment.usuario?.fotoPerfil
+            ? `<img src="${comment.usuario.fotoPerfil}" alt="">`
+            : `<div class="bs-comment-avatar-initial">${(comment.usuario?.username || 'U').charAt(0).toUpperCase()}</div>`;
+
+        const likeSvgFill = comment.meDioLike ? 'currentColor' : 'none';
+        const likedClass = comment.meDioLike ? 'liked' : '';
+
+        div.innerHTML = `
+            <div class="bs-comment-avatar">${avatarHtml}</div>
+            <div class="bs-comment-body">
+                <div class="bs-comment-header">
+                    <a href="/Feed/Perfil/${window.escapeHtml(comment.usuario?.username || '')}" class="bs-comment-username">${window.escapeHtml(comment.usuario?.username || 'usuario')}</a>
+                    <span class="bs-comment-time">${timeAgo}</span>
+                </div>
+                <p class="bs-comment-text">${window.escapeHtml(comment.texto)}</p>
+                <div class="bs-comment-actions">
+                    <button class="bs-comment-action-btn ${likedClass}" onclick="toggleBsCommentLike(${comment.id}, this)">
+                        <svg viewBox="0 0 24 24" fill="${likeSvgFill}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                        <span>${comment.numeroLikes > 0 ? comment.numeroLikes : ''}</span>
+                    </button>
+                    <button class="bs-comment-reply-btn" onclick="startBsReply(${comment.id}, '${window.escapeHtml(comment.usuario?.username || '')}')">Responder</button>
+                </div>
+                ${comment.totalRespuestas > 0 ? `
+                    <div class="bs-comment-replies" id="bsReplies-${comment.id}">
+                        <button class="bs-show-replies-btn" onclick="loadBsReplies(${comment.id}, this)">
+                            Ver ${comment.totalRespuestas} ${comment.totalRespuestas === 1 ? 'respuesta' : 'respuestas'}
+                        </button>
+                    </div>
+                ` : `<div class="bs-comment-replies" id="bsReplies-${comment.id}"></div>`}
+            </div>
+        `;
+
+        return div;
+    }
+
+    // Crear elemento HTML de una respuesta
+    function createBsReplyElement(reply) {
+        const div = document.createElement('div');
+        div.className = 'bs-reply-item';
+        div.dataset.commentId = reply.id;
+
+        const timeAgo = formatTimeAgo(reply.fechaCreacion);
+        const avatarHtml = reply.usuario?.fotoPerfil
+            ? `<img src="${reply.usuario.fotoPerfil}" alt="">`
+            : `<div class="bs-comment-avatar-initial">${(reply.usuario?.username || 'U').charAt(0).toUpperCase()}</div>`;
+
+        const likeSvgFill = reply.meDioLike ? 'currentColor' : 'none';
+        const likedClass = reply.meDioLike ? 'liked' : '';
+
+        div.innerHTML = `
+            <div class="bs-comment-avatar">${avatarHtml}</div>
+            <div class="bs-comment-body">
+                <div class="bs-comment-header">
+                    <a href="/Feed/Perfil/${window.escapeHtml(reply.usuario?.username || '')}" class="bs-comment-username">${window.escapeHtml(reply.usuario?.username || 'usuario')}</a>
+                    <span class="bs-comment-time">${timeAgo}</span>
+                </div>
+                <p class="bs-comment-text">${window.escapeHtml(reply.texto)}</p>
+                <div class="bs-comment-actions">
+                    <button class="bs-comment-action-btn ${likedClass}" onclick="toggleBsCommentLike(${reply.id}, this)">
+                        <svg viewBox="0 0 24 24" fill="${likeSvgFill}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                        <span>${reply.numeroLikes > 0 ? reply.numeroLikes : ''}</span>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        return div;
+    }
+
+    // Formatear tiempo relativo
+    function formatTimeAgo(dateStr) {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        const diffWeeks = Math.floor(diffDays / 7);
+
+        if (diffMins < 1) return 'ahora';
+        if (diffMins < 60) return `${diffMins}m`;
+        if (diffHours < 24) return `${diffHours}h`;
+        if (diffDays < 7) return `${diffDays}d`;
+        return `${diffWeeks}sem`;
+    }
+
+    // Toggle like en comentario del bottom sheet
+    window.toggleBsCommentLike = async function(commentId, btn) {
+        try {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            const res = await fetch('/Feed/ToggleLikeComentario', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `comentarioId=${commentId}&__RequestVerificationToken=${encodeURIComponent(token || '')}`
+            });
+            const data = await res.json();
+            if (data.success) {
+                const countSpan = btn.querySelector('span');
+                const svg = btn.querySelector('svg');
+                if (data.meDioLike) {
+                    btn.classList.add('liked');
+                    svg.setAttribute('fill', 'currentColor');
+                } else {
+                    btn.classList.remove('liked');
+                    svg.setAttribute('fill', 'none');
+                }
+                countSpan.textContent = data.likes > 0 ? data.likes : '';
+            }
+        } catch (err) {
+            console.error('Error al dar like:', err);
+        }
+    };
+
+    // Cargar respuestas de un comentario
+    window.loadBsReplies = async function(commentId, btn) {
+        const container = document.getElementById(`bsReplies-${commentId}`);
+        if (!container) return;
+
+        btn.textContent = 'Cargando...';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(`/Feed/ObtenerRespuestasComentario?comentarioId=${commentId}&skip=0&take=50`);
+            const data = await res.json();
+
+            if (data.success) {
+                // Quitar boton de mostrar respuestas
+                btn.remove();
+
+                // Agregar respuestas
+                data.respuestas.forEach(r => {
+                    container.appendChild(createBsReplyElement(r));
+                });
+            }
+        } catch (err) {
+            console.error('Error cargando respuestas:', err);
+            btn.textContent = 'Error, reintentar';
+            btn.disabled = false;
+        }
+    };
+
+    // Responder a un comentario
+    window.startBsReply = function(commentId, username) {
+        bsReplyToId = commentId;
+        document.getElementById('commentsBsReplyTo').textContent = 'Respondiendo a @@' + username;
+        document.getElementById('commentsBsReplyIndicator').classList.add('active');
+        document.getElementById('commentsBsInput').focus();
+        document.getElementById('commentsBsInput').placeholder = 'Responder a @@' + username + '...';
+    };
+
+    // Cancelar respuesta
+    window.cancelBsReply = function() {
+        bsReplyToId = null;
+        document.getElementById('commentsBsReplyIndicator').classList.remove('active');
+        document.getElementById('commentsBsInput').placeholder = 'Agrega un comentario...';
+    };
+
+    // Enviar comentario/respuesta
+    window.sendBsComment = async function() {
+        const input = document.getElementById('commentsBsInput');
+        const texto = input.value.trim();
+        if (!texto || !bsCurrentPostId) return;
+
+        const sendBtn = document.getElementById('commentsBsSendBtn');
+        sendBtn.classList.remove('enabled');
+        input.disabled = true;
+
+        try {
+            const formData = new FormData();
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value || '');
+            formData.append('id', bsCurrentPostId);
+            formData.append('texto', texto);
+            if (bsReplyToId) {
+                formData.append('comentarioPadreId', bsReplyToId);
+            }
+
+            const res = await fetch('/Feed/Comentar', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                input.value = '';
+
+                if (bsReplyToId) {
+                    // Agregar respuesta al contenedor de respuestas del comentario padre
+                    const repliesContainer = document.getElementById(`bsReplies-${bsReplyToId}`);
+                    if (repliesContainer) {
+                        const replyEl = document.createElement('div');
+                        replyEl.className = 'bs-reply-item';
+                        replyEl.innerHTML = `
+                            <div class="bs-comment-avatar">
+                                <div class="bs-comment-avatar-initial">${(data.comentario.username || 'U').charAt(0).toUpperCase()}</div>
+                            </div>
+                            <div class="bs-comment-body">
+                                <div class="bs-comment-header">
+                                    <span class="bs-comment-username">${window.escapeHtml(data.comentario.username)}</span>
+                                    <span class="bs-comment-time">ahora</span>
+                                </div>
+                                <p class="bs-comment-text">${window.escapeHtml(data.comentario.texto)}</p>
+                            </div>
+                        `;
+                        repliesContainer.appendChild(replyEl);
+                    }
+                    cancelBsReply();
+                } else {
+                    // Agregar comentario nuevo al principio de la lista
+                    const list = document.getElementById('commentsBsList');
+                    const newComment = document.createElement('div');
+                    newComment.className = 'bs-comment-item';
+                    newComment.innerHTML = `
+                        <div class="bs-comment-avatar">
+                            <div class="bs-comment-avatar-initial">${(data.comentario.username || 'U').charAt(0).toUpperCase()}</div>
+                        </div>
+                        <div class="bs-comment-body">
+                            <div class="bs-comment-header">
+                                <span class="bs-comment-username">${window.escapeHtml(data.comentario.username)}</span>
+                                <span class="bs-comment-time">ahora</span>
+                            </div>
+                            <p class="bs-comment-text">${window.escapeHtml(data.comentario.texto)}</p>
+                            <div class="bs-comment-actions">
+                                <button class="bs-comment-reply-btn" onclick="startBsReply(${data.comentario.id}, '${window.escapeHtml(data.comentario.username)}')">Responder</button>
+                            </div>
+                            <div class="bs-comment-replies" id="bsReplies-${data.comentario.id}"></div>
+                        </div>
+                    `;
+                    list.insertBefore(newComment, list.firstChild);
+                    document.getElementById('commentsBsEmpty').style.display = 'none';
+                }
+
+                // Actualizar contador de comentarios en el fullscreen
+                updateBsCommentCount(bsCurrentPostId, 1);
+            } else {
+                showFullscreenToast(data.message || 'Error al comentar');
+            }
+        } catch (err) {
+            console.error('Error al enviar comentario:', err);
+            showFullscreenToast('Error al publicar comentario');
+        } finally {
+            input.disabled = false;
+        }
+    };
+
+    // Actualizar contador de comentarios en el fullscreen overlay
+    function updateBsCommentCount(postId, delta) {
+        // Actualizar en fullscreenPosts
+        const postIdx = fullscreenPosts.findIndex(p => p.id === postId);
+        if (postIdx >= 0) {
+            fullscreenPosts[postIdx].comments = (fullscreenPosts[postIdx].comments || 0) + delta;
+            // Actualizar el span visible
+            const slide = document.querySelector(`.fullscreen-slide[data-post-id="${postId}"]`);
+            const countEl = slide?.querySelector('.credits-comments-count');
+            if (countEl) {
+                countEl.textContent = formatNumber(fullscreenPosts[postIdx].comments);
+            }
+        }
+    }
+
+    // Input handler para habilitar/deshabilitar boton de enviar
+    document.getElementById('commentsBsInput')?.addEventListener('input', function() {
+        const sendBtn = document.getElementById('commentsBsSendBtn');
+        if (this.value.trim()) {
+            sendBtn.classList.add('enabled');
+        } else {
+            sendBtn.classList.remove('enabled');
+        }
+    });
+
+    // Enter para enviar comentario
+    document.getElementById('commentsBsInput')?.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && this.value.trim()) {
+            sendBsComment();
+        }
+    });
+
+    // Drag gesture para cerrar el bottom sheet
+    let bsDragInitialized = false;
+    function initBsDragGesture() {
+        if (bsDragInitialized) return;
+        bsDragInitialized = true;
+
+        const sheet = document.getElementById('commentsBottomSheet');
+        const handle = document.getElementById('commentsBsDragHandle');
+        const body = document.getElementById('commentsBsBody');
+        if (!sheet || !handle) return;
+
+        let startY = 0;
+        let currentY = 0;
+        let isDragging = false;
+
+        function onTouchStart(e) {
+            // Solo permitir drag desde el handle o cuando el body esta scrolleado arriba
+            const isFromHandle = e.target.closest('#commentsBsDragHandle') || e.target.closest('.comments-bs-header');
+            const bodyAtTop = body.scrollTop <= 0;
+
+            if (!isFromHandle && !bodyAtTop) return;
+            if (!isFromHandle && bodyAtTop) {
+                // Solo si es un swipe hacia abajo, detectar en move
+            }
+
+            startY = e.touches[0].clientY;
+            currentY = startY;
+            isDragging = true;
+            sheet.classList.add('dragging');
+        }
+
+        function onTouchMove(e) {
+            if (!isDragging) return;
+            currentY = e.touches[0].clientY;
+            const deltaY = currentY - startY;
+
+            // Solo permitir arrastrar hacia abajo
+            if (deltaY < 0) {
+                sheet.style.transform = '';
+                return;
+            }
+
+            const isDesktop = window.innerWidth >= 768;
+            if (isDesktop) {
+                sheet.style.transform = `translateX(-50%) translateY(${deltaY}px)`;
+            } else {
+                sheet.style.transform = `translateY(${deltaY}px)`;
+            }
+
+            // Prevenir scroll del body mientras se arrastra
+            if (deltaY > 10) {
+                e.preventDefault();
+            }
+        }
+
+        function onTouchEnd() {
+            if (!isDragging) return;
+            isDragging = false;
+            sheet.classList.remove('dragging');
+            sheet.style.transform = '';
+
+            const deltaY = currentY - startY;
+            // Si arrastro mas de 100px hacia abajo, cerrar
+            if (deltaY > 100) {
+                closeCommentsBottomSheet();
+            }
+        }
+
+        sheet.addEventListener('touchstart', onTouchStart, { passive: true });
+        sheet.addEventListener('touchmove', onTouchMove, { passive: false });
+        sheet.addEventListener('touchend', onTouchEnd, { passive: true });
+    }
+
+    // Cerrar bottom sheet con Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('commentsBottomSheet')?.classList.contains('active')) {
+            closeCommentsBottomSheet();
+        }
+    });
+
     // Cerrar fullscreen viewer
     // ⚠️ GLOBAL para onclick en HTML
     window.closeFullscreenViewer = function() {
+        // Cerrar bottom sheet de comentarios si esta abierto
+        closeCommentsBottomSheet();
+
         // Obtener el postId del slide actual ANTES de limpiar
         const currentPostId = fullscreenPosts[currentFullscreenIndex]?.id;
 
+        // Limpiar timeout pendiente para evitar ejecución después de cerrar
+        if (scrollTimeout) {
+            clearTimeout(scrollTimeout);
+            scrollTimeout = null;
+        }
+
         // Pausar todo primero
         pauseAllFullscreenMedia();
+
+        // Limpiar cache de medios precargados para liberar memoria
+        for (const [src, media] of preloadedMedia.entries()) {
+            if (media instanceof HTMLVideoElement) {
+                media.pause();
+                media.removeAttribute('src');
+                media.load();
+            }
+        }
+        preloadedMedia.clear();
 
         // Ocultar botón de mute global
         const muteBtn = document.getElementById('globalMuteBtn');
@@ -16340,6 +17979,10 @@
 
         // IMPORTANTE: Marcar fullscreen como inactivo para permitir que el IntersectionObserver del feed funcione
         isFullscreenActive = false;
+
+        // Quitar clase del body y html para mostrar elementos de navegación nuevamente
+        document.body.classList.remove('fullscreen-active');
+        document.documentElement.classList.remove('fullscreen-active');
 
         // Cerrar también el carrusel fullscreen si está abierto
         closeFullscreenCarousel();
@@ -16548,6 +18191,10 @@
         isFullscreenActive = true;
         pauseFeedMedia();
 
+        // Agregar clase al body y html para ocultar elementos de navegación y forzar fondo negro
+        document.body.classList.add('fullscreen-active');
+        document.documentElement.classList.add('fullscreen-active');
+
         // Generar el viewer del carrusel
         generateCarouselFullscreenViewer();
 
@@ -16717,6 +18364,8 @@
             viewer.classList.remove('active');
         }
         document.body.classList.remove('fullscreen-mode');
+        document.body.classList.remove('fullscreen-active');
+        document.documentElement.classList.remove('fullscreen-active');
         document.body.style.overflow = '';
         isFullscreenActive = false;
         carouselFullscreenFiles = [];
@@ -16859,20 +18508,32 @@
         // Calcular velocidad del swipe
         const velocity = Math.abs(deltaX) / deltaTime;
 
-        // Swipe hacia la izquierda: deltaX negativo -> cerrar viewer
+        // Swipe hacia la izquierda (dedo izq): deltaX negativo -> ir al detalle
         const isSwipeLeft = deltaX < -100 || (deltaX < -50 && velocity > 0.4);
 
-        // Swipe hacia la derecha: deltaX positivo -> ir al detalle
+        // Swipe hacia la derecha (dedo der): deltaX positivo -> volver al feed
         const isSwipeRight = deltaX > 100 || (deltaX > 50 && velocity > 0.4);
 
         if (isSwipeLeft) {
-            closeFullscreenViewer();
-        } else if (isSwipeRight) {
             // Ir al detalle de la publicacion actual
             const currentPost = fullscreenPosts[currentFullscreenIndex];
             if (currentPost && currentPost.id) {
                 closeFullscreenViewer();
                 window.location.href = '/Feed/Detalle/' + currentPost.id;
+            }
+        } else if (isSwipeRight) {
+            // Volver al feed en la posición del post actual
+            const currentPost = fullscreenPosts[currentFullscreenIndex];
+            const postId = currentPost?.id;
+
+            // IMPORTANTE: Cerrar el viewer y limpiar estado antes de navegar
+            closeFullscreenViewer();
+
+            // Navegar al feed con hash para scroll
+            if (postId) {
+                window.location.href = '/Feed#post-' + postId;
+            } else {
+                window.location.href = '/Feed';
             }
         }
 
@@ -19357,10 +21018,12 @@
         }
     }
 
-    // Cargar stories al iniciar
+    // Cargar stories al iniciar (diferido para priorizar feed)
     document.addEventListener('DOMContentLoaded', function() {
-        actualizarBarraStories();
-        initStoriesDragScroll();
+        setTimeout(function() {
+            actualizarBarraStories();
+            initStoriesDragScroll();
+        }, 1500); // Diferir 1.5s - stories no son críticas
     });
 
     // Drag to scroll horizontal para stories (version segura)

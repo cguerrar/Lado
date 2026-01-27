@@ -247,6 +247,176 @@
         margin: 0;
         font-size: 13px;
     }
+
+    /* Contenido Rechazado */
+    .section-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-color);
+        margin: 32px 0 16px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .section-title i {
+        color: #ef4444;
+    }
+
+    .section-title .badge-count {
+        background: #ef4444;
+        color: white;
+        font-size: 12px;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-weight: 500;
+    }
+
+    .contenido-rechazado-card {
+        background: var(--card-bg);
+        border: 1px solid #fecaca;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        display: flex;
+        gap: 16px;
+        transition: all 0.2s;
+    }
+
+    .contenido-rechazado-card:hover {
+        border-color: #ef4444;
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+    }
+
+    .contenido-thumb {
+        width: 80px;
+        height: 80px;
+        border-radius: 8px;
+        object-fit: cover;
+        background: var(--bg-secondary);
+        flex-shrink: 0;
+    }
+
+    .contenido-thumb-placeholder {
+        width: 80px;
+        height: 80px;
+        border-radius: 8px;
+        background: var(--bg-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .contenido-thumb-placeholder i {
+        font-size: 24px;
+        color: var(--text-muted);
+    }
+
+    .contenido-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .contenido-fecha {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+    }
+
+    .contenido-descripcion {
+        font-size: 14px;
+        color: var(--text-color);
+        margin-bottom: 8px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .contenido-razon-rechazo {
+        font-size: 13px;
+        color: #dc2626;
+        background: #fef2f2;
+        padding: 8px 12px;
+        border-radius: 6px;
+        border-left: 3px solid #ef4444;
+    }
+
+    .contenido-razon-rechazo strong {
+        display: block;
+        font-size: 11px;
+        color: #991b1b;
+        margin-bottom: 2px;
+        text-transform: uppercase;
+    }
+
+    .contenido-actions {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .btn-apelar {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 20px;
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    .btn-apelar:hover {
+        background: var(--primary-hover);
+        color: white;
+        transform: translateY(-1px);
+    }
+
+    .no-rechazados {
+        text-align: center;
+        padding: 24px;
+        background: #f0fdf4;
+        border: 1px solid #86efac;
+        border-radius: 12px;
+        color: #166534;
+    }
+
+    .no-rechazados i {
+        font-size: 24px;
+        margin-bottom: 8px;
+        display: block;
+    }
+
+    .divider {
+        height: 1px;
+        background: var(--border-color);
+        margin: 32px 0;
+    }
+
+    @@media (max-width: 600px) {
+        .contenido-rechazado-card {
+            flex-direction: column;
+        }
+
+        .contenido-thumb,
+        .contenido-thumb-placeholder {
+            width: 100%;
+            height: 120px;
+        }
+
+        .contenido-actions {
+            flex-direction: row;
+            margin-top: 12px;
+        }
+    }
 </style>
 
 <div class="apelaciones-container">
@@ -265,6 +435,77 @@
             </p>
         </div>
     </div>
+
+    @{
+        var contenidosRechazados = ViewBag.ContenidosRechazados as List<Lado.Models.Contenido> ?? new List<Lado.Models.Contenido>();
+    }
+
+    @if (contenidosRechazados.Any())
+    {
+        <h2 class="section-title">
+            <i class="fas fa-ban"></i>
+            Contenido Rechazado
+            <span class="badge-count">@contenidosRechazados.Count</span>
+        </h2>
+
+        @foreach (var contenido in contenidosRechazados)
+        {
+            var primerArchivo = contenido.Archivos?.FirstOrDefault();
+            var thumbnail = primerArchivo?.Thumbnail ?? primerArchivo?.RutaArchivo ?? contenido.Thumbnail ?? contenido.RutaArchivo;
+            var esVideo = contenido.TipoContenido == Lado.Models.TipoContenido.Video ||
+                         (primerArchivo != null && primerArchivo.TipoArchivo == Lado.Models.TipoArchivo.Video);
+
+            <div class="contenido-rechazado-card">
+                @if (!string.IsNullOrEmpty(thumbnail))
+                {
+                    <img src="@thumbnail" alt="Contenido rechazado" class="contenido-thumb" onerror="this.style.display='none'">
+                }
+                else
+                {
+                    <div class="contenido-thumb-placeholder">
+                        <i class="fas @(esVideo ? "fa-video" : "fa-image")"></i>
+                    </div>
+                }
+
+                <div class="contenido-info">
+                    <div class="contenido-fecha">
+                        <i class="fas fa-calendar me-1"></i>
+                        Publicado el @contenido.FechaPublicacion.ToString("dd MMM yyyy, HH:mm")
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(contenido.Descripcion))
+                    {
+                        <div class="contenido-descripcion">@contenido.Descripcion</div>
+                    }
+                    else
+                    {
+                        <div class="contenido-descripcion" style="color: var(--text-muted); font-style: italic;">
+                            @(esVideo ? "Video" : "Imagen") sin descripcion
+                        </div>
+                    }
+
+                    <div class="contenido-razon-rechazo">
+                        <strong>Razon del rechazo:</strong>
+                        @(contenido.RazonCensura ?? "No especificada")
+                    </div>
+                </div>
+
+                <div class="contenido-actions">
+                    <a href="@Url.Action("CrearContenido", "Apelaciones", new { id = contenido.Id })" class="btn-apelar">
+                        <i class="fas fa-gavel"></i>
+                        Apelar
+                    </a>
+                </div>
+            </div>
+        }
+
+        <div class="divider"></div>
+    }
+
+    <h2 class="section-title" style="margin-top: 0;">
+        <i class="fas fa-history" style="color: var(--primary-color);"></i>
+        Historial de Apelaciones
+    </h2>
 
     @if (Model.Any())
     {

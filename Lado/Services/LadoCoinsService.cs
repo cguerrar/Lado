@@ -511,22 +511,22 @@ namespace Lado.Services
                 })
                 .ToListAsync();
 
+            var titulo7Dias = "LadoCoins por vencer";
             foreach (var alerta in alertas7Dias)
             {
-                // Verificar si ya enviamos alerta de 7 días hoy
-                var cacheKey = $"alerta_lc_7d_{alerta.UsuarioId}_{ahora:yyyyMMdd}";
-                if (YaEnviadoHoy(cacheKey)) continue;
+                // Verificar si ya enviamos alerta de 7 días hoy (verificación en BD)
+                if (await YaEnviadoHoyAsync(alerta.UsuarioId, titulo7Dias)) continue;
 
                 try
                 {
                     await _notificacionService.CrearNotificacionSistemaAsync(
                         alerta.UsuarioId,
-                        "LadoCoins por vencer",
+                        titulo7Dias,
                         $"Tienes ${alerta.MontoTotal:F2} LadoCoins que vencerán en 7 días. ¡Úsalos antes de que expiren!",
                         "/LadoCoins"
                     );
 
-                    MarcarEnviadoHoy(cacheKey);
+                    MarcarEnviadoHoy(alerta.UsuarioId, titulo7Dias);
                     _logger.LogInformation("Alerta 7 días enviada a usuario {UsuarioId}: ${Monto}", alerta.UsuarioId, alerta.MontoTotal);
                 }
                 catch (Exception ex)
@@ -551,22 +551,22 @@ namespace Lado.Services
                 })
                 .ToListAsync();
 
+            var titulo1Dia = "¡LadoCoins vencen mañana!";
             foreach (var alerta in alertas1Dia)
             {
-                // Verificar si ya enviamos alerta de 1 día hoy
-                var cacheKey = $"alerta_lc_1d_{alerta.UsuarioId}_{ahora:yyyyMMdd}";
-                if (YaEnviadoHoy(cacheKey)) continue;
+                // Verificar si ya enviamos alerta de 1 día hoy (verificación en BD)
+                if (await YaEnviadoHoyAsync(alerta.UsuarioId, titulo1Dia)) continue;
 
                 try
                 {
                     await _notificacionService.CrearNotificacionSistemaAsync(
                         alerta.UsuarioId,
-                        "¡LadoCoins vencen mañana!",
+                        titulo1Dia,
                         $"¡URGENTE! Tienes ${alerta.MontoTotal:F2} LadoCoins que vencerán mañana. ¡Úsalos hoy!",
                         "/LadoCoins"
                     );
 
-                    MarcarEnviadoHoy(cacheKey);
+                    MarcarEnviadoHoy(alerta.UsuarioId, titulo1Dia);
                     _logger.LogInformation("Alerta 1 día enviada a usuario {UsuarioId}: ${Monto}", alerta.UsuarioId, alerta.MontoTotal);
                 }
                 catch (Exception ex)
@@ -579,12 +579,15 @@ namespace Lado.Services
                 alertas7Dias.Count, alertas1Dia.Count);
         }
 
-        // Cache simple para evitar enviar múltiples alertas el mismo día
+        // Cache simple para evitar enviar múltiples alertas el mismo día (respaldo en memoria)
         private static readonly HashSet<string> _alertasEnviadas = new();
         private static DateTime _ultimaLimpiezaAlertas = DateTime.MinValue;
 
-        private bool YaEnviadoHoy(string cacheKey)
+        private async Task<bool> YaEnviadoHoyAsync(string usuarioId, string titulo)
         {
+            // Primero verificar cache en memoria (rápido)
+            var cacheKey = $"{titulo}_{usuarioId}_{DateTime.Now:yyyyMMdd}";
+
             // Limpiar cache cada día
             if (DateTime.Now.Date > _ultimaLimpiezaAlertas.Date)
             {
@@ -597,12 +600,32 @@ namespace Lado.Services
 
             lock (_alertasEnviadas)
             {
-                return _alertasEnviadas.Contains(cacheKey);
+                if (_alertasEnviadas.Contains(cacheKey))
+                    return true;
             }
+
+            // Si no está en cache, verificar en base de datos (persistente)
+            var hoyInicio = DateTime.Today;
+            var existe = await _context.Notificaciones
+                .AnyAsync(n => n.UsuarioId == usuarioId &&
+                              n.Titulo == titulo &&
+                              n.FechaCreacion >= hoyInicio);
+
+            if (existe)
+            {
+                // Agregar a cache para evitar consultas futuras
+                lock (_alertasEnviadas)
+                {
+                    _alertasEnviadas.Add(cacheKey);
+                }
+            }
+
+            return existe;
         }
 
-        private void MarcarEnviadoHoy(string cacheKey)
+        private void MarcarEnviadoHoy(string usuarioId, string titulo)
         {
+            var cacheKey = $"{titulo}_{usuarioId}_{DateTime.Now:yyyyMMdd}";
             lock (_alertasEnviadas)
             {
                 _alertasEnviadas.Add(cacheKey);

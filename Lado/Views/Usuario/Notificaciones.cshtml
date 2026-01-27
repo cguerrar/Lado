@@ -1082,6 +1082,11 @@
                 const btn = document.getElementById('btnMarcarLeidas');
                 if (btn) btn.remove();
 
+                // Actualizar badge del navbar
+                if (typeof actualizarBadgeNotificaciones === 'function') {
+                    actualizarBadgeNotificaciones(0);
+                }
+
                 if (window.showToast) {
                     showToast('success', 'Listo', 'Todas marcadas como leídas');
                 }
@@ -1093,6 +1098,8 @@
     async function eliminarNotificacionLocal(id) {
         const item = document.querySelector(`.notification-item[data-id="${id}"]`);
         if (!item) return;
+
+        const wasUnread = item.classList.contains('unread');
 
         item.style.transition = 'all 0.3s ease';
         item.style.opacity = '0';
@@ -1109,6 +1116,18 @@
             });
             const data = await response.json();
             if (data.success) {
+                // Si era no leída, decrementar el badge del navbar
+                if (wasUnread && typeof actualizarBadgeNotificaciones === 'function') {
+                    const badge = document.getElementById('notificationBadge');
+                    let count = parseInt(badge?.textContent) || 0;
+                    if (count > 0) {
+                        actualizarBadgeNotificaciones(count - 1);
+                    }
+                }
+
+                // Actualizar el badge local de la página
+                actualizarBadgeLocal();
+
                 setTimeout(() => {
                     item.remove();
                     verificarListaVacia();
@@ -1123,8 +1142,18 @@
         }
     }
 
+    function actualizarBadgeLocal() {
+        const unreadCount = document.querySelectorAll('.notification-item.unread').length;
+        const badge = document.querySelector('.badge-count');
+        if (unreadCount === 0 && badge) {
+            badge.remove();
+        } else if (badge) {
+            badge.textContent = unreadCount;
+        }
+    }
+
     async function eliminarTodas() {
-        if (!confirm('¿Eliminar todas las notificaciones? Esta acción no se puede deshacer.')) {
+        if (!confirm('¿Eliminar todas las notificaciones? Esta accion no se puede deshacer.')) {
             return;
         }
 
@@ -1148,6 +1177,16 @@
                 setTimeout(() => {
                     items.forEach(item => item.remove());
                     verificarListaVacia();
+
+                    // Actualizar badge del navbar a 0
+                    if (typeof actualizarBadgeNotificaciones === 'function') {
+                        actualizarBadgeNotificaciones(0);
+                    }
+
+                    // Eliminar badge local de la página
+                    const badgeLocal = document.querySelector('.badge-count');
+                    if (badgeLocal) badgeLocal.remove();
+
                     if (window.showToast) {
                         showToast('success', 'Listo', `${data.eliminadas} notificaciones eliminadas`);
                     }

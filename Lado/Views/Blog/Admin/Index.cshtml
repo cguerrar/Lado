@@ -1,0 +1,295 @@
+@model List<Lado.Models.ArticuloBlog>
+@{
+    ViewData["Title"] = "Gestionar Blog";
+    Layout = "_Layout";
+}
+
+<style>
+    .admin-blog-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 30px 20px;
+    }
+
+    .admin-blog-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+
+    .admin-blog-header h1 {
+        color: #111;
+        font-size: 1.8rem;
+    }
+
+    .btn-crear {
+        padding: 12px 24px;
+        background: #4682B4;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-crear:hover {
+        background: #36648B;
+        color: white;
+    }
+
+    .blog-table {
+        width: 100%;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+
+    .blog-table th,
+    .blog-table td {
+        padding: 16px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+
+    .blog-table th {
+        background: #f8f9fa;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .blog-table tr:hover {
+        background: #f8f9fa;
+    }
+
+    .blog-thumb {
+        width: 80px;
+        height: 50px;
+        object-fit: cover;
+        border-radius: 6px;
+    }
+
+    .blog-title-cell {
+        max-width: 300px;
+    }
+
+    .blog-title-cell a {
+        color: #111;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .blog-title-cell a:hover {
+        color: #4682B4;
+    }
+
+    .blog-status {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .blog-status.publicado {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .blog-status.borrador {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .blog-actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .blog-actions a,
+    .blog-actions button {
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-editar {
+        background: #e3f2fd;
+        color: #1565c0;
+    }
+
+    .btn-ver {
+        background: #e8f5e9;
+        color: #2e7d32;
+    }
+
+    .btn-toggle {
+        background: #fff3e0;
+        color: #ef6c00;
+    }
+
+    .btn-eliminar {
+        background: #ffebee;
+        color: #c62828;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px;
+        color: #666;
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: #ddd;
+        margin-bottom: 16px;
+    }
+
+    @@media (max-width: 768px) {
+        .admin-blog-header {
+            flex-direction: column;
+            gap: 16px;
+            align-items: flex-start;
+        }
+
+        .blog-table {
+            display: block;
+            overflow-x: auto;
+        }
+    }
+</style>
+
+<div class="admin-blog-container">
+    <div class="admin-blog-header">
+        <h1><i class="fas fa-newspaper"></i> Gestionar Blog</h1>
+        <a href="@Url.Action("AdminCrear", "Blog")" class="btn-crear">
+            <i class="fas fa-plus"></i> Nuevo Articulo
+        </a>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (Model.Any())
+    {
+        <table class="blog-table">
+            <thead>
+                <tr>
+                    <th>Imagen</th>
+                    <th>Titulo</th>
+                    <th>Categoria</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                    <th>Vistas</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var articulo in Model)
+                {
+                    <tr>
+                        <td>
+                            @if (!string.IsNullOrEmpty(articulo.ImagenPortada))
+                            {
+                                <img src="@articulo.ImagenPortada" alt="" class="blog-thumb">
+                            }
+                            else
+                            {
+                                <div class="blog-thumb" style="background: #eee; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-image" style="color: #ccc;"></i>
+                                </div>
+                            }
+                        </td>
+                        <td class="blog-title-cell">
+                            <a href="@Url.Action("Articulo", "Blog", new { slug = articulo.Slug })" target="_blank">
+                                @articulo.Titulo
+                            </a>
+                            @if (articulo.EsDestacado)
+                            {
+                                <span style="color: #ffc107; margin-left: 8px;"><i class="fas fa-star"></i></span>
+                            }
+                        </td>
+                        <td>@articulo.Categoria</td>
+                        <td>
+                            <span class="blog-status @(articulo.EstaPublicado ? "publicado" : "borrador")">
+                                @(articulo.EstaPublicado ? "Publicado" : "Borrador")
+                            </span>
+                        </td>
+                        <td>
+                            @if (articulo.FechaPublicacion.HasValue)
+                            {
+                                @articulo.FechaPublicacion.Value.ToString("dd/MM/yyyy")
+                            }
+                            else
+                            {
+                                <span style="color: #999;">Sin publicar</span>
+                            }
+                        </td>
+                        <td>@articulo.Vistas</td>
+                        <td>
+                            <div class="blog-actions">
+                                <a href="@Url.Action("AdminEditar", "Blog", new { id = articulo.Id })" class="btn-editar" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                @if (articulo.EstaPublicado)
+                                {
+                                    <a href="@Url.Action("Articulo", "Blog", new { slug = articulo.Slug })" target="_blank" class="btn-ver" title="Ver">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                }
+                                <button type="button" class="btn-toggle" onclick="togglePublicado(@articulo.Id)" title="@(articulo.EstaPublicado ? "Despublicar" : "Publicar")">
+                                    <i class="fas fa-@(articulo.EstaPublicado ? "eye-slash" : "check")"></i>
+                                </button>
+                                <form action="@Url.Action("AdminEliminar", "Blog", new { id = articulo.Id })" method="post" style="display: inline;"
+                                      onsubmit="return confirm('¿Eliminar este articulo?');">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn-eliminar" title="Eliminar">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="empty-state">
+            <i class="fas fa-newspaper"></i>
+            <h3>No hay articulos</h3>
+            <p>Crea tu primer articulo para el blog</p>
+        </div>
+    }
+</div>
+
+<script>
+    async function togglePublicado(id) {
+        try {
+            const response = await fetch(`/Admin/Blog/TogglePublicado/${id}`, {
+                method: 'POST',
+                headers: {
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                }
+            });
+
+            if (response.ok) {
+                location.reload();
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+</script>

@@ -670,8 +670,9 @@ namespace Lado.Controllers
         /// Vista del editor unificado de stories/reels con herramientas visuales
         /// </summary>
         /// <param name="modo">story (default) o reel</param>
+        /// <param name="galeriaMediaId">ID opcional de media de galería para precargar</param>
         [HttpGet("Editor")]
-        public async Task<IActionResult> Editor(string modo = "story")
+        public async Task<IActionResult> Editor(string modo = "story", int? galeriaMediaId = null)
         {
             var usuario = await _userManager.GetUserAsync(User);
             var usuarioVerificado = usuario?.EsCreador == true && usuario?.CreadorVerificado == true;
@@ -680,6 +681,21 @@ namespace Lado.Controllers
             ViewBag.Titulo = modo == "reel" ? "Crear Reel" : "Crear Historia";
             ViewBag.TextoPublicar = modo == "reel" ? "Publicar Reel" : "Publicar";
             ViewBag.UsuarioVerificado = usuarioVerificado;
+
+            // Si viene de la galería, cargar el archivo
+            if (galeriaMediaId.HasValue && usuario != null)
+            {
+                var mediaGaleria = await _context.MediasGaleria
+                    .FirstOrDefaultAsync(m => m.Id == galeriaMediaId.Value && m.UsuarioId == usuario.Id);
+
+                if (mediaGaleria != null)
+                {
+                    ViewBag.GaleriaMediaId = mediaGaleria.Id;
+                    ViewBag.GaleriaMediaUrl = mediaGaleria.RutaArchivo;
+                    ViewBag.GaleriaMediaTipo = mediaGaleria.TipoMedia == TipoMediaGaleria.Video ? "video" : "imagen";
+                }
+            }
+
             return View();
         }
 
@@ -688,6 +704,8 @@ namespace Lado.Controllers
         /// </summary>
         [HttpPost("CrearReel")]
         [ValidateAntiForgeryToken]
+        [RequestSizeLimit(500_000_000)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 500_000_000)]
         public async Task<IActionResult> CrearReel(
             IFormFile archivo,
             string? descripcion,
@@ -852,6 +870,10 @@ namespace Lado.Controllers
                 }
 
                 // Crear contenido como Reel
+                var nombreMostrado = tipoLadoFinal == TipoLado.LadoA
+                    ? usuario?.NombreCompleto
+                    : usuario?.Seudonimo;
+
                 var contenido = new Contenido
                 {
                     UsuarioId = usuarioId,
@@ -860,18 +882,22 @@ namespace Lado.Controllers
                     Descripcion = descripcion ?? "",
                     TipoLado = tipoLadoFinal,
                     EsReel = true,
+                    EsGratis = true,
+                    EsPublicoGeneral = tipoLadoFinal == TipoLado.LadoA,
+                    NombreMostrado = nombreMostrado,
                     FechaPublicacion = DateTime.Now,
                     EstaActivo = true,
                     NumeroLikes = 0,
                     NumeroComentarios = 0,
-                    NumeroCompartidos = 0
+                    NumeroCompartidos = 0,
+                    NumeroVistas = 0
                 };
 
                 _context.Contenidos.Add(contenido);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Reel creado: {ContenidoId} por usuario {UserId} (Editor unificado)",
-                    contenido.Id, usuarioId);
+                _logger.LogInformation("Reel creado: {ContenidoId} por usuario {UserId} (Editor unificado), Tipo: {TipoContenido}, TipoLado: {TipoLado}",
+                    contenido.Id, usuarioId, tipoContenido, tipoLadoFinal);
 
                 return Json(new
                 {
@@ -3029,6 +3055,7 @@ namespace Lado.Controllers
 
         /// <summary>
         /// Vista pública de una story (para links compartidos)
+        /// Estilo Instagram con navegación entre historias del mismo creador
         /// </summary>
         [HttpGet]
         [AllowAnonymous]
@@ -3047,6 +3074,8 @@ namespace Lado.Controllers
 
             // Si es LadoB y no está logueado o no está suscrito, mostrar preview
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var requiereSuscripcion = false;
+
             if (story.TipoLado == TipoLado.LadoB)
             {
                 var puedeVer = false;
@@ -3062,10 +3091,36 @@ namespace Lado.Controllers
 
                 if (!puedeVer)
                 {
+                    requiereSuscripcion = true;
                     ViewBag.RequiereSuscripcion = true;
                     ViewBag.Creador = story.Creador;
                 }
             }
+
+            // Obtener todas las historias activas del mismo creador (para navegación estilo Instagram)
+            var todasLasHistorias = await _context.Stories
+                .Where(s => s.CreadorId == story.CreadorId && s.EstaActivo)
+                .OrderBy(s => s.FechaPublicacion)
+                .Select(s => new {
+                    s.Id,
+                    s.RutaArchivo,
+                    s.TipoContenido,
+                    s.Texto,
+                    s.FechaPublicacion,
+                    s.NumeroVistas,
+                    s.NumeroLikes,
+                    s.TipoLado,
+                    Duracion = s.TipoContenido == TipoContenido.Video ? 15 : 5 // 15s video, 5s imagen
+                })
+                .ToListAsync();
+
+            // Encontrar índice de la historia actual
+            var indiceActual = todasLasHistorias.FindIndex(s => s.Id == id);
+
+            ViewBag.TodasLasHistorias = todasLasHistorias;
+            ViewBag.IndiceActual = indiceActual >= 0 ? indiceActual : 0;
+            ViewBag.TotalHistorias = todasLasHistorias.Count;
+            ViewBag.RequiereSuscripcionParaAlgunas = requiereSuscripcion;
 
             return View(story);
         }

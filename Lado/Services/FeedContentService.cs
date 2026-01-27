@@ -68,8 +68,29 @@ namespace Lado.Services
         public List<object> CreadoresFavoritos { get; set; } = new();
         public List<object> Stories { get; set; } = new();
         public List<object> Colecciones { get; set; } = new();
-        public List<ApplicationUser> CreadoresSugeridos { get; set; } = new();
+        public List<CreadorSugeridoDto> CreadoresSugeridos { get; set; } = new();
         public List<ApplicationUser> UsuariosLadoBPorIntereses { get; set; } = new();
+    }
+
+    /// <summary>
+    /// DTO enriquecido para creadores sugeridos en el feed
+    /// </summary>
+    public class CreadorSugeridoDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string NombreMostrar { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
+        public string? FotoPerfil { get; set; }
+        public string? FotoPortada { get; set; }
+        public string? Biografia { get; set; }
+        public string? Categoria { get; set; }
+        public string? CategoriaColor { get; set; }
+        public int NumeroSeguidores { get; set; }
+        public int SeguidoresEnComun { get; set; }
+        public string? TextoActividad { get; set; }
+        public bool CreadorVerificado { get; set; }
+        public bool EsLadoB { get; set; }
+        public string UrlPerfil { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -215,6 +236,7 @@ namespace Lado.Services
                         && (c.UsuarioId == usuarioId || !c.OcultoSilenciosamente) // Shadow hide
                         && c.TipoLado == TipoLado.LadoA
                         && c.Usuario != null
+                        && (c.UsuarioId == usuarioId || c.Usuario.EstaActivo) // No mostrar contenido de usuarios bloqueados por admin
                         && (creadoresIds.Contains(c.UsuarioId) || c.UsuarioId == usuarioId))
                 .OrderByDescending(c => c.FechaPublicacion)
                 .Take(limiteLadoA)
@@ -235,7 +257,8 @@ namespace Lado.Services
                             && !c.EsPrivado
                             && !c.OcultoSilenciosamente // Shadow hide
                             && c.TipoLado == TipoLado.LadoB
-                            && c.Usuario != null)
+                            && c.Usuario != null
+                            && c.Usuario.EstaActivo) // No mostrar contenido de usuarios bloqueados por admin
                     .OrderByDescending(c => c.FechaPublicacion)
                     .Take(limiteLadoBSuscriptos)
                     .ToListAsync()
@@ -275,6 +298,7 @@ namespace Lado.Services
                             && !c.EsPrivado
                             && !c.OcultoSilenciosamente // Shadow hide
                             && c.Usuario != null
+                            && c.Usuario.EstaActivo // No mostrar contenido de usuarios bloqueados por admin
                             && (!ocultarLadoB || c.TipoLado != TipoLado.LadoB))
                     .OrderByDescending(c => c.FechaPublicacion)
                     .Take(limiteComprado)
@@ -298,6 +322,7 @@ namespace Lado.Services
                             && !c.OcultoSilenciosamente // Shadow hide
                             && c.TipoLado == TipoLado.LadoA
                             && c.Usuario != null
+                            && c.Usuario.EstaActivo // No mostrar contenido de usuarios bloqueados por admin
                             && c.UsuarioId != usuarioId
                             && !creadoresIds.Contains(c.UsuarioId)
                             && !usuariosBloqueadosIds.Contains(c.UsuarioId)
@@ -326,6 +351,7 @@ namespace Lado.Services
                             && !c.OcultoSilenciosamente // Shadow hide
                             && c.TipoLado == TipoLado.LadoB
                             && c.Usuario != null
+                            && c.Usuario.EstaActivo // No mostrar contenido de usuarios bloqueados por admin
                             && c.UsuarioId != usuarioId
                             && !creadoresLadoBIds.Contains(c.UsuarioId)
                             && !contenidosCompradosIds.Contains(c.Id)
@@ -505,7 +531,7 @@ namespace Lado.Services
                 .Cast<object>()
                 .ToListAsync();
 
-            // 4. SUGERENCIAS DE USUARIOS
+            // 4. SUGERENCIAS DE USUARIOS (enriquecidas)
             var adminUsers = await _userManager.GetUsersInRoleAsync("Admin");
             var adminIds = adminUsers.Select(u => u.Id).ToList();
 
@@ -513,18 +539,104 @@ namespace Lado.Services
                 .Where(u => u.Id != usuarioId
                         && u.EstaActivo
                         && !creadoresIds.Contains(u.Id)
-                        && !adminIds.Contains(u.Id));
+                        && !adminIds.Contains(u.Id)
+                        && !usuariosBloqueadosIds.Contains(u.Id));
 
-            if (ocultarLadoB)
+            // Traer un pool más grande y luego barajar para variar en cada visita
+            var poolSugeridos = await creadoresSugeridosQuery
+                .OrderByDescending(u => u.NumeroSeguidores)
+                .Take((descubrimientoUsuariosCant + 5) * 3)
+                .ToListAsync();
+
+            var rng = new Random();
+            var candidatosSugeridos = poolSugeridos
+                .OrderBy(_ => rng.Next())
+                .Take(descubrimientoUsuariosCant + 5)
+                .ToList();
+
+            // Query batch: seguidores en común (personas que yo sigo y también siguen al candidato)
+            var candidatoIds = candidatosSugeridos.Select(u => u.Id).ToList();
+            var seguidoresEnComun = new Dictionary<string, int>();
+            if (creadoresIds.Any() && candidatoIds.Any())
             {
-                creadoresSugeridosQuery = creadoresSugeridosQuery
-                    .Where(u => !u.CreadorVerificado || string.IsNullOrEmpty(u.Seudonimo));
+                seguidoresEnComun = await _context.Suscripciones
+                    .Where(s => s.EstaActiva
+                            && creadoresIds.Contains(s.FanId)
+                            && candidatoIds.Contains(s.CreadorId))
+                    .GroupBy(s => s.CreadorId)
+                    .Select(g => new { CreadorId = g.Key, Count = g.Select(s => s.FanId).Distinct().Count() })
+                    .ToDictionaryAsync(x => x.CreadorId, x => x.Count);
             }
 
-            datos.CreadoresSugeridos = await creadoresSugeridosQuery
-                .OrderByDescending(u => u.NumeroSeguidores)
-                .Take(descubrimientoUsuariosCant)
-                .ToListAsync();
+            // Query batch: colores de categoría
+            var categoriasUnicas = candidatosSugeridos
+                .Where(u => !string.IsNullOrEmpty(u.Categoria))
+                .Select(u => u.Categoria!)
+                .Distinct()
+                .ToList();
+            var coloresCategorias = new Dictionary<string, string>();
+            if (categoriasUnicas.Any())
+            {
+                coloresCategorias = await _context.CategoriasIntereses
+                    .Where(c => c.EstaActiva && categoriasUnicas.Contains(c.Nombre) && !string.IsNullOrEmpty(c.Color))
+                    .ToDictionaryAsync(c => c.Nombre, c => c.Color!);
+            }
+
+            // Creadores sugeridos: LadoA y LadoB aparecen como entradas separadas
+            // (como si fueran usuarios distintos). Nadie sabe que son la misma persona.
+            var usuarioConfig = await _userManager.FindByIdAsync(usuarioId);
+            var bloquearLadoBSugerencias = usuarioConfig?.BloquearLadoB ?? false;
+
+            var sugeridos = new List<CreadorSugeridoDto>();
+            foreach (var u in candidatosSugeridos)
+            {
+                var tieneLadoB = u.EsCreador && !string.IsNullOrEmpty(u.Seudonimo);
+
+                // Entrada LadoA (identidad pública)
+                sugeridos.Add(new CreadorSugeridoDto
+                {
+                    Id = u.Id,
+                    NombreMostrar = u.NombreCompleto ?? u.UserName ?? "",
+                    UserName = u.UserName ?? "",
+                    FotoPerfil = u.FotoPerfil,
+                    FotoPortada = u.FotoPortada,
+                    Biografia = !string.IsNullOrEmpty(u.Biografia) && u.Biografia.Length > 80 ? u.Biografia.Substring(0, 80) + "..." : u.Biografia,
+                    Categoria = u.Categoria,
+                    CategoriaColor = !string.IsNullOrEmpty(u.Categoria) && coloresCategorias.TryGetValue(u.Categoria, out var color) ? color : null,
+                    NumeroSeguidores = u.NumeroSeguidores,
+                    SeguidoresEnComun = seguidoresEnComun.GetValueOrDefault(u.Id, 0),
+                    TextoActividad = CalcularTextoActividad(u.UltimaActividad),
+                    CreadorVerificado = u.CreadorVerificado,
+                    EsLadoB = false,
+                    UrlPerfil = $"/Feed/Perfil/{u.Id}"
+                });
+
+                // Entrada LadoB (seudónimo) como usuario separado
+                if (tieneLadoB && !bloquearLadoBSugerencias)
+                {
+                    var bioB = u.BiografiaLadoB ?? u.Biografia;
+                    sugeridos.Add(new CreadorSugeridoDto
+                    {
+                        Id = u.Id,
+                        NombreMostrar = u.Seudonimo!,
+                        UserName = u.Seudonimo!,
+                        FotoPerfil = u.FotoPerfilLadoB ?? u.FotoPerfil,
+                        FotoPortada = u.FotoPortadaLadoB ?? u.FotoPortada,
+                        Biografia = !string.IsNullOrEmpty(bioB) && bioB.Length > 80 ? bioB.Substring(0, 80) + "..." : bioB,
+                        Categoria = u.Categoria,
+                        CategoriaColor = !string.IsNullOrEmpty(u.Categoria) && coloresCategorias.TryGetValue(u.Categoria, out var colorB) ? colorB : null,
+                        NumeroSeguidores = u.NumeroSeguidores,
+                        SeguidoresEnComun = seguidoresEnComun.GetValueOrDefault(u.Id, 0),
+                        TextoActividad = CalcularTextoActividad(u.UltimaActividad),
+                        CreadorVerificado = u.CreadorVerificado,
+                        EsLadoB = true,
+                        UrlPerfil = $"/Feed/Creador/{u.Seudonimo}"
+                    });
+                }
+
+                if (sugeridos.Count >= descubrimientoUsuariosCant) break;
+            }
+            datos.CreadoresSugeridos = sugeridos.Take(descubrimientoUsuariosCant).ToList();
 
             // 5. USUARIOS LADOB POR INTERESES
             if (!ocultarLadoB)
@@ -779,6 +891,18 @@ namespace Lado.Services
             return resultado;
         }
 
+        private static string? CalcularTextoActividad(DateTime? ultimaActividad)
+        {
+            if (!ultimaActividad.HasValue) return null;
+
+            var diferencia = DateTime.Now - ultimaActividad.Value;
+            if (diferencia.TotalMinutes < 5) return "Activo ahora";
+            if (diferencia.TotalMinutes < 60) return $"Activo hace {(int)diferencia.TotalMinutes}m";
+            if (diferencia.TotalHours < 24) return $"Activo hace {(int)diferencia.TotalHours}h";
+            if (diferencia.TotalDays < 7) return $"Activo hace {(int)diferencia.TotalDays}d";
+            return null;
+        }
+
         private async Task<List<ApplicationUser>> ObtenerUsuariosLadoBPorInteresesAsync(
             string usuarioId,
             List<string> usuariosBloqueadosIds,
@@ -808,7 +932,11 @@ namespace Lado.Services
                 .Where(c => c.EstaActivo
                         && !c.EsBorrador
                         && !c.Censurado
+                        && !c.EsPrivado
+                        && !c.OcultoSilenciosamente
                         && c.TipoLado == TipoLado.LadoB
+                        && c.Usuario != null
+                        && c.Usuario.EstaActivo
                         && c.CategoriaInteresId.HasValue
                         && interesesUsuario.Contains(c.CategoriaInteresId.Value)
                         && c.UsuarioId != usuarioId

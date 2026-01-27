@@ -21,6 +21,12 @@ namespace Lado.Models
         [StringLength(20)]
         public string? Color { get; set; }
 
+        [StringLength(100)]
+        public string? Slug { get; set; }
+
+        [StringLength(300)]
+        public string? ImagenPortada { get; set; }
+
         // Jerarquia (categoria padre para subcategorias)
         public int? CategoriaPadreId { get; set; }
 

@@ -3,6 +3,9 @@
     var titulo = ViewBag.Titulo ?? "Crear Historia";
     var textoPublicar = ViewBag.TextoPublicar ?? "Publicar";
     var usuarioVerificado = ViewBag.UsuarioVerificado ?? false;
+    var galeriaMediaId = ViewBag.GaleriaMediaId;
+    var galeriaMediaUrl = ViewBag.GaleriaMediaUrl;
+    var galeriaMediaTipo = ViewBag.GaleriaMediaTipo;
     ViewData["Title"] = titulo;
     Layout = null; // Full screen sin layout
 }
@@ -1985,6 +1988,7 @@
         /* Panel de contenido de tabs */
         .music-tab-content {
             display: none;
+            position: relative; /* Para inputs visually-hidden con position:absolute */
         }
 
         .music-tab-content.active {
@@ -1993,17 +1997,30 @@
 
         /* Área de subir música */
         .music-upload-area {
+            position: relative; /* Requerido para file-input-overlay */
             border: 2px dashed var(--line);
             border-radius: 10px;
             padding: 30px 20px;
             text-align: center;
             cursor: pointer;
             transition: all 0.2s;
+            /* Propiedades críticas para móvil */
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
-        .music-upload-area:hover {
+        .music-upload-area:hover,
+        .music-upload-area:active {
             border-color: var(--primary);
             background: var(--primary-alpha);
+        }
+
+        /* Estado focus-within para accesibilidad */
+        .music-upload-area:focus-within {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
         }
 
         .music-upload-area.has-music {
@@ -3209,6 +3226,41 @@
             background: rgba(70, 130, 180, 0.1);
         }
 
+        /* Screen reader only - input oculto accesible */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* Input file overlay - Técnica opacity:0 para máxima compatibilidad iOS Safari
+           NOTA: La técnica clip:rect() tiene bugs conocidos en iOS Safari para file inputs.
+           Esta técnica overlay es la solución estándar de la industria. */
+        .file-input-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            min-height: 48px;
+            min-width: 48px;
+            z-index: 10;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        .file-input-overlay:focus {
+            outline: none;
+        }
+
         /* Upload inicial */
         .upload-overlay {
             position: absolute;
@@ -3224,6 +3276,17 @@
             gap: 16px;
             cursor: pointer;
             z-index: 100;
+            /* Propiedades críticas para móvil */
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* Estado focus-within para accesibilidad */
+        .upload-overlay:focus-within {
+            outline: 3px solid var(--accent);
+            outline-offset: -3px;
         }
 
         .upload-overlay.hidden {
@@ -3970,6 +4033,7 @@
             background: var(--bg-secondary);
             border-radius: 12px;
             padding: 16px;
+            position: relative; /* Para inputs visually-hidden con position:absolute */
         }
 
         .beatsync-section-title {
@@ -3990,17 +4054,30 @@
 
         /* Upload de música */
         .beatsync-music-upload {
+            position: relative; /* Requerido para file-input-overlay */
             border: 2px dashed var(--line);
             border-radius: 10px;
             padding: 20px;
             text-align: center;
             cursor: pointer;
             transition: all 0.2s;
+            /* Propiedades críticas para móvil */
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
-        .beatsync-music-upload:hover {
+        .beatsync-music-upload:hover,
+        .beatsync-music-upload:active {
             border-color: var(--primary);
             background: var(--primary-alpha);
+        }
+
+        /* Estado focus-within para accesibilidad */
+        .beatsync-music-upload:focus-within {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
         }
 
         .beatsync-music-upload.has-music {
@@ -4080,6 +4157,7 @@
         /* Panel de contenido de tabs */
         .beatsync-music-tab-content {
             display: none;
+            position: relative; /* Para inputs visually-hidden con position:absolute */
         }
 
         .beatsync-music-tab-content.active {
@@ -4330,6 +4408,7 @@
 
         /* Upload de fotos */
         .beatsync-photos-upload {
+            position: relative; /* Requerido para file-input-overlay */
             border: 2px dashed var(--line);
             border-radius: 10px;
             padding: 20px;
@@ -4337,11 +4416,23 @@
             cursor: pointer;
             transition: all 0.2s;
             min-height: 100px;
+            /* Propiedades críticas para móvil */
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
-        .beatsync-photos-upload:hover {
+        .beatsync-photos-upload:hover,
+        .beatsync-photos-upload:active {
             border-color: var(--primary);
             background: var(--primary-alpha);
+        }
+
+        /* Estado focus-within para accesibilidad */
+        .beatsync-photos-upload:focus-within {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
         }
 
         .beatsync-photos-upload.has-photos {
@@ -4420,6 +4511,11 @@
             color: var(--muted);
             font-size: 24px;
             transition: all 0.2s;
+            /* Propiedades críticas para móvil */
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .beatsync-add-more:hover {
@@ -5783,16 +5879,20 @@
         <!-- Canvas central -->
         <div class="canvas-area">
             <div class="canvas-wrapper" id="canvasWrapper">
-                <!-- Overlay de upload inicial -->
-                <div class="upload-overlay" id="uploadOverlay" onclick="document.getElementById('fileInput').click()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <!-- Técnica opacity:0 overlay - la MÁS compatible con iOS Safari -->
+                <label class="upload-overlay" id="uploadOverlay">
+                    <input type="file"
+                           id="fileInput"
+                           class="file-input-overlay"
+                           accept="image/*,video/*"
+                           onchange="cargarMedia(this)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="pointer-events: none;">
                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                         <circle cx="8.5" cy="8.5" r="1.5"/>
                         <polyline points="21 15 16 10 5 21"/>
                     </svg>
-                    <p><span>Toca para subir</span> una foto o video</p>
-                </div>
-                <input type="file" id="fileInput" accept="image/*,video/*,.heic,.heif" style="display:none;" onchange="cargarMedia(this)">
+                    <p style="pointer-events: none;"><span>Toca para subir</span> una foto o video</p>
+                </label>
 
                 <!-- Video de fondo (para cuando se sube un video) -->
                 <video id="videoBackground" muted loop playsinline></video>
@@ -6190,19 +6290,19 @@
                             </button>
                         </div>
 
-                        <!-- Tab: Subir música -->
+                        <!-- Tab: Subir música - Técnica opacity:0 overlay para iOS Safari -->
                         <div class="music-tab-content" id="musicTabUpload">
-                            <div class="music-upload-area" onclick="document.getElementById('musicFileInput').click()">
-                                <svg class="music-upload-icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <label class="music-upload-area">
+                                <input type="file" id="musicFileInput" class="file-input-overlay" accept="audio/*" onchange="handleMusicUpload(this)">
+                                <svg class="music-upload-icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="pointer-events: none;">
                                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                                     <polyline points="17 8 12 3 7 8"/>
                                     <line x1="12" y1="3" x2="12" y2="15"/>
                                 </svg>
-                                <div class="music-upload-text-lg">Toca para subir una canción</div>
-                                <div class="music-upload-hint-lg">MP3, WAV, AAC (máx 20MB)</div>
-                                <div class="music-upload-name" id="musicUploadName" style="display: none;"></div>
-                                <input type="file" id="musicFileInput" accept="audio/*" onchange="handleMusicUpload(this)" style="display:none;">
-                            </div>
+                                <div class="music-upload-text-lg" style="pointer-events: none;">Toca para subir una canción</div>
+                                <div class="music-upload-hint-lg" style="pointer-events: none;">MP3, WAV, AAC (máx 20MB)</div>
+                                <div class="music-upload-name" id="musicUploadName" style="display: none; pointer-events: none;"></div>
+                            </label>
                         </div>
 
                         <!-- Tab: Biblioteca -->
@@ -6808,19 +6908,19 @@
                                 </button>
                             </div>
 
-                            <!-- Tab: Subir música -->
+                            <!-- Tab: Subir música - Técnica opacity:0 overlay para iOS Safari -->
                             <div class="beatsync-music-tab-content active" id="beatsyncTabUpload">
-                                <div class="beatsync-music-upload" id="beatsyncMusicUpload" onclick="document.getElementById('beatsyncMusicInput').click()">
-                                    <svg class="beatsync-music-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <label class="beatsync-music-upload" id="beatsyncMusicUpload">
+                                    <input type="file" id="beatsyncMusicInput" class="file-input-overlay" accept="audio/*" onchange="handleBeatSyncMusic(event)">
+                                    <svg class="beatsync-music-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="pointer-events: none;">
                                         <path d="M9 18V5l12-2v13"/>
                                         <circle cx="6" cy="18" r="3"/>
                                         <circle cx="18" cy="16" r="3"/>
                                     </svg>
-                                    <div class="beatsync-music-text">Toca para subir una canción</div>
-                                    <div class="beatsync-music-name" id="beatsyncMusicName" style="display: none;"></div>
-                                </div>
+                                    <div class="beatsync-music-text" style="pointer-events: none;">Toca para subir una canción</div>
+                                    <div class="beatsync-music-name" id="beatsyncMusicName" style="display: none; pointer-events: none;"></div>
+                                </label>
                             </div>
-                            <input type="file" id="beatsyncMusicInput" accept="audio/*" style="display: none;" onchange="handleBeatSyncMusic(event)">
 
                             <!-- Tab: Biblioteca de música -->
                             <div class="beatsync-music-tab-content" id="beatsyncTabLibrary">
@@ -6944,14 +7044,21 @@
                                 </svg>
                                 Fotos (<span id="beatsyncPhotosCountLabel">0</span>)
                             </div>
-                            <div class="beatsync-photos-upload" id="beatsyncPhotosUpload" onclick="document.getElementById('beatsyncPhotosInput').click()">
-                                <svg class="beatsync-music-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <!-- Input siempre accesible para labels dinámicos con for= -->
+                            <input type="file"
+                                   id="beatsyncPhotosInput"
+                                   accept="image/*"
+                                   multiple
+                                   onchange="handleBeatSyncPhotos(event)"
+                                   style="position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px;">
+                            <label class="beatsync-photos-upload" id="beatsyncPhotosUpload" onclick="document.getElementById('beatsyncPhotosInput').click()">
+                                <svg class="beatsync-music-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                                     <line x1="12" y1="8" x2="12" y2="16"/>
                                     <line x1="8" y1="12" x2="16" y2="12"/>
                                 </svg>
                                 <div class="beatsync-music-text">Toca para agregar fotos</div>
-                            </div>
+                            </label>
                             <div class="beatsync-photos-grid" id="beatsyncPhotosGrid" style="display: none;"></div>
                             <div class="beatsync-photos-actions" id="beatsyncPhotosInfo" style="display: none;">
                                 <span class="beatsync-photos-hint">Arrastra para reordenar</span>
@@ -6966,7 +7073,6 @@
                                     Mezclar
                                 </button>
                             </div>
-                            <input type="file" id="beatsyncPhotosInput" accept="image/*,.heic,.heif" multiple style="display: none;" onchange="handleBeatSyncPhotos(event)">
                         </div>
 
                         <!-- Sección: Configuración -->
@@ -7593,7 +7699,58 @@
 
             // Verificar si viene del popup con un archivo pendiente
             cargarArchivoPendiente();
+
+            // Cargar media de galería si viene de /Galeria
+            cargarMediaDeGaleria();
         });
+
+        // Cargar media desde la galería privada
+        async function cargarMediaDeGaleria() {
+            const galeriaMediaUrl = '@(galeriaMediaUrl ?? "")';
+            const galeriaMediaTipo = '@(galeriaMediaTipo ?? "")';
+
+            if (!galeriaMediaUrl) return;
+
+            try {
+                console.log('[Editor] Cargando media de galería:', galeriaMediaUrl, galeriaMediaTipo);
+
+                // Mostrar indicador de carga
+                const overlay = document.getElementById('uploadOverlay');
+                if (overlay) {
+                    overlay.style.display = 'flex';
+                    overlay.querySelector('p').innerHTML = '<span>Cargando desde galería...</span>';
+                }
+
+                // Fetch el archivo desde la URL
+                const response = await fetch(galeriaMediaUrl);
+                if (!response.ok) throw new Error('No se pudo cargar el archivo');
+
+                const blob = await response.blob();
+                const fileName = galeriaMediaUrl.split('/').pop() || 'media';
+                const file = new File([blob], fileName, { type: blob.type });
+
+                // Crear input simulado
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                const fakeInput = { files: dataTransfer.files };
+
+                // Cargar el medio
+                await cargarMedia(fakeInput);
+
+                // Ocultar overlay
+                if (overlay) {
+                    overlay.style.display = 'none';
+                }
+
+                console.log('[Editor] Media de galería cargada exitosamente');
+            } catch (error) {
+                console.error('[Editor] Error cargando media de galería:', error);
+                const overlay = document.getElementById('uploadOverlay');
+                if (overlay) {
+                    overlay.style.display = 'none';
+                }
+            }
+        }
 
         function initCanvas() {
             try {
@@ -11657,6 +11814,7 @@
                 // Cuando termina todo (respuesta del servidor)
                 xhr.addEventListener('load', () => {
                     stopSimulatedProgress();
+                    if (processingPhaseTimeout) { clearTimeout(processingPhaseTimeout); processingPhaseTimeout = null; }
                     console.log('[XHR] Response received, status:', xhr.status);
 
                     if (xhr.status >= 200 && xhr.status < 300) {
@@ -11680,6 +11838,7 @@
                 // Error de red - común en iOS cuando la app va a background
                 xhr.addEventListener('error', (e) => {
                     stopSimulatedProgress();
+                    if (processingPhaseTimeout) { clearTimeout(processingPhaseTimeout); processingPhaseTimeout = null; }
                     console.error('[XHR] Network error', e);
 
                     // Mensaje específico para iOS
@@ -11693,6 +11852,7 @@
                 // Timeout
                 xhr.addEventListener('timeout', () => {
                     stopSimulatedProgress();
+                    if (processingPhaseTimeout) { clearTimeout(processingPhaseTimeout); processingPhaseTimeout = null; }
                     console.error('[XHR] Timeout');
                     reject(new Error('La subida tardó demasiado. Intenta con un video más corto o mejor conexión.'));
                 });
@@ -11755,21 +11915,39 @@
         }
 
         // Mostrar fase de procesamiento
+        let processingPhaseTimeout = null;
         function showProcessingPhase() {
             const progressText = document.getElementById('uploadProgressText');
             const progressFill = document.getElementById('uploadProgressFill');
             const loadingText = document.getElementById('loadingText');
 
+            // Detectar si es imagen o video para mostrar mensaje apropiado
+            const esVideo = mediaFile && mediaFile.type && mediaFile.type.startsWith('video');
+
             if (loadingText) {
-                loadingText.textContent = 'Procesando video...';
+                loadingText.textContent = esVideo ? 'Procesando video...' : 'Procesando...';
             }
             if (progressText) {
-                progressText.textContent = 'Convirtiendo para compatibilidad...';
+                progressText.textContent = esVideo ? 'Convirtiendo para compatibilidad...' : 'Guardando en el servidor...';
             }
             if (progressFill) {
                 progressFill.style.width = '100%';
                 progressFill.classList.add('indeterminate');
             }
+
+            // Safety timeout: si el servidor no responde en 90s, mostrar error
+            if (processingPhaseTimeout) clearTimeout(processingPhaseTimeout);
+            processingPhaseTimeout = setTimeout(() => {
+                console.error('[Upload] Timeout de procesamiento (90s)');
+                logErrorToBackend('error', 'Timeout de procesamiento del servidor (90s)', JSON.stringify({
+                    mediaType: mediaFile?.type,
+                    mediaSize: mediaFile?.size,
+                    canvasGenerated: canvasHasGeneratedContent
+                }));
+                mostrarToastExito('El servidor tardó demasiado. Intenta de nuevo.');
+                resetUploadProgress();
+                document.getElementById('loadingOverlay')?.classList.remove('active');
+            }, 90000);
         }
 
         // Función para actualizar UI de progreso
@@ -11849,6 +12027,11 @@
         // PUBLICAR
         // ========================================
         async function publicarStory() {
+            // FIX: Renovar token silenciosamente antes de publicar (evita error 400 en móviles)
+            if (typeof window.validarTokenCSRF === 'function') {
+                await window.validarTokenCSRF();
+            }
+
             // Si no hay mediaFile pero el canvas tiene contenido generado (plantilla/fondo),
             // generar una imagen del canvas para usar como media
             let archivoAEnviar = mediaFile;
@@ -12142,6 +12325,29 @@
                 const response = await uploadWithProgress(URL_CREAR, formData, updateUploadProgress);
 
                 if (!response.ok) {
+                    // Error 400: Token CSRF expirado - renovar silenciosamente y reintentar
+                    if (response.status === 400 && typeof window.validarTokenCSRF === 'function') {
+                        console.log('[Stories] Error 400, intentando renovar token y reintentar...');
+                        const renovado = await window.validarTokenCSRF();
+                        if (renovado && !window._reintentandoStory) {
+                            window._reintentandoStory = true;
+                            setTimeout(() => {
+                                window._reintentandoStory = false;
+                                publicarStory();
+                            }, 500);
+                            return;
+                        }
+                        // Si ya reintentamos, recargar silenciosamente
+                        window.location.reload();
+                        return;
+                    }
+
+                    // Error 401: Sesión expirada - redirigir a login
+                    if (response.status === 401) {
+                        window.location.href = '/Account/Login?returnUrl=' + encodeURIComponent(window.location.pathname);
+                        return;
+                    }
+
                     // Error HTTP - dar mensajes específicos según el código
                     const errorDetail = response.data?.message || response.data?.error || `HTTP ${response.status}`;
                     logErrorToBackend('error', `Publicar: HTTP ${response.status}`, errorDetail);
@@ -12157,12 +12363,6 @@
                             break;
                         case 503:
                             errorMsg = 'Servidor temporalmente no disponible. Intenta en unos minutos.';
-                            break;
-                        case 400:
-                            errorMsg = response.data?.message || 'Archivo no válido. Verifica el formato.';
-                            break;
-                        case 401:
-                            errorMsg = 'Sesión expirada. Recarga la página e intenta de nuevo.';
                             break;
                         case 500:
                             errorMsg = 'Error del servidor. Si persiste, contacta soporte.';
@@ -15218,7 +15418,7 @@
                         <button class="photo-remove" onclick="removeBeatSyncPhoto(${idx})">&times;</button>
                     </div>
                 `).join('') + `
-                    <div class="beatsync-add-more" onclick="document.getElementById('beatsyncPhotosInput').click()">+</div>
+                    <label for="beatsyncPhotosInput" class="beatsync-add-more">+</label>
                 `;
             } else {
                 // Mostrar solo las primeras + indicador de "más fotos"
@@ -15235,7 +15435,7 @@
                     <div class="beatsync-photo-item beatsync-more-photos" style="background: linear-gradient(135deg, var(--primary), var(--secondary)); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; cursor: default;">
                         +${hiddenCount} más
                     </div>
-                    <div class="beatsync-add-more" onclick="document.getElementById('beatsyncPhotosInput').click()">+</div>
+                    <label for="beatsyncPhotosInput" class="beatsync-add-more">+</label>
                 `;
             }
 
@@ -16919,6 +17119,139 @@
             ctx.font = `${iconSize}px Arial`;
             ctx.fillText('♪', width / 2, iconY);
         }
+
+        // ========================================
+        // RENOVACIÓN AUTOMÁTICA DEL TOKEN CSRF
+        // ========================================
+        // FIX: Soluciona error 400 en móviles (iOS/Android) después de suspensión/inactividad
+        (function() {
+            const TOKEN_REFRESH_INTERVAL = 10 * 60 * 1000; // 10 minutos
+            const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+            let lastTokenRefresh = Date.now();
+            let lastHeartbeat = Date.now();
+            let hiddenTimestamp = null;
+            let tokenValid = true;
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+            // Función para renovar el token
+            async function renovarToken(forzar = false, motivo = '') {
+                if (!forzar && (Date.now() - lastTokenRefresh) < 30000) {
+                    return true;
+                }
+
+                try {
+                    const response = await fetch('/Contenido/RenovarToken', {
+                        method: 'GET',
+                        credentials: 'same-origin'
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success && data.token && tokenInput) {
+                            tokenInput.value = data.token;
+                            lastTokenRefresh = Date.now();
+                            lastHeartbeat = Date.now();
+                            tokenValid = true;
+                            console.log('[Stories Token] Renovado' + (motivo ? ` (${motivo})` : ''));
+                            return true;
+                        }
+                    } else if (response.status === 401) {
+                        tokenValid = false;
+                        console.warn('[Stories Token] Sesión expirada');
+                        return false;
+                    }
+                } catch (e) {
+                    console.warn('[Stories Token] Error renovando:', e);
+                    return tokenValid;
+                }
+                return false;
+            }
+
+            // Validar token antes de operaciones importantes
+            window.validarTokenCSRF = async function() {
+                const tiempoDesdeRenovacion = Date.now() - lastTokenRefresh;
+                if (tiempoDesdeRenovacion > 5 * 60 * 1000) {
+                    return await renovarToken(true, 'pre-validación');
+                }
+                return tokenValid;
+            };
+
+            // Renovar token periódicamente
+            setInterval(() => {
+                if (document.visibilityState === 'visible') {
+                    renovarToken(false, 'intervalo');
+                }
+            }, TOKEN_REFRESH_INTERVAL);
+
+            // MÉTODO 1: visibilitychange
+            document.addEventListener('visibilitychange', async () => {
+                if (document.visibilityState === 'hidden') {
+                    hiddenTimestamp = Date.now();
+                } else if (document.visibilityState === 'visible') {
+                    const tiempoOculto = hiddenTimestamp ? (Date.now() - hiddenTimestamp) : 0;
+                    if (tiempoOculto > 2 * 60 * 1000) {
+                        await renovarToken(true, `visibilitychange ${Math.round(tiempoOculto/1000)}s`);
+                    }
+                    hiddenTimestamp = null;
+                    lastHeartbeat = Date.now();
+                }
+            });
+
+            // MÉTODO 2: pageshow (MÁS CONFIABLE en iOS Safari)
+            window.addEventListener('pageshow', async (event) => {
+                if (event.persisted) {
+                    await renovarToken(true, 'bfcache pageshow');
+                }
+                lastHeartbeat = Date.now();
+            });
+
+            // MÉTODO 3: focus (BACKUP para iOS)
+            window.addEventListener('focus', async () => {
+                const tiempoDesdeHeartbeat = Date.now() - lastHeartbeat;
+                if (tiempoDesdeHeartbeat > 2 * 60 * 1000) {
+                    await renovarToken(true, `focus después de ${Math.round(tiempoDesdeHeartbeat/1000)}s`);
+                }
+                lastHeartbeat = Date.now();
+            });
+
+            // MÉTODO 4: Heartbeat detector (CRÍTICO para iOS)
+            const HEARTBEAT_INTERVAL = 30000;
+            setInterval(async () => {
+                const ahora = Date.now();
+                const tiempoReal = ahora - lastHeartbeat;
+                if (tiempoReal > HEARTBEAT_INTERVAL + 60000) {
+                    await renovarToken(true, `heartbeat jump ${Math.round(tiempoReal/1000)}s`);
+                }
+                lastHeartbeat = ahora;
+            }, HEARTBEAT_INTERVAL);
+
+            // MÉTODO 5: Eventos táctiles (ESPECÍFICO para iOS)
+            if (isIOS) {
+                let ultimoToque = Date.now();
+                document.addEventListener('touchstart', async () => {
+                    const tiempoSinTocar = Date.now() - ultimoToque;
+                    if (tiempoSinTocar > 3 * 60 * 1000) {
+                        const tiempoDesdeRenovacion = Date.now() - lastTokenRefresh;
+                        if (tiempoDesdeRenovacion > 5 * 60 * 1000) {
+                            await renovarToken(true, `touchstart iOS ${Math.round(tiempoSinTocar/1000)}s`);
+                        }
+                    }
+                    ultimoToque = Date.now();
+                }, { passive: true });
+                console.log('[Stories Token] Modo iOS activado');
+            }
+
+            // MÉTODO 6: Reconexión de red
+            window.addEventListener('online', async () => {
+                await renovarToken(true, 'reconexión online');
+            });
+
+            // Navegación back/forward
+            if (performance.navigation && performance.navigation.type === 2) {
+                renovarToken(true, 'navegación back/forward');
+            }
+        })();
     </script>
 </body>
 </html>

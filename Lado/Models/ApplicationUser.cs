@@ -36,6 +36,9 @@ namespace Lado.Models
         [Display(Name = "Foto de Perfil LadoB")]
         public string? FotoPerfilLadoB { get; set; }
 
+        [Display(Name = "Foto de Portada LadoB")]
+        public string? FotoPortadaLadoB { get; set; }
+
         [Display(Name = "Biografía LadoB")]
         [StringLength(500)]
         public string? BiografiaLadoB { get; set; }
@@ -135,6 +138,12 @@ namespace Lado.Models
 
         [Display(Name = "Usar Retención del País")]
         public bool UsarRetencionPais { get; set; } = true; // true = usa la tasa del país, false = usa RetencionImpuestos
+
+        /// <summary>
+        /// Cuota de almacenamiento personalizada en MB. Si es null, usa la cuota por defecto según TipoUsuario.
+        /// </summary>
+        [Display(Name = "Cuota de Almacenamiento (MB)")]
+        public long? CuotaAlmacenamientoMB { get; set; }
 
         // === ESTADO DE CUENTA ===
         [Display(Name = "Cuenta Activa")]
@@ -302,6 +311,13 @@ namespace Lado.Models
         /// </summary>
         [Display(Name = "Ocultar del Feed Público")]
         public bool OcultarDeFeedPublico { get; set; } = false;
+
+        /// <summary>
+        /// Si es true, se muestra el Link in Bio en el perfil del usuario.
+        /// Solo aplica si el usuario TieneLadoB().
+        /// </summary>
+        [Display(Name = "Mostrar Link in Bio")]
+        public bool MostrarLinkInBio { get; set; } = true;
 
         // ========================================
         // PROMOCIÓN DE LADOB DESDE LADOA
@@ -603,6 +619,20 @@ namespace Lado.Models
                 return FotoPerfilLadoB;
             }
             return FotoPerfil;
+        }
+
+        /// <summary>
+        /// Obtiene la foto de portada según el contexto.
+        /// </summary>
+        /// <param name="usarLadoB">Si true, usa la portada de LadoB</param>
+        /// <returns>La ruta de la portada o null</returns>
+        public string? ObtenerFotoPortada(bool usarLadoB = false)
+        {
+            if (usarLadoB && !string.IsNullOrEmpty(FotoPortadaLadoB))
+            {
+                return FotoPortadaLadoB;
+            }
+            return FotoPortada;
         }
 
         /// <summary>

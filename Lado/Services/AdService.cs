@@ -154,6 +154,53 @@ namespace Lado.Services
                 if (anuncio == null)
                     return;
 
+                // Verificar y actualizar tracking de usuario único
+                bool esNuevoUsuario = false;
+                if (!string.IsNullOrEmpty(usuarioId))
+                {
+                    var vistaUsuario = await _context.VistasAnunciosUsuarios
+                        .FirstOrDefaultAsync(v => v.AnuncioId == anuncioId && v.UsuarioId == usuarioId);
+
+                    if (vistaUsuario == null)
+                    {
+                        // Primer vez que este usuario ve el anuncio
+                        esNuevoUsuario = true;
+                        vistaUsuario = new VistaAnuncioUsuario
+                        {
+                            AnuncioId = anuncioId,
+                            UsuarioId = usuarioId,
+                            TotalImpresiones = 1,
+                            ImpresionesHoy = 1,
+                            PrimeraImpresion = DateTime.Now,
+                            UltimaImpresion = DateTime.Now,
+                            FechaUltimoReset = DateTime.Today
+                        };
+                        _context.VistasAnunciosUsuarios.Add(vistaUsuario);
+                    }
+                    else
+                    {
+                        // Usuario ya vio el anuncio antes
+                        // Reset diario si es necesario
+                        if (vistaUsuario.FechaUltimoReset?.Date != DateTime.Today)
+                        {
+                            vistaUsuario.ImpresionesHoy = 0;
+                            vistaUsuario.FechaUltimoReset = DateTime.Today;
+                        }
+                        vistaUsuario.TotalImpresiones++;
+                        vistaUsuario.ImpresionesHoy++;
+                        vistaUsuario.UltimaImpresion = DateTime.Now;
+                    }
+                }
+
+                // Reset diario del anuncio si es necesario
+                if (anuncio.FechaUltimoResetDiario?.Date != DateTime.Today)
+                {
+                    anuncio.ImpresionesHoy = 0;
+                    anuncio.ClicsHoy = 0;
+                    anuncio.GastoHoy = 0;
+                    anuncio.FechaUltimoResetDiario = DateTime.Today;
+                }
+
                 // Si es anuncio de Lado, solo registrar impresión sin cobrar
                 if (anuncio.EsAnuncioLado)
                 {
@@ -167,6 +214,8 @@ namespace Lado.Services
                     };
                     _context.ImpresionesAnuncios.Add(impresionLado);
                     anuncio.Impresiones++;
+                    anuncio.ImpresionesHoy++;
+                    if (esNuevoUsuario) anuncio.UsuariosUnicos++;
                     anuncio.UltimaActualizacion = DateTime.Now;
                     await _context.SaveChangesAsync();
                     return;
@@ -202,6 +251,8 @@ namespace Lado.Services
 
                 // Actualizar contadores del anuncio
                 anuncio.Impresiones++;
+                anuncio.ImpresionesHoy++;
+                if (esNuevoUsuario) anuncio.UsuariosUnicos++;
                 anuncio.GastoTotal += costoImpresion;
                 anuncio.GastoHoy += costoImpresion;
                 anuncio.UltimaActualizacion = DateTime.Now;
@@ -253,6 +304,27 @@ namespace Lado.Services
                 if (anuncio == null)
                     return false;
 
+                // Reset diario del anuncio si es necesario
+                if (anuncio.FechaUltimoResetDiario?.Date != DateTime.Today)
+                {
+                    anuncio.ImpresionesHoy = 0;
+                    anuncio.ClicsHoy = 0;
+                    anuncio.GastoHoy = 0;
+                    anuncio.FechaUltimoResetDiario = DateTime.Today;
+                }
+
+                // Actualizar tracking de usuario si existe
+                if (!string.IsNullOrEmpty(usuarioId))
+                {
+                    var vistaUsuario = await _context.VistasAnunciosUsuarios
+                        .FirstOrDefaultAsync(v => v.AnuncioId == anuncioId && v.UsuarioId == usuarioId);
+                    if (vistaUsuario != null)
+                    {
+                        vistaUsuario.HizoClic = true;
+                        vistaUsuario.TotalClics++;
+                    }
+                }
+
                 // Si es anuncio de Lado, solo registrar clic sin cobrar
                 if (anuncio.EsAnuncioLado)
                 {
@@ -266,6 +338,7 @@ namespace Lado.Services
                     };
                     _context.ClicsAnuncios.Add(clicLado);
                     anuncio.Clics++;
+                    anuncio.ClicsHoy++;
                     anuncio.UltimaActualizacion = DateTime.Now;
                     await _context.SaveChangesAsync();
                     return true;
@@ -296,6 +369,7 @@ namespace Lado.Services
 
                 // Actualizar contadores del anuncio
                 anuncio.Clics++;
+                anuncio.ClicsHoy++;
                 anuncio.GastoTotal += costoClic;
                 anuncio.GastoHoy += costoClic;
                 anuncio.UltimaActualizacion = DateTime.Now;

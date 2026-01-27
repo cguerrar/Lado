@@ -165,6 +165,11 @@ namespace Lado.Data
         public DbSet<Popup> Popups { get; set; }
 
         // ========================================
+        // ⭐ DbSets NUEVOS - BLOG/NOTICIAS SEO
+        // ========================================
+        public DbSet<ArticuloBlog> ArticulosBlog { get; set; }
+
+        // ========================================
         // ⭐ DbSets NUEVOS - SISTEMA LADO COINS
         // ========================================
         public DbSet<LadoCoin> LadoCoins { get; set; }
@@ -240,6 +245,12 @@ namespace Lado.Data
         // ========================================
         public DbSet<MediaBiblioteca> MediaBiblioteca { get; set; }
         public DbSet<ConfiguracionPublicacionAutomatica> ConfiguracionesPublicacionAutomatica { get; set; }
+
+        // ========================================
+        // ⭐ DbSets NUEVOS - GALERÍA PRIVADA
+        // ========================================
+        public DbSet<Album> Albums { get; set; }
+        public DbSet<MediaGaleria> MediasGaleria { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -2903,6 +2914,62 @@ namespace Lado.Data
                     .WithMany()
                     .HasForeignKey(a => a.ModificadoPorId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ========================================
+            // ⭐ CONFIGURACIÓN GALERÍA PRIVADA
+            // ========================================
+            modelBuilder.Entity<Album>(entity =>
+            {
+                entity.HasOne(a => a.Usuario)
+                    .WithMany()
+                    .HasForeignKey(a => a.UsuarioId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(a => a.UsuarioId)
+                    .HasDatabaseName("IX_Albums_UsuarioId");
+
+                entity.HasIndex(a => new { a.UsuarioId, a.Orden })
+                    .HasDatabaseName("IX_Albums_UsuarioId_Orden");
+            });
+
+            modelBuilder.Entity<MediaGaleria>(entity =>
+            {
+                // NoAction para evitar múltiples cascade paths (Albums también tiene cascade a Usuario)
+                entity.HasOne(m => m.Usuario)
+                    .WithMany()
+                    .HasForeignKey(m => m.UsuarioId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                entity.HasOne(m => m.Album)
+                    .WithMany(a => a.Archivos)
+                    .HasForeignKey(m => m.AlbumId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(m => m.ContenidoAsociado)
+                    .WithMany()
+                    .HasForeignKey(m => m.ContenidoAsociadoId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(m => m.MensajeAsociado)
+                    .WithMany()
+                    .HasForeignKey(m => m.MensajeAsociadoId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(m => m.UsuarioId)
+                    .HasDatabaseName("IX_MediasGaleria_UsuarioId");
+
+                entity.HasIndex(m => m.AlbumId)
+                    .HasDatabaseName("IX_MediasGaleria_AlbumId");
+
+                entity.HasIndex(m => new { m.UsuarioId, m.EsFavorito })
+                    .HasDatabaseName("IX_MediasGaleria_UsuarioId_EsFavorito");
+
+                entity.HasIndex(m => new { m.UsuarioId, m.FechaSubida })
+                    .HasDatabaseName("IX_MediasGaleria_UsuarioId_FechaSubida");
+
+                entity.HasIndex(m => m.HashArchivo)
+                    .HasDatabaseName("IX_MediasGaleria_HashArchivo");
             });
         }
     }

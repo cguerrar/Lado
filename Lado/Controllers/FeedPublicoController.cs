@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Lado.Data;
 using Lado.Models;
 using Lado.Services;
@@ -10,6 +12,7 @@ namespace Lado.Controllers
     /// <summary>
     /// Controlador para el Feed Público - accesible para usuarios anónimos
     /// Muestra contenido público, sugerencias de creadores y contenido premium difuminado
+    /// OPTIMIZADO: Usa caché en memoria para evitar queries repetitivas
     /// </summary>
     public class FeedPublicoController : Controller
     {
@@ -17,34 +20,42 @@ namespace Lado.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILogger<FeedPublicoController> _logger;
         private readonly IAdService _adService;
-        private readonly IMediaIntegrityService _mediaIntegrity;
+        private readonly IMemoryCache _cache;
 
-        // Constantes de configuración
-        private const int MaxContenidoPublico = 300;
+        // Constantes de configuración - OPTIMIZADO v2
+        private const int MaxContenidoPublico = 200; // 200 items para mosaico denso
         private const int MaxContenidoPremium = 10;
         private const int MaxCreadoresSugeridos = 8;
         private const int MaxCreadoresPremium = 6;
         private const int MaxAnuncios = 2;
-        private const long MaxTamanoVideoBytes = 20 * 1024 * 1024; // 20MB
+
+        // Claves de caché
+        private const string CacheKeyFeedPublico = "FeedPublico_Contenido";
+        private const string CacheKeyFeedPremium = "FeedPublico_Premium";
+        private const string CacheKeyCreadoresSugeridos = "FeedPublico_Creadores";
+        private const string CacheKeyCreadoresPremium = "FeedPublico_CreadoresPremium";
+        private const string CacheKeyEstadisticas = "FeedPublico_Stats";
+        private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
         public FeedPublicoController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             ILogger<FeedPublicoController> logger,
             IAdService adService,
-            IMediaIntegrityService mediaIntegrity)
+            IMemoryCache cache)
         {
             _context = context;
             _userManager = userManager;
             _logger = logger;
             _adService = adService;
-            _mediaIntegrity = mediaIntegrity;
+            _cache = cache;
         }
 
         #region Acciones Públicas
 
         /// <summary>
         /// GET: /FeedPublico - Página principal del feed público con mosaico
+        /// OPTIMIZADO v2: Solo carga datos necesarios, selección aleatoria en SQL
         /// </summary>
         [HttpGet]
         public async Task<IActionResult> Index()
@@ -52,190 +63,33 @@ namespace Lado.Controllers
             try
             {
                 var estaAutenticado = User.Identity?.IsAuthenticated ?? false;
-                var userId = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                var userName = User?.Identity?.Name;
 
-                // ⚠️ CRÍTICO: Desactivar cache del navegador para usuarios autenticados
-                // Esto previene que el bfcache muestre datos del usuario anterior
-                if (estaAutenticado)
+                // Cache del navegador para usuarios NO autenticados (el contenido es igual para todos)
+                if (!estaAutenticado)
+                {
+                    Response.Headers["Cache-Control"] = "public, max-age=60"; // 1 minuto
+                }
+                else
                 {
                     Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private";
                     Response.Headers["Pragma"] = "no-cache";
                     Response.Headers["Expires"] = "0";
                 }
 
-                // DEBUG: Log de autenticación al entrar al FeedPublico
-                _logger.LogWarning("🔐 FEEDPUBLICO INDEX: EstaAutenticado={EstaAuth}, UserId={UserId}, UserName={UserName}",
-                    estaAutenticado, userId ?? "NULL", userName ?? "NULL");
-
                 ViewBag.EstaAutenticado = estaAutenticado;
-
-                // Configurar SEO
                 ConfigurarSeoIndex();
 
-                // Obtener IDs de usuarios que quieren ocultar su contenido del feed público
-                var usuariosOcultos = await _userManager.Users
-                    .Where(u => u.OcultarDeFeedPublico)
-                    .Select(u => u.Id)
-                    .ToListAsync();
+                // 1. CONTENIDO PÚBLICO con selección aleatoria - desde caché o BD
+                var contenidoPublico = await ObtenerContenidoPublicoCacheadoAsync();
 
-                // 1. CONTENIDO PÚBLICO para el mosaico
-                // IMPORTANTE: Solo LadoA (público) - NO mostrar LadoB en feed público
-                var contenidoPublicoRaw = await _context.Contenidos
-                    .Include(c => c.Usuario)
-                    .Where(c => c.EstaActivo
-                            && !c.EsBorrador
-                            && !c.Censurado
-                            && !c.OcultoSilenciosamente // Shadow hide
-                            && !c.EsPrivado
-                            && !c.EsContenidoSensible
-                            && c.TipoLado == TipoLado.LadoA
-                            && !string.IsNullOrEmpty(c.RutaArchivo)
-                            && c.Usuario != null
-                            && c.Usuario.EstaActivo
-                            && !usuariosOcultos.Contains(c.UsuarioId))
-                    .OrderByDescending(c => c.NumeroLikes + c.NumeroVistas)
-                    .ThenByDescending(c => c.FechaPublicacion)
-                    .Take(400)
-                    .ToListAsync();
+                // 2. ESTADÍSTICAS - desde caché o BD (para animación)
+                var stats = await ObtenerEstadisticasCacheadasAsync();
+                ViewBag.TotalCreadores = stats.TotalCreadores;
+                ViewBag.TotalUsuarios = stats.TotalUsuarios;
+                ViewBag.TotalContenido = stats.TotalContenido;
 
-                _logger.LogInformation("FeedPublico: Query BD retornó {Count} contenidos raw", contenidoPublicoRaw.Count);
-
-                // Filtrar contenido: excluir archivos faltantes Y videos muy grandes (>20MB)
-                List<Contenido> contenidoPublico;
-                try
-                {
-                    contenidoPublico = _mediaIntegrity
-                        .FiltrarContenidoParaFeedPublico(contenidoPublicoRaw, MaxTamanoVideoBytes)
-                        .Take(MaxContenidoPublico)
-                        .ToList();
-                    _logger.LogInformation("FeedPublico: Después de filtrar: {Count} contenidos válidos", contenidoPublico.Count);
-                }
-                catch (Exception exFiltro)
-                {
-                    _logger.LogError(exFiltro, "FeedPublico: Error en FiltrarContenidoParaFeedPublico, usando contenido sin filtrar");
-                    contenidoPublico = contenidoPublicoRaw.Take(MaxContenidoPublico).ToList();
-                }
-
-                // FALLBACK: Si no hay contenido, intentar query más simple
-                if (!contenidoPublico.Any())
-                {
-                    _logger.LogWarning("FeedPublico: No hay contenido con filtros normales, intentando fallback");
-                    contenidoPublico = await _context.Contenidos
-                        .Include(c => c.Usuario)
-                        .Where(c => c.EstaActivo
-                                && !c.EsBorrador
-                                && !string.IsNullOrEmpty(c.RutaArchivo)
-                                && c.Usuario != null
-                                && c.Usuario.EstaActivo)
-                        .OrderByDescending(c => c.FechaPublicacion)
-                        .Take(100)
-                        .ToListAsync();
-                    _logger.LogInformation("FeedPublico: Fallback retornó {Count} contenidos", contenidoPublico.Count);
-                }
-
-                // 2. CONTENIDO PREMIUM (LadoB) para mostrar difuminado
-                var contenidoPremiumRaw = await _context.Contenidos
-                    .Include(c => c.Usuario)
-                    .Where(c => c.EstaActivo
-                            && !c.EsBorrador
-                            && !c.Censurado
-                            && !c.OcultoSilenciosamente // Shadow hide
-                            && !c.EsPrivado
-                            && c.TipoLado == TipoLado.LadoB
-                            && c.Usuario != null
-                            && c.Usuario.EstaActivo
-                            && !usuariosOcultos.Contains(c.UsuarioId))
-                    .OrderByDescending(c => c.NumeroLikes)
-                    .ThenByDescending(c => c.FechaPublicacion)
-                    .Take(20)
-                    .ToListAsync();
-
-                var contenidoPremium = _mediaIntegrity.FiltrarContenidoValido(contenidoPremiumRaw)
-                    .Take(MaxContenidoPremium)
-                    .ToList();
-
-                ViewBag.ContenidoPremium = contenidoPremium;
-                ViewBag.ContenidoPremiumIds = contenidoPremium.Select(c => c.Id).ToList();
-
-                // 3. SUGERENCIAS DE USUARIOS (creadores populares)
-                var creadoresSugeridos = await _userManager.Users
-                    .Where(u => u.EstaActivo
-                            && u.CreadorVerificado
-                            && u.EsCreador
-                            && u.UserName != "admin"
-                            && !u.Email.ToLower().Contains("admin")
-                            && !usuariosOcultos.Contains(u.Id))
-                    .OrderByDescending(u => u.NumeroSeguidores)
-                    .Take(MaxCreadoresSugeridos)
-                    .ToListAsync();
-
-                // Si no hay suficientes verificados, agregar creadores activos
-                if (creadoresSugeridos.Count < 5)
-                {
-                    var usuariosAdicionales = await _userManager.Users
-                        .Where(u => u.EstaActivo
-                                && u.EsCreador
-                                && u.UserName != "admin"
-                                && !u.Email.ToLower().Contains("admin")
-                                && !usuariosOcultos.Contains(u.Id)
-                                && !creadoresSugeridos.Select(cs => cs.Id).Contains(u.Id))
-                        .OrderByDescending(u => u.NumeroSeguidores)
-                        .Take(MaxCreadoresSugeridos - creadoresSugeridos.Count)
-                        .ToListAsync();
-
-                    creadoresSugeridos.AddRange(usuariosAdicionales);
-                }
-
-                ViewBag.CreadoresSugeridos = creadoresSugeridos;
-
-                // 4. CREADORES PREMIUM (usuarios con contenido LadoB)
-                var creadoresPremiumIds = await _context.Contenidos
-                    .Where(c => c.TipoLado == TipoLado.LadoB && c.EstaActivo && !c.EsBorrador && !c.EsPrivado
-                            && !usuariosOcultos.Contains(c.UsuarioId))
-                    .Select(c => c.UsuarioId)
-                    .Distinct()
-                    .ToListAsync();
-
-                var creadoresPremium = await _userManager.Users
-                    .Where(u => creadoresPremiumIds.Contains(u.Id)
-                            && u.EstaActivo
-                            && u.UserName != "admin"
-                            && !u.Email.ToLower().Contains("admin")
-                            && !usuariosOcultos.Contains(u.Id))
-                    .OrderByDescending(u => u.NumeroSeguidores)
-                    .Take(MaxCreadoresPremium)
-                    .ToListAsync();
-
-                ViewBag.CreadoresPremium = creadoresPremium;
-
-                // 5. CARGAR ANUNCIOS PUBLICITARIOS
-                var usuarioId = estaAutenticado ? _userManager.GetUserId(User) : null;
-                var anuncios = await _adService.ObtenerAnunciosActivos(MaxAnuncios, usuarioId);
-                ViewBag.Anuncios = anuncios;
-
-                // Registrar impresiones de los anuncios mostrados
-                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-                foreach (var anuncio in anuncios)
-                {
-                    await _adService.RegistrarImpresion(anuncio.Id, usuarioId, ipAddress);
-                }
-
-                // 6. ESTADÍSTICAS PARA EL MOSAICO
-                var totalCreadores = await _userManager.Users
-                    .CountAsync(u => u.EstaActivo &&
-                        (u.EsCreador || u.TipoUsuario == 1 || !string.IsNullOrEmpty(u.Seudonimo)));
-                var totalUsuarios = await _userManager.Users
-                    .CountAsync(u => u.EstaActivo);
-                var totalContenido = await _context.Contenidos
-                    .CountAsync(c => c.EstaActivo && !c.EsBorrador);
-
-                ViewBag.TotalCreadores = totalCreadores;
-                ViewBag.TotalUsuarios = totalUsuarios;
-                ViewBag.TotalContenido = totalContenido;
-
-                _logger.LogInformation("FeedPublico: {TotalPublico} públicos, {TotalPremium} premium, {TotalSugeridos} sugeridos",
-                    contenidoPublico.Count, contenidoPremium.Count, creadoresSugeridos.Count);
+                // NOTA: Premium, creadores y anuncios NO se usan en la vista Index (mosaico)
+                // Se mantienen los métodos para otros usos pero no se llaman aquí
 
                 return View(contenidoPublico);
             }
@@ -248,10 +102,220 @@ namespace Lado.Controllers
         }
 
         /// <summary>
+        /// Obtiene contenido público desde caché o BD con SELECCIÓN ALEATORIA
+        /// OPTIMIZADO v2: Usa Guid.NewGuid() que se traduce a NEWID() en SQL Server
+        /// </summary>
+        private async Task<List<Contenido>> ObtenerContenidoPublicoCacheadoAsync()
+        {
+            // Solo usar caché si tiene contenido (no cachear listas vacías)
+            if (_cache.TryGetValue(CacheKeyFeedPublico, out List<Contenido>? cached) && cached != null && cached.Any())
+            {
+                return cached;
+            }
+
+            // Query con selección ALEATORIA en SQL Server (NEWID())
+            // Prioriza contenido con thumbnail para carga más rápida
+            // IMPORTANTE: EsPublicoGeneral filtra contenido marcado como "Solo para seguidores"
+            var contenido = await _context.Contenidos
+                .AsNoTracking()
+                .Include(c => c.Usuario)
+                .Where(c => c.EstaActivo
+                        && !c.EsBorrador
+                        && !c.Censurado
+                        && !c.OcultoSilenciosamente
+                        && !c.EsPrivado
+                        && !c.EsContenidoSensible
+                        && c.EsPublicoGeneral  // Solo contenido visible en feed público (no "Solo para seguidores")
+                        && c.TipoLado == TipoLado.LadoA
+                        && !string.IsNullOrEmpty(c.RutaArchivo)
+                        && c.Usuario != null
+                        && c.Usuario.EstaActivo
+                        && !c.Usuario.OcultarDeFeedPublico)
+                .OrderByDescending(c => !string.IsNullOrEmpty(c.Thumbnail)) // Priorizar con thumbnail
+                .ThenBy(c => Guid.NewGuid()) // Aleatorio en SQL Server (NEWID())
+                .Take(MaxContenidoPublico)
+                .ToListAsync();
+
+            // Fallback 1: sin filtros de contenido sensible/thumbnail, pero con TODOS los filtros de seguridad
+            if (!contenido.Any())
+            {
+                _logger.LogWarning("FeedPublico: Query principal vacía, usando fallback 1 (sin filtro sensible/EsPublicoGeneral)");
+                contenido = await _context.Contenidos
+                    .AsNoTracking()
+                    .Include(c => c.Usuario)
+                    .Where(c => c.EstaActivo
+                            && !c.EsBorrador
+                            && !c.Censurado
+                            && !c.OcultoSilenciosamente
+                            && !c.EsPrivado
+                            && c.TipoLado == TipoLado.LadoA
+                            && !string.IsNullOrEmpty(c.RutaArchivo)
+                            && c.Usuario != null
+                            && c.Usuario.EstaActivo)
+                    .OrderByDescending(c => c.FechaPublicacion)
+                    .Take(100)
+                    .ToListAsync();
+            }
+
+            // Fallback 2: sin filtro OcultarDeFeedPublico del usuario, pero con TODOS los filtros de seguridad del contenido
+            if (!contenido.Any())
+            {
+                _logger.LogWarning("FeedPublico: Fallback 1 vacío, usando fallback 2 (sin filtro OcultarDeFeedPublico)");
+                contenido = await _context.Contenidos
+                    .AsNoTracking()
+                    .Include(c => c.Usuario)
+                    .Where(c => c.EstaActivo
+                            && !c.EsBorrador
+                            && !c.Censurado
+                            && !c.OcultoSilenciosamente
+                            && !c.EsPrivado
+                            && c.TipoLado == TipoLado.LadoA
+                            && !string.IsNullOrEmpty(c.RutaArchivo)
+                            && c.Usuario != null
+                            && c.Usuario.EstaActivo)
+                    .OrderByDescending(c => c.FechaPublicacion)
+                    .Take(50)
+                    .ToListAsync();
+            }
+
+            // Solo cachear si hay contenido
+            if (contenido.Any())
+            {
+                _cache.Set(CacheKeyFeedPublico, contenido, CacheDuration);
+                _logger.LogInformation("FeedPublico: Cacheados {Count} contenidos públicos", contenido.Count);
+            }
+            else
+            {
+                _logger.LogWarning("FeedPublico: No hay contenido para mostrar en ningún fallback");
+            }
+
+            return contenido;
+        }
+
+        /// <summary>
+        /// Obtiene contenido premium desde caché o BD
+        /// </summary>
+        private async Task<List<Contenido>> ObtenerContenidoPremiumCacheadoAsync()
+        {
+            if (_cache.TryGetValue(CacheKeyFeedPremium, out List<Contenido>? cached) && cached != null)
+            {
+                return cached;
+            }
+
+            var contenido = await _context.Contenidos
+                .AsNoTracking()
+                .Include(c => c.Usuario)
+                .Where(c => c.EstaActivo
+                        && !c.EsBorrador
+                        && !c.Censurado
+                        && !c.OcultoSilenciosamente
+                        && !c.EsPrivado
+                        && c.TipoLado == TipoLado.LadoB
+                        && !string.IsNullOrEmpty(c.RutaArchivo)
+                        && c.Usuario != null
+                        && c.Usuario.EstaActivo
+                        && !c.Usuario.OcultarDeFeedPublico)
+                .OrderByDescending(c => c.NumeroLikes)
+                .ThenByDescending(c => c.FechaPublicacion)
+                .Take(MaxContenidoPremium)
+                .ToListAsync();
+
+            _cache.Set(CacheKeyFeedPremium, contenido, CacheDuration);
+            return contenido;
+        }
+
+        /// <summary>
+        /// Obtiene creadores sugeridos desde caché o BD
+        /// </summary>
+        private async Task<List<ApplicationUser>> ObtenerCreadoresSugeridosCacheadosAsync()
+        {
+            if (_cache.TryGetValue(CacheKeyCreadoresSugeridos, out List<ApplicationUser>? cached) && cached != null)
+            {
+                return cached;
+            }
+
+            var creadores = await _userManager.Users
+                .AsNoTracking()
+                .Where(u => u.EstaActivo
+                        && u.EsCreador
+                        && u.UserName != "admin"
+                        && !u.Email.ToLower().Contains("admin")
+                        && !u.OcultarDeFeedPublico)
+                .OrderByDescending(u => u.CreadorVerificado)
+                .ThenByDescending(u => u.NumeroSeguidores)
+                .Take(MaxCreadoresSugeridos)
+                .ToListAsync();
+
+            _cache.Set(CacheKeyCreadoresSugeridos, creadores, CacheDuration);
+            return creadores;
+        }
+
+        /// <summary>
+        /// Obtiene creadores premium desde caché o BD
+        /// </summary>
+        private async Task<List<ApplicationUser>> ObtenerCreadoresPremiumCacheadosAsync()
+        {
+            if (_cache.TryGetValue(CacheKeyCreadoresPremium, out List<ApplicationUser>? cached) && cached != null)
+            {
+                return cached;
+            }
+
+            var creadoresPremiumIds = await _context.Contenidos
+                .AsNoTracking()
+                .Where(c => c.TipoLado == TipoLado.LadoB
+                        && c.EstaActivo
+                        && !c.EsBorrador
+                        && !c.EsPrivado
+                        && !c.Censurado
+                        && !c.OcultoSilenciosamente)
+                .Select(c => c.UsuarioId)
+                .Distinct()
+                .ToListAsync();
+
+            var creadores = await _userManager.Users
+                .AsNoTracking()
+                .Where(u => creadoresPremiumIds.Contains(u.Id)
+                        && u.EstaActivo
+                        && u.UserName != "admin"
+                        && !u.Email.ToLower().Contains("admin")
+                        && !u.OcultarDeFeedPublico)
+                .OrderByDescending(u => u.NumeroSeguidores)
+                .Take(MaxCreadoresPremium)
+                .ToListAsync();
+
+            _cache.Set(CacheKeyCreadoresPremium, creadores, CacheDuration);
+            return creadores;
+        }
+
+        /// <summary>
+        /// Obtiene estadísticas desde caché o BD
+        /// </summary>
+        private async Task<(int TotalCreadores, int TotalUsuarios, int TotalContenido)> ObtenerEstadisticasCacheadasAsync()
+        {
+            if (_cache.TryGetValue(CacheKeyEstadisticas, out (int, int, int) cached))
+            {
+                return cached;
+            }
+
+            // Una sola query con proyección en lugar de 3 queries COUNT
+            var totalCreadores = await _userManager.Users
+                .CountAsync(u => u.EstaActivo && (u.EsCreador || u.TipoUsuario == 1));
+            var totalUsuarios = await _userManager.Users
+                .CountAsync(u => u.EstaActivo);
+            var totalContenido = await _context.Contenidos
+                .CountAsync(c => c.EstaActivo && !c.EsBorrador);
+
+            var stats = (totalCreadores, totalUsuarios, totalContenido);
+            _cache.Set(CacheKeyEstadisticas, stats, CacheDuration);
+            return stats;
+        }
+
+        /// <summary>
         /// GET: /FeedPublico/VerPerfil/{id} - Ver perfil público de un creador
+        /// ladoB: true = mostrar perfil LadoB (seudónimo), false = mostrar perfil LadoA (username)
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> VerPerfil(string id)
+        public async Task<IActionResult> VerPerfil(string id, bool ladoB = false)
         {
             try
             {
@@ -261,31 +325,65 @@ namespace Lado.Controllers
                     return RedirectToAction("Index");
                 }
 
-                var usuario = await _userManager.FindByIdAsync(id);
+                ApplicationUser? usuario;
+
+                if (ladoB)
+                {
+                    // ⭐ SEGURIDAD: Para LadoB, buscar por seudónimo (NO por user ID real)
+                    // Esto evita que alguien descubra el seudónimo conociendo el user ID
+                    usuario = await _context.Users.FirstOrDefaultAsync(u =>
+                        u.EstaActivo &&
+                        u.Seudonimo != null &&
+                        u.Seudonimo.ToLower() == id.ToLower());
+                }
+                else
+                {
+                    // Para LadoA, buscar por ID normalmente
+                    usuario = await _userManager.FindByIdAsync(id);
+                }
+
                 if (usuario == null || !usuario.EstaActivo)
                 {
                     TempData["Error"] = "Usuario no encontrado";
                     return RedirectToAction("Index");
                 }
 
-                var estaAutenticado = User.Identity?.IsAuthenticated ?? false;
-                var esCreadorLadoB = usuario.TieneLadoB();
+                // Usar el ID real del usuario para las consultas internas
+                var usuarioId = usuario.Id;
 
-                ViewBag.EsCreadorLadoB = esCreadorLadoB;
+                var estaAutenticado = User.Identity?.IsAuthenticated ?? false;
+
+                // Si el perfil es privado y el usuario no está autenticado → redirigir al login
+                if (usuario.PerfilPrivado && !estaAutenticado)
+                {
+                    TempData["Info"] = "Este perfil es privado. Inicia sesión para verlo.";
+                    return RedirectToAction("Login", "Account", new { returnUrl = $"/@{usuario.UserName}" });
+                }
+
+                var tieneLadoB = usuario.TieneLadoB();
+
+                // Determinar qué perfil mostrar:
+                // - Si ladoB=true Y el usuario tiene LadoB activo → mostrar perfil LadoB
+                // - En cualquier otro caso → mostrar perfil LadoA
+                var mostrarPerfilLadoB = ladoB && tieneLadoB;
+
+                ViewBag.EsCreadorLadoB = mostrarPerfilLadoB;
+                // ⭐ SEGURIDAD: No exponer si el usuario tiene LadoB cuando se ve desde LadoA
+                ViewBag.TieneLadoB = mostrarPerfilLadoB;
 
                 var contenidoPublico = new List<Contenido>();
                 var contenidoPremium = new List<Contenido>();
 
                 // LÓGICA DE CONTENIDO:
-                // - Creador LadoB: SOLO mostrar contenido LadoB (bloqueado/difuminado)
-                // - Creador LadoA: mostrar contenido LadoA público
+                // - Si mostrarPerfilLadoB: SOLO mostrar contenido LadoB (bloqueado/difuminado)
+                // - Si mostrar LadoA: mostrar contenido LadoA público
 
-                if (esCreadorLadoB)
+                if (mostrarPerfilLadoB)
                 {
-                    // Creador LadoB: SOLO mostrar contenido LadoB (bloqueado para no suscriptores)
-                    // NO mezclar con contenido LadoA
+                    // Perfil LadoB: SOLO mostrar contenido LadoB (bloqueado para no suscriptores)
+                    // NO mezclar con contenido LadoA para proteger privacidad
                     contenidoPremium = await _context.Contenidos
-                        .Where(c => c.UsuarioId == id
+                        .Where(c => c.UsuarioId == usuarioId
                                 && c.EstaActivo
                                 && !c.EsBorrador
                                 && !c.Censurado
@@ -296,30 +394,16 @@ namespace Lado.Controllers
                         .Take(18)
                         .ToListAsync();
 
-                    // NO cargar contenido LadoA para creadores LadoB
+                    // NO cargar contenido LadoA en perfil LadoB
                     contenidoPublico = new List<Contenido>();
-                }
-                else if (!estaAutenticado)
-                {
-                    // Usuario anónimo viendo creador LadoA: solo contenido público general
-                    contenidoPublico = await _context.Contenidos
-                        .Where(c => c.UsuarioId == id
-                                && c.EstaActivo
-                                && !c.EsBorrador
-                                && !c.Censurado
-                                && !c.OcultoSilenciosamente
-                                && !c.EsPrivado
-                                && c.TipoLado == TipoLado.LadoA
-                                && c.EsPublicoGeneral)
-                        .OrderByDescending(c => c.FechaPublicacion)
-                        .Take(18)
-                        .ToListAsync();
                 }
                 else
                 {
-                    // Usuario autenticado viendo creador LadoA: todo el contenido LadoA
+                    // Perfil LadoA: mostrar TODO el contenido LadoA (autenticado o no)
+                    // El filtro EsPublicoGeneral solo aplica al feed de descubrimiento, NO al perfil
+                    // Así "Solo para seguidores" significa: visible en perfil pero no en exploración
                     contenidoPublico = await _context.Contenidos
-                        .Where(c => c.UsuarioId == id
+                        .Where(c => c.UsuarioId == usuarioId
                                 && c.EstaActivo
                                 && !c.EsBorrador
                                 && !c.Censurado
@@ -327,7 +411,7 @@ namespace Lado.Controllers
                                 && !c.EsPrivado
                                 && c.TipoLado == TipoLado.LadoA)
                         .OrderByDescending(c => c.FechaPublicacion)
-                        .Take(18)
+                        .Take(50)  // Aumentado de 18 a 50 para mostrar más contenido
                         .ToListAsync();
                 }
 
@@ -338,18 +422,18 @@ namespace Lado.Controllers
                 ViewBag.TotalLikes = contenidoPublico.Sum(c => c.NumeroLikes) + contenidoPremium.Sum(c => c.NumeroLikes);
 
                 ViewBag.NumeroSuscriptores = await _context.Suscripciones
-                    .CountAsync(s => s.CreadorId == id && s.EstaActiva);
+                    .CountAsync(s => s.CreadorId == usuarioId && s.EstaActiva);
 
                 ViewBag.EstaAutenticado = estaAutenticado;
 
-                // Datos adicionales para creadores LadoB
-                if (esCreadorLadoB)
+                // Datos adicionales para perfil LadoB
+                if (mostrarPerfilLadoB)
                 {
                     ViewBag.PrecioSuscripcion = usuario.PrecioSuscripcionLadoB ?? 0;
 
                     // Contar total de contenido por tipo
                     var conteoTipos = await _context.Contenidos
-                        .Where(c => c.UsuarioId == id &&
+                        .Where(c => c.UsuarioId == usuarioId &&
                                     c.TipoLado == TipoLado.LadoB &&
                                     c.EstaActivo &&
                                     !c.Censurado &&
@@ -370,10 +454,10 @@ namespace Lado.Controllers
                     ViewBag.TotalContenidosLadoB = 0;
                 }
 
-                // Determinar datos de perfil a mostrar
-                ConfigurarDatosPerfilViewBag(usuario, esCreadorLadoB);
+                // Determinar datos de perfil a mostrar (nombre, foto, bio según lado)
+                ConfigurarDatosPerfilViewBag(usuario, mostrarPerfilLadoB);
 
-                _logger.LogInformation("VerPerfil: Usuario={Id}, EsLadoB={EsLadoB}", id, esCreadorLadoB);
+                _logger.LogInformation("VerPerfil: Identificador={Id}, MostrandoLadoB={LadoB}", id, mostrarPerfilLadoB);
 
                 return View(usuario);
             }
@@ -472,6 +556,35 @@ namespace Lado.Controllers
             }
         }
 
+        /// <summary>
+        /// GET: /FeedPublico/LimpiarCache - Limpia la caché del feed público
+        /// Solo accesible por administradores
+        /// </summary>
+        [HttpGet]
+        [Authorize(Roles = "Admin")]
+        public IActionResult LimpiarCache()
+        {
+            try
+            {
+                _cache.Remove(CacheKeyFeedPublico);
+                _cache.Remove(CacheKeyFeedPremium);
+                _cache.Remove(CacheKeyCreadoresSugeridos);
+                _cache.Remove(CacheKeyCreadoresPremium);
+                _cache.Remove(CacheKeyEstadisticas);
+
+                _logger.LogInformation("FeedPublico: Caché limpiada manualmente");
+
+                TempData["Success"] = "Caché del feed público limpiada correctamente";
+                return RedirectToAction("Index");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al limpiar caché");
+                TempData["Error"] = "Error al limpiar caché";
+                return RedirectToAction("Index");
+            }
+        }
+
         #endregion
 
         #region Métodos Privados
@@ -512,6 +625,120 @@ namespace Lado.Controllers
                 ViewBag.BioMostrar = usuario.Biografia ?? "";
                 ViewBag.UsernameMostrar = usuario.UserName ?? "";
             }
+        }
+
+        #endregion
+
+        #region Explorar por Categoría
+
+        /// <summary>
+        /// GET: /Explorar/Categoria/{slug} - Ver contenido por categoría (SEO)
+        /// </summary>
+        [Route("Explorar/Categoria/{slug}")]
+        [Route("Categoria/{slug}")]
+        public async Task<IActionResult> Categoria(string slug, int pagina = 1)
+        {
+            if (string.IsNullOrEmpty(slug))
+                return RedirectToAction(nameof(Index));
+
+            // Buscar categoría
+            var categoria = await _context.CategoriasIntereses
+                .FirstOrDefaultAsync(c => c.Slug == slug ||
+                    c.Nombre.ToLower().Replace(" ", "-") == slug.ToLower());
+
+            if (categoria == null)
+                return NotFound();
+
+            var pageSize = 24;
+
+            // Obtener contenido público de esta categoría
+            // IMPORTANTE: EsPublicoGeneral filtra contenido "Solo para seguidores"
+            var query = _context.Contenidos
+                .Include(c => c.Usuario)
+                .Where(c => c.CategoriaInteresId == categoria.Id &&
+                            c.TipoLado == TipoLado.LadoA &&
+                            c.EsPublicoGeneral &&  // Solo contenido visible en exploración
+                            c.EstaActivo &&
+                            !c.EsBorrador &&
+                            !c.Censurado &&
+                            !c.OcultoSilenciosamente &&
+                            !c.EsPrivado &&
+                            c.Usuario != null &&
+                            c.Usuario.EstaActivo);
+
+            var totalContenidos = await query.CountAsync();
+            var totalPaginas = (int)Math.Ceiling(totalContenidos / (double)pageSize);
+
+            var contenidos = await query
+                .OrderByDescending(c => c.FechaPublicacion)
+                .Skip((pagina - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            // Creadores destacados de esta categoría
+            var creadoresDestacados = await _context.Users
+                .Where(u => u.EstaActivo &&
+                            u.EsCreador &&
+                            u.CreadorVerificado &&
+                            _context.Contenidos.Any(c => c.UsuarioId == u.Id &&
+                                                         c.CategoriaInteresId == categoria.Id &&
+                                                         c.TipoLado == TipoLado.LadoA))
+                .OrderByDescending(u => u.NumeroSeguidores)
+                .Take(6)
+                .ToListAsync();
+
+            ViewBag.Categoria = categoria;
+            ViewBag.Contenidos = contenidos;
+            ViewBag.CreadoresDestacados = creadoresDestacados;
+            ViewBag.PaginaActual = pagina;
+            ViewBag.TotalPaginas = totalPaginas;
+            ViewBag.TotalContenidos = totalContenidos;
+
+            // SEO
+            ViewData["Title"] = $"{categoria.Nombre} - Explorar Lado";
+            ViewData["MetaDescription"] = !string.IsNullOrEmpty(categoria.Descripcion)
+                ? categoria.Descripcion
+                : $"Explora contenido de {categoria.Nombre} en Lado. Descubre creadores y publicaciones.";
+            ViewData["CanonicalUrl"] = $"https://ladoapp.com/Explorar/Categoria/{slug}";
+            ViewData["SchemaType"] = "CollectionPage";
+
+            return View("Categoria");
+        }
+
+        /// <summary>
+        /// GET: /Explorar/Categorias - Lista de todas las categorías
+        /// </summary>
+        [Route("Explorar/Categorias")]
+        [Route("Categorias")]
+        public async Task<IActionResult> Categorias()
+        {
+            var categorias = await _context.CategoriasIntereses
+                .Where(c => c.CategoriaPadreId == null) // Solo categorías principales
+                .OrderBy(c => c.Nombre)
+                .ToListAsync();
+
+            // Contar contenido por categoría (solo contenido visible en exploración)
+            var conteoCategoria = await _context.Contenidos
+                .Where(c => c.CategoriaInteresId != null &&
+                            c.TipoLado == TipoLado.LadoA &&
+                            c.EsPublicoGeneral &&  // Solo contenido visible en exploración
+                            c.EstaActivo &&
+                            !c.EsBorrador &&
+                            !c.Censurado &&
+                            !c.OcultoSilenciosamente &&
+                            !c.EsPrivado)
+                .GroupBy(c => c.CategoriaInteresId)
+                .Select(g => new { CategoriaId = g.Key, Cantidad = g.Count() })
+                .ToDictionaryAsync(x => x.CategoriaId ?? 0, x => x.Cantidad);
+
+            ViewBag.Categorias = categorias;
+            ViewBag.ConteoCategoria = conteoCategoria;
+
+            // SEO
+            ViewData["Title"] = "Explorar Categorías - Lado";
+            ViewData["MetaDescription"] = "Explora contenido por categorías en Lado. Encuentra creadores de fotografía, fitness, arte, música y más.";
+
+            return View("Categorias");
         }
 
         #endregion

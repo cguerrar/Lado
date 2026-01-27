@@ -1,0 +1,372 @@
+@model Lado.Models.ArticuloBlog
+@{
+    var relacionados = ViewBag.Relacionados as List<Lado.Models.ArticuloBlog> ?? new List<Lado.Models.ArticuloBlog>();
+    var baseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+}
+
+<style>
+    .article-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 30px 20px;
+    }
+
+    .article-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #4682B4;
+        text-decoration: none;
+        font-weight: 500;
+        margin-bottom: 24px;
+    }
+
+    .article-back:hover {
+        text-decoration: underline;
+    }
+
+    .article-header {
+        margin-bottom: 32px;
+    }
+
+    .article-category {
+        display: inline-block;
+        padding: 6px 16px;
+        background: #f0f7ff;
+        color: #4682B4;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 16px;
+    }
+
+    .article-title {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #111;
+        line-height: 1.3;
+        margin-bottom: 20px;
+    }
+
+    .article-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 20px;
+        color: #666;
+        font-size: 0.95rem;
+    }
+
+    .article-meta i {
+        margin-right: 6px;
+        color: #999;
+    }
+
+    .article-author {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .article-author-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .article-image {
+        width: 100%;
+        border-radius: 16px;
+        margin-bottom: 32px;
+    }
+
+    .article-content {
+        font-size: 1.1rem;
+        line-height: 1.8;
+        color: #333;
+    }
+
+    .article-content h2 {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #111;
+        margin: 32px 0 16px;
+    }
+
+    .article-content h3 {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #222;
+        margin: 24px 0 12px;
+    }
+
+    .article-content p {
+        margin-bottom: 20px;
+    }
+
+    .article-content ul,
+    .article-content ol {
+        margin: 16px 0;
+        padding-left: 24px;
+    }
+
+    .article-content li {
+        margin-bottom: 8px;
+    }
+
+    .article-content a {
+        color: #4682B4;
+    }
+
+    .article-content img {
+        max-width: 100%;
+        border-radius: 12px;
+        margin: 24px 0;
+    }
+
+    .article-content blockquote {
+        border-left: 4px solid #4682B4;
+        padding-left: 20px;
+        margin: 24px 0;
+        font-style: italic;
+        color: #555;
+    }
+
+    .article-content code {
+        background: #f5f5f5;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.9em;
+    }
+
+    .article-content pre {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        padding: 20px;
+        border-radius: 12px;
+        overflow-x: auto;
+        margin: 24px 0;
+    }
+
+    .article-content pre code {
+        background: none;
+        padding: 0;
+    }
+
+    .article-share {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 40px 0;
+        padding: 24px;
+        background: #f8f9fa;
+        border-radius: 12px;
+    }
+
+    .article-share span {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .article-share a {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.1rem;
+        transition: transform 0.2s;
+    }
+
+    .article-share a:hover {
+        transform: scale(1.1);
+    }
+
+    .share-twitter { background: #1da1f2; }
+    .share-facebook { background: #1877f2; }
+    .share-linkedin { background: #0a66c2; }
+    .share-whatsapp { background: #25d366; }
+
+    .article-related {
+        margin-top: 60px;
+        padding-top: 40px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .article-related h3 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #111;
+        margin-bottom: 24px;
+    }
+
+    .related-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 20px;
+    }
+
+    .related-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        text-decoration: none;
+        transition: transform 0.3s;
+    }
+
+    .related-card:hover {
+        transform: translateY(-3px);
+    }
+
+    .related-card img {
+        width: 100%;
+        height: 140px;
+        object-fit: cover;
+    }
+
+    .related-card-content {
+        padding: 16px;
+    }
+
+    .related-card-title {
+        font-weight: 600;
+        color: #111;
+        font-size: 1rem;
+        line-height: 1.4;
+    }
+
+    @@media (max-width: 768px) {
+        .article-title {
+            font-size: 1.8rem;
+        }
+
+        .article-meta {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .article-content {
+            font-size: 1rem;
+        }
+    }
+</style>
+
+<div class="article-container">
+    <a href="@Url.Action("Index", "Blog")" class="article-back">
+        <i class="fas fa-arrow-left"></i> Volver al Blog
+    </a>
+
+    <article>
+        <header class="article-header">
+            <span class="article-category">@Model.Categoria</span>
+            <h1 class="article-title">@Model.Titulo</h1>
+
+            <div class="article-meta">
+                @if (Model.Autor != null)
+                {
+                    <div class="article-author">
+                        @if (!string.IsNullOrEmpty(Model.Autor.FotoPerfil))
+                        {
+                            <img src="@Model.Autor.FotoPerfil" alt="@Model.Autor.NombreCompleto" class="article-author-avatar">
+                        }
+                        <span>Por @(Model.Autor.NombreCompleto ?? Model.Autor.UserName)</span>
+                    </div>
+                }
+
+                <span><i class="far fa-calendar"></i> @Model.FechaPublicacion?.ToString("dd MMMM yyyy")</span>
+                <span><i class="far fa-clock"></i> @Model.TiempoLecturaMinutos min de lectura</span>
+                <span><i class="far fa-eye"></i> @Model.Vistas vistas</span>
+            </div>
+        </header>
+
+        @if (!string.IsNullOrEmpty(Model.ImagenPortada))
+        {
+            <img src="@Model.ImagenPortada" alt="@Model.Titulo" class="article-image">
+        }
+
+        <div class="article-content">
+            @Html.Raw(Model.Contenido)
+        </div>
+
+        <div class="article-share">
+            <span>Compartir:</span>
+            <a href="https://twitter.com/intent/tweet?url=@Uri.EscapeDataString($"{baseUrl}/Blog/{Model.Slug}")&text=@Uri.EscapeDataString(Model.Titulo)"
+               target="_blank" class="share-twitter" title="Compartir en Twitter">
+                <i class="fab fa-twitter"></i>
+            </a>
+            <a href="https://www.facebook.com/sharer/sharer.php?u=@Uri.EscapeDataString($"{baseUrl}/Blog/{Model.Slug}")"
+               target="_blank" class="share-facebook" title="Compartir en Facebook">
+                <i class="fab fa-facebook-f"></i>
+            </a>
+            <a href="https://www.linkedin.com/shareArticle?mini=true&url=@Uri.EscapeDataString($"{baseUrl}/Blog/{Model.Slug}")&title=@Uri.EscapeDataString(Model.Titulo)"
+               target="_blank" class="share-linkedin" title="Compartir en LinkedIn">
+                <i class="fab fa-linkedin-in"></i>
+            </a>
+            <a href="https://api.whatsapp.com/send?text=@Uri.EscapeDataString($"{Model.Titulo} - {baseUrl}/Blog/{Model.Slug}")"
+               target="_blank" class="share-whatsapp" title="Compartir en WhatsApp">
+                <i class="fab fa-whatsapp"></i>
+            </a>
+        </div>
+    </article>
+
+    @if (relacionados.Any())
+    {
+        <section class="article-related">
+            <h3>Articulos relacionados</h3>
+            <div class="related-grid">
+                @foreach (var rel in relacionados)
+                {
+                    <a href="@Url.Action("Articulo", "Blog", new { slug = rel.Slug })" class="related-card">
+                        @if (!string.IsNullOrEmpty(rel.ImagenPortada))
+                        {
+                            <img src="@rel.ImagenPortada" alt="@rel.Titulo">
+                        }
+                        else
+                        {
+                            <img src="/images/blog-default.jpg" alt="@rel.Titulo">
+                        }
+                        <div class="related-card-content">
+                            <div class="related-card-title">@rel.Titulo</div>
+                        </div>
+                    </a>
+                }
+            </div>
+        </section>
+    }
+</div>
+
+<!-- Schema.org Article -->
+<script type="application/ld+json">
+{
+    "@@context": "https://schema.org",
+    "@@type": "Article",
+    "headline": "@Model.Titulo",
+    "description": "@(Model.MetaDescripcion ?? Model.Resumen ?? "")",
+    "image": "@(Model.ImagenPortada ?? "/images/og-default.jpg")",
+    "datePublished": "@Model.FechaPublicacion?.ToString("yyyy-MM-ddTHH:mm:ssZ")",
+    "dateModified": "@((Model.FechaModificacion ?? Model.FechaPublicacion)?.ToString("yyyy-MM-ddTHH:mm:ssZ"))",
+    "author": {
+        "@@type": "Person",
+        "name": "@(Model.Autor?.NombreCompleto ?? "Lado")"
+    },
+    "publisher": {
+        "@@type": "Organization",
+        "name": "Lado",
+        "logo": {
+            "@@type": "ImageObject",
+            "url": "@baseUrl/images/logo-512.png"
+        }
+    },
+    "mainEntityOfPage": {
+        "@@type": "WebPage",
+        "@@id": "@baseUrl/Blog/@Model.Slug"
+    },
+    "wordCount": "@Model.Contenido?.Split(' ').Length",
+    "articleSection": "@Model.Categoria"
+}
+</script>

@@ -1240,10 +1240,22 @@ namespace Lado.Controllers
             if (request.Ids == null || !request.Ids.Any())
                 return Json(new { success = false, message = "No se seleccionaron elementos" });
 
-            var medios = await _context.MediaBiblioteca
+            // Si se pidió orden aleatorio, mezclar los IDs primero
+            var idsOrdenados = request.Ids.ToList();
+            if (request.OrdenAleatorio)
+            {
+                var random = new Random();
+                idsOrdenados = idsOrdenados.OrderBy(_ => random.Next()).ToList();
+            }
+
+            var mediosQuery = await _context.MediaBiblioteca
                 .Where(m => request.Ids.Contains(m.Id))
-                .OrderBy(m => m.Orden)
                 .ToListAsync();
+
+            // Ordenar según los IDs (ya sea aleatorio o por orden original)
+            var medios = request.OrdenAleatorio
+                ? idsOrdenados.Select(id => mediosQuery.First(m => m.Id == id)).ToList()
+                : mediosQuery.OrderBy(m => m.Orden).ToList();
 
             if (!medios.Any())
                 return Json(new { success = false, message = "No se encontraron los elementos" });
@@ -1322,6 +1334,7 @@ namespace Lado.Controllers
             public bool DistribuirEnDias { get; set; }
             public int PublicacionesPorDia { get; set; } = 3;
             public int IntervaloMinutos { get; set; } = 60;
+            public bool OrdenAleatorio { get; set; }
         }
 
         // ========================================

@@ -1,0 +1,501 @@
+/* ========================================
+   FEEDPUBLICO - Mosaico de Landing Page
+   Extraido de Index.cshtml para mejor caching
+   ======================================== */
+
+/* Reset y base */
+.mosaic-page {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+    background: #000;
+    z-index: 1;
+}
+
+/* Mosaico de imagenes */
+.mosaic-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: grid;
+    gap: 4px;
+    animation: mosaicFloat 20s ease-in-out infinite;
+}
+
+@keyframes mosaicFloat {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -51%) scale(1.02); }
+}
+
+.mosaic-item {
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    border-radius: 4px;
+    background: linear-gradient(110deg, #0d0d0d 0%, #1a1a1a 20%, #2d2d2d 40%, #1a1a1a 60%, #0d0d0d 100%);
+    background-size: 300% 100%;
+    animation: shimmer 1.2s ease-in-out infinite;
+}
+
+.mosaic-item::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.2);
+    z-index: 1;
+    transition: background 0.3s ease;
+}
+
+.mosaic-item:hover {
+    transform: scale(1.15);
+    z-index: 100;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+}
+
+.mosaic-item:hover::before {
+    background: rgba(0, 0, 0, 0);
+}
+
+.mosaic-item.media-loaded {
+    background: #111;
+    animation: none;
+}
+
+@keyframes shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
+
+/* Media dentro de items */
+.mosaic-item img,
+.mosaic-item video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.4s ease, opacity 0.5s ease;
+}
+
+.mosaic-item img:not(.loaded),
+.mosaic-item video:not(.loaded) {
+    opacity: 0;
+}
+
+.mosaic-item img.loaded,
+.mosaic-item video.loaded {
+    opacity: 1;
+    animation: fadeInScale 0.3s ease-out forwards;
+}
+
+@keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.mosaic-item:hover img,
+.mosaic-item:hover video {
+    transform: scale(1.1);
+}
+
+/* Placeholders */
+.video-error-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+.video-error-placeholder svg {
+    width: 40%;
+    height: 40%;
+    opacity: 0.5;
+}
+
+.video-placeholder {
+    opacity: 0;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+/* Overlays oscuros */
+.mosaic-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.mosaic-overlay::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40%;
+    background: linear-gradient(to bottom,
+        rgba(0, 0, 0, 1) 0%,
+        rgba(0, 0, 0, 0.9) 20%,
+        rgba(0, 0, 0, 0.6) 50%,
+        rgba(0, 0, 0, 0) 100%
+    );
+}
+
+.mosaic-overlay::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 45%;
+    background: linear-gradient(to top,
+        rgba(0, 0, 0, 1) 0%,
+        rgba(0, 0, 0, 0.95) 25%,
+        rgba(0, 0, 0, 0.7) 50%,
+        rgba(0, 0, 0, 0) 100%
+    );
+}
+
+.mosaic-overlay-left,
+.mosaic-overlay-right {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: 15%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.mosaic-overlay-left {
+    left: 0;
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.8), transparent);
+}
+
+.mosaic-overlay-right {
+    right: 0;
+    background: linear-gradient(to left, rgba(0, 0, 0, 0.8), transparent);
+}
+
+.mosaic-bottom-fade {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 120px;
+    background: linear-gradient(to top, #000 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 9;
+    opacity: 0.8;
+}
+
+/* Contenido central (logo y CTA) */
+.mosaic-content {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    text-align: center;
+    pointer-events: none;
+}
+
+.mosaic-logo {
+    font-size: 5rem;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: -3px;
+    margin-bottom: 16px;
+    text-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+    animation: logoGlow 3s ease-in-out infinite alternate;
+}
+
+@keyframes logoGlow {
+    from { text-shadow: 0 4px 30px rgba(0, 0, 0, 0.5); }
+    to { text-shadow: 0 4px 60px rgba(70, 130, 180, 0.3), 0 0 100px rgba(70, 130, 180, 0.1); }
+}
+
+.mosaic-tagline {
+    font-size: 1.4rem;
+    color: rgba(255, 255, 255, 0.85);
+    margin-bottom: 40px;
+    font-weight: 400;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+/* Botones */
+.mosaic-buttons {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    pointer-events: auto;
+}
+
+.mosaic-btn {
+    padding: 16px 40px;
+    border-radius: 50px;
+    font-size: 16px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.mosaic-btn-primary {
+    background: linear-gradient(135deg, #4682B4 0%, #2c5f8a 100%);
+    color: #fff;
+    box-shadow: 0 8px 30px rgba(70, 130, 180, 0.4);
+}
+
+.mosaic-btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(70, 130, 180, 0.6);
+}
+
+.mosaic-btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(10px);
+}
+
+.mosaic-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-3px);
+}
+
+.mosaic-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+.mosaic-btn-info {
+    display: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    border: none;
+    font-size: 13px;
+    padding: 10px 16px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.mosaic-btn-info:hover {
+    color: #fff;
+}
+
+/* Badge de video */
+.video-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 4px;
+    padding: 4px 6px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.video-badge svg {
+    width: 12px;
+    height: 12px;
+    fill: #fff;
+}
+
+/* Ocultar navegacion en esta pagina */
+.mosaic-page ~ .navbar,
+.mosaic-page ~ footer,
+.mosaic-page ~ .mobile-nav,
+.mosaic-page ~ header,
+body.feedpublico-page .navbar,
+body.feedpublico-page footer,
+body.feedpublico-page .mobile-nav,
+body.feedpublico-page header,
+body.feedpublico-page .public-header {
+    display: none !important;
+}
+
+body.feedpublico-page {
+    overflow: hidden !important;
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+body.feedpublico-page main,
+body.feedpublico-page .main-content,
+body.feedpublico-page .public-main {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+    min-height: 100vh !important;
+}
+
+/* ========================================
+   RESPONSIVE - Tablets
+   ======================================== */
+@media (max-width: 1024px) {
+    .mosaic-logo { font-size: 4rem; }
+    .mosaic-tagline { font-size: 1.2rem; }
+}
+
+/* ========================================
+   RESPONSIVE - Moviles
+   ======================================== */
+@media (max-width: 768px) {
+    .mosaic-logo {
+        font-size: 3.5rem;
+        letter-spacing: -2px;
+    }
+    .mosaic-tagline {
+        font-size: 0.95rem;
+        padding: 0 20px;
+        letter-spacing: 1px;
+        margin-bottom: 30px;
+    }
+    .mosaic-buttons {
+        flex-direction: column;
+        padding: 0 30px;
+        gap: 12px;
+        width: 100%;
+        max-width: 300px;
+        margin: 0 auto;
+        align-items: center;
+    }
+    .mosaic-btn {
+        padding: 14px 24px;
+        font-size: 14px;
+        justify-content: center;
+        width: 100%;
+        text-align: center;
+    }
+    .mosaic-content {
+        width: 90%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .mosaic-btn-info {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        justify-content: center;
+        margin-top: 8px;
+    }
+    .mosaic-btn-info i { font-size: 12px; }
+    .mosaic-overlay::before { height: 35%; }
+    .mosaic-overlay::after { height: 40%; }
+    .mosaic-overlay-left,
+    .mosaic-overlay-right { width: 10%; }
+    .mosaic-item { border-radius: 3px; }
+    .video-badge {
+        top: 4px;
+        right: 4px;
+        padding: 2px 4px;
+    }
+    .video-badge svg {
+        width: 10px;
+        height: 10px;
+    }
+}
+
+/* ========================================
+   RESPONSIVE - Moviles pequenos
+   ======================================== */
+@media (max-width: 480px) {
+    .mosaic-logo { font-size: 2.8rem; }
+    .mosaic-tagline {
+        font-size: 0.85rem;
+        margin-bottom: 24px;
+    }
+    .mosaic-buttons {
+        padding: 0 24px;
+        max-width: 280px;
+    }
+    .mosaic-btn {
+        padding: 12px 20px;
+        font-size: 13px;
+    }
+    .mosaic-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+    .mosaic-content {
+        width: 95%;
+    }
+}
+
+/* ========================================
+   Soporte tactil (iOS/Android)
+   ======================================== */
+@media (hover: none) and (pointer: coarse) {
+    .mosaic-item:hover {
+        transform: none;
+        z-index: auto;
+        box-shadow: none;
+    }
+    .mosaic-item:hover::before {
+        background: rgba(0, 0, 0, 0.2);
+    }
+    .mosaic-item:hover img,
+    .mosaic-item:hover video {
+        transform: none;
+    }
+    .mosaic-item:active {
+        transform: scale(0.95);
+        opacity: 0.9;
+    }
+    .mosaic-btn {
+        min-height: 48px;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .mosaic-container {
+        animation: none !important;
+    }
+}
+
+/* ========================================
+   iOS Safe Areas
+   ======================================== */
+@supports (padding-top: env(safe-area-inset-top)) {
+    .mosaic-page {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+}
+
+/* ========================================
+   Landscape en moviles
+   ======================================== */
+@media (max-height: 500px) and (orientation: landscape) {
+    .mosaic-logo {
+        font-size: 2.2rem;
+        margin-bottom: 8px;
+    }
+    .mosaic-tagline {
+        font-size: 0.8rem;
+        margin-bottom: 16px;
+    }
+    .mosaic-buttons {
+        flex-direction: row;
+        gap: 10px;
+    }
+    .mosaic-btn {
+        padding: 10px 20px;
+        font-size: 12px;
+    }
+}

@@ -39,6 +39,24 @@ namespace Lado.Controllers
                 .OrderByDescending(a => a.FechaCreacion)
                 .ToListAsync();
 
+            // Obtener IDs de contenidos que ya tienen apelacion pendiente o en revision
+            var contenidosConApelacionPendiente = apelaciones
+                .Where(a => a.ContenidoId.HasValue &&
+                           (a.Estado == EstadoApelacion.Pendiente || a.Estado == EstadoApelacion.EnRevision))
+                .Select(a => a.ContenidoId!.Value)
+                .ToHashSet();
+
+            // Cargar contenidos censurados del usuario que NO tienen apelacion pendiente
+            var contenidosRechazados = await _context.Contenidos
+                .Include(c => c.Archivos.OrderBy(a => a.Orden))
+                .Where(c => c.UsuarioId == usuario.Id &&
+                           c.Censurado &&
+                           !contenidosConApelacionPendiente.Contains(c.Id))
+                .OrderByDescending(c => c.FechaPublicacion)
+                .ToListAsync();
+
+            ViewBag.ContenidosRechazados = contenidosRechazados;
+
             return View(apelaciones);
         }
 
@@ -49,7 +67,9 @@ namespace Lado.Controllers
             var usuario = await _userManager.GetUserAsync(User);
             if (usuario == null) return RedirectToAction("Login", "Account");
 
-            var contenido = await _context.Contenidos.FindAsync(id);
+            var contenido = await _context.Contenidos
+                .Include(c => c.Archivos.OrderBy(a => a.Orden))
+                .FirstOrDefaultAsync(c => c.Id == id);
             if (contenido == null) return NotFound();
 
             // Verificar que el contenido pertenece al usuario

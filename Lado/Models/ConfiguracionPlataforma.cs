@@ -136,5 +136,22 @@ namespace Lado.Models
         public const string EXPLORAR_LIMITE_CONTENIDO_MAPA = "Explorar_Limite_ContenidoMapa";  // Default: 30
         public const string EXPLORAR_PAGE_SIZE = "Explorar_PageSize";                          // Default: 30
         public const string EXPLORAR_CONFIANZA_OBJETOS = "Explorar_Confianza_Objetos";         // Default: 70 (0.7 * 100)
+
+        // ========================================
+        // CUOTAS DE ALMACENAMIENTO GALERÍA
+        // ========================================
+        // Cuotas por tipo de usuario (en MB)
+        public const string CUOTA_ALMACENAMIENTO_FAN_MB = "CuotaAlmacenamientoFanMB";                       // Default: 5120 (5 GB)
+        public const string CUOTA_ALMACENAMIENTO_CREADOR_MB = "CuotaAlmacenamientoCreadorMB";               // Default: 25600 (25 GB)
+        public const string CUOTA_ALMACENAMIENTO_CREADOR_ACTIVO_MB = "CuotaAlmacenamientoCreadorActivoMB"; // Default: 102400 (100 GB)
+        public const string CUOTA_ALMACENAMIENTO_CREADOR_TOP_MB = "CuotaAlmacenamientoCreadorTopMB";       // Default: 256000 (250 GB)
+
+        // Umbrales de ingresos para categorías de creador (en USD)
+        public const string UMBRAL_CREADOR_ACTIVO_INGRESOS = "UmbralCreadorActivoIngresos";                 // Default: 100 USD
+        public const string UMBRAL_CREADOR_TOP_INGRESOS = "UmbralCreadorTopIngresos";                       // Default: 1000 USD
+
+        // Alertas de cuota (porcentajes)
+        public const string CUOTA_ALERTA_PORCENTAJE_80 = "CuotaAlertaPorcentaje80";                         // Default: 80
+        public const string CUOTA_ALERTA_PORCENTAJE_100 = "CuotaAlertaPorcentaje100";                       // Default: 100
     }
 }

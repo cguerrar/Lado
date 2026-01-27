@@ -330,6 +330,7 @@ namespace Lado.Controllers.Api
                         NombreCompleto = u.NombreCompleto ?? "",
                         FotoPerfil = u.FotoPerfil,
                         FotoPortada = u.FotoPortada,
+                        FotoPortadaLadoB = u.FotoPortadaLadoB,
                         EstaVerificado = u.CreadorVerificado,
                         PrecioSuscripcion = u.PrecioSuscripcion,
                         TotalSuscriptores = u.Suscriptores.Count(s => s.EstaActiva),
