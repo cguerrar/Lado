@@ -69,6 +69,7 @@
         height: calc(100dvh - 80px);
         display: flex;
         flex-direction: column;
+        position: relative; /* Necesario para que las transformaciones funcionen */
     }
 
     .chat-container {
@@ -257,6 +258,66 @@
     .btn-menu svg {
         width: 20px;
         height: 20px;
+    }
+
+    /* Botón Buzz */
+    .btn-buzz {
+        color: white;
+        background: none;
+        border: none;
+        width: clamp(36px, 8vw, 44px);
+        height: clamp(36px, 8vw, 44px);
+        min-width: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: background 0.15s ease, opacity 0.2s ease;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn-buzz:hover,
+    .btn-buzz:active {
+        background: rgba(255,255,255,0.12);
+    }
+
+    .btn-buzz svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .btn-buzz:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .btn-buzz.buzz-sent {
+        animation: buzzPulse 0.3s ease;
+    }
+
+    @@keyframes buzzPulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.2); }
+    }
+
+    /* Animación shake para buzz recibido */
+    @@keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        10%, 90% { transform: translateX(-10px); }
+        20%, 80% { transform: translateX(10px); }
+        30%, 70% { transform: translateX(-8px); }
+        40%, 60% { transform: translateX(8px); }
+        50% { transform: translateX(0); }
+    }
+
+    .chat-shake {
+        animation: shake 0.6s cubic-bezier(.36,.07,.19,.97) both !important;
+    }
+
+    /* Efecto visual adicional para el shake */
+    .chat-shake .chat-messages {
+        box-shadow: 0 0 20px rgba(245, 158, 11, 0.3) !important;
     }
 
     /* Dropdown del menu */
@@ -1585,7 +1646,8 @@
         .mensajes-page {
             padding: 0;
             position: fixed;
-            top: 56px;
+            /* Ajustar top para navbar + safe-area (notch/Dynamic Island) */
+            top: calc(56px + env(safe-area-inset-top, 0px) + 14px);
             left: 0;
             right: 0;
             bottom: 0;
@@ -1672,6 +1734,7 @@
         /* Transiciones rapidas */
         .btn-back,
         .btn-menu,
+        .btn-buzz,
         .btn-send,
         .btn-attach,
         .btn-galeria,
@@ -1683,6 +1746,7 @@
         /* Touch feedback en lugar de hover */
         .btn-back:hover,
         .btn-menu:hover,
+        .btn-buzz:hover,
         .btn-attach:hover,
         .btn-galeria:hover,
         .btn-emoji:hover {
@@ -1690,7 +1754,8 @@
         }
 
         .btn-back:active,
-        .btn-menu:active {
+        .btn-menu:active,
+        .btn-buzz:active {
             background: rgba(255,255,255,0.15);
         }
 
@@ -1774,6 +1839,16 @@
                     </span>
                 </div>
             </div>
+
+            <!-- Botón Buzz -->
+            <button class="btn-buzz" id="btnBuzz" title="Llamar atención" onclick="enviarBuzz()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    <path d="M2 8c0-2.2.7-4.3 2-6"/>
+                    <path d="M22 8a10 10 0 0 0-2-6"/>
+                </svg>
+            </button>
 
             <div class="chat-menu dropdown">
                 <button class="btn-menu dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -2060,7 +2135,7 @@
 
 <!-- Image Modal -->
 <div class="image-modal" id="imageModal" onclick="cerrarImagenModal()">
-    <button class="image-modal-close">&times;</button>
+    <button class="image-modal-close">×</button>
     <img id="modalImage" src="" alt="">
 </div>
 
@@ -2173,6 +2248,33 @@
                 }
             });
 
+            // Handler para recibir buzz
+            connection.on("RecibirBuzz", function(data) {
+                console.log("=== BUZZ RECIBIDO ===");
+                console.log("Data:", data);
+                console.log("remitenteId:", data.remitenteId);
+                console.log("otroUsuarioId:", otroUsuarioId);
+                console.log("Coincide:", data.remitenteId === otroUsuarioId);
+
+                // Disparar evento global para que el layout pueda mostrar notificación
+                window.dispatchEvent(new CustomEvent('buzzRecibido', { detail: data }));
+
+                // Si el buzz viene del usuario con quien estamos chateando
+                if (data.remitenteId === otroUsuarioId) {
+                    // Agregar animación shake al contenedor de la página
+                    const chatContainer = document.querySelector('.mensajes-page');
+                    if (chatContainer) {
+                        chatContainer.classList.add('chat-shake');
+                        setTimeout(() => {
+                            chatContainer.classList.remove('chat-shake');
+                        }, 600); // Coincide con la duración de la animación
+                    }
+
+                    // Reproducir sonido de buzz
+                    reproducirSonidoBuzz();
+                }
+            });
+
             try {
                 await connection.start();
                 await connection.invoke("JoinConversation", otroUsuarioId);
@@ -2195,6 +2297,78 @@
             clearTimeout(receivedTypingTimeout);
             document.getElementById('typingIndicator').classList.remove('show');
             document.querySelector('.online-status').style.display = 'inline';
+        }
+
+        // Buzz - Llamar atención
+        let buzzCooldown = false;
+
+        async function enviarBuzz() {
+            if (buzzCooldown || !connection) return;
+
+            const btnBuzz = document.getElementById('btnBuzz');
+            if (!btnBuzz) return;
+
+            try {
+                await connection.invoke("SendBuzz", otroUsuarioId);
+
+                // Feedback visual de que se envió
+                btnBuzz.classList.add('buzz-sent');
+                setTimeout(() => btnBuzz.classList.remove('buzz-sent'), 300);
+
+                // Cooldown de 5 segundos
+                buzzCooldown = true;
+                btnBuzz.disabled = true;
+                btnBuzz.title = 'Espera 5 segundos...';
+
+                setTimeout(() => {
+                    buzzCooldown = false;
+                    btnBuzz.disabled = false;
+                    btnBuzz.title = 'Llamar atención';
+                }, 5000);
+            } catch (err) {
+                console.error('Error enviando buzz:', err);
+            }
+        }
+
+        function reproducirSonidoBuzz() {
+            try {
+                // Crear un beep corto usando Web Audio API
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                // Configurar el sonido
+                oscillator.frequency.value = 800; // Frecuencia en Hz
+                oscillator.type = 'sine';
+
+                // Configurar el volumen con fade out
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+                // Reproducir
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+
+                // Segundo beep más corto
+                setTimeout(() => {
+                    const osc2 = audioContext.createOscillator();
+                    const gain2 = audioContext.createGain();
+                    osc2.connect(gain2);
+                    gain2.connect(audioContext.destination);
+                    osc2.frequency.value = 1000;
+                    osc2.type = 'sine';
+                    gain2.gain.setValueAtTime(0.25, audioContext.currentTime);
+                    gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                    osc2.start(audioContext.currentTime);
+                    osc2.stop(audioContext.currentTime + 0.2);
+                }, 150);
+            } catch (e) {
+                // Si Web Audio API no está disponible, ignorar silenciosamente
+                console.log('Audio no disponible');
+            }
         }
 
         // Render Messages
