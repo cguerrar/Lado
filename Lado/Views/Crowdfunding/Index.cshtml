@@ -1,0 +1,1170 @@
+@model List<Lado.Models.CampanaCrowdfunding>
+@{
+    ViewData["Title"] = "Crowdfunding";
+    var categorias = ViewBag.Categorias as List<string> ?? new List<string>();
+    var categoriaActual = ViewBag.CategoriaActual as string;
+    var pagina = (int)(ViewBag.Pagina ?? 1);
+    var totalCampanas = (int)(ViewBag.TotalCampanas ?? 0);
+    var totalPaginas = (int)Math.Ceiling(totalCampanas / 12.0);
+    var esCreador = ViewBag.EsCreador as bool? ?? false;
+}
+
+<style>
+    :root {
+        --primary: #4682b4;
+        --primary-dark: #3a6d94;
+        --primary-light: rgba(70, 130, 180, 0.1);
+        --bg: #fafafa;
+        --card-bg: #ffffff;
+        --fg: #111827;
+        --fg-secondary: #4b5563;
+        --muted: #6b7280;
+        --border: #e5e7eb;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+    }
+
+    [data-theme="dark"] {
+        --bg: #0a0a0a;
+        --card-bg: #1a1a1a;
+        --fg: #f3f4f6;
+        --fg-secondary: #d1d5db;
+        --muted: #9ca3af;
+        --border: #374151;
+        --primary-light: rgba(70, 130, 180, 0.15);
+    }
+
+    .crowdfunding-page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px 20px 60px;
+    }
+
+    .page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .page-header h1 {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--fg);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .page-header h1 svg {
+        color: var(--primary);
+    }
+
+    .page-stats {
+        display: flex;
+        gap: 24px;
+        font-size: 14px;
+        color: var(--muted);
+    }
+
+    .page-stats span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .btn-crear {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 24px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .btn-crear:hover {
+        background: var(--primary-dark);
+        transform: translateY(-2px);
+        color: white;
+    }
+
+    /* Tabs de navegacion */
+    .nav-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 12px;
+    }
+
+    .nav-tabs .tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 20px;
+        background: transparent;
+        color: var(--muted);
+        text-decoration: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+
+    .nav-tabs .tab:hover {
+        color: var(--fg);
+        background: var(--primary-light);
+    }
+
+    .nav-tabs .tab.active {
+        color: var(--primary);
+        background: var(--primary-light);
+        font-weight: 600;
+    }
+
+    /* Filtros */
+    .filter-tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .filter-tab {
+        padding: 8px 16px;
+        border-radius: 20px;
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .filter-tab:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .filter-tab.active {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+
+    /* Grid de campañas */
+    .campaigns-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 24px;
+    }
+
+    .campaign-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+        transition: all 0.3s;
+    }
+
+    .campaign-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+    }
+
+    .campaign-image {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16/9;
+        background: linear-gradient(135deg, #4682b4 0%, #3a6d94 100%);
+        overflow: hidden;
+    }
+
+    .campaign-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .campaign-image-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        color: rgba(255,255,255,0.3);
+    }
+
+    .campaign-image-placeholder svg {
+        width: 48px;
+        height: 48px;
+    }
+
+    .campaign-badge {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .badge-hot {
+        background: var(--danger);
+        color: white;
+    }
+
+    .badge-ending {
+        background: var(--warning);
+        color: white;
+    }
+
+    .badge-new {
+        background: var(--primary);
+        color: white;
+    }
+
+    .badge-funded {
+        background: var(--success);
+        color: white;
+    }
+
+    .campaign-content {
+        padding: 20px;
+    }
+
+    .campaign-category {
+        display: inline-block;
+        font-size: 11px;
+        color: var(--primary);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+
+    .campaign-title {
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--fg);
+        margin: 0 0 12px 0;
+        line-height: 1.4;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .campaign-title a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .campaign-title a:hover {
+        color: var(--primary);
+    }
+
+    .campaign-creator {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .creator-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 13px;
+        overflow: hidden;
+    }
+
+    .creator-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .creator-name {
+        font-size: 13px;
+        color: var(--muted);
+    }
+
+    /* Barra de progreso */
+    .progress-section {
+        margin-bottom: 16px;
+    }
+
+    .progress-bar {
+        height: 8px;
+        background: var(--border);
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 10px;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary) 0%, var(--success) 100%);
+        border-radius: 4px;
+        transition: width 0.8s ease-out;
+        position: relative;
+    }
+
+    .progress-fill.funded {
+        background: var(--success);
+    }
+
+    .progress-stats {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+    }
+
+    .progress-amount {
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--fg);
+    }
+
+    .progress-goal {
+        font-size: 13px;
+        color: var(--muted);
+    }
+
+    .progress-percent {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--primary);
+    }
+
+    .progress-percent.funded {
+        color: var(--success);
+    }
+
+    /* Meta info */
+    .campaign-meta {
+        display: flex;
+        justify-content: space-between;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+    }
+
+    .meta-item {
+        text-align: center;
+        flex: 1;
+    }
+
+    .meta-item:not(:last-child) {
+        border-right: 1px solid var(--border);
+    }
+
+    .meta-value {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--fg);
+    }
+
+    .meta-label {
+        font-size: 11px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    /* Card para crear */
+    .create-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 160px;
+        border: 2px dashed var(--border);
+        border-radius: 16px;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-decoration: none;
+        color: var(--muted);
+        background: transparent;
+        padding: 20px;
+    }
+
+    .create-card:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+        background: var(--primary-light);
+    }
+
+    .create-card svg {
+        width: 32px;
+        height: 32px;
+        margin-bottom: 8px;
+    }
+
+    .create-card span {
+        font-weight: 600;
+        font-size: 13px;
+    }
+
+    /* Estado vacío */
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        color: var(--muted);
+    }
+
+    .empty-state svg {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 20px;
+        opacity: 0.4;
+        color: var(--primary);
+    }
+
+    .empty-state h3 {
+        font-size: 20px;
+        color: var(--fg);
+        margin-bottom: 8px;
+    }
+
+    .empty-state p {
+        margin-bottom: 24px;
+    }
+
+    /* Botón Aportar en cards */
+    .btn-aportar-card {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        padding: 12px 20px;
+        margin-top: 16px;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .btn-aportar-card:hover {
+        background: linear-gradient(135deg, #22c55e 0%, #10b981 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        color: white;
+    }
+
+    .btn-aportar-card.funded {
+        background: linear-gradient(135deg, #4682b4 0%, #3a6d94 100%);
+    }
+
+    .btn-aportar-card.funded:hover {
+        background: linear-gradient(135deg, #5a9bc9 0%, #4682b4 100%);
+        box-shadow: 0 6px 20px rgba(70, 130, 180, 0.4);
+    }
+
+    /* Paginación */
+    .pagination {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 40px;
+    }
+
+    .pagination a, .pagination span {
+        padding: 10px 16px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .pagination a {
+        background: var(--card-bg);
+        color: var(--fg);
+        border: 1px solid var(--border);
+    }
+
+    .pagination a:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .pagination .active {
+        background: var(--primary);
+        color: white;
+        border: 1px solid var(--primary);
+    }
+
+    /* Nuevo diseño de ayuda mejorado */
+    .help-banner-new {
+        background: linear-gradient(135deg, #2c5171 0%, #1a3a52 100%);
+        border: none;
+        border-radius: 20px;
+        padding: 0;
+        margin-bottom: 28px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(70, 130, 180, 0.2);
+    }
+
+    [data-theme="dark"] .help-banner-new {
+        background: linear-gradient(135deg, #1a3a52 0%, #0f2435 100%);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .help-header-new {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 24px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .help-header-new:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .help-title {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .help-icon-main {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .help-title h3 {
+        font-size: 18px;
+        font-weight: 700;
+        color: #ffffff;
+        margin: 0 0 4px 0;
+    }
+
+    .help-title p {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.7);
+        margin: 0;
+    }
+
+    .help-toggle-new {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+        padding: 10px;
+        color: rgba(255, 255, 255, 0.8);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .help-toggle-new:hover {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.3);
+        color: white;
+    }
+
+    .help-toggle-new.collapsed svg {
+        transform: rotate(-90deg);
+    }
+
+    .help-content-new {
+        padding: 0 24px 24px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(0, 0, 0, 0.15);
+    }
+
+    .help-content-new.hidden {
+        display: none;
+    }
+
+    .help-steps {
+        display: flex;
+        gap: 24px;
+        padding: 24px 0;
+    }
+
+    .help-step {
+        flex: 1;
+        display: flex;
+        gap: 14px;
+    }
+
+    .step-number {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    }
+
+    .step-content h4 {
+        font-size: 14px;
+        font-weight: 600;
+        color: #ffffff;
+        margin: 0 0 6px 0;
+    }
+
+    .step-content p {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.7);
+        margin: 0;
+        line-height: 1.5;
+    }
+
+    .help-features {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        padding-top: 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .feature-card {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.9);
+        transition: all 0.2s;
+    }
+
+    .feature-card:hover {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .feature-card svg {
+        color: #10b981;
+        flex-shrink: 0;
+    }
+
+    @@media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .campaigns-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .filter-tabs {
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            padding-bottom: 12px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .filter-tab {
+            white-space: nowrap;
+        }
+
+        /* Responsive para nuevo diseño de ayuda */
+        .help-banner-new {
+            margin-bottom: 20px;
+            border-radius: 16px;
+        }
+
+        .help-header-new {
+            padding: 16px;
+        }
+
+        .help-icon-main {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+        }
+
+        .help-icon-main svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        .help-title h3 {
+            font-size: 15px;
+        }
+
+        .help-title p {
+            font-size: 12px;
+        }
+
+        .help-content-new {
+            padding: 0 16px 16px;
+        }
+
+        .help-steps {
+            flex-direction: column;
+            gap: 16px;
+            padding: 16px 0;
+        }
+
+        .help-step {
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .help-step:last-child {
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .step-number {
+            width: 30px;
+            height: 30px;
+            font-size: 13px;
+        }
+
+        .step-content h4 {
+            font-size: 13px;
+        }
+
+        .step-content p {
+            font-size: 12px;
+        }
+
+        .help-features {
+            grid-template-columns: 1fr;
+            gap: 8px;
+            padding-top: 16px;
+        }
+
+        .feature-card {
+            padding: 12px 14px;
+            font-size: 12px;
+        }
+
+        .feature-card svg {
+            width: 18px;
+            height: 18px;
+        }
+    }
+</style>
+
+<div class="crowdfunding-page">
+    <div class="page-header">
+        <div>
+            <h1>
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2v20"></path>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                Crowdfunding
+            </h1>
+            <div class="page-stats">
+                <span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    @totalCampanas campañas activas
+                </span>
+            </div>
+        </div>
+
+        @if (esCreador)
+        {
+            <a href="@Url.Action("Crear")" class="btn-crear">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Nueva Campaña
+            </a>
+        }
+    </div>
+
+    <!-- Tabs de navegacion -->
+    <div class="nav-tabs">
+        <a href="@Url.Action("Index")" class="tab active">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+            </svg>
+            Explorar
+        </a>
+        @if (esCreador)
+        {
+            <a href="@Url.Action("MisCampanas")" class="tab">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2v20"></path>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                Mis Campañas
+            </a>
+        }
+        <a href="@Url.Action("MisAportes")" class="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+            </svg>
+            Mis Aportes
+        </a>
+    </div>
+
+    <!-- Ayuda mejorada -->
+    <div class="help-banner-new" id="helpBanner">
+        <div class="help-header-new" onclick="toggleHelp()">
+            <div class="help-title">
+                <div class="help-icon-main">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2v20"></path>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3>Como funciona el Crowdfunding</h3>
+                    <p>Financia contenido exclusivo de tus creadores favoritos</p>
+                </div>
+            </div>
+            <button class="help-toggle-new collapsed" id="helpToggle">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </button>
+        </div>
+        <div class="help-content-new hidden" id="helpContent">
+            <div class="help-steps">
+                <div class="help-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Explora campañas</h4>
+                        <p>Navega por las campañas activas y encuentra proyectos que te interesen apoyar.</p>
+                    </div>
+                </div>
+                <div class="help-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Haz tu aporte</h4>
+                        <p>Elige cuanto aportar. El dinero solo se cobra si se alcanza la meta.</p>
+                    </div>
+                </div>
+                <div class="help-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Recibe el contenido</h4>
+                        <p>Si la meta se alcanza, obtendras acceso al contenido exclusivo prometido.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="help-features">
+                <div class="feature-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
+                    <span>Devolucion garantizada si no se alcanza la meta</span>
+                </div>
+                <div class="feature-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span>Une fuerzas con otros fans</span>
+                </div>
+                <div class="feature-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                    <span>Contenido exclusivo solo para aportantes</span>
+                </div>
+                <div class="feature-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    <span>Tiempo limitado para alcanzar la meta</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    @if (categorias.Any())
+    {
+        <div class="filter-tabs">
+            <a href="@Url.Action("Index")" class="filter-tab @(string.IsNullOrEmpty(categoriaActual) ? "active" : "")">
+                Todas
+            </a>
+            @foreach (var cat in categorias)
+            {
+                <a href="@Url.Action("Index", new { categoria = cat })"
+                   class="filter-tab @(categoriaActual == cat ? "active" : "")">
+                    @cat
+                </a>
+            }
+        </div>
+    }
+
+    @if (Model.Count == 0)
+    {
+        <div class="empty-state">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                <path d="M12 2v20"></path>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+            </svg>
+            <h3>No hay campañas activas</h3>
+            <p>Sé el primero en crear una campaña de crowdfunding</p>
+            @if (esCreador)
+            {
+                <a href="@Url.Action("Crear")" class="btn-crear">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Crear Campaña
+                </a>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="campaigns-grid">
+            @foreach (var campana in Model)
+            {
+                var porcentaje = campana.PorcentajeProgreso;
+                var metaAlcanzada = porcentaje >= 100;
+                var esHot = porcentaje >= 75 && !metaAlcanzada;
+                var esNueva = campana.FechaPublicacion.HasValue && (DateTime.Now - campana.FechaPublicacion.Value).TotalDays < 3;
+                var terminaPronto = campana.DiasRestantes <= 3 && campana.DiasRestantes > 0 && !metaAlcanzada;
+
+                <div class="campaign-card">
+                    <div class="campaign-image">
+                        @if (!string.IsNullOrEmpty(campana.ImagenPreview))
+                        {
+                            <img src="@campana.ImagenPreview" alt="@campana.Titulo" loading="lazy" />
+                        }
+                        else
+                        {
+                            <div class="campaign-image-placeholder">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                    <polyline points="21 15 16 10 5 21"></polyline>
+                                </svg>
+                            </div>
+                        }
+
+                        @if (metaAlcanzada)
+                        {
+                            <span class="campaign-badge badge-funded">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="margin-right: 4px;">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                Financiado
+                            </span>
+                        }
+                        else if (esHot)
+                        {
+                            <span class="campaign-badge badge-hot">🔥 Hot</span>
+                        }
+                        else if (terminaPronto)
+                        {
+                            <span class="campaign-badge badge-ending">⏰ Últimos días</span>
+                        }
+                        else if (esNueva)
+                        {
+                            <span class="campaign-badge badge-new">✨ Nueva</span>
+                        }
+                    </div>
+
+                    <div class="campaign-content">
+                        @if (!string.IsNullOrEmpty(campana.Categoria))
+                        {
+                            <span class="campaign-category">@campana.Categoria</span>
+                        }
+
+                        <h3 class="campaign-title">
+                            <a href="@Url.Action("Detalles", new { id = campana.Id })">@campana.Titulo</a>
+                        </h3>
+
+                        <div class="campaign-creator">
+                            <div class="creator-avatar">
+                                @if (!string.IsNullOrEmpty(campana.Creador?.FotoPerfil))
+                                {
+                                    <img src="@campana.Creador.FotoPerfil" alt="" />
+                                }
+                                else
+                                {
+                                    @campana.Creador?.ObtenerInicial()
+                                }
+                            </div>
+                            <span class="creator-name">@campana.Creador?.NombreCompleto</span>
+                        </div>
+
+                        <div class="progress-section">
+                            <div class="progress-bar">
+                                <div class="progress-fill @(metaAlcanzada ? "funded" : "")"
+                                     style="width: @Math.Min(100, porcentaje).ToString("F0", System.Globalization.CultureInfo.InvariantCulture)%;"></div>
+                            </div>
+                            <div class="progress-stats">
+                                <div>
+                                    <span class="progress-amount">$@campana.TotalRecaudado.ToString("N0")</span>
+                                    <span class="progress-goal"> de $@campana.Meta.ToString("N0")</span>
+                                </div>
+                                <span class="progress-percent @(metaAlcanzada ? "funded" : "")">@porcentaje.ToString("F0")%</span>
+                            </div>
+                        </div>
+
+                        <div class="campaign-meta">
+                            <div class="meta-item">
+                                <div class="meta-value">@campana.TotalAportantes</div>
+                                <div class="meta-label">Aportantes</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-value">@campana.TiempoRestanteTexto</div>
+                                <div class="meta-label">Restante</div>
+                            </div>
+                        </div>
+
+                        <!-- Botón Aportar -->
+                        <a href="@Url.Action("Detalles", new { id = campana.Id })" class="btn-aportar-card @(metaAlcanzada ? "funded" : "")">
+                            @if (metaAlcanzada)
+                            {
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                <span>Ver campaña</span>
+                            }
+                            else
+                            {
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                                </svg>
+                                <span>Aportar</span>
+                            }
+                        </a>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @if (totalPaginas > 1)
+        {
+            <div class="pagination">
+                @if (pagina > 1)
+                {
+                    <a href="@Url.Action("Index", new { pagina = pagina - 1, categoria = categoriaActual })">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                    </a>
+                }
+
+                @for (int i = 1; i <= totalPaginas; i++)
+                {
+                    if (i == pagina)
+                    {
+                        <span class="active">@i</span>
+                    }
+                    else
+                    {
+                        <a href="@Url.Action("Index", new { pagina = i, categoria = categoriaActual })">@i</a>
+                    }
+                }
+
+                @if (pagina < totalPaginas)
+                {
+                    <a href="@Url.Action("Index", new { pagina = pagina + 1, categoria = categoriaActual })">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </a>
+                }
+            </div>
+        }
+    }
+</div>
+
+@section Scripts {
+    <script>
+        // Toggle ayuda
+        function toggleHelp() {
+            const content = document.getElementById('helpContent');
+            const toggle = document.getElementById('helpToggle');
+            const isHidden = content.classList.toggle('hidden');
+            toggle.classList.toggle('collapsed', isHidden);
+            localStorage.setItem('crowdfunding-help-expanded', !isHidden);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Restaurar estado de ayuda (colapsado por defecto, mostrar si el usuario lo expandió)
+            if (localStorage.getItem('crowdfunding-help-expanded') === 'true') {
+                document.getElementById('helpContent').classList.remove('hidden');
+                document.getElementById('helpToggle').classList.remove('collapsed');
+            }
+
+            // Animar barras de progreso al entrar en viewport
+            const progressBars = document.querySelectorAll('.progress-fill');
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const bar = entry.target;
+                        const width = bar.style.width;
+                        bar.style.width = '0%';
+                        setTimeout(() => {
+                            bar.style.width = width;
+                        }, 100);
+                        observer.unobserve(bar);
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            progressBars.forEach(bar => observer.observe(bar));
+        });
+    </script>
+}

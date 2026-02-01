@@ -1,0 +1,541 @@
+@model Lado.Controllers.CrearCampanaViewModel
+@{
+    ViewData["Title"] = Model.Id.HasValue ? "Editar Campana" : "Crear Campana";
+    var esEdicion = Model.Id.HasValue;
+}
+
+<style>
+    .create-form-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+        padding-bottom: calc(100px + env(safe-area-inset-bottom));
+    }
+
+    .form-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .form-header h1 {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--fg);
+        margin-bottom: 0.5rem;
+    }
+
+    .form-header p {
+        color: var(--muted);
+    }
+
+    .form-card {
+        background: var(--surface);
+        border-radius: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid var(--line);
+        padding: 2rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .form-section-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--fg);
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .form-section-title i {
+        color: #4682b4;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        color: var(--fg);
+        margin-bottom: 0.5rem;
+    }
+
+    .form-group small {
+        display: block;
+        color: var(--muted);
+        margin-top: 0.25rem;
+        font-size: 0.8rem;
+    }
+
+    .form-control {
+        background: var(--bg-secondary);
+        border: 1px solid var(--line);
+        border-radius: 0.75rem;
+        padding: 0.875rem 1rem;
+        font-size: 1rem;
+        color: var(--fg);
+        transition: all 0.2s;
+    }
+
+    .form-control:focus {
+        border-color: #4682b4;
+        box-shadow: 0 0 0 3px rgba(70, 130, 180, 0.15);
+        outline: none;
+    }
+
+    .form-control::placeholder {
+        color: var(--muted-light);
+    }
+
+    textarea.form-control {
+        min-height: 150px;
+        resize: vertical;
+    }
+
+    .input-group-text {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--line);
+        color: var(--fg-secondary);
+    }
+
+    .image-upload-area {
+        border: 2px dashed var(--line);
+        border-radius: 1rem;
+        padding: 2rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: var(--bg-secondary);
+    }
+
+    .image-upload-area:hover {
+        border-color: #4682b4;
+        background: var(--bg-tertiary);
+    }
+
+    .image-upload-area i {
+        font-size: 2.5rem;
+        color: var(--muted);
+        margin-bottom: 1rem;
+    }
+
+    .image-upload-area p {
+        color: var(--muted);
+        margin: 0;
+    }
+
+    .image-preview {
+        max-width: 100%;
+        max-height: 200px;
+        border-radius: 0.5rem;
+        margin-top: 1rem;
+    }
+
+    .current-image {
+        position: relative;
+        display: inline-block;
+    }
+
+    .current-image img {
+        max-width: 100%;
+        max-height: 200px;
+        border-radius: 0.5rem;
+    }
+
+    .tipo-lado-selector {
+        display: flex;
+        gap: 1rem;
+        margin-top: 0.5rem;
+    }
+
+    .tipo-lado-option {
+        flex: 1;
+        padding: 1rem;
+        border: 2px solid var(--line);
+        border-radius: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+    }
+
+    .tipo-lado-option:hover {
+        border-color: rgba(70, 130, 180, 0.5);
+    }
+
+    .tipo-lado-option.selected {
+        border-color: #4682b4;
+        background: rgba(70, 130, 180, 0.1);
+    }
+
+    .tipo-lado-option i {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+
+    .tipo-lado-option.lado-a i {
+        color: #4682b4;
+    }
+
+    .tipo-lado-option.lado-b i {
+        color: #3a6d94;
+    }
+
+    .tipo-lado-option span {
+        font-weight: 600;
+        color: var(--fg);
+    }
+
+    .tipo-lado-option small {
+        display: block;
+        color: var(--muted);
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+    }
+
+    .meta-input-group {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .meta-input-group .form-group {
+        flex: 1;
+    }
+
+    .btn-submit-campaign {
+        background: linear-gradient(135deg, #4682b4 0%, #3a6d94 100%);
+        color: white;
+        border: none;
+        padding: 1rem 2rem;
+        border-radius: 0.75rem;
+        font-size: 1.1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        width: 100%;
+    }
+
+    .btn-submit-campaign:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(70, 130, 180, 0.4);
+        background: linear-gradient(135deg, #5a9bc9 0%, #4682b4 100%);
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        align-items: stretch;
+    }
+
+    .form-actions .btn,
+    .form-actions .btn-outline-secondary {
+        flex: 0 0 auto;
+        min-width: 140px;
+        padding: 1rem 1.5rem;
+        border-radius: 0.75rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .form-actions .btn-outline-secondary {
+        background: transparent;
+        border: 2px solid var(--line);
+        color: var(--fg);
+    }
+
+    .form-actions .btn-outline-secondary:hover {
+        border-color: #4682b4;
+        color: #4682b4;
+        background: rgba(70, 130, 180, 0.1);
+    }
+
+    .form-actions .btn-submit-campaign {
+        flex: 1;
+        min-width: 200px;
+    }
+
+    .tips-box {
+        background: rgba(70, 130, 180, 0.1);
+        border-left: 4px solid #4682b4;
+        padding: 1rem 1.25rem;
+        border-radius: 0 0.5rem 0.5rem 0;
+        margin-top: 1rem;
+    }
+
+    .tips-box h6 {
+        color: #3a6d94;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
+
+    .tips-box ul {
+        margin: 0;
+        padding-left: 1.25rem;
+        color: var(--fg-secondary);
+        font-size: 0.9rem;
+    }
+
+    .tips-box li {
+        margin-bottom: 0.25rem;
+    }
+
+    /* Validacion de errores */
+    .text-danger, .field-validation-error {
+        color: #dc2626 !important;
+        font-size: 0.85rem;
+        margin-top: 0.25rem;
+        display: block;
+    }
+
+    .input-validation-error {
+        border-color: #dc2626 !important;
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15) !important;
+    }
+
+    .validation-summary-errors {
+        color: #dc2626;
+    }
+
+    .validation-summary-errors ul {
+        margin: 0;
+        padding-left: 1.25rem;
+    }
+
+    @@media (max-width: 768px) {
+        .meta-input-group {
+            flex-direction: column;
+        }
+
+        .tipo-lado-selector {
+            flex-direction: column;
+        }
+    }
+</style>
+
+<div class="create-form-container">
+    <div class="form-header">
+        <h1><i class="fas fa-rocket me-2"></i>@ViewData["Title"]</h1>
+        <p>Propone contenido exclusivo y deja que tus fans lo financien</p>
+    </div>
+
+    <form action="@(esEdicion ? Url.Action("Editar", "Crowdfunding", new { id = Model.Id }) : Url.Action("Crear", "Crowdfunding"))" method="post" enctype="multipart/form-data">
+        @Html.AntiForgeryToken()
+        @if (esEdicion)
+        {
+            <input type="hidden" asp-for="Id" />
+        }
+
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger mb-3" style="border-radius: 0.75rem; background: #fee2e2; border: 1px solid #fecaca; padding: 1rem;">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                <strong>Por favor corrige los siguientes errores:</strong>
+                <div asp-validation-summary="All" class="mt-2" style="color: #dc2626;"></div>
+            </div>
+        }
+
+        <!-- Informacion basica -->
+        <div class="form-card">
+            <h5 class="form-section-title">
+                <i class="fas fa-info-circle"></i>
+                Informacion basica
+            </h5>
+
+            <div class="form-group">
+                <label asp-for="Titulo"></label>
+                <input asp-for="Titulo" class="form-control" placeholder="Ej: Video especial de 30 minutos sobre..." minlength="10" maxlength="200" required />
+                <span asp-validation-for="Titulo" class="text-danger"></span>
+                <small>Minimo 10 caracteres. Un titulo claro y atractivo.</small>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Descripcion"></label>
+                <textarea asp-for="Descripcion" class="form-control" placeholder="Describe en detalle el contenido que crearas si se alcanza la meta..." minlength="50" maxlength="2000" required></textarea>
+                <span asp-validation-for="Descripcion" class="text-danger"></span>
+                <small>Minimo 50 caracteres. Se especifico sobre que incluira el contenido.</small>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Categoria"></label>
+                <select asp-for="Categoria" class="form-control">
+                    <option value="">Selecciona una categoria</option>
+                    <option value="Video">Video</option>
+                    <option value="Fotografia">Fotografia</option>
+                    <option value="Tutorial">Tutorial</option>
+                    <option value="Behind the Scenes">Behind the Scenes</option>
+                    <option value="Colaboracion">Colaboracion</option>
+                    <option value="Especial">Especial</option>
+                    <option value="Otro">Otro</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Tags"></label>
+                <input asp-for="Tags" class="form-control" placeholder="Ej: fitness, yoga, motivacion" />
+                <small>Tags separados por coma para que tu campana sea mas facil de encontrar</small>
+            </div>
+        </div>
+
+        <!-- Tipo de contenido -->
+        <div class="form-card">
+            <h5 class="form-section-title">
+                <i class="fas fa-eye"></i>
+                Tipo de contenido
+            </h5>
+
+            <div class="tipo-lado-selector">
+                <label class="tipo-lado-option lado-a @(Model.TipoLado == Lado.Models.TipoLado.LadoA ? "selected" : "")" onclick="selectTipoLado(0)">
+                    <input type="radio" asp-for="TipoLado" value="0" style="display: none;" />
+                    <i class="fas fa-globe"></i>
+                    <span>Lado A</span>
+                    <small>Contenido gratuito para todos</small>
+                </label>
+                <label class="tipo-lado-option lado-b @(Model.TipoLado == Lado.Models.TipoLado.LadoB ? "selected" : "")" onclick="selectTipoLado(1)">
+                    <input type="radio" asp-for="TipoLado" value="1" style="display: none;" />
+                    <i class="fas fa-crown"></i>
+                    <span>Lado B</span>
+                    <small>Contenido premium exclusivo</small>
+                </label>
+            </div>
+        </div>
+
+        <!-- Meta y plazos -->
+        <div class="form-card">
+            <h5 class="form-section-title">
+                <i class="fas fa-bullseye"></i>
+                Meta y plazos
+            </h5>
+
+            <div class="meta-input-group">
+                <div class="form-group">
+                    <label asp-for="Meta"></label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input asp-for="Meta" type="number" step="1" min="10" max="100000" class="form-control" />
+                    </div>
+                    <span asp-validation-for="Meta" class="text-danger"></span>
+                    <small>Monto minimo: $10, maximo: $100,000</small>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="AporteMinimo"></label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input asp-for="AporteMinimo" type="number" step="1" min="1" max="1000" class="form-control" />
+                    </div>
+                    <span asp-validation-for="AporteMinimo" class="text-danger"></span>
+                    <small>Aporte minimo permitido</small>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="FechaLimite"></label>
+                <input asp-for="FechaLimite" type="date" class="form-control" min="@DateTime.Now.AddDays(1).ToString("yyyy-MM-dd")" max="@DateTime.Now.AddDays(90).ToString("yyyy-MM-dd")" />
+                <span asp-validation-for="FechaLimite" class="text-danger"></span>
+                <small>Tienes entre 1 y 90 dias para alcanzar tu meta</small>
+            </div>
+
+            <div class="tips-box">
+                <h6><i class="fas fa-lightbulb me-1"></i>Consejos para tu meta</h6>
+                <ul>
+                    <li>Establece una meta realista basada en tu audiencia</li>
+                    <li>Si no se alcanza la meta, todos los aportes seran devueltos</li>
+                    <li>La plataforma retiene el 20% de comision cuando la campana es exitosa</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Imagen de preview -->
+        <div class="form-card">
+            <h5 class="form-section-title">
+                <i class="fas fa-image"></i>
+                Imagen de preview
+            </h5>
+
+            @if (!string.IsNullOrEmpty(Model.ImagenPreviewActual))
+            {
+                <div class="current-image mb-3">
+                    <p class="text-muted mb-2">Imagen actual:</p>
+                    <img src="@Model.ImagenPreviewActual" alt="Preview actual" />
+                </div>
+            }
+
+            <div class="image-upload-area" onclick="document.getElementById('imagenPreview').click()">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <p>Haz clic o arrastra una imagen aqui</p>
+                <small class="text-muted">Formatos: JPG, PNG. Max 5MB</small>
+                <img id="imagePreviewDisplay" class="image-preview" style="display: none;" />
+            </div>
+            <input type="file" id="imagenPreview" name="imagenPreview" accept="image/*" style="display: none;" onchange="previewImage(this)" />
+            <small>Una buena imagen aumenta significativamente las posibilidades de exito</small>
+        </div>
+
+        <!-- Botones de accion -->
+        <div class="form-actions">
+            <a href="@Url.Action("MisCampanas")" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Cancelar
+            </a>
+            <button type="submit" class="btn-submit-campaign">
+                <i class="fas fa-save me-2"></i>@(esEdicion ? "Guardar cambios" : "Crear campana")
+            </button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        function selectTipoLado(value) {
+            document.querySelectorAll('.tipo-lado-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+
+            const radio = document.querySelector(`input[name="TipoLado"][value="${value}"]`);
+            if (radio) {
+                radio.checked = true;
+                radio.closest('.tipo-lado-option').classList.add('selected');
+            }
+        }
+
+        function previewImage(input) {
+            const preview = document.getElementById('imagePreviewDisplay');
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Normalizar decimales antes de enviar (maneja locales con coma)
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const normalizeInput = (input) => {
+                if (!input || !input.value) return;
+                // Usar valueAsNumber si está disponible
+                if (!isNaN(input.valueAsNumber)) {
+                    input.value = input.valueAsNumber;
+                    return;
+                }
+                // Fallback: normalizar manualmente
+                let val = input.value.toString().trim();
+                if (val.includes(',')) {
+                    val = val.replace(/\./g, '').replace(',', '.');
+                }
+                input.value = val;
+            };
+
+            normalizeInput(document.getElementById('Meta'));
+            normalizeInput(document.getElementById('AporteMinimo'));
+        });
+    </script>
+}

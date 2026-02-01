@@ -1,0 +1,355 @@
+@model List<Lado.Models.CampanaCrowdfunding>
+@{
+    ViewData["Title"] = "Mis Aportes";
+    var totalAportado = (decimal)(ViewBag.TotalAportado ?? 0m);
+}
+
+<style>
+    .my-contributions-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+
+    /* Tabs de navegacion */
+    .nav-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid var(--border, #e5e7eb);
+        padding-bottom: 12px;
+    }
+
+    .nav-tabs .tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 20px;
+        background: transparent;
+        color: var(--muted, #6b7280);
+        text-decoration: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+
+    .nav-tabs .tab:hover {
+        color: var(--fg, #111827);
+        background: rgba(70, 130, 180, 0.1);
+    }
+
+    .nav-tabs .tab.active {
+        color: #4682b4;
+        background: rgba(70, 130, 180, 0.1);
+        font-weight: 600;
+    }
+
+    .page-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .page-header h1 {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--fg);
+        margin-bottom: 0.5rem;
+    }
+
+    .page-header p {
+        color: var(--muted);
+    }
+
+    .total-banner {
+        background: var(--primary-gradient);
+        color: white;
+        border-radius: 1rem;
+        padding: 1.5rem 2rem;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .total-banner h3 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin: 0;
+    }
+
+    .total-banner p {
+        margin: 0;
+        opacity: 0.9;
+    }
+
+    .contributions-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .contribution-card {
+        background: var(--surface);
+        border-radius: 1rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        border: 1px solid var(--line);
+        overflow: hidden;
+        display: grid;
+        grid-template-columns: 150px 1fr auto;
+        transition: all 0.2s;
+    }
+
+    .contribution-card:hover {
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    .contribution-image {
+        height: 120px;
+        background: var(--bg-tertiary);
+        background-size: cover;
+        background-position: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        font-size: 1.5rem;
+    }
+
+    .contribution-content {
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .contribution-status {
+        display: inline-flex;
+        padding: 0.2rem 0.6rem;
+        border-radius: 1rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-bottom: 0.5rem;
+        width: fit-content;
+    }
+
+    .status-activa { background: #dbeafe; color: #1d4ed8; }
+    .status-exitosa { background: #d1fae5; color: #059669; }
+    .status-fallida { background: #fee2e2; color: #dc2626; }
+    .status-pendiente { background: #fef3c7; color: #d97706; }
+
+    .contribution-title {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--fg);
+        margin-bottom: 0.25rem;
+    }
+
+    .contribution-title a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .contribution-title a:hover {
+        color: var(--primary);
+    }
+
+    .contribution-creator {
+        font-size: 0.85rem;
+        color: var(--muted);
+    }
+
+    .contribution-progress {
+        margin-top: 0.5rem;
+    }
+
+    .mini-progress {
+        height: 4px;
+        background: var(--bg-tertiary);
+        border-radius: 2px;
+        overflow: hidden;
+    }
+
+    .mini-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary) 0%, #10b981 100%);
+    }
+
+    .contribution-amount {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem 1.5rem;
+        border-left: 1px solid var(--line);
+        text-align: center;
+    }
+
+    .amount-value {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--primary);
+    }
+
+    .amount-label {
+        font-size: 0.75rem;
+        color: var(--muted);
+        text-transform: uppercase;
+    }
+
+    .access-badge {
+        margin-top: 0.5rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.75rem;
+        color: #10b981;
+        background: #d1fae5;
+        padding: 0.2rem 0.5rem;
+        border-radius: 0.25rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: var(--surface);
+        border-radius: 1rem;
+        border: 1px solid var(--line);
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: var(--primary-light);
+        margin-bottom: 1rem;
+    }
+
+    .empty-state h3 {
+        color: var(--fg);
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+        color: var(--muted);
+        margin-bottom: 1.5rem;
+    }
+
+    @@media (max-width: 768px) {
+        .contribution-card {
+            grid-template-columns: 1fr;
+        }
+
+        .contribution-image {
+            height: 100px;
+        }
+
+        .contribution-amount {
+            flex-direction: row;
+            justify-content: space-between;
+            border-left: none;
+            border-top: 1px solid var(--line);
+        }
+    }
+</style>
+
+<div class="my-contributions-container">
+    <div class="page-header">
+        <h1><i class="fas fa-hand-holding-heart me-2"></i>Mis Aportes</h1>
+        <p>Campanas que has apoyado</p>
+    </div>
+
+    <!-- Navegacion -->
+    <div class="nav-tabs">
+        <a href="@Url.Action("Index")" class="tab">
+            <i class="fas fa-compass"></i> Explorar
+        </a>
+        <a href="@Url.Action("MisCampanas")" class="tab">
+            <i class="fas fa-rocket"></i> Mis Campanas
+        </a>
+        <a href="@Url.Action("MisAportes")" class="tab active">
+            <i class="fas fa-hand-holding-heart"></i> Mis Aportes
+        </a>
+    </div>
+
+    @if (totalAportado > 0)
+    {
+        <div class="total-banner">
+            <p>Total aportado</p>
+            <h3>$@totalAportado.ToString("N2")</h3>
+        </div>
+    }
+
+    @if (Model.Count == 0)
+    {
+        <div class="empty-state">
+            <i class="fas fa-heart"></i>
+            <h3>Aun no has aportado a ninguna campana</h3>
+            <p>Apoya a tus creadores favoritos y recibe acceso a contenido exclusivo.</p>
+            <a href="@Url.Action("Index")" class="btn btn-primary btn-lg">
+                <i class="fas fa-search me-2"></i>Explorar campanas
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="contributions-list">
+            @foreach (var campana in Model)
+            {
+                var estadoClass = campana.Estado switch
+                {
+                    Lado.Models.EstadoCampanaCrowdfunding.Activa => "activa",
+                    Lado.Models.EstadoCampanaCrowdfunding.MetaAlcanzada => "pendiente",
+                    Lado.Models.EstadoCampanaCrowdfunding.Exitosa => "exitosa",
+                    Lado.Models.EstadoCampanaCrowdfunding.Fallida => "fallida",
+                    _ => "fallida"
+                };
+
+                var estadoTexto = campana.Estado switch
+                {
+                    Lado.Models.EstadoCampanaCrowdfunding.Activa => "En progreso",
+                    Lado.Models.EstadoCampanaCrowdfunding.MetaAlcanzada => "Meta alcanzada",
+                    Lado.Models.EstadoCampanaCrowdfunding.Exitosa => "Exitosa",
+                    Lado.Models.EstadoCampanaCrowdfunding.Fallida => "Devuelto",
+                    _ => "Cancelada"
+                };
+
+                <div class="contribution-card">
+                    <div class="contribution-image" style="@(!string.IsNullOrEmpty(campana.ImagenPreview) ? $"background-image: url('{campana.ImagenPreview}')" : "")">
+                        @if (string.IsNullOrEmpty(campana.ImagenPreview))
+                        {
+                            <i class="fas fa-image"></i>
+                        }
+                    </div>
+
+                    <div class="contribution-content">
+                        <span class="contribution-status status-@estadoClass">@estadoTexto</span>
+                        <h3 class="contribution-title">
+                            <a href="@Url.Action("Detalles", new { id = campana.Id })">@campana.Titulo</a>
+                        </h3>
+                        <div class="contribution-creator">
+                            por @campana.Creador?.NombreCompleto
+                        </div>
+                        <div class="contribution-progress">
+                            <div class="d-flex justify-content-between mb-1">
+                                <small class="text-muted">@campana.PorcentajeProgreso.ToString("F0")% financiado</small>
+                            </div>
+                            <div class="mini-progress">
+                                <div class="mini-progress-fill" style="width: @campana.PorcentajeProgreso.ToString("F0", System.Globalization.CultureInfo.InvariantCulture)%;"></div>
+                            </div>
+                        </div>
+
+                        @if (campana.Estado == Lado.Models.EstadoCampanaCrowdfunding.Exitosa && campana.ContenidoEntregadoId.HasValue)
+                        {
+                            <a href="/Feed/Detalle/@campana.ContenidoEntregadoId" class="access-badge">
+                                <i class="fas fa-unlock"></i>Ver contenido
+                            </a>
+                        }
+                    </div>
+
+                    <div class="contribution-amount">
+                        <div class="amount-value">$@campana.TotalRecaudado.ToString("N0")</div>
+                        <div class="amount-label">de $@campana.Meta.ToString("N0")</div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>

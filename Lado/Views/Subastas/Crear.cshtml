@@ -1,0 +1,774 @@
+@model Lado.Models.Subasta
+@using Lado.Models
+@{
+    ViewData["Title"] = "Crear Subasta";
+    var usuarioActual = ViewBag.UsuarioActual as ApplicationUser;
+    var contenidos = ViewBag.Contenidos as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+}
+
+@Html.AntiForgeryToken()
+
+<style>
+    :root {
+        --primary: #4682B4;
+        --primary-dark: #36648B;
+        --bg: #fafafa;
+        --card-bg: #ffffff;
+        --fg: #111827;
+        --muted: #6b7280;
+        --border: #e5e7eb;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+    }
+
+    [data-theme="dark"] {
+        --bg: #0a0a0a;
+        --card-bg: #1a1a1a;
+        --fg: #f3f4f6;
+        --muted: #9ca3af;
+        --border: #374151;
+    }
+
+    .crear-page {
+        max-width: 700px;
+        margin: 0 auto;
+        padding: 24px 20px 60px;
+    }
+
+    .page-header {
+        margin-bottom: 32px;
+    }
+
+    .page-header h1 {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--fg);
+        margin: 0 0 8px 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .page-header h1 svg {
+        color: var(--primary);
+    }
+
+    .page-header p {
+        color: var(--muted);
+        margin: 0;
+    }
+
+    .form-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 32px;
+    }
+
+    .form-section {
+        margin-bottom: 32px;
+    }
+
+    .form-section:last-child {
+        margin-bottom: 0;
+    }
+
+    .section-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--fg);
+        margin: 0 0 16px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .section-title svg {
+        width: 20px;
+        height: 20px;
+        color: var(--primary);
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--fg);
+        margin-bottom: 8px;
+    }
+
+    .form-group label .required {
+        color: var(--danger);
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="number"],
+    .form-group textarea,
+    .form-group select {
+        width: 100%;
+        padding: 14px 16px;
+        font-size: 15px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--bg);
+        color: var(--fg);
+        transition: all 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(70, 130, 180, 0.15);
+    }
+
+    .form-group textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    .form-group .hint {
+        font-size: 13px;
+        color: var(--muted);
+        margin-top: 6px;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    /* Upload de imagen */
+    .upload-area {
+        border: 2px dashed var(--border);
+        border-radius: 16px;
+        padding: 40px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: var(--bg);
+    }
+
+    .upload-area:hover {
+        border-color: var(--primary);
+        background: rgba(70, 130, 180, 0.05);
+    }
+
+    .upload-area svg {
+        width: 48px;
+        height: 48px;
+        color: var(--muted);
+        margin-bottom: 12px;
+    }
+
+    .upload-area p {
+        color: var(--muted);
+        margin: 0;
+    }
+
+    .upload-area.has-image {
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .upload-area.has-image img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+    }
+
+    #imagenPreview {
+        display: none;
+    }
+
+    /* Selector de duracion */
+    .duration-options {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+    }
+
+    .duration-option {
+        padding: 16px;
+        border: 2px solid var(--border);
+        border-radius: 12px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .duration-option:hover {
+        border-color: var(--primary);
+    }
+
+    .duration-option.selected {
+        border-color: var(--primary);
+        background: rgba(70, 130, 180, 0.1);
+    }
+
+    .duration-option .value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--fg);
+    }
+
+    .duration-option .unit {
+        font-size: 13px;
+        color: var(--muted);
+    }
+
+    /* Toggle switch */
+    .toggle-group {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px;
+        background: var(--bg);
+        border-radius: 12px;
+        margin-bottom: 12px;
+    }
+
+    .toggle-label {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .toggle-label span {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--fg);
+    }
+
+    .toggle-label small {
+        font-size: 13px;
+        color: var(--muted);
+    }
+
+    .toggle-switch {
+        position: relative;
+        width: 50px;
+        height: 28px;
+    }
+
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--border);
+        transition: 0.3s;
+        border-radius: 28px;
+    }
+
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 22px;
+        width: 22px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.3s;
+        border-radius: 50%;
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+        background-color: var(--primary);
+    }
+
+    .toggle-switch input:checked + .toggle-slider:before {
+        transform: translateX(22px);
+    }
+
+    /* Botones */
+    .form-actions {
+        display: flex;
+        gap: 16px;
+        margin-top: 32px;
+    }
+
+    .btn {
+        flex: 1;
+        padding: 16px 24px;
+        font-size: 16px;
+        font-weight: 600;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .btn-primary {
+        background: var(--primary);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: var(--primary-dark);
+    }
+
+    .btn-primary:disabled {
+        background: var(--muted);
+        cursor: not-allowed;
+    }
+
+    .btn-secondary {
+        background: var(--bg);
+        color: var(--fg);
+        border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+        border-color: var(--primary);
+    }
+
+    .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Selector de contenido */
+    .contenido-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        max-height: 300px;
+        overflow-y: auto;
+        padding: 4px;
+    }
+
+    .contenido-item {
+        position: relative;
+        width: 100%;
+        padding-bottom: 100%; /* 1:1 aspect ratio fallback */
+        border-radius: 12px;
+        overflow: hidden;
+        cursor: pointer;
+        border: 3px solid transparent;
+        transition: all 0.2s;
+        background-color: var(--border);
+    }
+
+    .contenido-item:hover {
+        transform: scale(1.05);
+    }
+
+    .contenido-item.selected {
+        border-color: var(--primary);
+    }
+
+    .contenido-item img {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .contenido-item .check {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 24px;
+        height: 24px;
+        background: var(--primary);
+        border-radius: 50%;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        z-index: 2;
+    }
+
+    .contenido-item.selected .check {
+        display: flex;
+    }
+
+    .contenido-item .placeholder-icon {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        background: var(--bg);
+    }
+
+    .contenido-item.no-image .placeholder-icon {
+        display: flex;
+    }
+
+    .contenido-item.no-image img {
+        display: none;
+    }
+
+    @@media (max-width: 768px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+
+        .duration-options {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .contenido-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+</style>
+
+<div class="crear-page">
+    <div class="page-header">
+        <h1>
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="m14.5 12.5-8.5 8.5-3-3 8.5-8.5"/>
+                <path d="m18 3 3 3"/>
+                <path d="m18 7-1.5-1.5"/>
+                <path d="m21 4-1.5-1.5"/>
+            </svg>
+            Crear Subasta
+        </h1>
+        <p>Pon contenido exclusivo en subasta y deja que tus fans compitan por el</p>
+    </div>
+
+    <div class="form-card">
+        <form id="crearSubastaForm" enctype="multipart/form-data">
+            <!-- Informacion basica -->
+            <div class="form-section">
+                <h3 class="section-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    Informacion Basica
+                </h3>
+
+                <div class="form-group">
+                    <label>Titulo <span class="required">*</span></label>
+                    <input type="text" id="titulo" name="titulo" maxlength="200" placeholder="Ej: Sesion fotografica exclusiva" required />
+                </div>
+
+                <div class="form-group">
+                    <label>Descripcion</label>
+                    <textarea id="descripcion" name="descripcion" maxlength="2000" placeholder="Describe que incluye esta subasta..."></textarea>
+                    <div class="hint">Maximo 2000 caracteres</div>
+                </div>
+
+                <div class="form-group">
+                    <label>Tipo de contenido</label>
+                    <select id="tipoContenido" name="tipoContenido">
+                        <option value="0">Acceso Exclusivo (solo el ganador lo vera)</option>
+                        <option value="1">Primero en Ver (luego se publica)</option>
+                        <option value="2">Contenido Personalizado (hecho para el ganador)</option>
+                        <option value="3">Experiencia VIP (videollamada, etc.)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Preview -->
+            <div class="form-section">
+                <h3 class="section-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    Imagen de Preview
+                </h3>
+
+                <div class="upload-area" id="uploadArea" onclick="document.getElementById('imagenPreview').click()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    <p>Haz clic para subir una imagen de preview</p>
+                </div>
+                <input type="file" id="imagenPreview" name="imagenPreview" accept="image/*" />
+                <div class="hint">Imagen que veran los usuarios. Maximo 5MB.</div>
+
+                @if (contenidos.Any())
+                {
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label>O selecciona un contenido existente (opcional)</label>
+                        <div class="contenido-grid">
+                            @foreach (var c in contenidos)
+                            {
+                                var imgSrc = c.Thumbnail;
+                                var tieneImagen = !string.IsNullOrEmpty(imgSrc);
+                                <div class="contenido-item @(!tieneImagen ? "no-image" : "")" data-id="@c.Id" onclick="seleccionarContenido(this)" title="ID: @c.Id">
+                                    @if (tieneImagen)
+                                    {
+                                        <img src="@imgSrc" alt="" onerror="this.parentElement.classList.add('no-image'); this.style.display='none';" />
+                                    }
+                                    <div class="placeholder-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                                            <polyline points="21 15 16 10 5 21"/>
+                                        </svg>
+                                    </div>
+                                    <div class="check">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                            <polyline points="20 6 9 17 4 12"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        <input type="hidden" id="contenidoId" name="contenidoId" />
+                    </div>
+                }
+            </div>
+
+            <!-- Precios -->
+            <div class="form-section">
+                <h3 class="section-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="1" x2="12" y2="23"/>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    </svg>
+                    Configuracion de Precios
+                </h3>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Precio Inicial <span class="required">*</span></label>
+                        <input type="number" id="precioInicial" name="precioInicial" min="1" max="10000" step="0.01" value="10.00" required />
+                        <div class="hint">El precio desde donde inicia la subasta</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Incremento Minimo</label>
+                        <input type="number" id="incrementoMinimo" name="incrementoMinimo" min="0.50" max="100" step="0.50" value="1.00" />
+                        <div class="hint">Cuanto debe subir cada puja</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Precio "Compralo Ya" (opcional)</label>
+                    <input type="number" id="precioCompraloYa" name="precioCompraloYa" min="0" step="0.01" placeholder="Dejar vacio para no incluir" />
+                    <div class="hint">Precio para compra inmediata sin esperar el fin</div>
+                </div>
+            </div>
+
+            <!-- Duracion -->
+            <div class="form-section">
+                <h3 class="section-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    Duracion
+                </h3>
+
+                <div class="duration-options">
+                    <div class="duration-option" data-hours="1" onclick="seleccionarDuracion(this)">
+                        <div class="value">1</div>
+                        <div class="unit">hora</div>
+                    </div>
+                    <div class="duration-option" data-hours="6" onclick="seleccionarDuracion(this)">
+                        <div class="value">6</div>
+                        <div class="unit">horas</div>
+                    </div>
+                    <div class="duration-option selected" data-hours="24" onclick="seleccionarDuracion(this)">
+                        <div class="value">24</div>
+                        <div class="unit">horas</div>
+                    </div>
+                    <div class="duration-option" data-hours="72" onclick="seleccionarDuracion(this)">
+                        <div class="value">3</div>
+                        <div class="unit">dias</div>
+                    </div>
+                </div>
+                <input type="hidden" id="duracionHoras" name="duracionHoras" value="24" />
+            </div>
+
+            <!-- Opciones -->
+            <div class="form-section">
+                <h3 class="section-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                    Opciones
+                </h3>
+
+                <div class="toggle-group">
+                    <div class="toggle-label">
+                        <span>Solo suscriptores pueden pujar</span>
+                        <small>Limita las pujas a tus suscriptores activos</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="soloSuscriptores" name="soloSuscriptores" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <a href="@Url.Action("Index")" class="btn btn-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary" id="btnCrear">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m14.5 12.5-8.5 8.5-3-3 8.5-8.5"/>
+                        <path d="m18 3 3 3"/>
+                    </svg>
+                    Crear Subasta
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Preview de imagen
+        document.getElementById('imagenPreview').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const uploadArea = document.getElementById('uploadArea');
+                    uploadArea.classList.add('has-image');
+                    uploadArea.innerHTML = `<img src="${e.target.result}" alt="Preview" />`;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Seleccionar duracion
+        function seleccionarDuracion(el) {
+            document.querySelectorAll('.duration-option').forEach(opt => opt.classList.remove('selected'));
+            el.classList.add('selected');
+            document.getElementById('duracionHoras').value = el.dataset.hours;
+        }
+
+        // Seleccionar contenido
+        function seleccionarContenido(el) {
+            const wasSelected = el.classList.contains('selected');
+            document.querySelectorAll('.contenido-item').forEach(item => item.classList.remove('selected'));
+
+            if (!wasSelected) {
+                el.classList.add('selected');
+                document.getElementById('contenidoId').value = el.dataset.id;
+            } else {
+                document.getElementById('contenidoId').value = '';
+            }
+        }
+
+        // Enviar formulario
+        document.getElementById('crearSubastaForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const btn = document.getElementById('btnCrear');
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<div class="spinner"></div> Creando...';
+            btn.disabled = true;
+
+            try {
+                // Funcion para obtener valor decimal del input (maneja locales con coma)
+                const getDecimalValue = (inputId) => {
+                    const input = document.getElementById(inputId);
+                    // Usar valueAsNumber que siempre retorna el numero correcto
+                    if (!isNaN(input.valueAsNumber)) {
+                        return input.valueAsNumber.toString();
+                    }
+                    // Fallback: normalizar manualmente
+                    let val = input.value.toString().trim();
+                    if (val.includes(',')) {
+                        // Formato europeo: eliminar puntos de miles, coma a punto decimal
+                        val = val.replace(/\./g, '').replace(',', '.');
+                    }
+                    return val;
+                };
+
+                const formData = new FormData();
+                formData.append('titulo', document.getElementById('titulo').value);
+                formData.append('descripcion', document.getElementById('descripcion').value);
+                formData.append('tipoContenido', document.getElementById('tipoContenido').value);
+                formData.append('precioInicial', getDecimalValue('precioInicial'));
+                formData.append('incrementoMinimo', getDecimalValue('incrementoMinimo'));
+                formData.append('duracionHoras', document.getElementById('duracionHoras').value);
+                formData.append('soloSuscriptores', document.getElementById('soloSuscriptores').checked);
+
+                const precioCompraloYaInput = document.getElementById('precioCompraloYa');
+                if (precioCompraloYaInput.value) {
+                    formData.append('precioCompraloYa', getDecimalValue('precioCompraloYa'));
+                }
+
+                const contenidoId = document.getElementById('contenidoId').value;
+                if (contenidoId) {
+                    formData.append('contenidoId', contenidoId);
+                }
+
+                const imagenInput = document.getElementById('imagenPreview');
+                if (imagenInput.files.length > 0) {
+                    formData.append('imagenPreview', imagenInput.files[0]);
+                }
+
+                // Obtener token anti-forgery
+                const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+                const response = await fetch('@Url.Action("Crear")', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': token
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    if (result.redirectUrl) {
+                        window.location.href = result.redirectUrl;
+                    } else {
+                        window.location.href = '@Url.Action("MisSubastas")';
+                    }
+                } else {
+                    alert(result.message || 'Error al crear la subasta');
+                    btn.innerHTML = originalContent;
+                    btn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error de conexion. Intenta de nuevo.');
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }
+        });
+    </script>
+}

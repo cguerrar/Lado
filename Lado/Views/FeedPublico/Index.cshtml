@@ -1,10 +1,16 @@
 @model IEnumerable<Lado.Models.Contenido>
 @using Lado.Models
 @{
-    ViewData["Title"] = "LADO - Descubre";
+    ViewData["Title"] = "Explorar Contenido - LadoApp";
     Layout = null; // Sin layout - pantalla completa negra
     var contenidoLista = Model?.ToList() ?? new List<Contenido>();
     var estaAutenticado = ViewBag.EstaAutenticado as bool? ?? false;
+
+    // SEO Variables
+    var baseUrl = "https://ladoapp.com";
+    var pageUrl = $"{baseUrl}/FeedPublico";
+    var ogImage = $"{baseUrl}/images/og-default.jpg";
+    var description = "Explora contenido exclusivo de creadores verificados en LadoApp. Descubre fotos, videos e historias de tus creadores favoritos.";
 }
 
 <!DOCTYPE html>
@@ -14,6 +20,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#000000" />
     <title>@ViewData["Title"]</title>
+    <meta name="description" content="@description" />
+    <meta name="keywords" content="explorar contenido, creadores, fotos exclusivas, videos, LadoApp, red social" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="@pageUrl" />
+
+    <!-- Open Graph -->
+    <meta property="og:site_name" content="LadoApp" />
+    <meta property="og:locale" content="es_ES" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="@pageUrl" />
+    <meta property="og:title" content="Explorar Contenido Exclusivo - LadoApp" />
+    <meta property="og:description" content="@description" />
+    <meta property="og:image" content="@ogImage" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@@LadoApp" />
+    <meta name="twitter:title" content="Explorar Contenido - LadoApp" />
+    <meta name="twitter:description" content="@description" />
+    <meta name="twitter:image" content="@ogImage" />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "CollectionPage",
+        "name": "Explorar Contenido - LadoApp",
+        "description": "@description",
+        "url": "@pageUrl",
+        "isPartOf": {
+            "@@type": "WebSite",
+            "name": "LadoApp",
+            "url": "@baseUrl"
+        }
+    }
+    </script>
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/css/feedpublico.css" asp-append-version="true" />
     <style>
@@ -33,27 +80,24 @@
     <!-- Mosaico de imagenes -->
     <div class="mosaic-container" id="mosaicGrid">
         @{
-            // Grid con contenido aleatorio del servidor - 200 items para mosaico denso
-            var itemsNecesarios = 200;
-            var cargarDirecto = 24;   // Primeras 24 imágenes cargan inmediatamente
-            var videosConAutoplay = 12;
+            // Grid con contenido - OPTIMIZADO para rendimiento
+            var itemsNecesarios = 150;  // Reducido para mejor rendimiento
 
-            var contenidoFinal = contenidoLista.ToList();
+            var contenidoOriginal = contenidoLista.ToList();
+            var contenidoFinal = new List<Contenido>();
+            var random = new Random();
 
-            // Solo duplicar si hay muy poco contenido
-            if (contenidoFinal.Count > 0 && contenidoFinal.Count < itemsNecesarios)
+            // Duplicar contenido si es necesario (solo si hay poco contenido)
+            if (contenidoOriginal.Count > 0)
             {
-                var random = new Random();
                 while (contenidoFinal.Count < itemsNecesarios)
                 {
-                    contenidoFinal.AddRange(contenidoLista.OrderBy(x => random.Next()));
+                    contenidoFinal.AddRange(contenidoOriginal.OrderBy(_ => random.Next()));
                 }
             }
 
             var itemsParaMostrar = contenidoFinal.Take(itemsNecesarios).ToList();
             var hayContenido = itemsParaMostrar.Any();
-            var contador = 0;
-            var contadorVideos = 0;
         }
 
         @if (hayContenido)
@@ -62,52 +106,29 @@
             {
                 var esVideo = item.TipoContenido == TipoContenido.Video;
                 var carpetaUsuario = item.Usuario?.UserName ?? "default";
-
-                // Limpiar rutas (datos legacy con comillas)
                 var rutaArchivo = LimpiarRuta(item.RutaArchivo, carpetaUsuario);
                 var thumbnailUrl = LimpiarRuta(item.Thumbnail, carpetaUsuario);
+
+                // Videos sin archivo válido se saltan
+                if (esVideo && string.IsNullOrEmpty(rutaArchivo))
+                {
+                    continue;
+                }
+
+                // Fotos: usar thumbnail si existe, sino la imagen directa
                 var imagenSrc = !string.IsNullOrEmpty(thumbnailUrl) ? thumbnailUrl : rutaArchivo;
 
-                var usarLazy = contador >= cargarDirecto;
-                var videoAutoplay = esVideo && contadorVideos < videosConAutoplay;
-                if (esVideo) contadorVideos++;
-                contador++;
-
-                <div class="mosaic-item @(usarLazy ? "" : "media-loaded")" data-tipo="@(esVideo ? "video" : "image")" onclick="window.location.href='@Url.Action("Login", "Account")'">
+                <div class="mosaic-item" onclick="window.location.href='@Url.Action("Login", "Account")'">
                     @if (esVideo)
                     {
-                        var posterUrl = !string.IsNullOrEmpty(thumbnailUrl) ? thumbnailUrl : "";
-                        if (!string.IsNullOrEmpty(posterUrl))
-                        {
-                            <img src="@posterUrl" alt="" class="loaded" loading="eager"
-                                 onload="this.parentElement.classList.add('media-loaded');"
-                                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E'; this.parentElement.classList.add('media-loaded');">
-                            <div class="video-badge">
-                                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                            </div>
-                        }
-                        else
-                        {
-                            <video data-video-src="@rutaArchivo" @(videoAutoplay ? "autoplay" : "") muted loop playsinline webkit-playsinline preload="metadata" style="background:#000;" class="video-placeholder"></video>
-                            <div class="video-badge">
-                                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                            </div>
-                        }
+                        <video src="@rutaArchivo" autoplay muted loop playsinline preload="metadata" poster="@thumbnailUrl" onloadeddata="this.classList.add('loaded')" onerror="this.parentElement.classList.add('has-error');this.style.display='none'"></video>
+                        <div class="video-badge">
+                            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </div>
                     }
                     else
                     {
-                        if (usarLazy)
-                        {
-                            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E"
-                                 data-src="@imagenSrc" alt="" loading="lazy" decoding="async"
-                                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E'; this.classList.add('loaded'); this.parentElement.classList.add('media-loaded');">
-                        }
-                        else
-                        {
-                            <img src="@imagenSrc" alt="" class="loaded" loading="eager"
-                                 onload="this.parentElement.classList.add('media-loaded');"
-                                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a2e%27 width=%27100%27 height=%27100%27/%3E%3C/svg%3E'; this.parentElement.classList.add('media-loaded');">
-                        }
+                        <img src="@imagenSrc" alt="" loading="eager" onload="this.classList.add('loaded')" onerror="this.parentElement.classList.add('has-error');this.style.display='none'">
                     }
                 </div>
             }
@@ -208,157 +229,28 @@
 }
 
 <script>
+        // MOSAICO SIMPLIFICADO - Igual que el landing para carga rápida
         (function() {
-            // MOSAICO OPTIMIZADO v2 - Carga rápida sin verificación HTTP previa
             const grid = document.getElementById('mosaicGrid');
             if (!grid) return;
 
             const items = grid.querySelectorAll('.mosaic-item');
+            if (items.length === 0) return;
+
             const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-            const fallbackSrc = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%231a1a2e' width='100' height='100'/%3E%3C/svg%3E";
 
-            // Control de carga paralela - aumentado para 200 items
-            const MAX_CONCURRENT = 16;
-            let activeLoads = 0;
-            const loadQueue = [];
-            const loadedItems = new Set();
-
-            // Suprimir errores de recursos en consola
-            window.addEventListener('error', (e) => {
-                if (e.target?.tagName === 'IMG' || e.target?.tagName === 'VIDEO') {
-                    e.preventDefault();
-                    return false;
-                }
-            }, true);
-
-            function processQueue() {
-                while (activeLoads < MAX_CONCURRENT && loadQueue.length > 0) {
-                    const item = loadQueue.shift();
-                    if (item && !loadedItems.has(item)) loadItem(item);
-                }
-            }
-
-            function queueItem(item, priority = false) {
-                if (loadedItems.has(item)) return;
-                priority ? loadQueue.unshift(item) : loadQueue.push(item);
-                processQueue();
-            }
-
-            function loadItem(item) {
-                loadedItems.add(item);
-                activeLoads++;
-                item.classList.add('media-loaded');
-
-                const img = item.querySelector('img[data-src]');
-                const video = item.querySelector('video[data-video-src]');
-
-                if (img) loadImage(img);
-                else if (video) loadVideo(video);
-                else {
-                    item.querySelector('img')?.classList.add('loaded');
-                    activeLoads--;
-                    processQueue();
-                }
-            }
-
-            function loadImage(img) {
-                const src = img.getAttribute('data-src');
-                img.removeAttribute('data-src');
-
-                const timeout = setTimeout(() => {
-                    if (!img.classList.contains('loaded')) {
-                        img.src = fallbackSrc;
-                        img.classList.add('loaded');
-                    }
-                    activeLoads--;
-                    processQueue();
-                }, 1500); // Reducido de 3000ms a 1500ms
-
-                img.onload = () => {
-                    clearTimeout(timeout);
-                    img.classList.add('loaded');
-                    activeLoads--;
-                    processQueue();
-                };
-
-                img.onerror = () => {
-                    clearTimeout(timeout);
-                    img.src = fallbackSrc;
-                    img.classList.add('loaded');
-                    activeLoads--;
-                    processQueue();
-                };
-
-                img.src = src;
-            }
-
-            function loadVideo(video) {
-                const src = video.getAttribute('data-video-src');
-                video.removeAttribute('data-video-src');
-
-                const timeout = setTimeout(() => {
-                    if (!video.classList.contains('loaded')) replaceWithPlaceholder(video);
-                    activeLoads--;
-                    processQueue();
-                }, 2500);
-
-                video.onloadeddata = () => {
-                    clearTimeout(timeout);
-                    video.classList.remove('video-placeholder');
-                    video.classList.add('loaded');
-                    video.muted = true;
-                    video.loop = true;
-                    video.play().catch(() => {});
-                    activeLoads--;
-                    processQueue();
-                };
-
-                video.onerror = () => {
-                    clearTimeout(timeout);
-                    replaceWithPlaceholder(video);
-                    activeLoads--;
-                    processQueue();
-                };
-
-                video.src = src;
-            }
-
-            function replaceWithPlaceholder(video) {
-                const placeholder = document.createElement('div');
-                placeholder.className = 'video-error-placeholder loaded';
-                placeholder.innerHTML = '<svg viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)"><path d="M8 5v14l11-7z"/></svg>';
-                video.replaceWith(placeholder);
-            }
-
-            // IntersectionObserver para lazy loading
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        queueItem(entry.target, true);
-                        observer.unobserve(entry.target);
-                    }
-                });
-            }, { rootMargin: '400px', threshold: 0 }); // Aumentado de 200px a 400px
-
-            // Configurar grid responsive
+            // Configurar grid - IGUAL QUE LANDING
             function setupGrid() {
                 const vw = window.innerWidth;
                 const vh = window.innerHeight;
+                const gap = 4;
 
-                // Items más pequeños para más densidad, con espacio negro arriba/abajo
-                let itemSize, gap;
-                if (vw > 1600) { itemSize = 90; gap = 3; }
-                else if (vw > 1200) { itemSize = 80; gap = 3; }
-                else if (vw > 1024) { itemSize = 70; gap = 3; }
-                else if (vw > 768) { itemSize = 60; gap = 2; }
-                else if (vw > 480) { itemSize = 50; gap = 2; }
-                else { itemSize = 45; gap = 2; }
+                // Items grandes como el landing
+                let itemSize = vw > 1200 ? 120 : vw > 768 ? 100 : vw > 480 ? 80 : 70;
 
-                // Usar solo 65% del alto para dejar espacio negro arriba y abajo
-                const visibleHeight = vh * 0.65;
-                const cols = Math.ceil(vw / (itemSize + gap)) + 4; // Más columnas para 200 items
-                const rows = Math.max(Math.ceil(visibleHeight / (itemSize + gap)), 6);
+                const cols = Math.ceil(vw / (itemSize + gap)) + 2;
+                const rows = Math.ceil(vh / (itemSize + gap)) + 2;
 
                 grid.style.gridTemplateColumns = `repeat(${cols}, ${itemSize}px)`;
                 grid.style.gridTemplateRows = `repeat(${rows}, ${itemSize}px)`;
@@ -366,86 +258,34 @@
 
                 const maxItems = cols * rows;
                 items.forEach((item, index) => {
-                    const shouldShow = index < maxItems;
-                    item.style.display = shouldShow ? 'block' : 'none';
-                    if (shouldShow && !loadedItems.has(item)) observer.observe(item);
+                    item.style.display = index < maxItems ? 'block' : 'none';
                 });
             }
 
-            // Inicializar
-            function init() {
-                setupGrid();
+            // Ejecutar inmediatamente
+            setupGrid();
+            window.addEventListener('resize', setupGrid);
 
-                // Marcar items y cargar primeros 16 inmediatamente
-                items.forEach((item, index) => {
-                    item.classList.add('media-loaded');
-                    const img = item.querySelector('img:not([data-src])');
-                    if (img) img.classList.add('loaded');
-
-                    if (index < 24 && item.style.display !== 'none') {
-                        queueItem(item, true);
-                    } else if (item.style.display !== 'none' && !loadedItems.has(item)) {
-                        observer.observe(item);
-                    }
-                });
-            }
-
-            // Ejecutar
-            if (document.readyState === 'complete' || document.readyState === 'interactive') {
-                requestAnimationFrame(init);
-            } else {
-                document.addEventListener('DOMContentLoaded', init);
-            }
-
-            // Resize handler con debounce
-            let resizeTimeout;
-            const handleResize = () => {
-                clearTimeout(resizeTimeout);
-                resizeTimeout = setTimeout(setupGrid, 100);
-            };
-            window.addEventListener('resize', handleResize);
-            window.addEventListener('orientationchange', () => setTimeout(setupGrid, 100));
-
-            // Parallax solo en desktop
+            // Parallax solo en desktop con throttle para rendimiento
             if (!isTouchDevice) {
+                let ticking = false;
                 document.addEventListener('mousemove', (e) => {
-                    const x = (e.clientX / window.innerWidth - 0.5) * 10;
-                    const y = (e.clientY / window.innerHeight - 0.5) * 10;
-                    grid.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+                    if (!ticking) {
+                        requestAnimationFrame(() => {
+                            const x = (e.clientX / window.innerWidth - 0.5) * 10;
+                            const y = (e.clientY / window.innerHeight - 0.5) * 10;
+                            grid.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+                            ticking = false;
+                        });
+                        ticking = true;
+                    }
                 });
             }
 
             // iOS fixes
             if (isIOS) {
                 document.body.style.cssText = 'position: fixed; width: 100%; height: 100%;';
-                let lastTouchEnd = 0;
-                document.addEventListener('touchend', (e) => {
-                    const now = Date.now();
-                    if (now - lastTouchEnd <= 300) e.preventDefault();
-                    lastTouchEnd = now;
-                }, false);
             }
-
-            // Animacion de estadisticas (si existen los elementos)
-            function animateValue(id, end, duration) {
-                const obj = document.getElementById(id);
-                if (!obj) return;
-                let startTime = null;
-                const step = (timestamp) => {
-                    if (!startTime) startTime = timestamp;
-                    const progress = Math.min((timestamp - startTime) / duration, 1);
-                    const current = Math.floor((1 - Math.pow(1 - progress, 3)) * end);
-                    obj.textContent = current >= 1000 ? (current / 1000).toFixed(1) + 'K' : current;
-                    if (progress < 1) requestAnimationFrame(step);
-                };
-                requestAnimationFrame(step);
-            }
-
-            setTimeout(() => {
-                animateValue('statCreadores', @(ViewBag.TotalCreadores ?? 50), 2000);
-                animateValue('statContenido', @(ViewBag.TotalContenido ?? 500), 2000);
-                animateValue('statComunidad', @(ViewBag.TotalUsuarios ?? 1000), 2000);
-            }, 500);
         })();
 </script>
 </body>

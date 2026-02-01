@@ -1,0 +1,1137 @@
+@model Lado.Models.CampanaCrowdfunding
+@{
+    ViewData["Title"] = Model.Titulo;
+    var aportantes = ViewBag.Aportantes as List<Lado.Models.AporteCrowdfunding> ?? new List<Lado.Models.AporteCrowdfunding>();
+    var aporteUsuario = ViewBag.AporteUsuario as Lado.Models.AporteCrowdfunding;
+    var saldoUsuario = (decimal)(ViewBag.SaldoUsuario ?? 0m);
+    var esCreador = (bool)(ViewBag.EsCreador ?? false);
+    var porcentaje = Model.PorcentajeProgreso;
+}
+
+@Html.AntiForgeryToken()
+
+<style>
+    /* Steelblue theme colors */
+    :root {
+        --steelblue: #4682b4;
+        --steelblue-dark: #3a6d94;
+        --steelblue-light: rgba(70, 130, 180, 0.1);
+        --steelblue-gradient: linear-gradient(135deg, #4682b4 0%, #3a6d94 100%);
+    }
+
+    .campaign-detail-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+
+    .campaign-header {
+        display: grid;
+        grid-template-columns: 1fr 400px;
+        gap: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .campaign-media {
+        border-radius: 1rem;
+        overflow: hidden;
+        background: var(--bg-tertiary);
+    }
+
+    .campaign-main-image {
+        width: 100%;
+        aspect-ratio: 16/9;
+        object-fit: cover;
+    }
+
+    .campaign-image-placeholder {
+        width: 100%;
+        aspect-ratio: 16/9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 4rem;
+        color: var(--muted);
+    }
+
+    .campaign-sidebar {
+        background: var(--surface);
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        border: 1px solid var(--line);
+        padding: 1.5rem;
+        height: fit-content;
+        position: sticky;
+        top: 100px;
+    }
+
+    /* Progress bar grande y animado */
+    .progress-section {
+        margin-bottom: 1.5rem;
+    }
+
+    .progress-bar-large {
+        height: 16px;
+        background: var(--bg-tertiary);
+        border-radius: 8px;
+        overflow: hidden;
+        position: relative;
+        margin-bottom: 1rem;
+    }
+
+    .progress-bar-large-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--steelblue) 0%, #10b981 50%, #22c55e 100%);
+        border-radius: 8px;
+        transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .progress-bar-large-fill::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(255,255,255,0.4) 50%,
+            transparent 100%
+        );
+        animation: progress-shimmer 2.5s infinite;
+    }
+
+    @@keyframes progress-shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+    }
+
+    .progress-bar-large-fill.goal-reached {
+        animation: goal-pulse 1s ease-in-out infinite alternate;
+    }
+
+    @@keyframes goal-pulse {
+        from { box-shadow: 0 0 10px rgba(34, 197, 94, 0.5); }
+        to { box-shadow: 0 0 20px rgba(34, 197, 94, 0.8); }
+    }
+
+    .progress-amount-large {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--fg);
+    }
+
+    .progress-goal-large {
+        font-size: 1.1rem;
+        color: var(--muted);
+    }
+
+    .progress-percentage {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--steelblue);
+    }
+
+    .stats-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 1rem 0;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 1.5rem;
+    }
+
+    .stat-item {
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--fg);
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        color: var(--muted);
+        text-transform: uppercase;
+    }
+
+    /* Formulario de aporte */
+    .contribute-section h4 {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--fg);
+    }
+
+    .amount-presets {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .amount-preset {
+        padding: 0.75rem;
+        border: 2px solid var(--line);
+        border-radius: 0.5rem;
+        background: var(--bg-secondary);
+        color: var(--fg);
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+    }
+
+    .amount-preset:hover {
+        border-color: var(--steelblue);
+        background: var(--steelblue-light);
+    }
+
+    .amount-preset.selected {
+        border-color: var(--steelblue);
+        background: var(--steelblue-gradient);
+        color: white;
+    }
+
+    .custom-amount-input {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .custom-amount-input .input-group {
+        flex: 1;
+    }
+
+    .btn-contribute {
+        width: 100%;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border: none;
+        padding: 1rem;
+        border-radius: 0.75rem;
+        font-size: 1.1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .btn-contribute:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-contribute:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .balance-info {
+        text-align: center;
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin-top: 0.75rem;
+    }
+
+    .balance-info strong {
+        color: var(--fg);
+    }
+
+    .already-contributed {
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid #10b981;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        text-align: center;
+    }
+
+    .already-contributed i {
+        font-size: 1.5rem;
+        color: #10b981;
+        margin-bottom: 0.5rem;
+    }
+
+    .already-contributed h5 {
+        color: #059669;
+        margin-bottom: 0.25rem;
+    }
+
+    .already-contributed p {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin: 0;
+    }
+
+    /* Contenido de la campana */
+    .campaign-content-section {
+        display: grid;
+        grid-template-columns: 1fr 350px;
+        gap: 2rem;
+    }
+
+    .campaign-main-content {
+        background: var(--surface);
+        border-radius: 1rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        border: 1px solid var(--line);
+        padding: 2rem;
+    }
+
+    .campaign-title {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: var(--fg);
+        margin-bottom: 0.5rem;
+    }
+
+    .campaign-category-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        background: var(--steelblue-light);
+        color: var(--steelblue-dark);
+        border-radius: 1rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    .creator-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        background: var(--bg-secondary);
+        border-radius: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .creator-avatar-large {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: var(--steelblue-gradient);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 1.25rem;
+        overflow: hidden;
+    }
+
+    .creator-avatar-large img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .creator-details h5 {
+        margin: 0 0 0.25rem 0;
+        font-size: 1rem;
+        color: var(--fg);
+    }
+
+    .creator-details span {
+        font-size: 0.85rem;
+        color: var(--muted);
+    }
+
+    .description-section h4 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--fg);
+        margin-bottom: 1rem;
+    }
+
+    .description-text {
+        color: var(--fg-secondary);
+        line-height: 1.7;
+        white-space: pre-wrap;
+    }
+
+    /* Lista de aportantes */
+    .supporters-section {
+        background: var(--surface);
+        border-radius: 1rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        border: 1px solid var(--line);
+        padding: 1.5rem;
+        height: fit-content;
+    }
+
+    .supporters-section h4 {
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .supporters-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .supporter-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .supporter-item:last-child {
+        border-bottom: none;
+    }
+
+    .supporter-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--bg-tertiary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        color: var(--muted);
+        overflow: hidden;
+    }
+
+    .supporter-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .supporter-info {
+        flex: 1;
+    }
+
+    .supporter-name {
+        font-weight: 600;
+        color: var(--fg);
+        font-size: 0.9rem;
+    }
+
+    .supporter-message {
+        font-size: 0.8rem;
+        color: var(--muted);
+        font-style: italic;
+    }
+
+    .supporter-amount {
+        font-weight: 700;
+        color: var(--steelblue);
+    }
+
+    /* Estado de campana */
+    .campaign-status-banner {
+        padding: 1rem;
+        border-radius: 0.75rem;
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+
+    .status-success {
+        background: rgba(16, 185, 129, 0.15);
+        border: 1px solid #10b981;
+        color: #059669;
+    }
+
+    .status-failed {
+        background: rgba(239, 68, 68, 0.15);
+        border: 1px solid #ef4444;
+        color: #dc2626;
+    }
+
+    .status-pending {
+        background: rgba(245, 158, 11, 0.15);
+        border: 1px solid #f59e0b;
+        color: #d97706;
+    }
+
+    /* Acciones del creador */
+    .creator-actions {
+        background: var(--bg-secondary);
+        border-radius: 0.75rem;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+
+    .creator-actions h5 {
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+        color: var(--fg-secondary);
+    }
+
+    .creator-actions .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+
+    @@media (max-width: 992px) {
+        .campaign-header {
+            grid-template-columns: 1fr;
+        }
+
+        .campaign-sidebar {
+            position: static;
+        }
+
+        .campaign-content-section {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Opciones adicionales */
+    .contribute-options {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--line);
+    }
+
+    .contribute-options label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: var(--fg-secondary);
+        cursor: pointer;
+    }
+
+    .message-input {
+        margin-top: 1rem;
+    }
+
+    .message-input textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 0.5rem;
+        padding: 0.75rem;
+        font-size: 0.9rem;
+        background: var(--bg-secondary);
+        color: var(--fg);
+        resize: none;
+    }
+
+    .message-input textarea:focus {
+        outline: none;
+        border-color: var(--steelblue);
+        box-shadow: 0 0 0 3px var(--steelblue-light);
+    }
+
+    /* Steelblue button overrides */
+    .btn-outline-primary {
+        border-color: var(--steelblue);
+        color: var(--steelblue);
+    }
+
+    .btn-outline-primary:hover {
+        background: var(--steelblue-gradient);
+        border-color: var(--steelblue);
+        color: white;
+    }
+
+    .text-primary {
+        color: var(--steelblue) !important;
+    }
+
+    /* Form input focus styles */
+    .form-control:focus {
+        border-color: var(--steelblue);
+        box-shadow: 0 0 0 3px var(--steelblue-light);
+    }
+
+    .input-group-text {
+        background: var(--steelblue-light);
+        border-color: var(--line);
+        color: var(--steelblue);
+    }
+
+    /* Checkbox styling */
+    .contribute-options input[type="checkbox"]:checked {
+        background-color: var(--steelblue);
+        border-color: var(--steelblue);
+    }
+
+    /* Link styles */
+    .balance-info a.text-primary:hover {
+        color: var(--steelblue-dark) !important;
+        text-decoration: underline;
+    }
+
+    /* Creator action buttons */
+    .creator-actions .btn-outline-primary {
+        margin-bottom: 0.5rem;
+    }
+
+    .creator-actions .btn-outline-primary:hover {
+        background: var(--steelblue);
+        border-color: var(--steelblue);
+    }
+
+    /* Campaign sidebar header styling */
+    .campaign-sidebar h4 {
+        color: var(--steelblue-dark);
+    }
+
+    /* Supporter section header */
+    .supporters-section h4 i {
+        color: var(--steelblue);
+    }
+
+    /* Description section icon */
+    .description-section h4 i {
+        color: var(--steelblue);
+    }
+
+    /* Fix layout spacing and prevent overlapping */
+    .contribute-section {
+        margin-top: 1.5rem;
+    }
+
+    .contribute-section h4 {
+        color: var(--steelblue-dark);
+    }
+
+    /* Ensure buttons don't overlap */
+    .creator-actions .btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .creator-actions .btn:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Tags styling with steelblue */
+    .badge.bg-secondary {
+        background: var(--steelblue-light) !important;
+        color: var(--steelblue-dark);
+        border: 1px solid var(--steelblue);
+    }
+
+    /* Mobile improvements */
+    @@media (max-width: 576px) {
+        .amount-presets {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .stats-row {
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .stat-item {
+            flex: 1 1 30%;
+            min-width: 80px;
+        }
+
+        .campaign-title {
+            font-size: 1.5rem;
+        }
+
+        .progress-amount-large {
+            font-size: 1.5rem;
+        }
+    }
+
+    /* Verified creator badge */
+    .creator-details .text-primary {
+        color: var(--steelblue) !important;
+    }
+
+    /* Custom scrollbar for supporters list */
+    .supporters-list::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .supporters-list::-webkit-scrollbar-track {
+        background: var(--bg-tertiary);
+        border-radius: 3px;
+    }
+
+    .supporters-list::-webkit-scrollbar-thumb {
+        background: var(--steelblue-light);
+        border-radius: 3px;
+    }
+
+    .supporters-list::-webkit-scrollbar-thumb:hover {
+        background: var(--steelblue);
+    }
+</style>
+
+<div class="campaign-detail-container">
+    <!-- Header con imagen y sidebar -->
+    <div class="campaign-header">
+        <div class="campaign-media">
+            @if (!string.IsNullOrEmpty(Model.ImagenPreview))
+            {
+                <img src="@Model.ImagenPreview" alt="@Model.Titulo" class="campaign-main-image" />
+            }
+            else
+            {
+                <div class="campaign-image-placeholder">
+                    <i class="fas fa-image"></i>
+                </div>
+            }
+        </div>
+
+        <div class="campaign-sidebar">
+            <!-- Estado de la campana -->
+            @if (Model.Estado == Lado.Models.EstadoCampanaCrowdfunding.Exitosa)
+            {
+                <div class="campaign-status-banner status-success">
+                    <i class="fas fa-check-circle me-2"></i>Meta alcanzada - Contenido entregado
+                </div>
+            }
+            else if (Model.Estado == Lado.Models.EstadoCampanaCrowdfunding.Fallida)
+            {
+                <div class="campaign-status-banner status-failed">
+                    <i class="fas fa-times-circle me-2"></i>No se alcanzo la meta - Aportes devueltos
+                </div>
+            }
+            else if (Model.Estado == Lado.Models.EstadoCampanaCrowdfunding.Cancelada)
+            {
+                <div class="campaign-status-banner status-failed">
+                    <i class="fas fa-ban me-2"></i>Campana cancelada
+                </div>
+            }
+            else if (Model.Estado == Lado.Models.EstadoCampanaCrowdfunding.MetaAlcanzada)
+            {
+                <div class="campaign-status-banner status-success">
+                    <i class="fas fa-trophy me-2"></i>Meta alcanzada! Esperando contenido...
+                </div>
+            }
+
+            <!-- Barra de progreso grande -->
+            <div class="progress-section">
+                <div class="progress-bar-large">
+                    <div class="progress-bar-large-fill @(Model.MetaAlcanzada ? "goal-reached" : "")"
+                         style="width: 0%;"
+                         data-progress="@porcentaje.ToString("F0", System.Globalization.CultureInfo.InvariantCulture)">
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-end">
+                    <div>
+                        <div class="progress-amount-large" id="totalRecaudado">$@Model.TotalRecaudado.ToString("N0")</div>
+                        <div class="progress-goal-large">de $@Model.Meta.ToString("N0")</div>
+                    </div>
+                    <div class="progress-percentage" id="porcentajeProgreso">@porcentaje.ToString("F0")%</div>
+                </div>
+            </div>
+
+            <!-- Estadisticas -->
+            <div class="stats-row">
+                <div class="stat-item">
+                    <div class="stat-value" id="totalAportantes">@Model.TotalAportantes</div>
+                    <div class="stat-label">Aportantes</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">@Model.TiempoRestanteTexto</div>
+                    <div class="stat-label">Restantes</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">$@Model.AporteMinimo.ToString("N0")</div>
+                    <div class="stat-label">Minimo</div>
+                </div>
+            </div>
+
+            @if (Model.PuedeRecibAportes && !esCreador)
+            {
+                @if (aporteUsuario != null)
+                {
+                    <div class="already-contributed">
+                        <i class="fas fa-heart"></i>
+                        <h5>Ya aportaste $@aporteUsuario.Monto.ToString("N2")</h5>
+                        <p>Gracias por tu apoyo!</p>
+                    </div>
+
+                    <!-- Permitir aportar mas -->
+                    <div class="mt-3">
+                        <button class="btn btn-outline-primary w-100" onclick="toggleAportarMas()">
+                            <i class="fas fa-plus me-1"></i>Aportar mas
+                        </button>
+                    </div>
+                }
+
+                <div class="contribute-section" id="contributeSection" style="@(aporteUsuario != null ? "display: none;" : "")">
+                    <h4>Haz tu aporte</h4>
+
+                    <!-- Montos predefinidos -->
+                    <div class="amount-presets">
+                        <button type="button" class="amount-preset" data-amount="5">$5</button>
+                        <button type="button" class="amount-preset" data-amount="10">$10</button>
+                        <button type="button" class="amount-preset" data-amount="25">$25</button>
+                        <button type="button" class="amount-preset" data-amount="50">$50</button>
+                    </div>
+
+                    <!-- Monto personalizado -->
+                    <div class="custom-amount-input">
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" id="montoAporte" class="form-control" placeholder="Otro monto" min="@Model.AporteMinimo" step="1" />
+                        </div>
+                    </div>
+
+                    <!-- Mensaje opcional -->
+                    <div class="message-input">
+                        <textarea id="mensajeAporte" placeholder="Deja un mensaje (opcional)" rows="2" maxlength="500"></textarea>
+                    </div>
+
+                    <!-- Opciones -->
+                    <div class="contribute-options">
+                        <label>
+                            <input type="checkbox" id="esAnonimo" />
+                            Aparecer como anonimo
+                        </label>
+                    </div>
+
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <button class="btn-contribute" id="btnAportar" onclick="realizarAporte()">
+                            <i class="fas fa-heart"></i>
+                            <span>Aportar ahora</span>
+                        </button>
+                        <div class="balance-info">
+                            Tu saldo: <strong>$@saldoUsuario.ToString("N2")</strong>
+                            @if (saldoUsuario < Model.AporteMinimo)
+                            {
+                                <br /><a href="/Billetera/Recargar" class="text-primary">Recargar saldo</a>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <a href="/Account/Login?returnUrl=@Uri.EscapeDataString($"/Crowdfunding/Detalles/{Model.Id}")" class="btn-contribute">
+                            <i class="fas fa-sign-in-alt"></i>
+                            <span>Inicia sesion para aportar</span>
+                        </a>
+                    }
+                </div>
+            }
+            else if (esCreador)
+            {
+                <div class="creator-actions">
+                    <h5><i class="fas fa-cog me-1"></i>Acciones del creador</h5>
+
+                    @if (Model.Estado == Lado.Models.EstadoCampanaCrowdfunding.Borrador)
+                    {
+                        <a href="@Url.Action("Editar", new { id = Model.Id })" class="btn btn-outline-primary">
+                            <i class="fas fa-edit me-1"></i>Editar campana
+                        </a>
+                        <button class="btn btn-success" onclick="publicarCampana()">
+                            <i class="fas fa-rocket me-1"></i>Publicar campana
+                        </button>
+                    }
+                    else if (Model.Estado == Lado.Models.EstadoCampanaCrowdfunding.MetaAlcanzada || (Model.Estado == Lado.Models.EstadoCampanaCrowdfunding.Activa && Model.MetaAlcanzada))
+                    {
+                        <a href="@Url.Action("Finalizar", new { id = Model.Id })" class="btn btn-success">
+                            <i class="fas fa-gift me-1"></i>Entregar contenido
+                        </a>
+                    }
+                    else if (Model.Estado == Lado.Models.EstadoCampanaCrowdfunding.Activa)
+                    {
+                        <button class="btn btn-danger" onclick="cancelarCampana()">
+                            <i class="fas fa-times me-1"></i>Cancelar campana
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Contenido y aportantes -->
+    <div class="campaign-content-section">
+        <div class="campaign-main-content">
+            @if (!string.IsNullOrEmpty(Model.Categoria))
+            {
+                <span class="campaign-category-badge">@Model.Categoria</span>
+            }
+
+            <h1 class="campaign-title">@Model.Titulo</h1>
+
+            <div class="creator-info">
+                <div class="creator-avatar-large">
+                    @if (!string.IsNullOrEmpty(Model.Creador?.FotoPerfil))
+                    {
+                        <img src="@Model.Creador.FotoPerfil" alt="@Model.Creador.NombreCompleto" />
+                    }
+                    else
+                    {
+                        @Model.Creador?.ObtenerInicial()
+                    }
+                </div>
+                <div class="creator-details">
+                    <h5>@Model.Creador?.NombreCompleto</h5>
+                    <span>
+                        @if (Model.Creador?.EsVerificado == true)
+                        {
+                            <i class="fas fa-check-circle text-primary me-1"></i>
+                        }
+                        Creador
+                    </span>
+                </div>
+            </div>
+
+            <div class="description-section">
+                <h4><i class="fas fa-info-circle me-2"></i>Sobre esta campana</h4>
+                <p class="description-text">@Model.Descripcion</p>
+            </div>
+
+            @if (!string.IsNullOrEmpty(Model.Tags))
+            {
+                <div class="mt-4">
+                    @foreach (var tag in Model.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        <span class="badge bg-secondary me-1">#@tag.Trim()</span>
+                    }
+                </div>
+            }
+
+            @if (Model.Estado == Lado.Models.EstadoCampanaCrowdfunding.Exitosa && Model.ContenidoEntregado != null)
+            {
+                <div class="alert alert-success mt-4">
+                    <h5><i class="fas fa-gift me-2"></i>Contenido entregado</h5>
+                    <p>@Model.MensajeAgradecimiento</p>
+                    @if (aporteUsuario != null && aporteUsuario.AccesoOtorgado)
+                    {
+                        <a href="/Feed/Detalle/@Model.ContenidoEntregadoId" class="btn btn-success">
+                            <i class="fas fa-play me-1"></i>Ver contenido
+                        </a>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="supporters-section">
+            <h4><i class="fas fa-users me-2"></i>Aportantes (@Model.TotalAportantes)</h4>
+
+            @if (aportantes.Any())
+            {
+                <div class="supporters-list">
+                    @foreach (var aporte in aportantes)
+                    {
+                        <div class="supporter-item">
+                            <div class="supporter-avatar">
+                                @if (!aporte.EsAnonimo && aporte.Aportante != null)
+                                {
+                                    if (!string.IsNullOrEmpty(aporte.Aportante.FotoPerfil))
+                                    {
+                                        <img src="@aporte.Aportante.FotoPerfil" alt="" />
+                                    }
+                                    else
+                                    {
+                                        @aporte.Aportante.ObtenerInicial()
+                                    }
+                                }
+                                else
+                                {
+                                    <i class="fas fa-user-secret"></i>
+                                }
+                            </div>
+                            <div class="supporter-info">
+                                <div class="supporter-name">
+                                    @(aporte.EsAnonimo ? "Anonimo" : aporte.Aportante?.NombreCompleto)
+                                </div>
+                                @if (!string.IsNullOrEmpty(aporte.Mensaje))
+                                {
+                                    <div class="supporter-message">"@aporte.Mensaje"</div>
+                                }
+                            </div>
+                            <div class="supporter-amount">$@aporte.Monto.ToString("N0")</div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="text-muted text-center py-4">
+                    <i class="fas fa-hand-holding-heart d-block mb-2" style="font-size: 2rem;"></i>
+                    Se el primero en aportar!
+                </p>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const campanaId = @Model.Id;
+        const aporteMinimo = @(Model.AporteMinimo.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        const saldoUsuario = @(saldoUsuario.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        let montoSeleccionado = 0;
+
+        // Animar barra de progreso al cargar
+        document.addEventListener('DOMContentLoaded', function() {
+            const progressBar = document.querySelector('.progress-bar-large-fill');
+            if (progressBar) {
+                const progress = progressBar.dataset.progress;
+                setTimeout(() => {
+                    progressBar.style.width = progress + '%';
+                }, 100);
+            }
+        });
+
+        // Seleccionar monto predefinido
+        document.querySelectorAll('.amount-preset').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.amount-preset').forEach(b => b.classList.remove('selected'));
+                this.classList.add('selected');
+                montoSeleccionado = parseFloat(this.dataset.amount);
+                document.getElementById('montoAporte').value = montoSeleccionado;
+            });
+        });
+
+        // Monto personalizado
+        document.getElementById('montoAporte')?.addEventListener('input', function() {
+            document.querySelectorAll('.amount-preset').forEach(b => b.classList.remove('selected'));
+            montoSeleccionado = parseFloat(this.value) || 0;
+        });
+
+        function toggleAportarMas() {
+            const section = document.getElementById('contributeSection');
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        }
+
+        async function realizarAporte() {
+            const monto = parseFloat(document.getElementById('montoAporte').value) || montoSeleccionado;
+            const mensaje = document.getElementById('mensajeAporte')?.value || '';
+            const esAnonimo = document.getElementById('esAnonimo')?.checked || false;
+
+            if (monto < aporteMinimo) {
+                alert(`El aporte minimo es de $${aporteMinimo}`);
+                return;
+            }
+
+            if (monto > saldoUsuario) {
+                alert('Saldo insuficiente. Por favor recarga tu billetera.');
+                return;
+            }
+
+            const btn = document.getElementById('btnAportar');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Procesando...';
+
+            try {
+                const response = await fetch('/Crowdfunding/Aportar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-TOKEN': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                    },
+                    body: `campanaId=${campanaId}&monto=${monto}&mensaje=${encodeURIComponent(mensaje)}&esAnonimo=${esAnonimo}&__RequestVerificationToken=${document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''}`
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Actualizar UI
+                    document.getElementById('totalRecaudado').textContent = '$' + data.totalRecaudado.toLocaleString();
+                    document.getElementById('porcentajeProgreso').textContent = Math.round(data.nuevoProgreso) + '%';
+                    document.getElementById('totalAportantes').textContent = data.totalAportantes;
+
+                    const progressBar = document.querySelector('.progress-bar-large-fill');
+                    progressBar.style.width = data.nuevoProgreso + '%';
+
+                    if (data.metaAlcanzada) {
+                        progressBar.classList.add('goal-reached');
+                    }
+
+                    alert('Gracias por tu aporte!');
+                    location.reload();
+                } else {
+                    alert(data.message || 'Error al procesar el aporte');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al procesar el aporte');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-heart"></i><span>Aportar ahora</span>';
+            }
+        }
+
+        async function publicarCampana() {
+            if (!confirm('Estas seguro de publicar esta campana? Una vez publicada no podras editarla.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/Crowdfunding/Publicar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: `campanaId=${campanaId}&__RequestVerificationToken=${document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''}`
+                });
+
+                const data = await response.json();
+                alert(data.message);
+
+                if (data.success) {
+                    location.reload();
+                }
+            } catch (error) {
+                alert('Error al publicar la campana');
+            }
+        }
+
+        async function cancelarCampana() {
+            if (!confirm('Estas seguro de cancelar esta campana? Todos los aportes seran devueltos a los aportantes.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/Crowdfunding/Cancelar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: `campanaId=${campanaId}&__RequestVerificationToken=${document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''}`
+                });
+
+                const data = await response.json();
+                alert(data.message);
+
+                if (data.success) {
+                    location.href = '/Crowdfunding/MisCampanas';
+                }
+            } catch (error) {
+                alert('Error al cancelar la campana');
+            }
+        }
+
+        // Actualizar progreso cada 30 segundos
+        setInterval(async () => {
+            try {
+                const response = await fetch(`/Crowdfunding/Progreso/${campanaId}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('totalRecaudado').textContent = '$' + data.totalRecaudado.toLocaleString();
+                    document.getElementById('porcentajeProgreso').textContent = Math.round(data.progreso) + '%';
+                    document.getElementById('totalAportantes').textContent = data.totalAportantes;
+
+                    const progressBar = document.querySelector('.progress-bar-large-fill');
+                    progressBar.style.width = data.progreso + '%';
+                }
+            } catch (error) {
+                console.error('Error actualizando progreso:', error);
+            }
+        }, 30000);
+    </script>
+}

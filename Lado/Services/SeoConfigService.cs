@@ -484,15 +484,33 @@ namespace Lado.Services
                     sb.AppendLine($"Crawl-delay: {config.RobotsCrawlDelayOtros}");
                 }
 
-                // Rutas agrupadas por tipo
+                // IMPORTANTE: Siempre permitir páginas públicas (hardcodeado para evitar bloqueos accidentales)
+                sb.AppendLine("Allow: /");
+                sb.AppendLine("Allow: /FeedPublico/");
+                sb.AppendLine("Allow: /Feed/Detalle/");
+                sb.AppendLine("Allow: /Home/");
+                sb.AppendLine("Allow: /About");
+                sb.AppendLine("Allow: /Privacy");
+                sb.AppendLine("Allow: /Terms");
+                sb.AppendLine("Allow: /Blog/");
+                sb.AppendLine();
+
+                // Rutas adicionales de la BD
                 var rutasAllow = rutas.Where(r => r.Tipo == TipoReglaRobots.Allow && r.UserAgent == "*");
                 var rutasDisallow = rutas.Where(r => r.Tipo == TipoReglaRobots.Disallow && r.UserAgent == "*");
 
                 foreach (var ruta in rutasAllow)
                 {
-                    sb.AppendLine($"Allow: {ruta.Ruta}");
+                    // Evitar duplicados
+                    if (ruta.Ruta != "/" && !ruta.Ruta.StartsWith("/FeedPublico") && !ruta.Ruta.StartsWith("/Feed/Detalle"))
+                    {
+                        sb.AppendLine($"Allow: {ruta.Ruta}");
+                    }
                 }
 
+                sb.AppendLine();
+
+                // Bloquear áreas privadas
                 foreach (var ruta in rutasDisallow)
                 {
                     sb.AppendLine($"Disallow: {ruta.Ruta}");

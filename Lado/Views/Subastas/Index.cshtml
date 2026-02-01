@@ -1,0 +1,1279 @@
+@model IEnumerable<Lado.Models.Subasta>
+@using Lado.Models
+@{
+    ViewData["Title"] = "Subastas Activas";
+    var usuarioActual = ViewBag.UsuarioActual as ApplicationUser;
+    var esCreador = ViewBag.EsCreador as bool? ?? false;
+    var paginaActual = ViewBag.PaginaActual as int? ?? 1;
+    var totalPaginas = ViewBag.TotalPaginas as int? ?? 1;
+    var totalSubastas = ViewBag.TotalSubastas as int? ?? 0;
+
+    // Forzar no cache
+    Context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+    Context.Response.Headers["Pragma"] = "no-cache";
+    Context.Response.Headers["Expires"] = "0";
+}
+
+@Html.AntiForgeryToken()
+
+<style>
+    :root {
+        --primary: #4682B4;
+        --primary-dark: #36648B;
+        --bg: #fafafa;
+        --card-bg: #ffffff;
+        --fg: #111827;
+        --muted: #6b7280;
+        --border: #e5e7eb;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+    }
+
+    [data-theme="dark"] {
+        --bg: #0a0a0a;
+        --card-bg: #1a1a1a;
+        --fg: #f3f4f6;
+        --muted: #9ca3af;
+        --border: #374151;
+    }
+
+    .subastas-page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px 20px 60px;
+    }
+
+    .subastas-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 32px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .subastas-header h1 {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--fg);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .subastas-header h1 svg {
+        color: var(--primary);
+    }
+
+    .subastas-stats {
+        display: flex;
+        gap: 24px;
+        font-size: 14px;
+        color: var(--muted);
+    }
+
+    .subastas-stats span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .btn-crear {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 24px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .btn-crear:hover {
+        background: var(--primary-dark);
+        transform: translateY(-2px);
+    }
+
+    /* Tabs de navegacion */
+    .subastas-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 12px;
+    }
+
+    .subastas-tabs .tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 20px;
+        background: transparent;
+        color: var(--muted);
+        text-decoration: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+
+    .subastas-tabs .tab:hover {
+        color: var(--fg);
+        background: var(--bg);
+    }
+
+    .subastas-tabs .tab.active {
+        color: var(--primary);
+        background: rgba(70, 130, 180, 0.1);
+        font-weight: 600;
+    }
+
+    /* Grid de subastas */
+    .subastas-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 24px;
+    }
+
+    .subasta-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        overflow: hidden;
+        transition: all 0.3s;
+        position: relative;
+    }
+
+    .subasta-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+    }
+
+    .subasta-card.urgente {
+        border-color: var(--danger);
+        animation: pulse-border 2s infinite;
+    }
+
+    @@keyframes pulse-border {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+        50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+    }
+
+    .subasta-preview {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16/10;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        overflow: hidden;
+    }
+
+    .subasta-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .subasta-preview-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        color: rgba(255,255,255,0.3);
+    }
+
+    .subasta-preview-placeholder svg {
+        width: 64px;
+        height: 64px;
+    }
+
+    .subasta-badge {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        padding: 6px 12px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .subasta-badge.urgente {
+        background: var(--danger);
+        animation: flash 1s infinite;
+    }
+
+    @@keyframes flash {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
+    .subasta-countdown {
+        position: absolute;
+        bottom: 12px;
+        right: 12px;
+        padding: 8px 14px;
+        background: rgba(0,0,0,0.85);
+        color: white;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 700;
+        font-family: 'SF Mono', 'Consolas', monospace;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .subasta-countdown svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .subasta-content {
+        padding: 20px;
+    }
+
+    .subasta-creator {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+
+    .creator-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 14px;
+        overflow: hidden;
+    }
+
+    .creator-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .creator-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg);
+    }
+
+    .subasta-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--fg);
+        margin: 0 0 8px 0;
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .subasta-description {
+        font-size: 14px;
+        color: var(--muted);
+        margin-bottom: 16px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .subasta-price-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-bottom: 16px;
+    }
+
+    .price-current {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .price-label {
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .price-value {
+        font-size: 28px;
+        font-weight: 800;
+        color: var(--success);
+    }
+
+    .price-pujas {
+        font-size: 13px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .btn-ver-subasta {
+        display: block;
+        width: 100%;
+        padding: 14px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 15px;
+        font-weight: 600;
+        text-align: center;
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-ver-subasta:hover {
+        background: var(--primary-dark);
+    }
+
+    .btn-share-card {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 36px;
+        height: 36px;
+        background: rgba(255,255,255,0.95);
+        border: none;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        z-index: 2;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .btn-share-card svg {
+        width: 18px;
+        height: 18px;
+        color: #374151;
+    }
+
+    .btn-share-card:hover {
+        background: var(--primary);
+        transform: scale(1.1);
+    }
+
+    .btn-share-card:hover svg {
+        color: white;
+    }
+
+    [data-theme="dark"] .btn-share-card {
+        background: rgba(30,30,30,0.95);
+    }
+
+    [data-theme="dark"] .btn-share-card svg {
+        color: #e5e7eb;
+    }
+
+    /* Estado vacio */
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        color: var(--muted);
+    }
+
+    .empty-state svg {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    .empty-state h3 {
+        font-size: 20px;
+        color: var(--fg);
+        margin-bottom: 8px;
+    }
+
+    /* Paginacion */
+    .pagination {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 40px;
+    }
+
+    .pagination a, .pagination span {
+        padding: 10px 16px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .pagination a {
+        background: var(--card-bg);
+        color: var(--fg);
+        border: 1px solid var(--border);
+    }
+
+    .pagination a:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .pagination .active {
+        background: var(--primary);
+        color: white;
+        border: 1px solid var(--primary);
+    }
+
+    /* Help Banner */
+    .help-banner {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(249, 115, 22, 0.1) 100%);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        border-radius: 16px;
+        padding: 20px 24px;
+        margin-bottom: 24px;
+    }
+
+    .help-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+    }
+
+    .help-header h3 {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        color: #d97706;
+        margin: 0;
+    }
+
+    .help-header svg {
+        color: #f59e0b;
+    }
+
+    .help-toggle {
+        background: none;
+        border: none;
+        color: #d97706;
+        cursor: pointer;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        transition: transform 0.3s;
+    }
+
+    .help-toggle.collapsed {
+        transform: rotate(-90deg);
+    }
+
+    .help-content {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(245, 158, 11, 0.2);
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 16px;
+    }
+
+    .help-content.hidden {
+        display: none;
+    }
+
+    .help-item {
+        display: flex;
+        gap: 12px;
+    }
+
+    .help-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: rgba(245, 158, 11, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        color: #f59e0b;
+    }
+
+    .help-text h4 {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--fg);
+        margin: 0 0 4px 0;
+    }
+
+    .help-text p {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0;
+        line-height: 1.4;
+    }
+
+    /* Nuevo diseño de ayuda mejorado */
+    .help-banner-new {
+        background: linear-gradient(135deg, #1e3a5f 0%, #0d1f33 100%);
+        border: none;
+        border-radius: 20px;
+        padding: 0;
+        margin-bottom: 28px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    [data-theme="dark"] .help-banner-new {
+        background: linear-gradient(135deg, #1a3a5c 0%, #0f2744 100%);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .help-header-new {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 24px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .help-header-new:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .help-title {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .help-icon-main {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    }
+
+    .help-title h3 {
+        font-size: 18px;
+        font-weight: 700;
+        color: #ffffff;
+        margin: 0 0 4px 0;
+    }
+
+    .help-title p {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.7);
+        margin: 0;
+    }
+
+    .help-toggle-new {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+        padding: 10px;
+        color: rgba(255, 255, 255, 0.8);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .help-toggle-new:hover {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.3);
+        color: white;
+    }
+
+    .help-toggle-new.collapsed svg {
+        transform: rotate(-90deg);
+    }
+
+    .help-content-new {
+        padding: 0 24px 24px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(0, 0, 0, 0.15);
+    }
+
+    .help-content-new.hidden {
+        display: none;
+    }
+
+    .help-steps {
+        display: flex;
+        gap: 24px;
+        padding: 24px 0;
+    }
+
+    .help-step {
+        flex: 1;
+        display: flex;
+        gap: 14px;
+    }
+
+    .step-number {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+        font-size: 14px;
+        flex-shrink: 0;
+    }
+
+    .step-content h4 {
+        font-size: 14px;
+        font-weight: 600;
+        color: #ffffff;
+        margin: 0 0 6px 0;
+    }
+
+    .step-content p {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.7);
+        margin: 0;
+        line-height: 1.5;
+    }
+
+    .help-features {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        padding-top: 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .feature-card {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.9);
+        transition: all 0.2s;
+    }
+
+    .feature-card:hover {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .feature-card svg {
+        color: #f59e0b;
+        flex-shrink: 0;
+    }
+
+    @@media (max-width: 768px) {
+        .subastas-page {
+            padding: 16px 12px 60px;
+        }
+
+        .subastas-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .subastas-header h1 {
+            font-size: 22px;
+        }
+
+        .subastas-tabs {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 8px;
+        }
+
+        .subastas-tabs .tab {
+            padding: 10px 14px;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        .subastas-grid {
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        .help-content {
+            grid-template-columns: 1fr;
+        }
+
+        /* Responsive para nuevo diseño de ayuda */
+        .help-banner-new {
+            margin-bottom: 20px;
+            border-radius: 16px;
+        }
+
+        .help-header-new {
+            padding: 16px;
+        }
+
+        .help-icon-main {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+        }
+
+        .help-icon-main svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        .help-title h3 {
+            font-size: 15px;
+        }
+
+        .help-title p {
+            font-size: 12px;
+        }
+
+        .help-content-new {
+            padding: 0 16px 16px;
+        }
+
+        .help-steps {
+            flex-direction: column;
+            gap: 16px;
+            padding: 16px 0;
+        }
+
+        .help-step {
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .help-step:last-child {
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .step-number {
+            width: 30px;
+            height: 30px;
+            font-size: 13px;
+        }
+
+        .step-content h4 {
+            font-size: 13px;
+        }
+
+        .step-content p {
+            font-size: 12px;
+        }
+
+        .help-features {
+            grid-template-columns: 1fr;
+            gap: 8px;
+            padding-top: 16px;
+        }
+
+        .feature-card {
+            padding: 12px 14px;
+            font-size: 12px;
+        }
+
+        .feature-card svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Cards de subasta en móvil */
+        .subasta-card {
+            border-radius: 16px;
+        }
+
+        .subasta-content {
+            padding: 16px;
+        }
+
+        .subasta-title {
+            font-size: 16px;
+        }
+
+        .price-value {
+            font-size: 24px;
+        }
+
+        .btn-ver-subasta {
+            padding: 12px;
+            font-size: 14px;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .subastas-header h1 {
+            font-size: 20px;
+        }
+
+        .subastas-header h1 svg {
+            width: 26px;
+            height: 26px;
+        }
+
+        .btn-crear {
+            width: 100%;
+            justify-content: center;
+            padding: 14px 20px;
+        }
+
+        .help-title {
+            gap: 12px;
+        }
+
+        .help-toggle-new {
+            padding: 8px;
+        }
+    }
+</style>
+
+<div class="subastas-page">
+    <div class="subastas-header">
+        <div>
+            <h1>
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m14.5 12.5-8.5 8.5-3-3 8.5-8.5"/>
+                    <path d="m18 3 3 3"/>
+                    <path d="m18 7-1.5-1.5"/>
+                    <path d="m21 4-1.5-1.5"/>
+                    <path d="M9.5 9.5 5 14"/>
+                </svg>
+                Subastas Activas
+            </h1>
+            <div class="subastas-stats">
+                <span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    @totalSubastas subastas activas
+                </span>
+            </div>
+        </div>
+
+        @if (esCreador)
+        {
+            <a href="@Url.Action("Crear")" class="btn-crear">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Crear Subasta
+            </a>
+        }
+    </div>
+
+    <!-- Tabs de navegacion -->
+    <div class="subastas-tabs">
+        <a href="@Url.Action("Index")" class="tab active">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+            </svg>
+            Explorar
+        </a>
+        @if (esCreador)
+        {
+            <a href="@Url.Action("MisSubastas")" class="tab">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="m14.5 12.5-8.5 8.5-3-3 8.5-8.5"/>
+                    <path d="m18 3 3 3"/>
+                </svg>
+                Mis Subastas
+            </a>
+        }
+    </div>
+
+    <!-- Ayuda mejorada -->
+    <div class="help-banner-new" id="helpBanner">
+        <div class="help-header-new" onclick="toggleHelp()">
+            <div class="help-title">
+                <div class="help-icon-main">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m14.5 12.5-8.5 8.5-3-3 8.5-8.5"/>
+                        <path d="m18 3 3 3"/>
+                        <path d="m18 7-1.5-1.5"/>
+                        <path d="m21 4-1.5-1.5"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3>Como funcionan las Subastas</h3>
+                    <p>Compite por contenido exclusivo de tus creadores favoritos</p>
+                </div>
+            </div>
+            <button class="help-toggle-new collapsed" id="helpToggle">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </button>
+        </div>
+        <div class="help-content-new hidden" id="helpContent">
+            <div class="help-steps">
+                <div class="help-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Explora y elige</h4>
+                        <p>Navega por las subastas activas y encuentra contenido exclusivo que te interese.</p>
+                    </div>
+                </div>
+                <div class="help-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Haz tu puja</h4>
+                        <p>Ingresa un monto mayor a la puja actual. Si alguien te supera, recibiras una notificacion.</p>
+                    </div>
+                </div>
+                <div class="help-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Gana y disfruta</h4>
+                        <p>Si tu puja es la mas alta al finalizar, ganas el contenido. El pago se descuenta automaticamente.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="help-features">
+                <div class="feature-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    <span>Extension automatica en ultimos 2 min</span>
+                </div>
+                <div class="feature-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path>
+                    </svg>
+                    <span>Compralo Ya para compra inmediata</span>
+                </div>
+                <div class="feature-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
+                    <span>Solo pagas si ganas la subasta</span>
+                </div>
+                <div class="feature-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Chat directo con el creador al ganar</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (Model.Any())
+    {
+        <div class="subastas-grid">
+            @foreach (var subasta in Model)
+            {
+                var tiempoRestante = subasta.TiempoRestante();
+                var esUrgente = tiempoRestante.HasValue && tiempoRestante.Value.TotalMinutes <= 15;
+
+                <div class="subasta-card @(esUrgente ? "urgente" : "")" data-subasta-id="@subasta.Id" data-fecha-fin="@subasta.FechaFin.ToString("o")">
+                    <div class="subasta-preview">
+                        @if (!string.IsNullOrEmpty(subasta.ImagenPreview))
+                        {
+                            <img src="@subasta.ImagenPreview" alt="@subasta.Titulo" loading="lazy" />
+                        }
+                        else if (subasta.Contenido?.Thumbnail != null)
+                        {
+                            <img src="@subasta.Contenido.Thumbnail" alt="@subasta.Titulo" loading="lazy" />
+                        }
+                        else
+                        {
+                            <div class="subasta-preview-placeholder">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                                    <polyline points="21 15 16 10 5 21"/>
+                                </svg>
+                            </div>
+                        }
+
+                        <div class="subasta-badge @(esUrgente ? "urgente" : "")">
+                            @if (esUrgente)
+                            {
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                                </svg>
+                                <span>ULTIMOS MINUTOS</span>
+                            }
+                            else
+                            {
+                                <span>ACTIVA</span>
+                            }
+                        </div>
+
+                        <div class="subasta-countdown" data-countdown="@subasta.Id">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                            <span class="countdown-text">--:--:--</span>
+                        </div>
+
+                        <button type="button" class="btn-share-card" onclick="compartirSubasta(event, @subasta.Id, '@subasta.Titulo.Replace("'", "\\'")')" title="Compartir">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="18" cy="5" r="3"/>
+                                <circle cx="6" cy="12" r="3"/>
+                                <circle cx="18" cy="19" r="3"/>
+                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="subasta-content">
+                        <div class="subasta-creator">
+                            <a href="@Url.Action("Perfil", "Feed", new { id = subasta.Creador?.UserName })" class="creator-avatar" title="@subasta.Creador?.UserName (ID: @subasta.CreadorId)">
+                                @if (!string.IsNullOrEmpty(subasta.Creador?.FotoPerfil))
+                                {
+                                    <img src="@subasta.Creador.FotoPerfil" alt="@subasta.Creador?.UserName" />
+                                }
+                                else
+                                {
+                                    @(subasta.Creador?.UserName?.Substring(0, 1).ToUpper() ?? "?")
+                                }
+                            </a>
+                            <a href="@Url.Action("Perfil", "Feed", new { id = subasta.Creador?.UserName })" class="creator-name">@(subasta.Creador?.Seudonimo ?? subasta.Creador?.UserName)</a>
+                        </div>
+
+                        <h3 class="subasta-title">@subasta.Titulo</h3>
+
+                        @if (!string.IsNullOrEmpty(subasta.Descripcion))
+                        {
+                            <p class="subasta-description">@subasta.Descripcion</p>
+                        }
+
+                        <div class="subasta-price-row">
+                            <div class="price-current">
+                                <span class="price-label">Puja actual</span>
+                                <span class="price-value" data-price="@subasta.Id">$@subasta.PrecioActual.ToString("N2")</span>
+                            </div>
+                            <div class="price-pujas">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="9" cy="7" r="4"/>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                </svg>
+                                <span data-pujas="@subasta.Id">@subasta.NumeroPujas pujas</span>
+                            </div>
+                        </div>
+
+                        <a href="@Url.Action("Detalles", new { id = subasta.Id })" class="btn-ver-subasta">
+                            Ver Subasta
+                        </a>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @if (totalPaginas > 1)
+        {
+            <div class="pagination">
+                @if (paginaActual > 1)
+                {
+                    <a href="@Url.Action("Index", new { pagina = paginaActual - 1 })">Anterior</a>
+                }
+
+                @for (int i = 1; i <= totalPaginas; i++)
+                {
+                    if (i == paginaActual)
+                    {
+                        <span class="active">@i</span>
+                    }
+                    else
+                    {
+                        <a href="@Url.Action("Index", new { pagina = i })">@i</a>
+                    }
+                }
+
+                @if (paginaActual < totalPaginas)
+                {
+                    <a href="@Url.Action("Index", new { pagina = paginaActual + 1 })">Siguiente</a>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-state">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                <path d="m14.5 12.5-8.5 8.5-3-3 8.5-8.5"/>
+                <path d="m18 3 3 3"/>
+                <path d="m18 7-1.5-1.5"/>
+                <path d="m21 4-1.5-1.5"/>
+            </svg>
+            <h3>No hay subastas activas</h3>
+            <p>Vuelve pronto para ver nuevas subastas de contenido exclusivo</p>
+            @if (esCreador)
+            {
+                <a href="@Url.Action("Crear")" class="btn-crear" style="margin-top: 20px; display: inline-flex;">
+                    Crear la primera subasta
+                </a>
+            }
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        // Toggle ayuda
+        function toggleHelp() {
+            const content = document.getElementById('helpContent');
+            const toggle = document.getElementById('helpToggle');
+            const isHidden = content.classList.toggle('hidden');
+            toggle.classList.toggle('collapsed', isHidden);
+            localStorage.setItem('subastas-help-expanded', !isHidden);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Restaurar estado de ayuda (colapsado por defecto, mostrar si el usuario lo expandió)
+            if (localStorage.getItem('subastas-help-expanded') === 'true') {
+                document.getElementById('helpContent').classList.remove('hidden');
+                document.getElementById('helpToggle').classList.remove('collapsed');
+            }
+            // Inicializar countdowns
+            const cards = document.querySelectorAll('[data-subasta-id]');
+
+            cards.forEach(card => {
+                const fechaFin = new Date(card.dataset.fechaFin);
+                const countdownEl = card.querySelector('.countdown-text');
+                const subastaId = card.dataset.subastaId;
+
+                function updateCountdown() {
+                    const now = new Date();
+                    const diff = fechaFin - now;
+
+                    if (diff <= 0) {
+                        countdownEl.textContent = 'FINALIZADA';
+                        card.classList.remove('urgente');
+                        return;
+                    }
+
+                    const hours = Math.floor(diff / (1000 * 60 * 60));
+                    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+                    if (hours > 0) {
+                        countdownEl.textContent = `${hours}h ${minutes}m ${seconds}s`;
+                    } else {
+                        countdownEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    }
+
+                    // Marcar como urgente si quedan menos de 15 minutos
+                    if (diff <= 15 * 60 * 1000) {
+                        card.classList.add('urgente');
+                        card.querySelector('.subasta-badge').classList.add('urgente');
+                        card.querySelector('.subasta-badge').innerHTML = `
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                            </svg>
+                            <span>ULTIMOS MINUTOS</span>
+                        `;
+                    }
+                }
+
+                updateCountdown();
+                setInterval(updateCountdown, 1000);
+            });
+
+            // Funcion compartir subasta
+            window.compartirSubasta = async function(event, subastaId, titulo) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const url = `${window.location.origin}/Subastas/Detalles/${subastaId}`;
+
+                if (navigator.share) {
+                    try {
+                        await navigator.share({
+                            title: titulo,
+                            text: `Mira esta subasta: ${titulo}`,
+                            url: url
+                        });
+                    } catch (e) {
+                        // Usuario cancelo
+                    }
+                } else {
+                    try {
+                        await navigator.clipboard.writeText(url);
+                        // Mostrar feedback visual
+                        const btn = event.currentTarget;
+                        const originalHtml = btn.innerHTML;
+                        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+                        btn.style.background = '#10b981';
+                        setTimeout(() => {
+                            btn.innerHTML = originalHtml;
+                            btn.style.background = '';
+                        }, 1500);
+                    } catch (e) {
+                        prompt('Copia este link:', url);
+                    }
+                }
+            };
+
+            // Actualizar precios cada 10 segundos
+            setInterval(async function() {
+                for (const card of cards) {
+                    const subastaId = card.dataset.subastaId;
+                    try {
+                        const response = await fetch(`/Subastas/Estado/${subastaId}`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            const priceEl = card.querySelector(`[data-price="${subastaId}"]`);
+                            const pujasEl = card.querySelector(`[data-pujas="${subastaId}"]`);
+
+                            if (priceEl) {
+                                priceEl.textContent = '$' + parseFloat(data.precioActual).toFixed(2);
+                            }
+                            if (pujasEl) {
+                                pujasEl.textContent = data.numeroPujas + ' pujas';
+                            }
+                        }
+                    } catch (e) {
+                        console.log('Error actualizando estado:', e);
+                    }
+                }
+            }, 10000);
+        });
+    </script>
+}

@@ -1,0 +1,447 @@
+@model Lado.Models.CampanaCrowdfunding
+@{
+    ViewData["Title"] = "Finalizar Campana";
+    var contenidos = ViewBag.Contenidos as List<Lado.Models.Contenido> ?? new List<Lado.Models.Contenido>();
+}
+
+<style>
+    .finalize-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+
+    .success-banner {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border-radius: 1rem;
+        padding: 2rem;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .success-banner i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .success-banner h2 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+    }
+
+    .success-banner p {
+        opacity: 0.9;
+        margin: 0;
+    }
+
+    .campaign-summary {
+        background: var(--surface);
+        border-radius: 1rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        border: 1px solid var(--line);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .campaign-summary h4 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
+
+    .summary-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+    }
+
+    .summary-stat {
+        text-align: center;
+        padding: 1rem;
+        background: var(--bg-secondary);
+        border-radius: 0.75rem;
+    }
+
+    .summary-stat .value {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--fg);
+    }
+
+    .summary-stat .label {
+        font-size: 0.8rem;
+        color: var(--muted);
+    }
+
+    .finalize-form {
+        background: var(--surface);
+        border-radius: 1rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        border: 1px solid var(--line);
+        padding: 2rem;
+    }
+
+    .finalize-form h4 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .finalize-form h4 i {
+        color: var(--primary);
+    }
+
+    .content-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .content-option {
+        border: 2px solid var(--line);
+        border-radius: 0.75rem;
+        overflow: hidden;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .content-option:hover {
+        border-color: var(--primary-light);
+    }
+
+    .content-option.selected {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(70, 130, 180, 0.2);
+    }
+
+    .content-option input {
+        display: none;
+    }
+
+    .content-thumbnail {
+        height: 100px;
+        background: var(--bg-tertiary);
+        background-size: cover;
+        background-position: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+    }
+
+    .content-info {
+        padding: 0.5rem;
+        font-size: 0.8rem;
+    }
+
+    .content-info .title {
+        font-weight: 600;
+        color: var(--fg);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .content-info .date {
+        font-size: 0.7rem;
+        color: var(--muted);
+    }
+
+    .message-section {
+        margin-bottom: 1.5rem;
+    }
+
+    .message-section label {
+        display: block;
+        font-weight: 600;
+        color: var(--fg);
+        margin-bottom: 0.5rem;
+    }
+
+    .message-section textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 0.75rem;
+        padding: 1rem;
+        min-height: 100px;
+        font-size: 1rem;
+        background: var(--bg-secondary);
+        color: var(--fg);
+        resize: vertical;
+    }
+
+    .message-section textarea:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+
+    .finalize-actions {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-top: 1.5rem;
+    }
+
+    .finalize-actions .btn-outline-secondary {
+        min-width: 120px;
+        white-space: nowrap;
+    }
+
+    .btn-finalize {
+        flex: 1;
+        min-width: 200px;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border: none;
+        padding: 1rem 1.5rem;
+        border-radius: 0.75rem;
+        font-size: 1.1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    .btn-finalize:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-finalize:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .info-box {
+        background: rgba(70, 130, 180, 0.1);
+        border-left: 4px solid #4682b4;
+        padding: 1rem;
+        border-radius: 0 0.5rem 0.5rem 0;
+        margin-bottom: 1.5rem;
+    }
+
+    .info-box h6 {
+        color: #3a6d94;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
+
+    .info-box p {
+        margin: 0;
+        color: var(--fg-secondary);
+        font-size: 0.9rem;
+    }
+
+    .empty-content {
+        text-align: center;
+        padding: 2rem;
+        color: var(--muted);
+    }
+
+    .empty-content i {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    @@media (max-width: 768px) {
+        .summary-stats {
+            grid-template-columns: 1fr;
+        }
+
+        .finalize-actions {
+            flex-direction: column;
+        }
+
+        .finalize-actions .btn-outline-secondary,
+        .btn-finalize {
+            width: 100%;
+            min-width: unset;
+            text-align: center;
+            justify-content: center;
+        }
+
+        .content-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .finalize-container {
+            padding: 1rem 0.5rem;
+        }
+
+        .success-banner {
+            padding: 1.5rem 1rem;
+        }
+
+        .success-banner h2 {
+            font-size: 1.5rem;
+        }
+
+        .finalize-form {
+            padding: 1.25rem;
+        }
+
+        .content-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="finalize-container">
+    <div class="success-banner">
+        <i class="fas fa-trophy"></i>
+        <h2>Felicitaciones!</h2>
+        <p>Tu campana "@Model.Titulo" alcanzo la meta. Es hora de entregar el contenido prometido.</p>
+    </div>
+
+    <div class="campaign-summary">
+        <h4><i class="fas fa-chart-bar me-2"></i>Resumen de la campana</h4>
+        <div class="summary-stats">
+            <div class="summary-stat">
+                <div class="value">$@Model.TotalRecaudado.ToString("N0")</div>
+                <div class="label">Recaudado</div>
+            </div>
+            <div class="summary-stat">
+                <div class="value">@Model.TotalAportantes</div>
+                <div class="label">Aportantes</div>
+            </div>
+            <div class="summary-stat">
+                <div class="value">$@((Model.TotalRecaudado * 0.80m).ToString("N0"))</div>
+                <div class="label">Tu ganancia (80%)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="finalize-form">
+        <h4><i class="fas fa-gift"></i>Selecciona el contenido a entregar</h4>
+
+        <div class="info-box">
+            <h6><i class="fas fa-info-circle me-1"></i>Importante</h6>
+            <p>El contenido seleccionado sera accesible para todos los @Model.TotalAportantes aportantes de la campana. Puedes seleccionar un contenido existente o crear uno nuevo primero.</p>
+        </div>
+
+        @if (contenidos.Any())
+        {
+            <div class="content-grid" id="contentGrid">
+                @foreach (var contenido in contenidos)
+                {
+                    var thumbnail = contenido.Thumbnail ?? contenido.RutaArchivo;
+                    <label class="content-option" onclick="selectContent(@contenido.Id)">
+                        <input type="radio" name="contenidoId" value="@contenido.Id" />
+                        <div class="content-thumbnail" style="@(!string.IsNullOrEmpty(thumbnail) ? $"background-image: url('{thumbnail}')" : "")">
+                            @if (string.IsNullOrEmpty(thumbnail))
+                            {
+                                <i class="fas fa-@(contenido.TipoContenido == Lado.Models.TipoContenido.Video ? "video" : "image")"></i>
+                            }
+                        </div>
+                        <div class="content-info">
+                            <div class="title">@(string.IsNullOrEmpty(contenido.Descripcion) ? "Sin titulo" : contenido.Descripcion.Length > 30 ? contenido.Descripcion.Substring(0, 30) + "..." : contenido.Descripcion)</div>
+                            <div class="date">@contenido.FechaPublicacion.ToString("dd/MM/yyyy")</div>
+                        </div>
+                    </label>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="empty-content">
+                <i class="fas fa-exclamation-circle"></i>
+                <p>No tienes contenido publicado. Crea el contenido primero y luego vuelve aqui.</p>
+                <a href="/Contenido/Crear" class="btn btn-primary mt-2">
+                    <i class="fas fa-plus me-1"></i>Crear contenido
+                </a>
+            </div>
+        }
+
+        <div class="message-section">
+            <label for="mensajeAgradecimiento">
+                <i class="fas fa-heart me-1"></i>Mensaje de agradecimiento (opcional)
+            </label>
+            <textarea id="mensajeAgradecimiento" placeholder="Escribe un mensaje de agradecimiento para tus aportantes..." maxlength="1000"></textarea>
+        </div>
+
+        <div class="finalize-actions">
+            <a href="@Url.Action("Detalles", new { id = Model.Id })" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Volver
+            </a>
+            <button type="button" class="btn-finalize" id="btnFinalizar" onclick="finalizarCampana()" @(contenidos.Any() ? "" : "disabled")>
+                <i class="fas fa-check-circle me-2"></i>Entregar contenido y finalizar
+            </button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const campanaId = @Model.Id;
+        let contenidoSeleccionado = null;
+
+        function selectContent(id) {
+            contenidoSeleccionado = id;
+
+            // Actualizar UI
+            document.querySelectorAll('.content-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+
+            const selected = document.querySelector(`input[value="${id}"]`);
+            if (selected) {
+                selected.checked = true;
+                selected.closest('.content-option').classList.add('selected');
+            }
+        }
+
+        async function finalizarCampana() {
+            if (!contenidoSeleccionado) {
+                alert('Por favor selecciona el contenido a entregar');
+                return;
+            }
+
+            if (!confirm('Estas seguro de finalizar la campana? Esto entregara el contenido a todos los aportantes y transferira los fondos a tu cuenta.')) {
+                return;
+            }
+
+            const btn = document.getElementById('btnFinalizar');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Procesando...';
+
+            const mensaje = document.getElementById('mensajeAgradecimiento').value;
+
+            try {
+                const response = await fetch('/Crowdfunding/Finalizar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: `campanaId=${campanaId}&contenidoId=${contenidoSeleccionado}&mensajeAgradecimiento=${encodeURIComponent(mensaje)}&__RequestVerificationToken=${document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''}`
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('Campana finalizada exitosamente! Todos los aportantes ahora tienen acceso al contenido.');
+                    window.location.href = `/Crowdfunding/Detalles/${campanaId}`;
+                } else {
+                    alert(data.message || 'Error al finalizar la campana');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al finalizar la campana');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Entregar contenido y finalizar';
+            }
+        }
+    </script>
+    @Html.AntiForgeryToken()
+}

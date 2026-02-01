@@ -1,0 +1,410 @@
+@{
+    ViewData["Title"] = "Pago con Tarjeta";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var monto = ViewBag.Monto ?? 0m;
+    var saldoActual = ViewBag.SaldoActual ?? 0m;
+}
+
+<style>
+    .pago-container {
+        max-width: 480px;
+        margin: 40px auto;
+        padding: 0 20px;
+    }
+
+    .pago-card {
+        background: var(--card-bg);
+        border-radius: 20px;
+        padding: 32px;
+        box-shadow: var(--shadow-lg);
+    }
+
+    .pago-header {
+        text-align: center;
+        margin-bottom: 28px;
+    }
+
+    .pago-header h1 {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 8px;
+    }
+
+    .monto-badge {
+        display: inline-block;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        padding: 8px 20px;
+        border-radius: 20px;
+        font-size: 20px;
+        font-weight: 700;
+    }
+
+    .saldo-actual {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-top: 12px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        margin-bottom: 8px;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 14px 16px;
+        border: 2px solid var(--border-color);
+        border-radius: 12px;
+        font-size: 16px;
+        background: var(--input-bg);
+        color: var(--text-primary);
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-group input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    .card-icon {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-secondary);
+    }
+
+    .input-wrapper {
+        position: relative;
+    }
+
+    .input-wrapper input {
+        padding-right: 50px;
+    }
+
+    .btn-pagar {
+        width: 100%;
+        padding: 16px;
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .btn-pagar:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-pagar:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .btn-pagar .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .sandbox-badge {
+        background: #fef3c7;
+        color: #92400e;
+        padding: 10px 16px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+        text-align: center;
+        margin-bottom: 24px;
+        border: 1px solid #fbbf24;
+    }
+
+    .sandbox-badge strong {
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    .message {
+        padding: 14px 16px;
+        border-radius: 10px;
+        font-size: 14px;
+        margin-top: 16px;
+        display: none;
+    }
+
+    .message.error {
+        background: #fef2f2;
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+    }
+
+    .message.success {
+        background: #f0fdf4;
+        color: #166534;
+        border: 1px solid #86efac;
+    }
+
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-size: 14px;
+        margin-bottom: 20px;
+        transition: color 0.2s;
+    }
+
+    .back-link:hover {
+        color: var(--primary);
+    }
+
+    .security-badges {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .security-badge {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--text-secondary);
+    }
+
+    /* Dark mode */
+    [data-theme="dark"] .sandbox-badge {
+        background: #78350f;
+        color: #fef3c7;
+        border-color: #92400e;
+    }
+
+    [data-theme="dark"] .message.error {
+        background: #450a0a;
+        color: #fca5a5;
+    }
+
+    [data-theme="dark"] .message.success {
+        background: #052e16;
+        color: #86efac;
+    }
+</style>
+
+<div class="pago-container">
+    <a href="@Url.Action("Index", "Billetera")" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Volver a Mi Billetera
+    </a>
+
+    <div class="pago-card">
+        <div class="pago-header">
+            <h1>Pago con Tarjeta</h1>
+            <div class="monto-badge">$@(((decimal)monto).ToString("N2"))</div>
+            <p class="saldo-actual">Saldo actual: <strong>$@(((decimal)saldoActual).ToString("N2"))</strong></p>
+        </div>
+
+        <div class="sandbox-badge">
+            <strong>MODO SIMULADO</strong>
+            Ingresa cualquier dato valido. El pago sera procesado automaticamente.
+        </div>
+
+        <form id="formPagoTarjeta">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="monto" value="@monto" />
+
+            <div class="form-group">
+                <label>Numero de Tarjeta</label>
+                <div class="input-wrapper">
+                    <input type="text" name="numeroTarjeta" id="numeroTarjeta"
+                           placeholder="1234 5678 9012 3456"
+                           maxlength="19"
+                           autocomplete="cc-number"
+                           required>
+                    <span class="card-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+                            <line x1="1" y1="10" x2="23" y2="10"/>
+                        </svg>
+                    </span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Nombre del Titular</label>
+                <input type="text" name="nombreTitular" id="nombreTitular"
+                       placeholder="JUAN PEREZ"
+                       autocomplete="cc-name"
+                       style="text-transform: uppercase;"
+                       required>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Fecha de Expiracion</label>
+                    <input type="text" name="fechaExpiracion" id="fechaExpiracion"
+                           placeholder="MM/AA"
+                           maxlength="5"
+                           autocomplete="cc-exp"
+                           required>
+                </div>
+                <div class="form-group">
+                    <label>CVV</label>
+                    <input type="text" name="cvv" id="cvv"
+                           placeholder="123"
+                           maxlength="4"
+                           autocomplete="cc-csc"
+                           required>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-pagar" id="btnPagar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                Pagar $@(((decimal)monto).ToString("N2"))
+            </button>
+        </form>
+
+        <div class="message error" id="errorMessage"></div>
+        <div class="message success" id="successMessage"></div>
+
+        <div class="security-badges">
+            <div class="security-badge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                SSL Seguro
+            </div>
+            <div class="security-badge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Datos Protegidos
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('formPagoTarjeta');
+    const btnPagar = document.getElementById('btnPagar');
+    const errorMessage = document.getElementById('errorMessage');
+    const successMessage = document.getElementById('successMessage');
+    const numeroTarjeta = document.getElementById('numeroTarjeta');
+    const fechaExpiracion = document.getElementById('fechaExpiracion');
+    const cvv = document.getElementById('cvv');
+
+    // Formatear numero de tarjeta con espacios
+    numeroTarjeta.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\s/g, '').replace(/\D/g, '');
+        let formatted = '';
+        for (let i = 0; i < value.length && i < 16; i++) {
+            if (i > 0 && i % 4 === 0) formatted += ' ';
+            formatted += value[i];
+        }
+        e.target.value = formatted;
+    });
+
+    // Formatear fecha MM/AA
+    fechaExpiracion.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, '');
+        if (value.length >= 2) {
+            value = value.substring(0, 2) + '/' + value.substring(2, 4);
+        }
+        e.target.value = value;
+    });
+
+    // Solo numeros en CVV
+    cvv.addEventListener('input', function(e) {
+        e.target.value = e.target.value.replace(/\D/g, '').substring(0, 4);
+    });
+
+    // Enviar formulario
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        // Ocultar mensajes
+        errorMessage.style.display = 'none';
+        successMessage.style.display = 'none';
+
+        // Mostrar loading
+        btnPagar.disabled = true;
+        btnPagar.innerHTML = '<div class="spinner"></div> Procesando...';
+
+        try {
+            const formData = new FormData(form);
+            const response = await fetch('@Url.Action("ProcesarPagoTarjeta", "FanBilletera")', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                successMessage.textContent = result.mensaje;
+                successMessage.style.display = 'block';
+                btnPagar.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> ¡Pago Exitoso!';
+                btnPagar.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+
+                // Redirigir después de 2 segundos
+                setTimeout(() => {
+                    window.location.href = '/Billetera';
+                }, 2000);
+            } else {
+                errorMessage.textContent = result.error || 'Error al procesar el pago';
+                errorMessage.style.display = 'block';
+                btnPagar.disabled = false;
+                btnPagar.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Pagar $@(((decimal)monto).ToString("N2"))';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            errorMessage.textContent = 'Error de conexion. Intenta de nuevo.';
+            errorMessage.style.display = 'block';
+            btnPagar.disabled = false;
+            btnPagar.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Pagar $@(((decimal)monto).ToString("N2"))';
+        }
+    });
+});
+</script>
+}
